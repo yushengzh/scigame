@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2503.11604v1\", \"citation\": \"Ivar S. Haugerud, Excitability and Oscillations of Active Droplets, Physical Review Letters (2026), DOI:10.1103/g9dh-ymx9\", \"journal_doi\": \"10.1103/g9dh-ymx9\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main.tex =====\nL000002\t\\documentclass[twocolumn,aps,prd,reprint,nofootinbib,url = false,longbibliography,superscriptaddress,en]{revtex4-2}\nL000003\t\\usepackage[utf8]{inputenc}\nL000004\t\nL000005\t\\usepackage[english]{babel}\nL000006\t\\usepackage{amssymb}\nL000007\t\\usepackage{amsmath}\nL000008\t\\usepackage{comment}\nL000009\t\\usepackage{lipsum}\nL000010\t\\usepackage{bm}\nL000011\t\\usepackage{booktabs}\nL000012\t\nL000013\t\\usepackage{mhchem}\nL000014\t\nL000015\t\nL000016\t\\usepackage{mathtools}\nL000017\t\\usepackage[final]{graphicx}\nL000018\t\nL000019\t\\usepackage[labelformat=simple,subrefformat=parens,labelformat=parens]{subfig}\nL000020\t\\usepackage{floatrow}\nL000021\t\\floatsetup[figure]{style=plain,subcapbesideposition=top}\nL000022\t\nL000023\t\\usepackage{caption}\nL000024\t\\captionsetup{justification=Justified,font=small,singlelinecheck=false}\nL000025\t\\bibliographystyle{apsrev4-1}\nL000026\t\nL000027\t\\newcommand{\\RN}[1]{\nL000028\t  \\textup{\\uppercase\\expandafter{\\romannumeral#1}}\nL000029\t}\nL000030\t\nL000031\t\nL000032\t\\newcommand{\\ish}[1]{\\textcolor{blue}{Ivar: #1}}\nL000033\t\\newcommand{\\cw}[1]{\\textcolor{red}{Chris: #1}}\nL000034\t\nL000035\t\\newcommand{\\com}[1]{\\textcolor{red}{ #1}}\nL000036\t\nL000037\t\\newcommand{\\hv}[1]{\\textcolor{green}{Hidde: #1}}\nL000038\t\nL000039\t\nL000040\t\\usepackage[usenames, dvipsnames]{color}\nL000041\t\nL000042\t\\definecolor{myred1}{RGB}{255, 0, 0}\nL000043\t\\definecolor{myyellow1}{RGB}{255, 255, 219}\nL000044\t\\definecolor{mygreen1}{RGB}{0, 255, 0}\nL000045\t\\definecolor{mygreen2}{RGB}{0, 126, 0}\nL000046\t\\definecolor{myblue1}{RGB}{0, 0, 255}\nL000047\t\\usepackage{physics}\nL000048\t\nL000049\t\nL000050\t\\begin{document}\nL000051\t\\title{\nL000052\t\nL000053\tExcitability\nL000054\tand oscillations\nL000055\t\nL000056\tof active droplets\nL000057\t}\nL000058\t\nL000059\t\nL000060\t\nL000061\t\\author{Ivar S. Haugerud}\nL000062\t\\affiliation{\nL000063\t Faculty of Mathematics, Natural Sciences, and Materials Engineering: Institute of Physics, University of Augsburg, Universit\\\"atsstra\\ss e~1, 86159 Augsburg, Germany\nL000064\t}\nL000065\t\nL000066\t\nL000067\t\\author{Hidde D. Vuijk}\nL000068\t\\affiliation{\nL000069\t Faculty of Mathematics, Natural Sciences, and Materials Engineering: Institute of Physics, University of Augsburg, Universit\\\"atsstra\\ss e~1, 86159 Augsburg, Germany\nL000070\t}\nL000071\t\nL000072\t\nL000073\t\\author{Job Boekhoven}\nL000074\t\nL000075\t\\affiliation{School of Natural Sciences, Department of Bioscience, Technical University of Munich, Lichtenbergstraße 4, 85748 Garching, Germany}\nL000076\t\nL000077\t\nL000078\t\\author{Christoph A. Weber}\nL000079\t\nL000080\t\\affiliation{\nL000081\t Faculty of Mathematics, Natural Sciences, and Materials Engineering: Institute of Physics, University of Augsburg, Universit\\\"atsstra\\ss e~1, 86159 Augsburg, Germany\nL000082\t}\nL000083\t\\date{\\today}\nL000084\t\nL000085\t\nL000086\t\nL000087\t\nL000088\t\\begin{abstract}\nL000089\tIn living cells, cycles of\nL000090\tformation and dissolution of liquid droplets can mediate biological functions such as DNA repair.\nL000091\tHowever, the minimal physicochemical prerequisite for such droplet oscillations remains elusive.\nL000092\tHere, we present a simple model composed of only two independent chemical components with their diffusive and chemical fluxes\nL000093\tgoverned by non-equilibrium thermodynamics.\nL000094\tThere is turnover of fuel that maintains a chemical reaction away from equilibrium, leading to active droplets.\nL000095\tWe find that a single active droplet undergoes a pitchfork-bifurcation in the droplet volume upon increasing the fueling strength.\nL000096\tStrikingly, the active droplet becomes excitable upon adding a further chemical reaction.\nL000097\tFor sufficient fueling, the system undergoes self-sustained oscillations cycling between droplet formation and dissolution.\nL000098\t\nL000099\tThe minimal nature of our model suggests\nL000100\tself-sustained active droplets as functional modules for \\textit{de novo} life.\nL000101\t\\end{abstract}\nL000102\t\\maketitle\nL000103\t\nL000104\t\\textit{Introduction:}\nL000105\tOscillations of concentrations are fundamental to numerous biological processes, including the circadian rhythm~\\cite{zehringPelementTransformationPeriod1984,bargielloRestorationCircadianBehavioural1984} and the cell cycle~\\cite{dunlapMolecularBasesCircadian1999,goldbeterBiochemicalOscillationsCellular1996}. Extensive experimental and theoretical work has revealed the underlying mechanism of oscillating chemical reactions, such as the Briggs–Rauscher reaction~\\cite{brayPERIODICREACTIONHOMOGENEOUS1921,zhabotinskyHistoryChemicalOscillations1991}, the Belousov–Zhabotinsky reaction~\\cite{pechenkinBelousovHisReaction2009,belousovPeriodicReactionIts1958}, and the Brusselator~\\cite{prigogineSymmetryBreakingInstabilitiesDissipative1967,prigogineSymmetryBreakingInstabilities1968}. The oscillations emerge as a consequence of non-linearities in the chemical kinetic equations giving rise to an unstable region in phase space through a Hopf-bifurcation~\\cite{marsdenHopfBifurcationIts2012,caraballoStochasticpitchforkBifurcation2001}. Such non-linearities can further lead to excitable concentration fronts and pulses that propagate, as well as stationary Turing patterns~\\cite{cross1993pattern,turingChemicalBasisMorphogenesis1997,epsteinNonlinearChemicalDynamics1996,novakDesignPrinciplesBiochemical2008, halatekRethinkingPatternFormation2018}.\nL000106\t\nL000107\tAn alternative mechanism for spatial patterns in chemically active systems is through phase separation of liquid condensates~\\cite{sodingMechanismsActiveRegulation2020,folkmannRegulationBiomolecularCondensates2021,hymanLiquidLiquidPhaseSeparation2014c,bananiBiomolecularCondensatesOrganizers2017}. The patterns not necessarily originate from non-linearities in the chemical kinetics but from thermodynamic interactions between the components~\\cite{weberPhysicsActiveEmulsions2019d,luo2023influence,menou2023physical}. When the chemical reactions break detailed balance of the rates, the system is maintained away from equilibrium, making the droplets active~\\cite{riess2020design,zwickerChemicallyActiveDroplets2024,weberPhysicsActiveEmulsions2019d}. Active droplets can behave fundamentally different from their equilibrium counterpart, exhibiting properties such as droplet  division~\\cite{zwickerGrowthDivisionActive2017b},\nL000108\taccelerated ripening~\\cite{tena2021accelerated},\nL000109\tsize control~\\cite{wurtzChemicalReactionControlledPhaseSeparated2018,zwickerGrowthDivisionActive2017b,zwickerSuppressionOstwaldRipening2015},\nL000110\tshell-formation~\\cite{bergmannLiquidSphericalShells2023d}, and various other spatial morphologies and patterns~\\cite{bartolucciControllingCompositionCoexisting2021d,bauermannCriticalTransitionIntensive2024}.\nL000111\t\nL000112\t\nL000113\tOscillating chemical reactions rely on the precise spatial and temporal regulation of chemical processes -- a property that can be provided by biomolecular condensates~\\cite{wurtzChemicalReactionControlledPhaseSeparated2018,hymanLiquidLiquidPhaseSeparation2014c,bananiBiomolecularCondensatesOrganizers2017}. A key question is whether liquid condensates could not only regulate the chemical processes to enhance the stability of oscillating chemical reactions~\\cite{smokersPhaseSeparatedDropletsCan2025}, but create the oscillations themselves. Cyclic reaction networks coupled to the liquid condensate could lead to oscillations in concentrations and even of the droplet. Such a mechanism is of biological relevance, as cycles of formation and dissolution of active biomolecular condensates  have been shown to facilitate DNA repair~\\cite{hsiehPlausibleRobustBiological2024,heltbergEnhancedDNARepair2022,heltbergCoupledOscillatorCooperativity2023}.\nL000114\t\nL000115\tOur work presents a minimal theoretical model to achieve self-sustained oscillation of condensates; see Fig.~\\ref{fig:1}. The oscillations do not emerge due to a complex non-linear reaction network but through the combination of minimalistic chemistry away from equilibrium and the thermodynamics of phase separation, leading to an active droplet. We show that a pitchfork bifurcation in the droplet volume emerges as active droplets are driven far away from equilibrium, making them bistable. With the addition of a second reaction that breaks the conservation law of the first chemical reaction, the droplets behave as an excitable medium, exhibiting both wave propagation with a refractory period and emergent self-sustained oscillations.\nL000116\t\nL000117\t\nL000118\t\nL000119\t\\begin{figure}\nL000120\t    \\centering\nL000121\t    \\makebox[\\textwidth][c]{{\\includegraphics[width=\\textwidth]{final_figures/fig1.pdf}}}\nL000122\t     \\caption{\nL000123\t     \\textbf{Formation and dissolution of active droplets:} (a) Chemically active droplets break detailed balance of the rates through the turnover of a fuel of strength $\\delta$. This turnover drives the reaction of component $A$ to $B$ in the dense phase (II), while in the dilute phase (I), there is no fuel, and the pathway from $B$ to $A$ dominates (Eq.~\\eqref{eq:r_1_pathway}). We find that for a large enough fuel strength $\\delta$, a pitchfork bifurcation in droplet volumes occurs.\nL000124\t     (b) Upon adding a further chemical reaction (Eq.~\\eqref{eq:r_2_pathway}) that breaks the conservation of $A$ and $B$, makes the active droplet excitable and capable of self-sustained cycles of formation (1) and dissolution (4).\nL000125\t     }\nL000126\t     \\label{fig:1}\nL000127\t\\end{figure}\nL000128\t\nL000129\t\nL000130\t\\begin{figure*}\nL000131\t    \\centering\nL000132\t     \\makebox[\\textwidth][c]{\nL000133\t\\includegraphics[width=\\textwidth]{final_figures/panel2.pdf}}\nL000134\t     \\caption{\nL000135\t     \\textbf{Pitchfork bifurcation to an active droplet:}\nL000136\t\nL000137\t     (a) Upon increasing the fuel strength $\\delta$, the reaction nullcline (Eq.~\\eqref{eq:NESS}) for reaction $r_1$ (Eq.~\\eqref{eq:r_1_pathway}) in the phase-separated domain (gray shaded) bends, leading to three non-equilibrium steady states (NESS) for a fixed conservation line $\\bar{\\psi}=\\bar{\\phi}_A+\\bar{\\phi}_B$; closed symbols are stable and open symbols unstable fixed points.\nL000138\t\nL000139\t     (b) The net reaction rate along the conservation line only has multiple steady states for sufficiently large fuel strength $\\delta/(k_BT)$, where the center point is unstable.\nL000140\t\nL000141\t     (c) The multiple steady points arise from a pitchfork bifurcation in droplet volume upon a critical fuel strength $\\delta^*$ (vertical dotted line). Above this threshold value  $\\delta^*$, there are three NESS' where two are locally stable (bistability).\nL000142\t\nL000143\t     (d)\nL000144\t      At fixed fuel strength,\nL000145\t     The occurrence of the bifurcation depends on the value of quantity $\\bar{\\psi}$ conserved by reaction~\\eqref{eq:r_1_pathway}. There is a range of  $\\bar{\\psi}$-values (vertical dotted lines), where the system is bistable.\nL000146\t\nL000147\t     (e)\nL000148\t     Bistability is only possible within a range of $\\bar{\\psi}$ values that grow with fuel strength $\\delta$. The analytical approximation for the critical fuel strength $\\delta^*$ from Eq.~\\eqref{eq:full_delta*} agrees well for fuel strength $\\delta$ close to the onset of bistability.}\nL000149\t     \\label{fig:2}\nL000150\t\\end{figure*}\nL000151\t\nL000152\t\\textit{Theory of active droplets:}\nL000153\tThe evolution of volume fractions $\\phi_i(\\bm{x}, t)$ in space $\\bm{x}$ and time $t$ are governed by diffusive fluxes $\\bm{j}_i$ and reaction rates $r_i$ of component $i$ with the corresponding continuous equations~\\cite{julicherDropletPhysicsIntracellular2024, bauermannEnergyMatterSupply2022d,weberPhysicsActiveEmulsions2019d}:\nL000154\t\\begin{equation}   \\partial_t\\phi_i(\\bm{x}, t) =  -\\nabla \\cdot \\bm{j}_i + r_i\\,  .\\label{eq:phi_dot}\nL000155\t\\end{equation}\nL000156\tWe investigate a minimalistic ternary system $(i=A,B,C)$ initially limited to a single reversible uni-molecular chemical reaction between $A$ and $B$,\nL000157\t\\begin{equation}\nL000158\tr_1: \\quad \\ce{A <=>>[$k_1\\exp{\\tilde{\\delta}/(k_BT)}$][$k_1$]B} \\, ,\\label{eq:r_1_pathway}\nL000159\t\\end{equation}\nL000160\twhere the net reaction rate $r_B=-r_A= r_1$ and $k_1$ is the reaction rate coefficient. The reaction rates are governed by the chemical potentials $\\mu_i$~\\cite{adame-aranaLiquidPhaseSeparation2020a,bauermannChemicalKineticsMass2022d}\nL000161\t(see Appendix~\\ref{seq:free_energy_and_chempot}),\nL000162\t\\begin{equation}\nL000163\t    r_1 = k_1\\left[ \\exp{\\frac{\\mu_A + \\tilde{\\delta}(\\phi_A, \\phi_B)}{k_BT}} - \\exp{\\frac{\\mu_B}{k_BT}} \\right]\\, , \\label{eq:r}\nL000164\t\\end{equation}\nL000165\twhere $k_BT$ is the thermal energy. Moreover, $\\tilde{\\delta}(\\phi_A,\\phi_B)$ captures the effects of a composition-dependent fuel~\\cite{boekhovenDissipativeSelfAssemblyMolecular2010,boekhovenTransientAssemblyActive2015} that enhances the forward reaction pathway, where $\\exp\\{ \\tilde \\delta/(k_BT)\\}$ can be understood as a chemostatted fuel activity; see Appendix~\\ref{sec:fuel} for further discussions.\nL000166\tA non-vanishing $\\tilde{\\delta}(\\phi_A,\\phi_B)$ breaks detailed balance of the rates, $r_1^\\rightharpoonup/r_1^\\leftharpoondown = \\exp\\{(\\Delta\\mu + \\tilde{\\delta})/(k_BT)\\}$, where $\\Delta\\mu=\\mu_A-\\mu_B$ characterizes how far the system is away from chemical equilibrium~\\cite{julicherModelingMolecularMotors1997b,weberPhysicsActiveEmulsions2019d}.\nL000167\t\nL000168\t\nL000169\tAccording to Eq.~\\eqref{eq:phi_dot}, the volume fraction fields $\\phi_i$ further evolve due to chemical potential gradients in space, leading to diffusive fluxes. In linear response,\nL000170\tdiffusive fluxes read $\\bm{j}_i = -\\Lambda_i\\nabla \\mu_i$,\nL000171\twhere $\\Lambda_i$ are the mobility coefficients~\\cite{de2013non}.\nL000172\t\nL000173\tFor sufficiently strong interactions between the components, the system can phase-separate, creating  stable inhomogeneous volume-fraction profiles.\nL000174\t\nL000175\tThe dynamic Eqs.~\\eqref{eq:phi_dot} governing phase separation simplify~\\cite{bauermannChemicalKineticsMass2022d} when the diffusive exchange rate between phases is much faster than the reaction rate coefficient, $k_1 \\ll \\Lambda_ik_BT/L^2$, where $L$ is the system size and $\\sqrt{\\Lambda_ik_BT/k_1}$ is the corresponding reaction-diffusion length scale.\nL000176\t\nL000177\tIn this limit, the two phases $(\\RN{1},\\,\\RN{2})$ satisfy the conditions of phase equilibrium at all times:\nL000178\t\\begin{equation}\nL000179\t    \\mu_i^\\RN{1} = \\mu_i^\\RN{2}\\,. \\label{eq:phase_coex}\nL000180\t\\end{equation} Furthermore, each phase is homogeneous in composition with different volume fractions in each phase $(\\phi_i^\\RN{1},\\phi_i^\\RN{2})$ with corresponding phase volumes $V^\\RN{1}$ and $V^{\\RN{2}}=V-V^\\RN{1}$. This leads to the simplified  dynamic equations at phase equilibrium~\\cite{bauermannChemicalKineticsMass2022d}:\nL000181\t\\begin{subequations}\nL000182\t\\label{eq:kinetic_evolve}\nL000183\t\\begin{align}\nL000184\t    \\dv{\\phi_i^{\\RN{1}/\\RN{2}}}{t} &= r_i^{\\RN{1}/\\RN{2}} - j^{\\RN{1}/\\RN{2}}_i - \\phi_i^{\\RN{1}/\\RN{2}}\\frac{\\dot{V}^{\\RN{1}/\\RN{2}}}{V^{\\RN{1}/\\RN{2}}} \\, , \\label{eq:phi_dot_fast_diff}\\\\\nL000185\t    \\frac{\\dot{V}^{\\RN{1}/\\RN{2}}}{V^{\\RN{1}/\\RN{2}}} &= \\sum_{k=A,B,C} \\left( r_k^{\\RN{1}/\\RN{2}} - j_k^{\\RN{1}/\\RN{2}} \\right)\\, , \\label{eq:vol_change}\nL000186\t\\end{align}\nL000187\t\\end{subequations}\nL000188\twhere $i=A,B$, and the diffusive flux $j_i^{\\RN{1}/\\RN{2}}$ is set to ensure the conditions of phase coexistence (Eq.~\\eqref{eq:phase_coex}), see Appendix~\\ref{seq:SJ_method} for a derivation. Phase-averaged quantities are denoted by a bar, which, for an arbitrary quantity $X$ at phase equilibrium, is\nL000189\t\\begin{equation}\nL000190\t    \\bar{X} \\equiv \\frac{V^\\RN{1}X^\\RN{1} + V^\\RN{2}X^\\RN{2}}{V^\\RN{1} + V^\\RN{2}}\\,. \\label{eq:phase_avg}\nL000191\t\\end{equation}\nL000192\tFor a ternary system with chemical reaction 1 (Eq.~\\eqref{eq:r_1_pathway}), a natural choice of quantities is the phase-averaged total volume fraction $\\bar{\\psi}$, which is conserved during reaction 1, and the phase-averaged reaction extent $\\bar{\\xi}$,\nL000193\t\\begin{equation}\nL000194\t    \\bar{\\psi} \\equiv \\frac{\\bar{\\phi}_A+\\bar{\\phi}_B}{2}\\,,\\qquad \\qquad\\quad  \\bar{\\xi} \\equiv \\frac{\\bar{\\phi}_B-\\bar{\\phi}_A}{2}\\,.\\label{eq:tot_vol_frac}\nL000195\t\\end{equation}\nL000196\tWith this choice of quantities, Eqs.~\\eqref{eq:kinetic_evolve} become\nL000197\t\\begin{equation}\nL000198\t\\label{eq:dt_xi_bar}\nL000199\t \\text{d}_t\\bar{\\psi}=0\\,,\\quad\\qquad\\qquad \\text{d}_t\\bar{\\xi}=\\bar{r}_1   \\,.\nL000200\t\\end{equation}\nL000201\tSteady states, which corresponds to $\\bar{r}_1=0$, defines the reaction nullcline of $r_1$:\nL000202\t\\begin{equation}\nL000203\t    \\label{eq:nullcline_condtion}\nL000204\t V^\\RN{1}\\,r^\\RN{1}_1 = V^\\RN{2}\\,r^\\RN{2}_1\\, .\nL000205\t\\end{equation}\nL000206\t\nL000207\tFor reactions obeying detailed balance of the rates ($\\tilde \\delta=0$), the nullcline is the tie-line of the binodal, making it independent of the phase volumes ($V^\\RN{1}$ and $V^\\RN{2}$). For chemical reactions that break the detailed balance of the rates, the nullcline for phase-separated systems depends on the phase volumes. To maintain the system away from equilibrium,\nL000208\twe consider\nL000209\t\\begin{equation}\nL000210\t\\label{eq:delta_tilde}\nL000211\t\\tilde{\\delta}(\\psi) = \\frac{\\delta}{\\pi}\\left[\\frac{\\pi}{2} + \\tanh{\\left(\\frac{\\psi-\\psi_{1/2}}{\\kappa}\\right)}\\right]\nL000212\t\\, ,\nL000213\t\\end{equation}\nL000214\twhere\nL000215\t$\\delta\\geq 0$ is the fuel strength that enhances turnover from $A$ to $B$. For $\\delta=0$, the system can settle to thermodynamic equilibrium.\nL000216\t\nL000217\tThe parameter $\\kappa\\ll 1$\nL000218\tsets the range of $\\psi$-values around $\\psi_{1/2}$ where the transition from non-fueled to the fueled case occurs.\nL000219\tFor $\\psi_{1/2}$ inside the binodal, the dilute phase is  approximately unfueled, while the dense phase is   fueled  ($\\tilde{\\delta}^\\RN{1}\\simeq 0$, $\\tilde{\\delta}^\\RN{2}\\simeq \\delta$), resulting in a volume-dependent reaction nullcline when phase-separated.\nL000220\tThe phase-dependent fueling gives rise to non-equilibrium steady states (NESS) with continuous chemical turnover in both phases, balanced by diffusive fluxes across the phase boundary, see Fig.~\\ref{fig:1}(a). For the fueling described by Eq.~\\eqref{eq:delta_tilde}, the component $B$ is produced in the dense phase (large $\\psi$) and diffuses to the dilute phase (small $\\psi$), reacting to $A$ before diffusing back to the droplet.\nL000221\tEq.~\\eqref{eq:nullcline_condtion}\nL000222\tdictates a corresponding steady state droplet volume\nL000223\t\\begin{equation}\nL000224\t    \\frac{V^\\RN{2}}{V} = \\frac{k_1^\\RN{1}\\left[e^{\\frac{\\Delta\\mu+\\delta^\\RN{1}}{k_BT}} - 1 \\right]}{k_1^\\RN{2}\\left[e^{\\frac{\\Delta\\mu+\\delta^\\RN{2}}{k_BT}} - 1\\right] -  k_1^\\RN{1}\\left[e^{\\frac{\\Delta\\mu+\\delta^\\RN{1}}{k_BT}} - 1 \\right] } \\, ,  \\label{eq:NESS}\nL000225\t\\end{equation}\nL000226\twhere $\\delta^\\text{I/II}=\\tilde{\\delta}(\\psi^\\text{I/II})$ and $k_1^\\text{I/II}$ denote the phase dependent reaction rate coefficients of reaction 1 (Eq.~\\eqref{eq:r_1_pathway}).\nL000227\tUnless stated otherwise, we solve Eqs.~\\eqref{eq:kinetic_evolve} numerically.\nL000228\t\nL000229\tFor information about the parameters used and numerical implementation, see Appendix~\\ref{seq:parameters_used}.\nL000230\t\nL000231\t\nL000232\t\\textit{Pitchfork bifurcation to an active droplet:}\nL000233\tWithout fuel ($\\delta=0$), the steady state of the system is homogeneous, corresponding to thermodynamic equilibrium.\nL000234\tUpon increasing the fuel strength\nL000235\t$\\delta$, active droplets emerge as non-equilibrium steady states that are locally stable.\nL000236\tTheir emergence requires a large enough fueling, bending the reaction nullcline strong enough (Fig.~\\ref{fig:2}(a,b)) and thereby creating multiple intersections with the same conserved line of constant total volume fraction $\\bar{\\psi}$.\nL000237\tWe note that the homogeneous steady state remains stable as $\\delta$ is increased and a locally stable active droplet is created. Thus, the system becomes bistable with two locally stable steady states.\nL000238\t\nL000239\tBistability between an active droplet state and a homogeneous state emerges  through a pitchfork bifurcation at which the steady droplet volume $V^\\RN{2}$ jumps from zero to a finite value;\nL000240\tsee Fig.~\\ref{fig:2}(c).\nL000241\tThe bifurcation occurs at a critical fuel strength $\\delta^*$. An approximate expression for the critical fuel strength is given as (see Appendix~\\ref{sec:analytics} for the derivation)\nL000242\t\\begin{equation}\nL000243\t    \\delta^* \\simeq k_BT \\log{\\left( 1 + \\frac{k^\\RN{1}_1}{k^\\RN{2}_1}\\Theta \\right) } \\, , \\label{eq:ana_deltastar}\nL000244\t\\end{equation}\nL000245\twhere $\\Theta$ depends solely on thermodynamic parameters (see Eq.~\\eqref{eq:crit_interactions}). We see that the bifurcation is favored when the reactions are faster in the dense phase compared to the dilute phase ($k^\\RN{2}_1 > k^\\RN{1}_1$).\nL000246\tMoreover, the prerequisite for the bifurcation ($\\Theta>0$) sets a restriction to certain phase diagram types.\nL000247\tFor example, the bifurcation can occur when the\nL000248\t product $B$ of the fueled reaction  is\nL000249\tless soluble than its precursor $A$, for which $\\Theta>0$.\nL000250\tFurthermore, $\\Theta$ never approaches zero implying that fuel is always necessary ($\\delta>0$) for the emergence of bistability.\nL000251\t\nL000252\t\nL000253\t\nL000254\tWe further find that bistability is only possible\nL000255\tin a range of total volume fractions\nL000256\t$\\bar{\\psi}$-values and this range increases with fuel strength $\\delta$ (orange domain in Fig.~\\ref{fig:2}(d,e)).\nL000257\tThe analytic expression for the critical fuel strength $\\delta^*$ given in Eq.~\\eqref{eq:ana_deltastar} agrees well with the complete numerical solution close to the active droplet domain in Fig.~\\ref{fig:2}(e).\nL000258\tAs the total volume fraction $\\bar{\\psi}$ enters the binodal for a fixed fuel strength $\\delta>\\delta^*$, a jump occurs in both phase volume and average composition (Fig.~\\ref{fig:2}(d)), unlike the case for $\\delta < \\delta^*$.\nL000259\t\nL000260\tThe onset of bistability can be understood through a normal form obtained from Taylor expanding the dynamic Eq.~\\eqref{eq:dt_xi_bar} for the reaction extent $\\bar{\\xi}$. By expanding the phase-separated and homogeneous case separately, at the points $(\\bar{\\xi}_0,\\bar{\\psi}_0)$ and $(\\bar{\\xi}_2,\\bar{\\psi}_0)$ respectively, we find (derivation see Appendix~\\ref{sec:effective_bistab}),\nL000261\t\\begin{equation}\nL000262\t   \\partial_t\\bar{\\xi} \\simeq\nL000263\t\\begin{cases}\nL000264\t-\\left(\\bar{\\xi} - \\bar{\\xi}_0\\right)h_1,\\qquad\\qquad\\qquad\\,\\,\\,\\quad \\,\\bar{\\xi} \\leq \\xi^\\RN{1},\\\\\nL000265\t \\bar{r}_1(\\bar{\\xi}_2, \\bar{\\psi}_0) - \\left(\\bar{\\xi} - \\bar{\\xi}_2\\right)^2\\,h_2\\quad\\qquad \\bar{\\xi} > \\xi^\\RN{1}\\,,\\label{eq:effective_equations}\nL000266\t\\end{cases}\nL000267\t\\end{equation}\nL000268\twith the coefficients $h_1$ and $h_2$ given in Eq.~\\eqref{eq:h_1} and \\eqref{eq:h_2} respectively, $\\bar{r}_1$ is the phase-averaged reaction rate evaluated at the phase-separated expansion point, and $\\xi^\\RN{1}$ is the reaction extent at the dilute branch of the binodal for the given $\\bar{\\psi}_0$. As seen in Fig.~\\ref{fig:2}(b), for homogeneous values of the reaction extent ($\\bar{\\xi}\\leq\\xi^\\RN{1}$), the reaction rate is linear and stable ($h_1>0$) around its steady point $\\bar{\\xi}_0$. For phase-separated values of the reaction extent ($\\bar{\\xi}>\\xi^\\RN{1}$), a second-order expansion is necessary to capture the behaviour for strong fueling $\\delta$.\nL000269\tSince the normal form in the phase-separated domain corresponds to a concave parabola ($h_2>0$), the requirement for bistability is a positive offset value  at the expansion point:\nL000270\t\\begin{equation}\nL000271\t    \\bar{r}_1 = r^\\rightharpoonup_1\\left(\\overline{\\exp{\\frac{\\delta}{k_BT}} - \\exp{-\\frac{\\Delta \\mu}{k_BT}}}\\right) >0\nL000272\t    \\, .\nL000273\t    \\label{eq:r_bar_rewrite}\nL000274\t\\end{equation}\nL000275\tThis equation shows that the pitchfork bifurcation occurs when the thermodynamic force $(\\Delta \\mu)$ is dominated by  the non-equilibrium driving $(\\delta)$.\nL000276\tThe bar denotes a phase average (Eq.~\\eqref{eq:phase_avg}).\nL000277\tWe note that for $\\bar{\\psi}_0$ values with a homogeneous steady point, the chemical potential difference is negative when phase separated ($\\Delta\\mu<0$).\nL000278\t\nL000279\t\nL000280\t\nL000281\t\nL000282\t\nL000283\t\nL000284\t\nL000285\t\nL000286\t\\begin{figure}[tb]\nL000287\t    \\centering\nL000288\t      \\makebox[\\textwidth][c]{\nL000289\t      \\includegraphics[width=\\textwidth]{final_figures/Figg3.pdf}}\nL000290\t     \\caption{\nL000291\t     \\textbf{Excitable active droplet:}\nL000292\t     When considering two chemical reactions, reaction $r_1$ (Eq.~\\eqref{eq:r_1_pathway}) and reaction $r_2$  (Eq.~\\eqref{eq:r_2_pathway}), the active droplet system becomes excitable.\nL000293\t     A compositional perturbation (blue pentagon)  can excite the system. As a result, the system follows an extended trajectory (orange)  with  changes in average composition far beyond the initial  perturbation.\nL000294\t     During this excited trajectory, the system has a refractory period when it is no longer excitable. It relaxes back to the NESS, where the reaction nullclines for both reactions intersect (green and red lines).\nL000295\t     The active droplet system can  be considered as bistable excitable media.\nL000296\t\nL000297\t     }\nL000298\t     \\label{fig:3}\nL000299\t\\end{figure}\nL000300\t\nL000301\t\\begin{figure*}[tb]\nL000302\t    \\centering\nL000303\t    \\makebox[\\textwidth][c]{\nL000304\t    \\includegraphics[width=\\textwidth]{final_figures/panel4.pdf}}\nL000305\t     \\caption{\nL000306\t     \\textbf{Self-sustained cycles of droplet formation and dissolution:}\nL000307\t\nL000308\t     (a)\nL000309\t    For cases where the intersection between the two reaction nullclines (green and red lines) occurs for unstable droplet volumes (white dot), it cannot concomitantly satisfy its two steady-state conditions.\nL000310\t     The result is self-sustained oscillations of an active droplet cycling between formation and dissolution.\nL000311\t\nL000312\t      (b) The droplet continuously forms and dissolves in time. When nucleated at the same position,\nL000313\t      droplet formation and dissolution correspond to  a standing wave.\nL000314\t\nL000315\t      (c) The cycle frequency $\\Omega$ is weakly affected by the fuel strength $\\delta$. However,\nL000316\t      the cyclic trajectories in phase space (inset) are significantly bigger, indicating that the compositional changes are much more pronounced.\nL000317\t      The cycle frequency follows a power-law with the reaction rate coefficient $k_2$, $\\Omega \\propto k_2$, due to the fuel making $r_1$ relax much faster than $r_2$ upon formation and dissolution.\nL000318\t\nL000319\t      (d, e) We confirm active droplets' formation and dissolution cycles by solving the continuum equation for the volume fraction fields (Eq.~\\eqref{eq:phi_dot}).\nL000320\t      We find a good agreement of the phase space trajectory of the spatially averaged volume fractions for phase equilibrium theory (Eq.~\\eqref{eq:kinetic_evolve}), where the main discrepancy originates from the droplet's nucleation time. An animation corresponding to panel (d) is included in the Supplementary Information.}\nL000321\t     \\label{fig:4}\nL000322\t\\end{figure*}\nL000323\t\nL000324\t\\textit{Excitable active droplet:} Excitable systems can lead to wave propagation upon a perturbation, followed by  a refractory period in which the system is no longer~\\cite{cross1993pattern, turingChemicalBasisMorphogenesis1997,epsteinNonlinearChemicalDynamics1996, cross2009pattern}. Here, we show that the bistable system discussed in the previous paragraph becomes excitable upon adding a second reaction $r_2$  that allows the otherwise conserved quantity $\\bar{\\psi}$ to change in time,\nL000325\t\\begin{equation}\nL000326\tr_2: \\quad \\text{A} + \\text{B} \\ce{<=>[$k_2$]} 2\\text{C} \\,. \\label{eq:r_2}\nL000327\t\\end{equation}\nL000328\tThe reaction obeys detailed balance of the rates\nL000329\t\\begin{equation}\nL000330\t\\label{eq:r_2_pathway}\nL000331\t    r_2=k_2\\left( \\exp{\\frac{2\\mu_C}{k_BT}} - \\exp{\\frac{\\mu_A+\\mu_B}{k_BT}}\\right)\\, .\nL000332\t\\end{equation}\nL000333\tThus, the net reaction rates $r_i$ in Eq.~\\eqref{eq:phi_dot} and Eqs.~\\eqref{eq:kinetic_evolve} is $r_A=r_2-r_1$ and $r_B=r_2+r_1$.\nL000334\tThe dynamics of the average reaction extent and the total volume fraction (Eq.~\\eqref{eq:tot_vol_frac}) becomes\nL000335\t\\begin{equation}\nL000336\t\\label{eq:barxi_barpsi_1_2}\nL000337\t\\partial_t\\bar{\\xi}=\\bar{r}_1\\, ,\\qquad\\quad\\partial_t\\bar{\\psi}=\\bar{r}_2\\,.\nL000338\t\\end{equation}\nL000339\t\nL000340\tFor a bistable droplet ($\\delta>\\delta^*$, Eq.~\\eqref{eq:ana_deltastar}), we find that a compositional perturbation which destabilizes the droplet, resulting in an excited trajectory in the phase diagram (Fig.~\\ref{fig:3}).\nL000341\t\nL000342\tSuch a perturbation leads to the dissolution of the droplet. Once dissolved, the reactions drive the average composition into the binodal, nucleating an active droplet, and returning the system to its initial non-equilibrium steady state. Along its excited trajectory, the system exhibits a refractory period when it is no longer excitable. The resulting evolution of the droplet volume in time is reminiscent of a wave pulse. Alternatively, bistable systems at a homogeneous steady state can be excited upon a perturbation that nucleates an active droplet; see Appendix~\\ref{sec:excited_homo} for further discussions.\nL000343\t\nL000344\t\nL000345\t\nL000346\t\nL000347\t\nL000348\t\nL000349\t\nL000350\t\\textit{Oscillating active droplet:}\nL000351\tWhen the excitable fixed point becomes unstable, the excitable system undergoes cycles of formation and dissolution of the active droplet.\nL000352\tGraphically speaking, destabilization corresponds to\nL000353\tboth nullclines of $r_1$ and $r_2$ intersect inside the phase-separated domain of the phase diagram.\nL000354\tAs a result, a tiny droplet grows because the phase-dependent fueling  favors the turnover from $A$ to $B$,  increasing its volume (Fig.~\\ref{fig:4}(b)). These compositional changes make the second net reaction rate $\\bar{r}_2$ flip sign, decreasing the total volume fraction $\\bar{\\psi}$. This reduction in $\\bar{\\psi}$ lowers the droplet volume until crossing the unstable branch of the pitchfork bifurcation (Fig.~\\ref{fig:2}(c,d), dashed lines).\nL000355\tConsequently, the droplet dissolves, and the effect of fueling approximately disappears.\nL000356\tThe lack of fuel reverts the direction of the net reaction rate $\\bar{r}_1$, converting now $B$ back to $A$, leading to a flipped sign of $\\bar{r}_2$.\nL000357\tA droplet nucleates, reaching its initial state. The cycle of formation and dissolution of the active droplet continues indefinitely.\nL000358\t\nL000359\t\nL000360\tThe transitions between an excitable system (Fig.~\\ref{fig:3} and a system with oscillations of an active droplet (Fig.~\\ref{fig:4}(a)) occur through a Hopf bifurcation~\\cite{cross1993pattern, marsdenHopfBifurcationIts2012,caraballoStochasticpitchforkBifurcation2001, cross2009pattern}. At the Hopf bifurcation, eigenvalues of the linearization around the fixed point become imaginary.\nL000361\t\nL000362\tThe transition to oscillations can, for example, be triggered by changing the reference chemical potential of component $C$, as defined in Eq.~\\eqref{eq:decomp_chempot}, or by extending the unstable domain of $r_1$ by increasing the fuel strength $\\delta$.\nL000363\t\nL000364\tThe Hopf bifurcation can be understood through the system's\nL000365\tnormal form (Eqs.~\\eqref{eq:barxi_barpsi_1_2}).\nL000366\tIt is obtained by performing a Taylor expansion on both sides of the binodal (see Appendix~\\ref{sec:effective_active} for the derivation), yielding\nL000367\t\\begin{subequations}  \\label{eq:effective_active}\nL000368\t\\begin{align}\nL000369\t\\partial_t\\bar{\\psi} &\\simeq -\\left(\\bar{\\xi}-\\bar{\\xi}_1\\right)f_\\xi - \\left(\\bar{\\psi} - \\bar{\\psi}_1\\right)f_\\psi\\,, \\\\\nL000370\t\\partial_t\\bar{\\xi} &\\simeq\nL000371\t\\begin{cases}\nL000372\t   -\\left(\\bar{\\psi} - \\bar{\\psi}_0\\right)h_\\psi -  \\left(\\bar{\\xi} - \\bar{\\xi}_0\\right)h_\\xi\\, ,\\,\\,\\,\\,\\qquad \\bar{\\xi} \\leq \\xi^\\RN{1},\\\\\nL000373\t   \\bar{r}_1 - \\left(\\bar{\\psi} - \\bar{\\psi}_1\\right)\\tilde{h}_\\psi  - h_{\\xi\\xi}\\left(\\bar{\\xi} - \\bar{\\xi}_2\\right)^2\\, , \\, \\, \\, \\bar{\\xi} > \\xi^\\RN{1}\\,.\nL000374\t\\end{cases}\nL000375\t\\end{align}\nL000376\t\\end{subequations}\nL000377\tThe key difference to the normal form with a single reaction $r_1$ (Eq.~\\eqref{eq:effective_equations}) is that $\\bar{\\psi}$ is no longer a conserved quantity and changes during the kinetics. The consequences are coupling terms between the two dynamic quantities $\\bar{\\psi}(t)$ and $\\bar{\\xi}(t)$, characterized by   the coefficients $f_{\\xi}$, $h_{\\psi}$ and $\\tilde{h}_{\\psi}$ (definitions see Eqs.~\\eqref{eq:def_rhos}, \\eqref{eq:h_psi}, and \\eqref{eq:h_psi_tilde}).\nL000378\tWe find that $f_{\\xi}>0$, $h_{\\psi}<0$, and $\\tilde{h}_{\\psi}>0$,  leads\nL000379\tto negative feedback\nL000380\tbetween $\\bar{\\psi}(t)$ and $\\bar{\\xi}(t)$\nL000381\t(see discussion in Appendix~\\ref{sec:effective_active}).\nL000382\tThe signs of $f_{\\xi}$ and $h_{\\psi}$ are set by thermodynamics, while the difference in sign between $\\tilde{h}_{\\psi}$ and $h_{\\psi}$ is ensured from the fuel. Negative feedback loops, together with the instability at the intersection of the two nullclines, represent a well-established fundamental ingredient for the emergence of oscillations in non-linear systems~\\cite{cross1993pattern,strogatz2018nonlinear}. For cases where the two quantities can relax to a stable fixed point, i.e., $\\bar{\\psi}_0=\\bar{\\psi}_1$ and $\\bar{\\xi}_0=\\bar{\\xi}_1$ (homogeneous), or alternatively $\\bar{\\xi}_2=\\bar{\\xi}_1$ (phase-separated), the system does not oscillate, however can remain excitable.\nL000383\t\nL000384\t\nL000385\t\nL000386\t\nL000387\tThe oscillation frequency\nL000388\tis dominantly determined by the reaction rate coefficient $k_2^{}$ of the second reaction~\\eqref{eq:r_2_pathway}.\nL000389\tThis property is apparent in the scaling of the\nL000390\tcycle frequency $\\Omega\\propto k_2$, as shown in Fig.~\\ref{fig:4}(c).\nL000391\tThe dominant role of $k_2$ can be explained as follows:\nL000392\tThe first reaction~\\eqref{eq:r_1_pathway} is fast since phase separation switches on the fueled forward pathway converting $A$ to $B$, a prerequisite for having an active droplet. To complete the cycle, the slower unfueled reaction 2 with $k_2\\ll k_1 \\exp\\{\\delta/(k_BT)\\}$ becomes rate limiting, thereby  determining the cycle frequency $\\Omega$.\nL000393\tThis separation of time-scales is consistent with\nL000394\tthe fuel strength $\\delta$\nL000395\thaving only little effects on the cycle frequency $\\Omega$\nL000396\t(different colors in Fig.~\\ref{fig:4}(c)).\nL000397\tNotably, the compositional changes along a cycle are more pronounced for larger fuel strength $\\delta$ (Fig.~\\ref{fig:4}(c), inset).\nL000398\t\nL000399\t\nL000400\tConsistently, we find formation-dissolution cycles when numerically solving the  continuous dynamic equations for the volume fraction fields $\\phi_i(\\bm{x},t)$ ($i=A,B$) (Eq.~\\eqref{eq:phi_dot}).\nL000401\tFig.~\\ref{fig:4}(d) depicts representative snapshots of the volume fraction fields indicating the formation, growth, shrinkage, and dissolution of an active droplet over the period $(2\\pi/\\Omega)$.\nL000402\tFig.~\\ref{fig:4}(e) shows the corresponding phase space trajectory, which agrees well with the fast-diffusion limit. The self-sustaining oscillations are, therefore, well captured by the dynamic equations derived in the fast-diffusion limit which paved the way to determine the normal forms of the pitchfork bifurcation (Eq.~\\eqref{eq:effective_equations}) of an active droplet and the Hopf bifurcation (Eq.~\\eqref{eq:effective_active}) to cycles of formation and dissolution of an active droplet.\nL000403\t\nL000404\t\nL000405\t\nL000406\t\\textit{Entropy production of an active droplet:} The entropy production characterizes the system's dissipation and serves as a measure of how far a system is away from thermodynamic equilibrium~\\cite{julicherModelingMolecularMotors1997b}. For an active droplet, the entropy production rate $\\dot{S}$ at the non-equilibrium steady state (derivation see Appendix~\\ref{sec:fuel}) scales\nL000407\t\\begin{equation}\nL000408\t{\\dot{S}_\\text{NESS}} \\propto\nL000409\t{k_B V} k_1\nL000410\t\nL000411\t\\left( \\exp{\\frac{\\mu_B}{k_BT}} - \\exp{\\frac{\\mu_A}{k_BT}}\\right)\\, .    \\label{eq:entropy_prod_NESS}\nL000412\t\\end{equation}\nL000413\t\nL000414\t\nL000415\tAs the chemical reaction $r_2$ (Eq.~\\eqref{eq:r_2})\nL000416\t\nL000417\tobeys detailed balance of the rates,\nL000418\tthe chemical potentials $\\mu_A$ and $\\mu_B$ are fixed by the tie-line selected by the nullcline of $r_2$  (green line in Fig.~\\ref{fig:3} and Fig.~\\ref{fig:4}(a)). Thus, the entropy production for active droplets is independent of the fuel strength $\\delta$, and is instead a constant set by the properties of the non-dissipative chemical reaction 2. For a fixed $\\Delta\\mu=\\mu_A-\\mu_B$, we see from Eq.~\\eqref{eq:NESS} that an increase in fuel strength $\\delta$ decreases the droplet volume. This reduced volume exactly balances the increased dissipation from a stronger fuel, keeping the entropy production constant, as seen in Fig.~\\ref{fig:5}. We note again that without a second reaction, which obeys detailed balance, the entropy productions will increase with the fuel strength $\\delta$~\\cite{bauermannEnergyMatterSupply2022d}.\nL000419\t\nL000420\t\nL000421\t\\begin{figure}[tb]\nL000422\t    \\centering\nL000423\t      \\makebox[\\textwidth][c]{\nL000424\t      \\includegraphics[width=\\textwidth]{final_figures/figg5.pdf}}\nL000425\t     \\caption{\nL000426\t     \\textbf{\nL000427\t     Discontinuous entropy production at the onset of oscillations.}\nL000428\t     Upon increasing the fuel strength $\\delta$, homogeneous NESS transits to the active droplet state with a stationary droplet volume with a kink in the entropy production $\\dot S$.\nL000429\t    Increasing $\\delta$ further decreases the droplet volume (b) but keeps the entropy production (a) constant; further discussion see Appendix~\\ref{sec:fuel}. At the onset of formation-dissolution cycles, the entropy production $\\dot S$ jumps (transition between the green and yellow domain in (a)). The volume  averaged over a period jumps slightly, while the peak of the wave (Max) and its mean volume when phase separated (PS Mean) (see Fig.~\\ref{fig:4}(b)) show a significant jump, suggesting both as ideal read-outs in experiments of self-sustained cycles. The analytic prediction for the critical fuel strength is the horizontal orange line.\nL000430\t     }\nL000431\t     \\label{fig:5}\nL000432\t\\end{figure}\nL000433\t\nL000434\tIncreasing the fuel strength further, the droplet transitions from an active droplet to an excitable droplet, where the steady state is stable. Upon further increasing the fuel strength $\\delta$, cycles of formation and dissolution emerge. The transition from stationary, excitable droplets to oscillations creates a discontinuous jump in the entropy production rate $\\dot{S}$. Over a cycle, the average entropy production rate $ \\langle \\dot{S} \\rangle\\equiv ({2\\pi}/{\\Omega})\\int_0^{2\\pi/\\Omega}\\dot{S}\\, \\text{d}t$, continues to grow with fuel strength $\\delta$. As the entropy production rate jumps, so does the average droplet volume; see Fig.~\\ref{fig:5}(b). An even larger jump occurs when comparing the average droplet volume when phase-separated (PS mean) and the maximum droplet volume over a cycle (Max). Formation-dissolution cycles thus permit a discontinuous increase in entropy production and larger droplet volumes as the system is driven away from equilibrium.\nL000435\t\nL000436\t\nL000437\t\\textit{Discussion:}\nL000438\tCyclic reaction networks in homogeneous systems, such as the Brusselator~\\cite{prigogineSymmetryBreakingInstabilitiesDissipative1967,prigogineSymmetryBreakingInstabilities1968}, rely on a complex non-linear reaction network of many components with a large variety of time scales~\\cite{novakDesignPrinciplesBiochemical2008,semenovRationalDesignFunctional2015}. The oscillations studied here occur with only two independent components.\nL000439\tOur phase-separated system can instead use the phase boundary to create a simple cyclic network by effectively increasing the number of degrees of freedom through the phase-dependent concentrations and a cyclic network with a single detailed-balance breaking reaction,\nL000440\t$A^\\RN{1} \\textcolor{black}{\\rightarrow} A^\\RN{2}\\textcolor{black}{\\rightarrow} B^\\RN{2}\\textcolor{black}{\\rightarrow} B^\\RN{1}\\textcolor{black}{\\rightarrow} A^\\RN{1}$, where diffusive exchange between the phases I and II act as effective reaction steps.\nL000441\t\nL000442\tBistability in homogeneous chemical systems relies on higher-order reaction networks to achieve a cubic normal form~\\cite{epsteinNonlinearChemicalDynamics1996,novakDesignPrinciplesBiochemical2008}. Our phase-separated system gives rise to\nL000443\tthe effective properties of a cubic form through\nL000444\ttwo phases with a piece-wise combination of a linear and quadratic function (Eq.~\\eqref{eq:effective_equations}).\nL000445\tIn other words, phase separation enables three stable points despite only two independent chemical states.\nL000446\t\nL000447\tThe bistability found in Fig.~\\ref{fig:2} is, therefore, not a consequence of the complexity of the reaction network as such, it is a property of active droplets. Specifically, bistability arises from the coupling between phase separation and detailed-balance-breaking chemical reactions far from equilibrium, which we have shown can give rise to excitability and self-sustaining chemical oscillations.\nL000448\t\nL000449\tThe relevance of thermodynamic interactions among components for the bistability enables the same chemical reaction network to give fundamentally different oscillations. Changing thermodynamic parameters leads to different binodals, strongly altering the composition changes during a cycle. We find, for example, self-sustained oscillations of the active droplet's volumes; see Appendix~\\ref{sec:volume_oscillations}.\nL000450\t\nL000451\t\nL000452\t\\textit{Conclusion:} In our work, we present a minimal theoretical model to achieve bistability, excitability, and oscillations in phase-separated systems with chemical reaction maintained away from equilibrium.  We show that this non-equilibrium driving enables a pitchfork bifurcation in droplet volumes with two locally stable chemical states (bistability). By including an additional reaction, the system becomes excitable. For cases where the non-equilibrium steady state is on either of the stable branches, perturbations trigger an excited trajectory in composition, during which the system exhibits a refractory period. Upon enhancing the non-equilibrium driving, a Hopf bifurcation occurs to a self-sustained oscillating droplet undergoing indefinite formation and dissolution cycles.\nL000453\t\nL000454\tExcitable and oscillating active droplets can be realized experimentally in multiple ways. The general requirement is a phase-separating system with a phase-dependent fueled reaction pathway\nL000455\tand a second chemical reaction that alters the quantity conserved by the fueled reaction.\nL000456\tMoreover, the product of the fueled pathway should phase-separate more strongly than the precursor reactant.\nL000457\tA potential experimental system could rely on  transient post-translational modifications of proteins, where phase separation is activated through arginine methylation or phosphorylation~\\cite{luo2021regulation}.\nL000458\tAlternatively, various synthetic systems were recently proposed that use chemical fuels to transiently activate thermodynamically unstable products for active droplet formation~\\cite{donau2023chemistry},\nL000459\teither through  phosphorylation of peptides~\\cite{poprawa2024active} or\nL000460\tfuel-driven condensing reactions~\\cite{bergmannLiquidSphericalShells2023d,sastre2025size}.\nL000461\t\nL000462\t\nL000463\tOur work is relevant for non-equilibrium systems that are phase-separated  and composed of evolving  oligomer sequences~\\cite{bartolucciInterplayBiomolecularAssembly2024c,haugerudTheorySequenceSelection2024}. Such systems were proposed as simple prebiotic compartments at the Origin of Life~\\cite{ianeselli2023physical}. Cycles of formation and dissolution can mediate a search mechanism in sequence space, reminiscent of stochastic resetting~\\cite{evansDiffusionStochasticResetting2011} of the dense environment in which selection can occur~\\cite{haugerudTheorySequenceSelection2024}. Resetting is beneficial in search processes of specific sequences in a high-dimensional sequence space~\\cite{evansStochasticResettingApplications2020}, allowing their self-replication, for example.\nL000464\t\nL000465\t\nL000466\t\nL000467\tThe emergence of oscillations through non-equilibrium phase separation makes them an ideal functional module for \\textit{de novo} life systems~\\cite{kriebischRoadmapSynthesisLife2025}. Robust self-sustained chemical oscillations are crucial for \\textit{de novo} life to facilitate clock-like functions similiar to extant life, such as the circadian rhythm and cell cycle~\\cite{zehringPelementTransformationPeriod1984,bargielloRestorationCircadianBehavioural1984,dunlapMolecularBasesCircadian1999,goldbeterBiochemicalOscillationsCellular1996}, and could thereby provide in other biological functions such as DNA repair~\\cite{hsiehPlausibleRobustBiological2024,heltbergEnhancedDNARepair2022,heltbergCoupledOscillatorCooperativity2023,kriebischRoadmapSynthesisLife2025}.\nL000468\t\nL000469\t\\textit{Acknowledgements:}\nL000470\tWe thank Leonardo Silva Dias for careful feedback on the manuscript and his recommendations for references on chemical oscillators.\nL000471\tC.\\ A.\\ Weber acknowledges the European Research Council (ERC) under the European Union's Horizon 2020 research and innovation program (Fuelled Life,  Grant Number 949021), and the SPP 2191 “Molecular Mechanisms of Functional Phase Separation” of the German Science Foundation for financial support.\nL000472\t\nL000473\t\\bibliography{cycles.bib}\nL000474\t\nL000475\t\nL000476\t\nL000477\t\\appendix\nL000478\t\\section{Free energy and chemical potentials}\\label{seq:free_energy_and_chempot}\nL000479\tThe chemical potentials that govern the dynamics of the system (Eq.~\\eqref{eq:phi_dot}) are calculated by changes in the mean-field Gibbs free energy $G$ per volume $V$, where we use the Flory-Huggins free energy density \\cite{bauermannChemicalKineticsMass2022d,adame-aranaLiquidPhaseSeparation2020a},\nL000480\t\\begin{align}\nL000481\t    \\frac{G(T, p, \\{\\phi_k\\})}{V} = k_\\text{B}T &\\sum_{i=0}^M \\left[\\frac{\\phi_i}{\\nu_i}\\log{\\phi_i} + \\frac{\\omega_i\\phi_i}{\\nu_ik_BT}\\right] \\nonumber\\\\ + \\frac{1}{2\\nu_0} &\\sum_{i=0}^M\\sum_{j=0}^M \\chi_{ij}\\phi_i\\phi_j+ p \\, .\\label{eq:gibbs}\nL000482\t\\end{align}\nL000483\tHere, $\\omega_i$ denotes the internal energies, $\\chi_{ij}$ characterize the interaction strength between component $i$ and $j$, and $p$ is the pressure. The volume fractions are defined as $\\phi_i\\equiv\\nu_iN_i/V$, where $\\nu_i$ is the molecular volume of component $i$, and $N_i$ is the number of particles of that type. From the change in Gibbs free energy with respect to particle number $N_i$, we find the chemical potential ${\\mu}_{i} = \\partial{G}/{\\partial N_{i}}\\vert_{N_{j\\neq i}}$ to be on the form\nL000484\t\\begin{equation}\nL000485\t    \\frac{\\mu_i}{\\nu_i} = \\left(\\pdv{g}{\\phi_i}\\right)_{T,p,\\phi_{j\\neq i}} + \\left(g - \\sum_{j}\\phi_j\\left(\\pdv{g}{\\phi_j}\\right)_{T,p,\\phi_{k\\neq j}} \\right)\\,, \\label{eq:rewrite_mu}\nL000486\t\\end{equation}\nL000487\twhere $g$ is the Gibbs free energy per volume $G/V$ given in Eq.~\\eqref{eq:gibbs}. The first term in Eq.~\\eqref{eq:rewrite_mu} represents the change in free energy when adding a particle due to compositional changes, while the second term represents the change due to the volume change of the system. Evaluating the derivatives grants us an expression for the chemical potentials\nL000488\t\\begin{equation}\nL000489\t    \\mu_i = k_BT\\left(\\log{\\phi_i}+1\\right)+\\omega_i + \\nu_i\\left(p-\\Gamma\\right) + \\frac{\\nu_i}{\\nu_0}\\sum_{j}\\chi_{ij}\\phi_j, \\label{eq:chem_pot}\nL000490\t\\end{equation}\nL000491\twhere we have defined\nL000492\t\\begin{equation}\nL000493\t    \\Gamma = \\frac{1}{2\\nu_0}\\sum_{ij}\\chi_{ij}\\phi_i\\phi_j + k_BT\\sum_i\\frac{\\phi_i}{\\nu_i}.\nL000494\t\\end{equation}\nL000495\tThe chemical potential can be separated into a composition-independent contribution $\\mu_i^0$ known as the reference chemical potential, and a composition-dependent activity coefficients $\\gamma_i$, such that\nL000496\t\\begin{equation}\nL000497\t    \\mu_i = \\mu_i^0(T,p) + k_BT\\,\\log{\\left(\\phi_i\\gamma_i(\\{\\phi_j\\}, T, p) \\right)}\\,. \\label{eq:decomp_chempot}\nL000498\t\\end{equation}\nL000499\tThe activity coefficient approaches a constant in the limit of weak interactions or solvent-rich systems, leading to chemical reaction rates agreeing with the law of mass-action \\cite{bauermannChemicalKineticsMass2022d}. When solving the continuum equation, a mobility of $\\Lambda_i = \\Lambda_i^0\\phi_i$ is chosen to retrieve the diffusion equation in the aforementioned limit.\nL000500\t\nL000501\tFor the spatial profile in Fig.~\\ref{fig:4}(d) found from solving the full continuum equation (Eq.~\\eqref{eq:phi_dot}) the free energy $G$ is calculated from\nL000502\t\\begin{align}\nL000503\t\\begin{split}\nL000504\t    G = \\int_V \\text{d}^3\\bm{x}\\, &\\Bigg[ g(\\phi_i(\\bm{x})) + \\frac{\\kappa_A}{2}\\left(\\nabla\\phi_A\\right)^2 \\\\ &+ \\frac{\\kappa_B}{2}\\left(\\nabla\\phi_B\\right)^2   + U(\\bm{x})(\\phi_A + \\phi_B)\\Bigg]\\,. \\label{eq:gibbs_spatial}\nL000505\t\\end{split}\nL000506\t\\end{align}\nL000507\tHere, $g$ is the Gibbs-free energy density, i.e., the right-hand side of Eq.~\\eqref{eq:gibbs}, $\\kappa_i$ is the free energy cost associated to gradients of component $i$, and $U$ is an external potential affecting $A$ and $B$, which is included to act as a nucleation potential. The chemical potential of component $i$ for this free energy is calculated from the functional derivative of $G$ with respect to volume fraction,\nL000508\t\\begin{equation}\nL000509\t    \\tilde{\\mu}_i = \\nu_i\\frac{\\delta G}{\\delta \\phi_i}\\, .\nL000510\t\\end{equation}\nL000511\tThe inclusion of the free energy cost characterized by  $\\kappa_i$ to the free energy yields an additional term in the chemical potential with respect to: Eq.~\\eqref{eq:chem_pot}\nL000512\t\\begin{equation}\nL000513\t    \\tilde{\\mu}_i = \\mu_i - \\kappa_i\\nabla^2\\phi_i + U\\left[1-\\delta_{i,C}\\right] \\, . \\label{eq:chem_pot_spatial}\nL000514\t\\end{equation}\nL000515\t\nL000516\tBy using the free energy in Eq.~\\eqref{eq:gibbs},\nL000517\tthere can be phase separation that gives rise to domains of very different values of the total volume fraction $\\psi(\\bm{x},t)=\\phi_A(\\bm{x},t)+\\phi_B(\\bm{x},t)$.\nL000518\tThe free energy cost parameter $\\kappa_i$ is related to surface tension that leads to a droplet size-dependent Laplace pressure, increasing the respective volume fraction in each domain.\nL000519\tSince the binodal displayed in Fig.~\\ref{fig:4}(e) is calculated without such surface tension effects, it does not exactly correspond to the binodal for the continuum equation. Still, it serves as a good approximation when the droplet's radius is much larger than the capillary length~\\cite{weberPhysicsActiveEmulsions2019d}.\nL000520\t\nL000521\tThe potential $U$ in Eq.~\\eqref{eq:gibbs_spatial} and \\eqref{eq:chem_pot_spatial} is included to create a nucleation site, which allows droplet nucleation in the meta-stable region inside the binodal without noise. This is done as we are not interested in probing the nucleation or nucleation-time scales in this investigation. The role of stochasticity will be discussed in future work. \\par\nL000522\t\nL000523\t\nL000524\t\nL000525\t\nL000526\t\\section{Reaction scheme with an explicit fuel component}\\label{sec:fuel}\nL000527\tDetailed balance is broken by a fuel $\\tilde{\\delta}$ according to Eq.~\\eqref{eq:r_2_pathway}. Breaking detailed balance in this fashion is equivalent to the combined effect of the two reactions:\nL000528\t\\begin{equation}\nL000529\t    A\\xrightleftharpoons{k_u}{} B\\, ,\\qquad A+F\\xrightharpoonup{k_\\text{f}}{} B\\, ,\nL000530\t\\end{equation}\nL000531\twhere the former reaction obeys detailed balance of the rates while the latter breaks it. The reaction rates of the unfueled $(r_\\text{u})$ and fueled reaction $(r_\\text{f})$ are\nL000532\t\\begin{align}\nL000533\t    r_\\text{u} &= k_u\\left[\\exp{\\frac{\\mu_A}{k_BT}} - \\exp{\\frac{\\mu_B}{k_BT}} \\right], \\label{eq:r_u}\\\\\nL000534\t    r_\\text{f} &= k_\\text{f}\\exp{\\frac{\\mu_A+\\mu_F}{k_BT}}\\, , \\label{eq:r_f}\nL000535\t\\end{align}\nL000536\tsuch that $r_B = -r_A = r_\\text{u}+r_\\text{f}$. Performing the mapping between these rates and the coarse-grained rate studied (Eq. \\eqref{eq:r}), we find\nL000537\t\\begin{equation}\nL000538\t    \\tilde{\\delta} = \\log{\\left(1+\\frac{k_\\text{f}}{k_u}\\exp{\\frac{\\mu_F}{k_BT}}\\right)}, \\label{eq:delta_muF}\nL000539\t\\end{equation}\nL000540\twhere $\\mu_F$ is the chemical potential of the fuel. Solving for the reaction rate coefficient of the fueled reaction $k_\\text{f}$, we find\nL000541\t\\begin{equation}\nL000542\t    k_\\text{f} = k_u\\exp{-\\frac{\\mu_F}{k_BT}}\\left(\\exp{\\frac{\\tilde{\\delta}}{k_BT}}-1\\right), \\label{eq:k_f}\nL000543\t\\end{equation}\nL000544\twith $k_u = k_1$.\nL000545\tThus, the fuel's chemical potential can be regarded as phase-independent, meaning it satisfies the conditions of phase coexistence, and the phase-dependent fuel strength originates from the composition dependence of the rate coefficient $k_\\text{f}$. For the studied case of $\\tilde{\\delta}^{\\RN{1}}=0$ and $\\tilde{\\delta}^{\\RN{2}}=\\delta$, this is equivalent to the fueled reaction having a reaction rate of zero in the dilute phase, and a non-zero value according to Eq.~\\eqref{eq:k_f} in the dense phase.\nL000546\t\nL000547\t\nL000548\t\nL000549\tThe detailed-balance breaking reaction produces entropy. The entropy production originates from the fact that the fuel is chemostatted, implying an entropy-producing boundary flux to maintain a chemostatted fuel. The entropy production rate reads \\cite{julicherGenericTheoryColloidal2009a,bauermannEnergyMatterSupply2022d}\nL000550\t\\begin{equation}\nL000551\t    -T\\partial_t s = \\partial_t g + j_F\\,,\nL000552\t\\end{equation}\nL000553\tThe flux of fuel into the system $j_F$ balances the loss of fuel by the fueled reaction, $j_F = - \\mu_Fr_F/\\nu_F$, where we now explicitly keep track of the chemostatted fuel with a constant chemical potential $\\mu_F$ and molecular volume $\\nu_F$. In a non-equilibrium steady state $\\partial_t g=0$, and integrates to zero over a closed cycle, such that all entropy production originates from the dissipative fueled reaction $r_F$. From the fueled reaction rate (Eq.~\\eqref{eq:r_f}), we find\nL000554\t\\begin{comment}\nL000555\tWriting out the volume-fraction changes in time and gathering terms corresponding to each chemical reaction, we find\nL000556\t\\begin{align}\nL000557\t    \\begin{split}\nL000558\t    \\partial_t \\tilde{g} = &\\left(\\frac{\\mu_A}{\\nu_A} - \\frac{\\mu_B}{\\nu_B} \\right)\\left(r_\\text{u} + r_\\text{f} \\right) + \\frac{\\mu_F}{\\nu_F}r_\\text{f} \\\\\nL000559\t    + &\\left(\\frac{\\mu_A}{\\nu_A} + \\frac{\\mu_B}{\\nu_B} - 2\\frac{\\mu_C}{\\nu_C} \\right)r_2\\, ,\nL000560\t    \\end{split}\nL000561\t\\end{align}\nL000562\twhere $r_\\text{u}$, $r_\\text{f}$ and $r_2$ are defined in Eqs \\eqref{eq:r_u}, \\eqref{eq:r_f}, and \\eqref{eq:r_2_pathway} respectively. Though not apparent, the first and last terms on the right-hand side are zero in a steady state and integrate to zero over a period, independently of the path, as long as the initial and final points are the same. Thus, only the term $\\mu_Fr_\\text{f}/\\nu_F$ contributes to the free-energy change. The time change of the free-energy density in an isothermal system relates to the entropy production rate density $\\dot{s}$ as $\\partial_t \\tilde{g} = T\\partial_t s$ \\cite{julicherGenericTheoryColloidal2009a,bauermannEnergyMatterSupply2022d}, such that\nL000563\t\\end{comment}\nL000564\t\\begin{equation}\nL000565\t    \\frac{\\dot{s}}{k_B} = \\frac{\\mu_Fk_\\text{f}}{k_BT\\nu_F}\\exp{\\frac{\\mu_A+\\mu_F}{k_BT}} \\, .    \\label{eq:entropy_prod_rate_homogeneous}\nL000566\t\\end{equation}\nL000567\tPerforming a volume integral to find the entropy production rate $\\dot{S}=\\int \\dot s\\,\\text{d}^3x$ yields\nL000568\t\\begin{equation}\nL000569\t    \\frac{\\dot{S}}{k_B} = \\frac{\\mu_F}{k_BT\\nu_F}\\exp{\\frac{\\mu_A+\\mu_F}{k_BT}}\\left(V^\\RN{1}k_\\text{f}^\\RN{1} + V^\\RN{2}k_\\text{f}^\\RN{2}\\right) .    \\label{eq:entropy_prod}\nL000570\t\\end{equation}\nL000571\tThe entropy production over a cycle is calculated from integrating this expression over a period\nL000572\t\\begin{equation}\nL000573\t\\langle \\dot{S} \\rangle=\\frac{\\Omega}{2\\pi}\\int_0^{2\\pi/\\Omega}\\dot{S}\\,\\text{d}t\\,.\nL000574\t\\end{equation}\nL000575\tAt a non-equilibrium steady state, we can use the expression of the droplet volume $V^\\RN{2}$ (Eq.~\\eqref{eq:NESS}) and the relation between fuel strength $\\tilde{\\delta}$ and $k_\\text{f}$ in Eq.~\\eqref{eq:k_f}, where $\\tilde{\\delta}^\\RN{1}=0$ and $\\tilde{\\delta}^\\RN{2}=\\delta$. The entropy production at the non-equilibrium steady state simplifies to\nL000576\t\\begin{equation}\nL000577\t    \\frac{\\dot{S}}{k_B} = \\frac{\\mu_Fk_1V}{k_BT\\nu_F}\\left( \\exp{\\frac{\\mu_B}{k_BT}} - \\exp{\\frac{\\mu_A}{k_BT}} \\right)\\, .\nL000578\t\\end{equation}\nL000579\t\nL000580\tSince the fuel is aiding the transition from $A$ to $B$ $(\\mu_F>0)$, we have that $\\mu_A<\\mu_B$, ensuring that the entropy production is positive. For the case where the fuel strength goes to zero, the tie-line corresponding to chemical equilibrium, i.e., $\\mu_A=\\mu_B$, will be selected, making the entropy production rate zero. Interestingly, the entropy production is independent of the fuel strength and the phase volumes.\nL000581\t\nL000582\t\nL000583\t\nL000584\t\nL000585\t\\section{Kinetics at phase equilibrium}\\label{seq:SJ_method}\nL000586\t\nL000587\tIn this section, we follow the work of Bauermann et al.~\\cite{bauermannChemicalKineticsMass2022d} to derive the expression for the diffusive flux between the two phases, $j_i^{\\RN{1}/\\RN{2}}$, in Eqs.~\\eqref{eq:kinetic_evolve}. This approach to phase-separated kinetics is valid when the system is at phase equilibrium throughout the kinetics, i.e., if the system size $L$ is much smaller than the reaction-diffusion length; $k_1 \\ll \\Lambda_ik_BT/L^2$. For phase-separated systems, this implies that the concentration profiles of each component in both phases are uniform $\\phi_i^{\\RN{1}/\\RN{2}}$, and the interface is infinitely thin (the $\\kappa$-terms in Eq.~\\eqref{eq:gibbs_spatial} are ignored).\nL000588\t\nL000589\tFor two phases to remain at phase coexistence, the chemical potentials of all $M-1$ components in the two phases change equally in time,\nL000590\t\\begin{equation}\nL000591\t    \\partial_t \\mu_i^\\RN{1} = \\partial_t \\mu_i^\\RN{2}, \\label{eq:equal_chem}\nL000592\t\\end{equation}\nL000593\tand are initiated at equal values of the chemical potentials $\\mu_i^\\RN{1}(t=0) = \\mu_i^\\RN{2}(t=0)$, but different compositions. Using the chain rule, the time derivative of a chemical potential can be written as\nL000594\t\\begin{equation}\nL000595\t     \\partial_t \\mu_i^\\alpha = \\sum_{k=1}^M \\dot{\\phi_k^\\alpha}\\pdv{\\mu_i^\\alpha}{\\phi_k} \\, , \\label{eq:mu_dot}\nL000596\t\\end{equation}\nL000597\twhere $\\alpha$ is the phase index; $\\alpha\\in\\{\\RN{1}, \\RN{2}\\}$.\nL000598\tIncompressible systems, where the molecular volumes are independent of composition $\\text{d}_t\\nu_i=0$, follow Eqs.~\\eqref{eq:kinetic_evolve}. Combining Eqs.~\\eqref{eq:kinetic_evolve} with the expression for the volume change of the phases (Eq.~\\eqref{eq:vol_change}) for volume conserving chemical reaction $(\\sum_{i=1}^M r_i=0)$, we obtain\nL000599\t\\begin{equation}\nL000600\t    \\dot{\\phi_k^\\alpha} = r_k^{\\alpha} - j_k^{\\alpha} + \\phi_k^{\\alpha} \\sum_{l=1}^M j_{l}^{\\alpha} \\, . \\label{eq:kinetic_in_app}\nL000601\t\\end{equation}\nL000602\tSuch that the chemical potential change in Eq. \\eqref{eq:mu_dot} takes the form\nL000603\t\\begin{equation}\nL000604\t     \\partial_t \\mu_i^\\alpha = \\sum_{k=1}^M \\left( r_k^{\\alpha} - j_k^{\\alpha}  + \\phi_k^{\\alpha} \\sum_{l=1}^M j_l^{\\alpha} \\right)\\pdv{\\mu_i^\\alpha}{\\phi_k}\\, ,\nL000605\t\\end{equation}\nL000606\twhich can be expressed in terms of the fluxes:\nL000607\t\\begin{align}\nL000608\t    \\begin{split}\nL000609\t    \\partial_t \\mu_i^\\alpha &= \\sum_{k=1}^M j_k^\\alpha\\left(-\\pdv{\\mu_i^\\alpha}{\\phi_k} + \\sum_{l=1}^M \\phi_l^\\alpha \\pdv{\\mu_i^\\alpha}{\\phi_l}\\right)+  \\sum_{k=1}^M \\pdv{\\mu_i^\\alpha}{\\phi_k}r_k^\\alpha \\, .\\end{split}\nL000610\t\\end{align}\nL000611\tThe kinetic constraint on the chemical potentials (Eq.~\\eqref{eq:equal_chem}) thus reads\nL000612\t\\begin{align}\nL000613\t     &\\sum_{k=1}^M j_k^\\RN{1}\\left\\{ \\sum_{l=1}^M \\phi_l^\\RN{1} \\pdv{\\mu_i^\\RN{1}}{\\phi_l^\\RN{1}} -\\pdv{\\mu_i^\\RN{1}}{\\phi_k^\\RN{1}} + \\frac{V^\\RN{1}}{V^\\RN{2}}\\left(\\sum_{l=1}^M \\phi_l^\\RN{2} \\pdv{\\mu_i^\\RN{2}}{\\phi_l^\\RN{2}} -\\pdv{\\mu_i^\\RN{2}}{\\phi_k^\\RN{2}} \\right) \\right\\} \\nonumber \\\\ &= -\\sum_{k=1}^M \\pdv{\\mu_i^\\RN{1}}{\\phi_k^\\RN{1}}r_k^\\RN{1} +  \\sum_{k=1}^M \\pdv{\\mu_i^\\RN{2}}{\\phi_k^\\RN{2}}r_k^\\RN{2} \\, ,\\label{eq:chem_pot_constraint}\nL000614\t\\end{align}\nL000615\twhere we have used the conservation of particle volume of the diffusive flux,\nL000616\t\\begin{equation}\nL000617\t    j_i^\\RN{1}V^\\RN{1} = -j_i^\\RN{2}V^\\RN{2} \\, . \\label{eq:particle_cons}\nL000618\t\\end{equation}\nL000619\tThis set of equations \\eqref{eq:chem_pot_constraint} can be written as a matrix-vector equation\nL000620\t\\begin{equation}\nL000621\t    A_{ik}j^\\RN{1}_k = s_i,\nL000622\t\\end{equation}\nL000623\twhich can be solved for $j^\\RN{1}_k$. The reaction rates in each phase act as source terms in $s_i$, while $A_{ik}$ specifies how the composition changes in each phase will affect the chemical potentials, constraining the diffusive fluxes between the phases to equalize the chemical potential change for all components in both phases.\nL000624\t\nL000625\t\nL000626\t\nL000627\t\\section{Parameters, numerical implimentation of continuum equation, and full phase diagrams}\\label{seq:parameters_used}\nL000628\tFor reproducibility, the parameters used to generate all figures are given in Table~\\ref{tab:params}. We have assumed that the reaction rate coefficients are composition-independent $k_{1}^\\RN{1}=k_{1}^\\RN{2}=k_1$ and $k_{2}^\\RN{1}=k_{2}^\\RN{2}=k_2$. For the continuum simulation in Fig.~\\ref{fig:4}(d,e), there are a few parameters in addition to the ones listed in Table~\\ref{tab:params}, they are listed here instead:\nL000629\tSystem size $L/\\ell=0.15$, where $\\ell$ is the reaction-diffusion length scale $\\ell\\equiv\\sqrt{k_BT\\Lambda/k_1}$, surface tensions $\\kappa_A/\\mathcal{K} = \\kappa_B/\\mathcal{K}\nL000630\t = 1.8\\cdot10^{-5}$, where $\\mathcal{K} = k_BT \\ell^2$. The time-step $\\delta t=10^{-7}/k_1$, and the number of grid points $N_x=N_y=250$. In order to retrieve the diffusion equation in the dilute limit $(\\chi_{ij}=0)$, the mobilities scale linearly with the volume fractions according to $\\Lambda_i = \\Lambda_i^{(0)}\\phi_i$. Lastly, the external potential is $U=-1.5k_BT\\delta_{i,N_x/2}\\delta_{j,N_y/2}$, where $i$ and $j$ are the spatial indices in the $x$ and $y$ direction respectively, and $\\delta_{\\alpha,\\beta}$ is the Kronecker delta. The system was initialized with $\\bar{\\phi}_A = 0.32$ and $\\bar{\\phi}_A = 0.014$.\nL000631\t\nL000632\t\nL000633\tTo solve the full spatial equation (Eq.~\\eqref{eq:phi_dot}) needed to generate the data in Fig.~\\ref{fig:4}(d) and (e), the spectral-method is employed~\\cite{zhuCoarseningKineticsVariablemobility1999}. The spectral method solves the continuous dynamic Eqs.~\\eqref{eq:phi_dot} in Fourier-space. Periodic boundary conditions were used.\\par\nL000634\t\nL000635\t\nL000636\t\\begin{table*}[]\nL000637\t \\caption{\\textbf{Parameter choices for each figure:} Common for all figures in this work is that the molecular volumes are equal, $\\nu_i=1$. All energy values in the table are given in units of $k_BT$ ($\\chi_{ij}/k_BT$, $\\omega_i/k_BT$ and $\\delta/k_BT$). \\label{tab:params}}\nL000638\t\\begin{tabular}{@{}lllllllllllll@{}}\nL000639\t\\toprule\nL000640\tFigure $\\quad\\qquad\\quad$& $\\chi_{AB}\\quad$ & $\\chi_{AC}\\quad$ & $\\chi_{BC}\\qquad$ & $\\omega_A\\qquad$ & $\\omega_B\\qquad$  & $\\omega_{C}\\qquad$ & $k_2/k_1 \\qquad$ & $\\delta\\qquad$ & $\\kappa\\qquad$ &  $\\psi_{1/2}\\qquad$ & $\\bar{\\psi}\\qquad$ \\\\ \\midrule\nL000641\t\\ref{fig:2}(a, b, c) \\& \\ref{fig:appendix2}      &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -2.25 & --  & --- & $5\\cdot10^{-4}$ & 0.25 & 0.16  \\\\\nL000642\t\\ref{fig:2}(d)     &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -2.25 & --  & 4 & $5\\cdot10^{-4}$ & 0.25 & --  \\\\\nL000643\t\\ref{fig:2}(e)     &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -2.25 & --  & 4 & $5\\cdot10^{-4}$ & 0.25 & --  \\\\\nL000644\t\\ref{fig:3}     &    0.0      &    2.01      &   3           &  -1.5      &  0.1   & -1.68 & 5  & 4 & $5\\cdot10^{-4}$ & 0.25 & --  \\\\\nL000645\t\\ref{fig:4}(a,b,e) \\& \\ref{fig:appendix3}    &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -2.25 & 1.0  & 4 & $5\\cdot10^{-4}$ & 0.25 & --\\\\\nL000646\t\\ref{fig:4}(c)     &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -2.25 & --  & -- & $5\\cdot10^{-4}$ & 0.25 & -- \\\\\nL000647\t\\ref{fig:5}     &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -2.25 & 1.0  & --- & $5\\cdot10^{-4}$ & 0.25 & --  \\\\\nL000648\t\\ref{fig:3_appendix}     &    0.0      &    2.01      &   3           &  -2.5      &  0.1   & -1.925 & 5  & 4 & $5\\cdot10^{-4}$ & 0.25 & --  \\\\\nL000649\t\\ref{fig:appendix_intermediateDrops}     &    0.6      &    3.0      &   -0.6           &  -2.5      &  0.5   & -1.35 & 1.0  & 2.0 & 0.04 & 0.225 & --\\\\\nL000650\t\\bottomrule\nL000651\t\\end{tabular}\nL000652\t\\end{table*}\nL000653\t\nL000654\t\nL000655\t\\begin{figure}\nL000656\t    \\centering\nL000657\t      \\makebox[\\textwidth][c]{\nL000658\t      \\includegraphics[width=0.8\\textwidth]{final_figures/2a_appendix.pdf}}\nL000659\t     \\caption{\nL000660\t     \\textbf{Full phase diagram:} The full phase space, instead of the subset displayed in Fig.~\\ref{fig:2}(a), shows the entire binodal and how the unfueled system selects a single tie-line.}\nL000661\t     \\label{fig:appendix2}\nL000662\t\\end{figure}\nL000663\t\nL000664\tThe phase diagrams in Fig.~\\ref{fig:2}(a), Fig.~\\ref{fig:3}, and Fig.~\\ref{fig:3_appendix} only show a subset of the whole phase space. Therefore, the entire phase diagrams are shown in Fig.~\\ref{fig:appendix2} and Fig.~\\ref{fig:appendix3}. For the former, we see how the unfueled case (blue) selects a specific tie-line, while the fueled nullclines cross different tie-lines with different phase compositions. Furthermore, the full binodal makes it apparent how $A$-$C$ only barely phase separates, while $B$-$C$ is strongly repulsive. These parameters are chosen to achieve the conditions for bistability, as discussed in Appendix \\ref{sec:analytics}, by making the angle $\\alpha$ in Eq.~\\eqref{eq:crit_interactions} large.\\par\nL000665\t\nL000666\t\nL000667\t\nL000668\t\\begin{figure}[tb]\nL000669\t    \\centering\nL000670\t      \\makebox[\\textwidth][c]{\nL000671\t      \\sidesubfloat[]{\\includegraphics[width=0.7\\textwidth]{final_figures/excitable_appendix_PS.pdf}\\label{fig:2a}}}\\\\\nL000672\t    \\vspace{0.2cm}\nL000673\t      \\makebox[\\textwidth][c]{\nL000674\t      \\sidesubfloat[]{\\includegraphics[width=0.7\\textwidth]{final_figures/excitable_appendix.pdf}\\label{fig:2b}}}\nL000675\t     \\caption{\nL000676\t     \\textbf{Full phase diagram of excitable systems:}\nL000677\t     The full phase space, instead of the subset displayed in Fig.~\\ref{fig:3} and Fig.~\\ref{fig:3_appendix}, shown in (a) and (b) respectively, shows that there are two stable steady state points. Different initial conditions lead to different attractors, roughly separated by the total volume fraction $\\psi$ of the unstable steady state point.\nL000678\t}\nL000679\t\\label{fig:appendix3}\nL000680\t\\end{figure}\nL000681\t\nL000682\tThe full phase space for an excitable droplet, as depicted in Fig.~\\ref{fig:3} and Fig.~\\ref{fig:3_appendix}, is shown in Fig.~\\ref{fig:appendix3}(a,b). Here we see that the system is a bistable excitable medium, as there are two stable state points (black dots), and one unstable steady state (white dot). Even though there are two stable steady state points, only the lower one is excitable, as the flow lines show. The separatrix between the two equilibria is approximately given by the conserved line $\\bar{\\psi}$ of the unstable steady state. All initial conditions with $\\bar{\\psi}$ smaller than this value will create an excitable system.\nL000683\t\nL000684\t\nL000685\t\\section{Effective description of bistable active droplets}\\label{sec:effective_bistab}\nL000686\tFor the single reaction $r_1$, defined in Eq.~\\eqref{eq:r_1_pathway}, the evolution of the system is efficiently described by the dynamics of two fields; the reaction extent $\\bar{\\xi}\\equiv(\\bar{\\phi}_B - \\bar{\\phi}_A)/2$ and the total volume fraction $\\bar{\\psi}\\equiv(\\bar{\\phi}_A - \\bar{\\phi}_B)/2$. With this choice of coordinates, $\\bar{\\psi}$ is a constant $\\bar{\\psi}_0$, which is set by the initial conditions, while the change in $\\bar{\\xi}$ is equal to the phase-averaged reaction rate\nL000687\t\\begin{equation}\nL000688\t    \\partial_t\\bar{\\xi} = \\bar{r}_1(\\bar{\\xi},\\bar{\\psi}_0)\\,. \\label{eq:xi}\nL000689\t\\end{equation}\nL000690\tHere, we will expand the reaction rate at two different $\\xi$-values, one where the system is homogeneous and one where it is phase-separated.  By connecting the two cases, we find a piece-wise function that captures the normal form of bistable droplets given in Eq.~\\eqref{eq:effective_equations}, and displayed in Fig. \\ref{fig:2}(b).\nL000691\t\nL000692\tLet us start with the homogeneous case. The fluxes around the homogeneous chemical equilibrium point, denoted $(\\bar{\\xi}_0, \\bar{\\psi}_0)$, is approximately linear,\nL000693\t\\begin{equation}\nL000694\t   \\partial_t\\bar{\\xi} = -\\left(\\bar{\\xi} - \\bar{\\xi}_0\\right)h_1(\\bar{\\xi}_0,\\bar{\\psi}_0)\\,, \\label{eq:approx1}\nL000695\t\\end{equation}\nL000696\twhere $h_1>0$ makes  $\\bar{\\xi}_0$ a stable steady state. The first order coefficient of the Taylor expansion of $\\bar{r}_1$, denoted $h_1$, takes the form\nL000697\t\\begin{equation}\nL000698\t    h_1 = r_1^\\rightharpoonup\\left[\\frac{2\\bar{\\psi}_0}{\\bar{\\psi}_0^2 - \\bar{\\xi}_0^2} - \\pdv{}{\\bar{\\xi}}\\ln{\\left(\\frac{\\gamma_A}{\\gamma_B} \\right)}\\Bigg\\vert_{\\bar{\\xi}_0,\\bar{\\psi}_0}\\right]\\,, \\label{eq:h_1}\nL000699\t\\end{equation}\nL000700\twhere we have decomposed the chemical potential in terms of the reference chemical potentials $\\mu_i^0$ and the activity coefficients $\\gamma_i$, as defined through Eq.~\\eqref{eq:decomp_chempot}.\nL000701\tThe chemical equilibrium point $(\\bar{\\xi}_0,\\bar{\\psi}_0)$ around which we have expanded, defined by $\\mu_A=\\mu_B$, is given by\nL000702\t\\begin{equation}\nL000703\t    \\frac{\\bar{\\xi}_0}{\\bar{\\psi}_0} = 1- \\frac{2}{1+\\frac{\\gamma_A}{\\gamma_B}\\exp{\\frac{\\mu_A^0 + \\mu_B^0}{k_BT}}}\\,.\nL000704\t\\end{equation}\nL000705\tThe chemical forward and backward rates as used in Eq.~\\eqref{eq:h_1}, $r^\\rightharpoonup_1$ and $r^\\leftharpoondown_1$ respectively, are by definition positive\nL000706\t\\begin{equation}\nL000707\t    r_1^\\rightharpoonup\\equiv k_1\\exp{\\frac{\\mu_A}{k_BT}}\\, ,\\qquad r_1^\\leftharpoondown \\equiv k_1\\exp{\\frac{\\mu_B}{k_BT}}\\,. \\label{eq:r_f_or_r_back}\nL000708\t\\end{equation}\nL000709\tFurthermore, the first term in the square bracket of Eq. \\eqref{eq:h_1} is by the definitions of $\\bar{\\psi}$ and $\\bar{\\xi}$ positive, while the second term can take both signs. Using our form of the chemical potential (Eq.~\\eqref{eq:chem_pot}), the full expression simplifies to\nL000710\t\\begin{equation}\nL000711\t    h_1 = r_1^\\rightharpoonup\\left[\\frac{2\\bar{\\psi}_0}{\\bar{\\psi}_0^2 - \\bar{\\xi}_0^2} - 2\\frac{\\chi_{AB}}{k_BT}\\right]\\,, \\label{eq:h_1_def}\nL000712\t\\end{equation}\nL000713\tindependently of the number of components.\nL000714\t\nL000715\t\nL000716\t\nL000717\t\\begin{comment}\nL000718\tWe see that $h_1$ can be become negative for cases where\nL000719\t\\begin{equation}\nL000720\t    \\frac{\\chi_{AB}}{k_BT} > \\left(\\frac{1}{\\bar{\\phi}_A} +  \\frac{1}{\\bar{\\phi}_B}\\right),\nL000721\t\\end{equation}\nL000722\twhich coincides with the criteria for being inside the spinodal\\com{check}~\\cite{weberPhysicsActiveEmulsions2019d}, thus breaking our assumption of homogeneity. This shows that homogeneous chemical equilibrium points are always steady.\\par\nL000723\t\\end{comment}\nL000724\tWe now perform a Taylor expansion of $\\bar{r}_1$ for the case where the system is phase-separated. For phase-separated systems, changes in $\\bar{\\xi}$ now result in changes in the phase volumes and the composition of the phases. The local maxima in the phase-separated domain in Fig.~\\ref{fig:2}(a), denoted as $(\\bar{\\xi}_2, \\bar{\\psi}_0)$, can be approximated as\nL000725\t\\begin{equation}\nL000726\t    \\partial_t\\bar{\\xi} = h_0 - \\left(\\bar{\\xi} - \\bar{\\xi}_2\\right)^2 \\, h_2(\\bar{\\xi}_2,\\bar{\\psi}_0)\\,, \\label{eq:approx2}\nL000727\t\\end{equation}\nL000728\twhere $h_0$ is a constant given by $h_0=\\bar{r}_1(\\bar{\\xi}_2,\\bar{\\psi}_0)$, and $h_2$ is the negative of the second order coefficient of the Taylor expansion, i.e., $h_2=-\\partial_{\\bar{\\xi}}^2\\bar{r_1}\\big\\vert_{\\bar{\\xi}_2,\\bar{\\psi}_0}/2$, is given by\nL000729\t\\begin{align}\nL000730\t    2h_2 = -& \\pdv[2]{}{\\bar{\\xi}}\\left(r_1^\\rightharpoonup - r_1^\\leftharpoondown\\right) \\nonumber \\\\ &- \\left[\\exp{\\frac{\\delta}{k_BT}}-1\\right]\\pdv[2]{}{\\bar{\\xi}}\\left(\\frac{V^\\RN{2}r_1^\\rightharpoonup}{V}\\right)\\,. \\label{eq:h_2}\nL000731\t\\end{align}\nL000732\tNotably, the composition in each phase ($\\phi_i^{\\RN{1}/\\RN{2}}$) have a non-linear transcendental dependence on the phase-averaged quantities ($\\bar{\\xi},\\bar{\\psi}$) which must be known to perform the derivatives in Eq. \\eqref{eq:h_2}.\nL000733\t\nL000734\t\nL000735\t\nL000736\t\nL000737\t\nL000738\tFurther note that the conditions of phase coexistence (Eq.~\\eqref{eq:phase_coex}) allow us to omit the phase index of the forward and backward reaction rates (defined in Eq.~\\eqref{eq:r_f_or_r_back}). All non-equilibrium effects are captured by the second line of Eq.~\\eqref{eq:h_2}, where volume changes are irrelevant for equilibrium systems ($\\delta=0$). \\par\nL000739\tFor bistability to occur $h_0$, as defined in Eq.~\\eqref{eq:r_bar_rewrite}, must be positive. Remember that both the forward and backward reaction rates are positive by definition (Eq.~\\eqref{eq:r_f_or_r_back}).\nL000740\tFor a sufficiently strong fuel strength $\\delta$, the coefficient $h_0$ can become positive, as we see in Eq. \\eqref{eq:r_bar_rewrite}.\nL000741\t\nL000742\t\nL000743\tBy ensuring continuity of $\\partial_t\\bar{\\xi}$ at the binodal $\\bar{\\xi}=\\xi^{\\RN{1}}(\\bar{\\psi}_0)$, we can find an expression for $h_2$ in terms of $h_0$ and $h_1$, yielding\nL000744\t\\begin{equation}\nL000745\t    h_2 = \\frac{h_1\\left( \\xi^\\RN{1} - \\xi_0 \\right) + h_0}{\\left(\\xi^\\RN{1}-\\bar{\\xi_2}\\right)^2}\\,.\\label{eq:approx3}\nL000746\t\\end{equation}\nL000747\tThis alters the curvature at the expansion point $(\\bar{\\xi}_2, \\bar{\\psi}_2)$ while keeping the constant offset fixed. The choice of expressing $h_2$ in terms of the other coefficients is done to reduce the complexity of the normal form, while still capturing the essential role of the sign of $h_0$.\nL000748\t\nL000749\t\nL000750\tFrom the two expressions, we can write a piece-wise function for $\\partial_t\\bar{\\xi}$ as given in the main text in Eq.~\\eqref{eq:effective_equations}. Usually, the normal form of bistable chemical reactions in homogeneous systems originates from a cubic relationship between the reaction extent and its time derivative~\\cite{epsteinNonlinearChemicalDynamics1996,novakDesignPrinciplesBiochemical2008}. In contrast, for phase-separated systems the minimal prerequisite of bistability is a quadratic relationship between $\\xi$ and its time derivative. By utilizing the different behavior of homogeneous and phase-separated systems, bistability can occur for simpler reaction schemes. In the following Appendix, we perform the same expansion for systems where $\\bar{\\psi}$ is dynamic.\nL000751\t\nL000752\t\nL000753\t\nL000754\t\\section{Effective description of excited active droplets}\\label{sec:effective_active}\nL000755\t\nL000756\tWe follow a similar procedure as in Appendix~\\ref{sec:effective_bistab} to describe an excitable system. The key difference is a further chemical reaction with the rate $r_2$, defined in Eq.~\\eqref{eq:r_2_pathway}, which makes $\\bar{\\psi}$ change in time according to\nL000757\t\\begin{equation}\nL000758\t    \\partial_t\\bar{\\psi}= \\bar{r}_2\\, ,\nL000759\t\\end{equation}\nL000760\twhile the kinetic equation of $\\bar{\\xi}$ in Eq.~\\eqref{eq:xi} remains unchanged. The procedure of using piece-wise functions by treating the homogeneous and phase-separated cases separately will still be followed. We begin with the homogeneous case.\nL000761\t\nL000762\tAs the additional reaction $\\bar{r}_2$ obeys detailed balance with phase-independent rate coefficients $(k_2^\\RN{1}=k_2^\\RN{2})$, the reaction rate $r_2$ is equal in both phases. This makes changes in phase volumes not affect the phase-averaged reaction rates, such that the change in phase-averaged reaction rate $\\partial_{\\bar{\\psi}}\\bar{r}_2$ is equal to the reaction rate change in either phase $\\partial_{\\bar{\\psi}}\\bar{r}_2=\\partial_{\\bar{\\psi}}r^\\RN{1}_2=\\partial_{\\bar{\\psi}}r^\\RN{2}_2$. As a consequence, its expansion can approximately be made independently of phase separation, where we find\nL000763\t\\begin{equation}\nL000764\t    \\partial_t\\bar{\\psi} = -\\left(\\bar{\\xi}-\\bar{\\xi}_1\\right)f_\\xi\\left(\\bar{\\psi}_1, \\bar{\\xi}_1\\right) - \\left(\\bar{\\psi} - \\bar{\\psi}_1\\right)f_\\psi(\\bar{\\psi}_1, \\bar{\\xi}_1)\\, .\nL000765\t\\end{equation}\nL000766\tThe expansion point $(\\bar{\\psi}_1, \\bar{\\xi}_1)$ is chosen as the unstable steady state point in Fig.~\\ref{fig:4}(a), allowing us to set the zeroth order contribution to zero. Furthermore, the expansion is stable to changes in $\\bar{\\psi}$ ($f_\\psi>0$),\nL000767\twhere we have\nL000768\t\\begin{align}\nL000769\t    \\frac{f_{\\psi}}{2} &= \\bar{r}_2^\\rightharpoonup\\left( \\frac{2\\bar{\\xi}_1^2-\\bar{\\psi}_1}{\\left( \\bar{\\psi}_1^2 - \\bar{\\xi}_1^2 \\right)\\left(2\\bar{\\psi}_1-1\\right)} + \\frac{\\chi_{AB}-2\\chi_{BC}-2\\chi_{AC}}{k_BT}\\,\\right)\\,,\\nonumber \\\\\nL000770\t    \\frac{f_{\\xi}}{2} &= \\bar{r}_2^\\rightharpoonup\\left( \\frac{\\bar{\\xi}_1}{ \\bar{\\xi}_1^2 - \\bar{\\psi}_1^2} + \\frac{\\chi_{AC}-\\chi_{BC}}{k_BT}\\,\\right)\\,, \\label{eq:def_rhos}\nL000771\t\\end{align}\nL000772\twhere the first term of $f_\\psi$ is always positive. The sign of $f_\\xi$ can be both positive and negative. Performing a Taylor expansion of $\\bar{r}_1$ now requires an expansion in both variables $\\bar{\\xi}$ and $\\bar{\\psi}$. The homogeneous expansion becomes\nL000773\t\\begin{equation}\nL000774\t    \\partial_t\\bar{\\xi} = -\\left(\\bar{\\xi} - \\bar{\\xi}_0\\right)h_\\xi - \\left(\\bar{\\psi} - \\bar{\\psi}_0\\right)h_\\psi\\,. \\label{eq:approx4}\nL000775\t\\end{equation}\nL000776\tHere, $h_\\xi$ takes the same form as in Eq. \\eqref{eq:h_1_def}, and $h_\\psi$ can take both signs\nL000777\t\\begin{equation}\nL000778\t    h_\\psi = 2r_1^\\rightharpoonup\\left( \\frac{-\\bar{\\xi}_0}{{\\bar{\\psi}^2_0 - \\bar{\\xi}^2_0}} + \\frac{\\chi_{AC}-\\chi_{BC}}{k_BT}\\right) \\, . \\label{eq:h_psi}\nL000779\t\\end{equation}\nL000780\tFor the phase-separated expansion at $(\\bar{\\xi}_2, \\bar{\\psi}_1)$, the only addition in comparison to the derivation in Appendix~\\ref{sec:effective_bistab}, which granted the normal form in Eq.~\\eqref{eq:effective_equations}, is the expansion in $\\bar{\\psi}$, which yields a first-order coefficient\nL000781\t\\begin{equation}\nL000782\t    \\tilde{h}_\\psi = \\pdv{}{\\bar{\\psi}}\\left(r_1^\\leftharpoondown - r_1^\\rightharpoonup\\right)  \\, . \\label{eq:h_psi_tilde}\nL000783\t\\end{equation}\nL000784\tSuch that the normal form for $\\bar{\\xi}$ becomes\nL000785\t\\begin{equation}\nL000786\t    \\partial_t\\bar{\\xi} =\nL000787\t\\begin{cases}\nL000788\t   -\\left(\\bar{\\psi} - \\bar{\\psi}_0\\right)h_\\psi -  \\left(\\bar{\\xi} - \\bar{\\xi}_0\\right)h_\\xi,\\qquad\\quad\\, \\bar{\\xi} \\leq \\xi^\\RN{1},\\\\\nL000789\t   \\bar{r}_1 - \\left(\\bar{\\psi} - \\bar{\\psi}_1\\right)\\tilde{h}_\\psi  - h_{\\xi\\xi}\\left(\\bar{\\xi} - \\bar{\\xi}_2\\right)^2,\\quad \\bar{\\xi} > \\xi^\\RN{1}\\,.\nL000790\t\\end{cases}\nL000791\t\\end{equation}\nL000792\tThe system follows the two coupled equations for the phase-averaged total volume fraction $\\bar{\\psi}$ and for the phase-averaged reaction extent $\\bar{\\xi}$ given in Eq.~\\eqref{eq:effective_active}. The coefficients $f_{\\xi}$, $h_\\psi$, and $\\tilde{h}_\\psi$ induces a bilateral coupling between $\\bar{\\psi}$ and $\\bar{\\xi}$. Similar to other oscillating chemical reactions~\\cite{epsteinNonlinearChemicalDynamics1996,novakDesignPrinciplesBiochemical2008}, the kinetic equation for $\\bar{\\xi}$  is a sum of a coupling between the two quantities and a bistability. The combination of bistability and a negative feedback between $\\bar{\\psi}$ and $\\bar{\\xi}$ induces self-sustained stable chemical oscillations. The negative feedback emerges when large $\\bar{\\psi}$-values $(\\bar{\\psi}>\\bar{\\psi_1})$ leads to a decrease in $\\bar{\\xi}$ through $\\tilde{h}_{\\psi}>0$, while small $\\bar{\\psi}$-values $(\\bar{\\psi}<\\bar{\\psi_0})$ leads to an increase in $\\bar{\\xi}$ through $h_{\\psi}<0$. When this is combined with $\\bar{\\xi}>\\bar{\\xi}_1$ decreasing $\\bar{\\psi}$ and $\\bar{\\xi}<\\bar{\\xi}_1$ increasing it, i.e. $f_\\xi>0$, self-sustained cycles in $\\bar{\\xi}$ and $\\bar{\\psi}$ appear. Note that the essential property of $r_2$ is to make the otherwise conserved quantity $\\bar{\\psi}$ dynamic. The same normal form might therefore be achievable when allowing material exchange with a reservoir \\cite{haugerudNonequilibriumWetDry2024a}.\\par\nL000793\t\nL000794\t\nL000795\t\nL000796\t\nL000797\t\\section{Excitability to an active droplet}\\label{sec:excited_homo}\nL000798\t\nL000799\tSimilar to the excitable droplet displayed in Fig. \\ref{fig:4}, a homogeneous system with the two reactions $r_1$ and $r_2$ can become excitable upon a droplet forming perturbation. To achieve this, the intersection of the two nullclines must occur outside the binodal. Thus, a droplet forming perturbation into the binodal results in an excited trajectory much longer than the perturbation, as seen in Fig. \\ref{fig:3_appendix}. The dilute branch of the binodal corresponds to an excitation threshold.  During the excited trajectory, the droplet volume and composition change until it dissolves and returns to its homogeneous steady state. The system is not excitable along the trajectory, thus exhibiting a refractory period.\nL000800\t\nL000801\t\nL000802\t\\begin{figure}\nL000803\t    \\centering\nL000804\t      \\makebox[\\textwidth][c]{\nL000805\t      \\includegraphics[width=\\textwidth]{final_figures/figure3.pdf}}\nL000806\t     \\caption{\nL000807\t     \\textbf{Excitability to an active droplet:}\nL000808\t     When considering two chemical reactions (reaction $r_1$ Eq.~\\eqref{eq:r_1_pathway} and reaction $r_2$ Eq.~\\eqref{eq:r_2_pathway}),\nL000809\tthe active droplet system becomes excitable.\nL000810\t     For NESS close to the binodal, a compositional perturbation beyond the binodal line (black cross) can excite the system, forming an active droplet. As a result, the system follows an extended trajectory (orange)  with  changes in average composition far beyond the initial  perturbation.\nL000811\t     During this excited trajectory, the system has a refractory period in which it is no longer excitable. It relaxes back to the NESS, where the reaction nullclines for both reactions intersect (green and red lines).\nL000812\t\nL000813\t     }\nL000814\t     \\label{fig:3_appendix}\nL000815\t\\end{figure}\nL000816\t\nL000817\t\\section{Finding the critical fuel strength $\\delta^*$}\\label{sec:analytics}\nL000818\t\nL000819\tHere, we derive an approximate expression for the critical fuel strength $\\delta^*$, above which bistability occurs. To this end, we use the expression for the volume of the dense phase $V^\\RN{2}$ at the phase-separated nullcline given in Eq.~\\eqref{eq:NESS}, and insert it into the definition of the phase-averaged total volume fraction $\\bar{\\psi}$ using Eq.~\\eqref{eq:tot_vol_frac}. Finding the conditions for bistability is equivalent to finding non-equilibrium steady states with $\\bar{\\psi} < \\psi_0^\\RN{1}$, where $\\psi_0^\\RN{1} = \\phi_A^0 + \\phi_B^0$ is the total volume fraction where the dilute branch of the binodal intersects the nullcline of $r_1$ (Eq. \\eqref{eq:r_1_pathway}). Solving for $\\delta^*$ gives an expression the critical fuel strength necessary for bistability as a function of $\\Delta\\psi=\\bar{\\psi}-\\psi^\\RN{1}$:\nL000820\t\\begin{equation}\nL000821\t    e^{\\frac{\\delta^*}{k_BT}} = 1 + (1-e^{\\frac{-\\Delta\\mu}{k_BT}})\\left(\\frac{k^\\RN{1}_1}{k^\\RN{2}}\\left(1 + \\frac{\\psi^\\RN{2} - \\psi^\\RN{1}}{\\bar{\\psi} - \\psi^\\RN{1}} \\right) - 1\\right)\\, , \\label{eq:analytic_first_exp}\nL000822\t\\end{equation}\nL000823\twhere $\\Delta\\mu=\\mu_A-\\mu_B$ is the chemical potential difference between $A$ and $B$. As the fuel converts $A$ to $B$, the chemical potential difference is negative; $\\Delta\\mu<0.$ So far, no approximations have been made.\nL000824\t\nL000825\tDue to the non-linearity of Eq.~\\eqref{eq:analytic_first_exp}, we perform a Taylor-expansion at the point where the $r_1$ nullcline intersects the dilute branch of the binodal, which we denote $(\\phi_A^0,\\,\\phi_B^0)$. We investigate small deviations around this point, i.e., close to chemical equilibrium where $\\abs{\\Delta\\mu}\\ll k_BT$. Furthermore, we follow Ref.~\\cite{bauermannCriticalTransitionIntensive2024} and approximate the tie-lines to be orthogonal to the binodal. This implies that $(\\psi^\\RN{2}-\\psi^\\RN{1})$ is a constant along the binodal and can be set equal to the difference at the chemical equilibrium tie-line $(\\psi^\\RN{2}_0-\\psi^\\RN{1}_0)$. With these assumptions, we find\nL000826\t\\begin{align}\nL000827\t    \\begin{split}\nL000828\t    e^{\\frac{\\delta^*}{k_BT}} = 1 - \\frac{\\Delta\\mu}{k_BT}\\left[\\frac{k^\\RN{1}_1}{k^\\RN{2}_1}\\left(1+\\frac{\\psi_0^\\RN{2} - \\psi_0^\\RN{1}}{\\Delta\\psi}\\right) - 1\\right]& \\label{eq:early_delta_star} \\\\ + \\frac{1}{2}\\left(\\frac{\\Delta\\mu}{k_BT}\\right)^2\\left[\\frac{k^\\RN{1}_1}{k^\\RN{2}_1}\\left( 1 + \\frac{\\psi_0^\\RN{2} - \\psi_0^\\RN{1}}{\\Delta\\psi} \\right)-1\\right]& \\, , \\end{split}\nL000829\t\\end{align}\nL000830\twhere the Taylor expansion is truncated above second order, ignoring $\\mathcal{O}(\\Delta\\mu/k_BT)^3$. We continue by introducing the angle $\\alpha$ of the dilute branch of the binodal at $(\\phi_A^0,\\,\\phi_B^0)$, relative to the conserved line of $\\psi^\\RN{1}_0 = \\phi_A^0 + \\phi_B^0$ at the same point. This definition of the angle is such that $\\alpha=0$ gives a binodal parallel to the conserved line, where the dilute branch of the binodal can be approximated as $(\\phi_A^0 - \\epsilon\\sin{\\left(\\alpha + \\pi/4\\right)}, \\phi_B^0 - \\epsilon\\sin{\\left(\\alpha - \\pi/4\\right)})$, where $\\epsilon \\simeq \\Delta\\psi/(\\sqrt{2}\\sin{\\left(\\alpha\\right)})$. An illustration is given in Fig.~\\ref{fig:appendix_analytics}. Performing this Taylor expansion in the chemical potential difference, we find $\\Delta\\mu\\approx\\Delta\\psi\\,\\theta$, where\nL000831\t\\begin{align}\nL000832\t    \\theta &= \\frac{\\cos{\\alpha}\\left(\\phi_A^0\\right)^{-1} +  \\sin{\\alpha}\\left(\\phi_B^0\\right)^{-1}}{\\sqrt{2}\\sin{\\alpha}} \\label{eq:approx_chem}\\\\ &+ \\frac{\\chi_{BC}-\\chi_{AC}}{k_BT} + \\frac{1}{\\tan{\\alpha}}\\frac{\\chi_{AB}}{k_BT}\\, .\\nonumber\nL000833\t\\end{align}\nL000834\tUsing this approximate expression for the chemical potential in Eq.~\\eqref{eq:early_delta_star}, we find\nL000835\t\\begin{align}\nL000836\t    \\exp{\\frac{\\delta^*}{k_BT}} &= 1 + \\frac{k^\\RN{1}_1}{k^\\RN{2}_1}\\theta\\left(\\psi_0^\\RN{2} - \\psi_0^\\RN{1}\\right) \\label{eq:full_delta*} \\\\\nL000837\t    &- \\Delta\\psi\\,\\theta\\left(1 - \\frac{k^\\RN{1}_1}{k^\\RN{2}_1}\\left( 1 + \\theta\\frac{\\psi^\\RN{2}_0-\\psi^\\RN{1}_0}{2}\\right) \\right) \\nonumber \\\\\nL000838\t    &+ \\left(\\Delta\\psi\\right)^2\\frac{\\theta^2}{2}\\left(1-\\frac{k^\\RN{1}_1}{k^\\RN{2}_1}\\right)\\nonumber\\,.\nL000839\t\\end{align}\nL000840\tThe terms independent of $\\Delta\\psi$ give the expression for the minimal fuel strength needed for bifurcation, as shown in Eq.~\\eqref{eq:ana_deltastar} and Fig.~\\ref{fig:2}(e), where we have separated the thermodynamic parameters into $\\Theta\\equiv \\left( \\psi_0^\\RN{2}-\\psi_0^\\RN{1}\\right)\\theta$, such that\nL000841\t\\begin{align}\nL000842\t    \\Theta &= \\left(\\psi_0^\\RN{2} - \\psi_0^\\RN{1}\\right)\\Big(\\frac{\\chi_{BC}-\\chi_{AC}}{k_BT} +  \\frac{1}{\\tan{\\alpha}}\\frac{\\chi_{AB}}{k_BT} \\nonumber \\\\\nL000843\t    &+\\frac{\\cos{\\alpha}\\left(\\phi_A^0\\right)^{-1} +  \\sin{\\alpha}\\left(\\phi_B^0\\right)^{-1}}{\\sqrt{2}\\sin{\\alpha}}\\Big)\\, .\\label{eq:crit_interactions}\nL000844\t\\end{align}\nL000845\tNotably, the expression diverges at an angle $\\alpha=0$, and any angle $\\alpha < 0$ gives a large negative value of $\\Theta$, which does not yield physical solutions of $\\delta^*$ in Eq.~\\eqref{eq:ana_deltastar}. This can be understood geometrically, as the $r_1$ nullcline has to lie within the binodal for multiple intersections with $\\psi$ to occur, and therefore, $\\psi$ has to also lie within the binodal. Note that $\\alpha$ is in general negative when $\\chi_{AC}>\\chi_{BC}$, and positive when $\\chi_{AC}<\\chi_{BC}$, making the latter a necessity for bistability.\nL000846\tThe minimal value of $\\Theta$, which occurs for $\\alpha=\\pi/2$, is finite. Consequently, the critical fuel strength $\\delta^*$ never approaches zero, and a finite fuel strength is always necessary for bistability. Note further that large values of $\\alpha$, which lowers the critical fuel strength, occurs when $\\chi_{BC}\\gg\\chi_{AC}$, thereby increasing the constant offset of $\\Theta$. It is, therefore, not trivial to minimize the expression for $\\Theta$. The predicted critical fuel strength is compared with the analytic expression in Fig.~\\ref{fig:2}(e), which agrees with the numerical solution within $10\\%$. As $\\Delta\\psi$ increases the deviation from chemical equilibrium increases and higher order terms in $\\Delta\\mu$ are need for an agreement, creating a growing discrepency between the analytic and numerical result.\nL000847\t\nL000848\tFor the case where the reaction rate coefficient is equal in both phases, the expression simplifies to\nL000849\t\\begin{equation}\nL000850\t    e^{\\frac{\\delta^*}{k_BT}} = 1 - \\left(\\psi^\\RN{2}_0 -\\psi^\\RN{1}_0 \\right)\\theta + \\Delta\\psi \\left(\\psi^\\RN{2}_0 -\\psi^\\RN{1}_0 \\right) \\frac{\\theta^2}{2}\\, ,\nL000851\t\\end{equation}\nL000852\tas the second order contribution of $\\Delta\\psi$ in Eq.~\\eqref{eq:full_delta*} cancels.\nL000853\t\nL000854\t\\begin{figure}\nL000855\t    \\centering\nL000856\t      \\makebox[\\textwidth][c]{\nL000857\t      \\includegraphics[width=0.75\\textwidth]{final_figures/appendix_analytics2.pdf}}\nL000858\t     \\caption{\nL000859\t     \\textbf{Approximate phase diagram:} To approximate the chemical potential around the chemical equilibrium point of the dilute binodal branch $(\\phi_A^0, \\phi_B^0)$, we approximate the binodal as a straight line with angle $\\alpha$ relative to the conserved line $\\psi_0^\\RN{1}=\\phi_A^0+\\phi_B^0$. With this approximation, a point align the binodal can be written as $(\\phi_A^0 - \\epsilon\\sin{\\left(\\alpha + \\pi/4\\right)}, \\phi_B^0 - \\epsilon\\sin{\\left(\\alpha - \\pi/4\\right)})$, leading to the expression for the chemical potential in Eq.~\\eqref{eq:approx_chem}.}\nL000860\t     \\label{fig:appendix_analytics}\nL000861\t\\end{figure}\nL000862\t\nL000863\t\nL000864\t\\section{Oscillations in droplet volume}\\label{sec:volume_oscillations}\nL000865\t\nL000866\t\nL000867\t\nL000868\t\\begin{figure}\nL000869\t    \\centering\nL000870\t      \\makebox[\\textwidth][c]{\nL000871\t      \\includegraphics[width=0.9\\textwidth]{final_figures/figE.pdf}}\nL000872\t     \\caption{\nL000873\t     \\textbf{Oscillations in droplets volumes:} The same chemical reaction network can produce oscillations in the droplet volume. These oscillations are achieved by changing the interaction strengths between the components, altering the binodal and, therefore, the curvature of the reaction nullcline. }\nL000874\t     \\label{fig:appendix_intermediateDrops}\nL000875\t\\end{figure}\nL000876\t\nL000877\tWe have investigated the case of a system where both $A$ and $B$ independently phase-separate from the solvent. The same reaction network can produce fundamentally different oscillations by changing the interactions between the components. For example, it could make large droplet volumes unstable, though this is similar to the system we studied here. \\par\nL000878\tAn interesting case is a system where the reaction nullcline becomes unstable in the center of the binodal instead of by either the dilute or dense branch, as depicted in Fig.~\\ref{fig:appendix_intermediateDrops}. Such a system does not result in formation and dissolution cycles but droplet volume oscillations. The oscillations emerge from an interval of droplet compositions being unstable. As the droplet grows and changes composition, it becomes unstable, leading to a fast change in composition and a decrease in droplet volume. This fast composition change crosses the nullcine of $r_2$, leading to a turnover from $C$ to $A$ and $B$. Again, this turnover leads to an unstable droplet composition where diffusive and reactive fluxes cannot balance, leading to a fast increase in droplet volume, continuing indefinitely.\nL000879\t\nL000880\t\nL000881\t\nL000882\tThe discussed oscillation type originates from phase diagrams where the dilute phase can become dense enough for the fuel to partition into the dilute and dense phases. This reduces the effect of the fuel, as it affects reactions similarly in both phases. In the limiting case of the fuel affecting the reaction equally in both phases, the system is mappable to an equilibrium system with a change in internal energy $\\tilde{\\omega}_A = \\omega_A + \\delta$. For the case in Fig.~\\ref{fig:appendix_intermediateDrops}, the fueling threshold is $\\psi_{1/2}=0.45$, with a less steep fuel transition width than previously, $\\kappa=0.04$.\nL000883\t\nL000884\t\\end{document}\nL000885\t===== END FILE: main.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides a minimal theoretical model of active droplets with two chemical reactions, showing a pitchfork bifurcation in droplet volume with fuel strength, excitability, and self-sustained oscillations. The key quantitative relations include the critical fuel strength for bistability (Eq. 12) and the cycle frequency scaling with k2 (Omega proportional to k2). The paper reports specific parameter values in Table 1 for figures, including fuel strength delta=4 (in units of k_BT) and k2/k1=1.0 for oscillation figures. The cycle frequency is stated to be weakly affected by delta, with a power-law dependence on k2. The source provides enough quantitative detail to support a numeric control (delta), a numeric readout (cycle frequency Omega), and a quantitative mechanism (Omega proportional to k2), but the exact numeric value of Omega is not given, only the scaling relation. Therefore, case_authoring_ready is set to false because no numeric readout value is reported; only a proportionality is stated.\\\",\\n  \\\"case_authoring_ready\\\": false,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Ivar S. Haugerud, Excitability and Oscillations of Active Droplets, Physical Review Letters (2026), DOI:10.1103/g9dh-ymx9\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/g9dh-ymx9\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2503.11604v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper presents a minimal theoretical model of active droplets with two chemical reactions, showing a pitchfork bifurcation in droplet volume with fuel strength, excitability, and self-sustained oscillations. It derives normal forms for bistability and oscillations, and provides parameter values for figures.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"cycle_frequency_scaling\\\",\\n      \\\"statement\\\": \\\"The cycle frequency Omega of self-sustained oscillations is proportional to the reaction rate coefficient k2 of the second reaction, Omega proportional to k2, because the slower unfueled reaction 2 becomes rate-limiting.\\\",\\n      \\\"equations\\\": [\\n        \\\"Omega \\\\\\\\propto k_2\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"Omega\\\",\\n        \\\"k_2\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"cycle_freq_proportionality_constant\\\",\\n          \\\"value\\\": 1.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"proportionality constant in Omega = C * k2\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 317,\\n              \\\"line_end\\\": 317,\\n              \\\"support\\\": \\\"The cycle frequency follows a power-law with the reaction rate coefficient k2, Omega proportional to k2.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 317,\\n          \\\"line_end\\\": 317,\\n          \\\"support\\\": \\\"The cycle frequency follows a power-law with the reaction rate coefficient k2, Omega proportional to k2.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 390,\\n          \\\"line_end\\\": 390,\\n          \\\"support\\\": \\\"This property is apparent in the scaling of the cycle frequency Omega proportional to k2.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"oscillation_parameters_fig4\\\",\\n      \\\"statement\\\": \\\"For oscillation figures (Fig. 4a,b,e), the parameters are: chi_AB=0, chi_AC=2.01, chi_BC=3, omega_A=-2.5, omega_B=0.1, omega_C=-2.25, k2/k1=1.0, delta=4 (in units of k_BT), kappa=5e-4, psi_1/2=0.25, and molecular volumes nu_i=1.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 645,\\n          \\\"line_end\\\": 645,\\n          \\\"support\\\": \\\"Table row for Fig. 4(a,b,e) lists chi_AB=0, chi_AC=2.01, chi_BC=3, omega_A=-2.5, omega_B=0.1, omega_C=-2.25, k2/k1=1.0, delta=4, kappa=5e-4, psi_1/2=0.25.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 637,\\n          \\\"line_end\\\": 637,\\n          \\\"support\\\": \\\"Common for all figures: molecular volumes are equal, nu_i=1, and energy values are in units of k_BT.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"fuel_strength_delta\\\",\\n      \\\"definition\\\": \\\"Fuel strength delta that enhances the forward reaction from A to B, appearing in the fueling function tilde_delta(psi) = (delta/pi)[pi/2 + tanh((psi-psi_1/2)/kappa)].\\\",\\n      \\\"unit\\\": \\\"k_BT\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [4.0],\\n      \\\"domain_statement\\\": \\\"The paper reports delta=4 (in units of k_BT) for oscillation figures (Fig. 4a,b,e) and delta=4 for Fig. 3, but no continuous range is given for the oscillation regime.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 645,\\n          \\\"line_end\\\": 645,\\n          \\\"support\\\": \\\"Table row for Fig. 4(a,b,e) lists delta=4.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"reaction_rate_coefficient_k2\\\",\\n      \\\"definition\\\": \\\"Reaction rate coefficient of the second reaction r2: A + B <=> 2C, which breaks the conservation of psi.\\\",\\n      \\\"unit\\\": \\\"k1\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [1.0],\\n      \\\"domain_statement\\\": \\\"The paper reports k2/k1=1.0 for oscillation figures (Fig. 4a,b,e), and k2/k1=5 for Fig. 3, but no continuous range is given.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 645,\\n          \\\"line_end\\\": 645,\\n          \\\"support\\\": \\\"Table row for Fig. 4(a,b,e) lists k2/k1=1.0.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"cycle_frequency_Omega\\\",\\n      \\\"definition\\\": \\\"The frequency of self-sustained formation-dissolution cycles of the active droplet, defined as the inverse of the period.\\\",\\n      \\\"unit\\\": \\\"k1\\\",\\n      \\\"statistic\\\": \\\"Reported as a scaling relation, not a measured value.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 317,\\n          \\\"line_end\\\": 317,\\n          \\\"support\\\": \\\"The cycle frequency follows a power-law with the reaction rate coefficient k2, Omega proportional to k2.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 390,\\n          \\\"line_end\\\": 390,\\n          \\\"support\\\": \\\"This property is apparent in the scaling of the cycle frequency Omega proportional to k2.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"cycle_frequency_scaling_claim\\\",\\n      \\\"statement\\\": \\\"The cycle frequency Omega of self-sustained oscillations is proportional to the reaction rate coefficient k2, Omega proportional to k2, and is weakly affected by the fuel strength delta.\\\",\\n      \\\"quantitative_form\\\": \\\"Omega = C * k2\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"cycle_frequency_Omega\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"param\\\": \\\"cycle_freq_proportionality_constant\\\"\\n            },\\n            {\\n              \\\"var\\\": \\\"reaction_rate_coefficient_k2\\\"\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"cycle_frequency_scaling\\\"],\\n      \\\"control_names\\\": [\\\"reaction_rate_coefficient_k2\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"reaction_rate_coefficient_k2\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [1.0],\\n          \\\"domain_statement\\\": \\\"The paper reports k2/k1=1.0 for oscillation figures (Fig. 4a,b,e), and k2/k1=5 for Fig. 3, but no continuous range is given.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 645,\\n              \\\"line_end\\\": 645,\\n              \\\"support\\\": \\\"Table row for Fig. 4(a,b,e) lists k2/k1=1.0.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"cycle_frequency_Omega\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"oscillation_parameters_fig4\\\"],\\n      \\\"applicability\\\": \\\"The scaling holds for the oscillation regime where the system undergoes self-sustained cycles, with k2 much smaller than k1*exp(delta/(k_BT)) so that reaction 2 is rate-limiting.\\\",\\n      \\\"statistical_basis\\\": \\\"The scaling is stated qualitatively from numerical observations; no error bars or fit details are provided.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 317,\\n          \\\"line_end\\\": 317,\\n          \\\"support\\\": \\\"The cycle frequency follows a power-law with the reaction rate coefficient k2, Omega proportional to k2.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 390,\\n          \\\"line_end\\\": 390,\\n          \\\"support\\\": \\\"This property is apparent in the scaling of the cycle frequency Omega proportional to k2.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 392,\\n          \\\"line_end\\\": 392,\\n          \\\"support\\\": \\\"The slower unfueled reaction 2 with k2 << k1*exp(delta/(k_BT)) becomes rate limiting, thereby determining the cycle frequency Omega.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"cycle_frequency_numeric_value_missing\\\",\\n      \\\"statement\\\": \\\"The paper states Omega proportional to k2 but does not report a numeric value for Omega or the proportionality constant, so the exact numeric relation is not specified.\\\",\\n      \\\"claim_ids\\\": [\\\"cycle_frequency_scaling_claim\\\"],\\n      \\\"mechanism_ids\\\": [\\\"cycle_frequency_scaling\\\"],\\n      \\\"control_names\\\": [\\\"reaction_rate_coefficient_k2\\\"],\\n      \\\"readout_names\\\": [\\\"cycle_frequency_Omega\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"oscillation_parameters_fig4\\\"],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 317,\\n          \\\"line_end\\\": 317,\\n          \\\"support\\\": \\\"The cycle frequency follows a power-law with the reaction rate coefficient k2, Omega proportional to k2.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"must contain at least two unique values\",\"path\":\"$.controls[0].allowed_values\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

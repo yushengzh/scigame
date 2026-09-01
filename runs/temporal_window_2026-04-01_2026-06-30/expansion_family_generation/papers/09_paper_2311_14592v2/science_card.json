@@ -1,0 +1,484 @@
+{
+  "assessment": "The source provides a quantitative analysis of chaotic fluctuations in transmon qubit gates, focusing on the KL divergence of eigenphase spacings and curvature statistics. The best quantitative cluster is the curvature power-law decay for the BGATE, with two regimes (Poisson and GUE) distinguished by the time interval. The controls are time t and the curvature k, and the readout is the probability distribution P(k). The source reports fitted exponents beta=2 and beta=4 for the two regimes, with a normalization constant. The case is authoring-ready because it has numeric controls, a numeric readout, a quantitative mechanism, and an objective response within an explicit domain.",
+  "case_authoring_ready": true,
+  "claims": [
+    {
+      "anchors": [
+        {
+          "line_end": 361,
+          "line_start": 360,
+          "support": "The latter instead follows a POI-like behavior with exponent beta_tilde=2."
+        },
+        {
+          "line_end": 323,
+          "line_start": 322,
+          "support": "P_POI(k) = N_POI / (1 + k^2)."
+        }
+      ],
+      "applicability": "Applies to the initial time interval of the fast BGATE (T = 50 ns), where the curvature statistics follow Poisson-like behavior.",
+      "claim_id": "curvature_power_law_poisson",
+      "control_domains": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 330,
+              "line_start": 328,
+              "support": "For large k, Eq. (Curv) gives a power-law behavior, P(k->infinity) proportional to |k|^(-beta_tilde)."
+            }
+          ],
+          "control_name": "curvature_k",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "The curvature k is a non-negative real number; the power-law behavior is stated for large k, and the distributions are defined for k >= 0.",
+          "maximum": 100.0,
+          "minimum": 0.0
+        }
+      ],
+      "control_names": [
+        "curvature_k"
+      ],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "bgate_fast",
+        "system_params",
+        "hilbert_dim"
+      ],
+      "mechanism_ids": [
+        "curvature_power_law"
+      ],
+      "oracle_outputs": {
+        "curvature_distribution": {
+          "args": [
+            {
+              "param": "N_POI"
+            },
+            {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "var": "curvature_k"
+                    },
+                    {
+                      "param": "two_constant"
+                    }
+                  ],
+                  "op": "power"
+                },
+                {
+                  "param": "one_constant"
+                }
+              ],
+              "op": "add"
+            }
+          ],
+          "op": "divide"
+        }
+      },
+      "quantitative_form": "P(k) = N_POI / (1 + k^2) for k >= 0, with power-law tail P(k) ~ |k|^(-2) for large k.",
+      "readout_names": [
+        "curvature_distribution"
+      ],
+      "statement": "For the initial time interval of the fast BGATE, the curvature distribution follows a Poisson-like power-law decay with exponent beta_tilde = 2.",
+      "statistical_basis": "Curvature values collected from the initial time segment (first 0.5 ns interval) and histogrammed.",
+      "uncertainty": "source_unspecified"
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 360,
+          "line_start": 360,
+          "support": "reproducing the GUE exponent of beta_tilde=4 for all but the initial time interval."
+        },
+        {
+          "line_end": 323,
+          "line_start": 323,
+          "support": "P_GUE(k) = N_GUE / (1 + k^2)^2."
+        }
+      ],
+      "applicability": "Applies to all but the initial time interval of the fast BGATE (T = 50 ns), where the curvature statistics follow GUE-like behavior.",
+      "claim_id": "curvature_power_law_gue",
+      "control_domains": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 330,
+              "line_start": 328,
+              "support": "For large k, Eq. (Curv) gives a power-law behavior, P(k->infinity) proportional to |k|^(-beta_tilde)."
+            }
+          ],
+          "control_name": "curvature_k",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "The curvature k is a non-negative real number; the power-law behavior is stated for large k, and the distributions are defined for k >= 0.",
+          "maximum": 100.0,
+          "minimum": 0.0
+        }
+      ],
+      "control_names": [
+        "curvature_k"
+      ],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "bgate_fast",
+        "system_params",
+        "hilbert_dim"
+      ],
+      "mechanism_ids": [
+        "curvature_power_law"
+      ],
+      "oracle_outputs": {
+        "curvature_distribution": {
+          "args": [
+            {
+              "param": "N_GUE"
+            },
+            {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "var": "curvature_k"
+                        },
+                        {
+                          "param": "two_constant"
+                        }
+                      ],
+                      "op": "power"
+                    },
+                    {
+                      "param": "one_constant"
+                    }
+                  ],
+                  "op": "add"
+                },
+                {
+                  "param": "two_constant"
+                }
+              ],
+              "op": "power"
+            }
+          ],
+          "op": "divide"
+        }
+      },
+      "quantitative_form": "P(k) = N_GUE / (1 + k^2)^2 for k >= 0, with power-law tail P(k) ~ |k|^(-4) for large k.",
+      "readout_names": [
+        "curvature_distribution"
+      ],
+      "statement": "For all but the initial time interval of the fast BGATE, the curvature distribution follows a GUE-like power-law decay with exponent beta_tilde = 4.",
+      "statistical_basis": "Curvature values collected from each time segment (0.5 ns intervals) and histogrammed.",
+      "uncertainty": "source_unspecified"
+    }
+  ],
+  "controls": [
+    {
+      "allowed_values": [
+        0.25,
+        0.75,
+        1.25,
+        1.75,
+        2.25,
+        2.75,
+        3.25,
+        3.75,
+        4.25,
+        4.75,
+        5.25,
+        5.75,
+        6.25,
+        6.75,
+        7.25,
+        7.75,
+        8.25,
+        8.75,
+        9.25,
+        9.75,
+        10.25,
+        10.75,
+        11.25,
+        11.75,
+        12.25,
+        12.75,
+        13.25,
+        13.75,
+        14.25,
+        14.75
+      ],
+      "anchors": [
+        {
+          "line_end": 350,
+          "line_start": 349,
+          "support": "we calculate the curvature of the eigenphases in each of 30 equally-spaced t segments of length 0.5 ns."
+        }
+      ],
+      "definition": "Time during the gate protocol at which the curvature distribution is evaluated.",
+      "domain_kind": "numeric_values",
+      "domain_statement": "30 equally-spaced t segments of length 0.5 ns covering the gate duration T = 50 ns; the midpoint of each segment is used.",
+      "maximum": null,
+      "minimum": null,
+      "name": "time_t",
+      "unit": "nanosecond"
+    },
+    {
+      "allowed_values": [],
+      "anchors": [
+        {
+          "line_end": 327,
+          "line_start": 325,
+          "support": "k_n = kappa_n Delta(phi_n) / (2 pi Var(dt phi_n)), with kappa_n = d^2 phi_n/dt^2."
+        },
+        {
+          "line_end": 330,
+          "line_start": 328,
+          "support": "For large k, Eq. (Curv) gives a power-law behavior, P(k->infinity) proportional to |k|^(-beta_tilde)."
+        }
+      ],
+      "definition": "Dimensionless eigenphase curvature, rescaled by average spacing and velocity variance.",
+      "domain_kind": "continuous_interval",
+      "domain_statement": "The curvature k is a non-negative real number; the power-law behavior is stated for large k, and the distributions are defined for k >= 0.",
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "name": "curvature_k",
+      "unit": "dimensionless"
+    }
+  ],
+  "fixed_conditions": [
+    {
+      "anchors": [
+        {
+          "line_end": 235,
+          "line_start": 234,
+          "support": "The fastest possible universal set of gates uses gate durations of T = 50 ns."
+        },
+        {
+          "line_end": 232,
+          "line_start": 229,
+          "support": "Gates operate in the quasi-dispersive straddling qutrits (QuaDiSQ) regime with dim H = 150."
+        }
+      ],
+      "condition_id": "bgate_fast",
+      "statement": "Fast entangling BGATE with gate duration T = 50 ns, operating in the QuaDiSQ regime with Hilbert space dimension 150."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 241,
+          "line_start": 239,
+          "support": "Increasing the gate durations by a factor of two to T = 100 ns significantly reduces both temporal and spectral complexity of the pulses."
+        }
+      ],
+      "condition_id": "bgate_slow",
+      "statement": "Slower entangling BGATE with gate duration T = 100 ns, operating in the QuaDiSQ regime with Hilbert space dimension 150."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 526,
+          "line_start": 514,
+          "support": "Table with parameters: frequency cavity C = 6.2 GHz, base frequency transmon Q1 = 6.0 GHz, base frequency transmon Q2 = 5.9 GHz, anharmonicity Q1 = -290 MHz, anharmonicity Q2 = -310 MHz, coupling g = 70 MHz, driving frequency = 5.93 GHz."
+        }
+      ],
+      "condition_id": "system_params",
+      "statement": "System parameters: cavity frequency omega_c/2pi = 6.2 GHz, transmon Q1 frequency omega_1/2pi = 6.0 GHz, transmon Q2 frequency omega_2/2pi = 5.9 GHz, anharmonicities alpha_1/2pi = -290 MHz, alpha_2/2pi = -310 MHz, coupling g/2pi = 70 MHz, drive frequency omega_d/2pi = 5.93 GHz."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 492,
+          "line_start": 492,
+          "support": "Taking the local Hilbert space dimensions to be 5 for each of the transmons and 6 for the cavity, resulted in a total Hilbert space dimension N=150."
+        }
+      ],
+      "condition_id": "hilbert_dim",
+      "statement": "Hilbert space dimension N = 150, constructed from local dimensions 5 for each transmon and 6 for the cavity."
+    }
+  ],
+  "mechanisms": [
+    {
+      "anchors": [
+        {
+          "line_end": 330,
+          "line_start": 316,
+          "support": "Definition of curvature kappa_n = d^2 phi_n/dt^2, rescaled curvature k_n, and the distributions P_POI(k) and P_GUE(k) with power-law tails."
+        },
+        {
+          "line_end": 361,
+          "line_start": 349,
+          "support": "Curvature statistics computed in 30 equally-spaced t segments of length 0.5 ns; power-law decay with exponent 4 for all but initial interval, exponent 2 for initial interval."
+        }
+      ],
+      "equations": [
+        "P(k) = N / (1 + k^2) for Poisson",
+        "P(k) = N / (1 + k^2)^2 for GUE",
+        "P(k -> infinity) proportional to |k|^(-beta_tilde) with beta_tilde = 2 (Poisson) or 4 (GUE)"
+      ],
+      "mechanism_id": "curvature_power_law",
+      "parameters": [
+        {
+          "anchors": [
+            {
+              "line_end": 330,
+              "line_start": 328,
+              "support": "For large k, Eq. (Curv) gives a power-law behavior, P(k->infinity) proportional to |k|^(-beta_tilde) with beta_tilde=2(4) for the Poisson (GUE) case."
+            },
+            {
+              "line_end": 361,
+              "line_start": 360,
+              "support": "The latter instead follows a POI-like behavior with exponent beta_tilde=2."
+            }
+          ],
+          "name": "beta_POI",
+          "role": "power-law exponent for Poisson curvature distribution",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless",
+          "value": 2.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 330,
+              "line_start": 328,
+              "support": "For large k, Eq. (Curv) gives a power-law behavior, P(k->infinity) proportional to |k|^(-beta_tilde) with beta_tilde=2(4) for the Poisson (GUE) case."
+            },
+            {
+              "line_end": 360,
+              "line_start": 360,
+              "support": "reproducing the GUE exponent of beta_tilde=4 for all but the initial time interval."
+            }
+          ],
+          "name": "beta_GUE",
+          "role": "power-law exponent for GUE curvature distribution",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless",
+          "value": 4.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 323,
+              "line_start": 322,
+              "support": "P_POI(k) = N_POI / (1 + k^2), where N_POI is a normalization constant."
+            }
+          ],
+          "name": "N_POI",
+          "role": "normalization constant for Poisson curvature distribution (set to 1 for the power-law form)",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 323,
+              "line_start": 323,
+              "support": "P_GUE(k) = N_GUE / (1 + k^2)^2, where N_GUE is a normalization constant."
+            }
+          ],
+          "name": "N_GUE",
+          "role": "normalization constant for GUE curvature distribution (set to 1 for the power-law form)",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 323,
+              "line_start": 322,
+              "support": "P_POI(k) = N_POI / (1 + k^2), P_GUE(k) = N_GUE / (1 + k^2)^2."
+            }
+          ],
+          "name": "one_constant",
+          "role": "constant 1 appearing in the curvature distribution denominators",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 323,
+              "line_start": 323,
+              "support": "P_GUE(k) = N_GUE / (1 + k^2)^2."
+            }
+          ],
+          "name": "two_constant",
+          "role": "constant 2 appearing as the exponent in the GUE curvature distribution",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless",
+          "value": 2.0
+        }
+      ],
+      "statement": "The probability distribution of dimensionless eigenphase curvatures k follows a power-law decay for large k, with exponent beta_tilde = 2 for Poisson (integrable) dynamics and beta_tilde = 4 for GUE (chaotic) dynamics.",
+      "variable_names": [
+        "k",
+        "kappa_n",
+        "Delta",
+        "Var(dt phi_n)",
+        "beta_tilde",
+        "N_POI",
+        "N_GUE"
+      ]
+    }
+  ],
+  "paper_scope": "The paper analyzes signatures of non-integrability and chaos in a universal set of transmon qubit gates (Hadamard, local phase, and BGATE) implemented via optimal control on two transmons coupled to a cavity. It uses spectral statistics (KL divergence of eigenphase spacings) and curvature statistics to identify chaotic fluctuations, and studies robustness of the fast BGATE to parameter deviations.",
+  "readouts": [
+    {
+      "anchors": [
+        {
+          "line_end": 351,
+          "line_start": 349,
+          "support": "we calculate the curvature of the eigenphases in each of 30 equally-spaced t segments of length 0.5 ns. The resulting distributions of the curvatures are shown in Fig. 3."
+        },
+        {
+          "line_end": 317,
+          "line_start": 316,
+          "support": "we consider the curvature kappa_n of the eigenphases, kappa_n(t) = d^2 phi_n(t)/dt^2."
+        }
+      ],
+      "definition": "Probability distribution P(k) of the dimensionless eigenphase curvatures k, computed from the curvature values in each time segment.",
+      "name": "curvature_distribution",
+      "resolution": null,
+      "statistic": "Histogram of curvature values in each time segment; the distribution is normalized.",
+      "uncertainty": "source_unspecified",
+      "unit": "dimensionless"
+    }
+  ],
+  "source": {
+    "arxiv_versioned_id": "2311.14592v2",
+    "citation": "Daniel Basilewitsch, Chaotic Fluctuations in a Universal Set of Transmon Qubit Gates, Physical Review Letters (2026), DOI:10.1103/8nch-ld18",
+    "journal_doi": "10.1103/8nch-ld18"
+  },
+  "source_ambiguities": [
+    {
+      "ambiguity_id": "curvature_normalization",
+      "anchors": [
+        {
+          "line_end": 323,
+          "line_start": 322,
+          "support": "P_POI(k) = N_POI / (1 + k^2), P_GUE(k) = N_GUE / (1 + k^2)^2, where N_POI/GUE is a normalization constant."
+        }
+      ],
+      "claim_ids": [
+        "curvature_power_law_poisson",
+        "curvature_power_law_gue"
+      ],
+      "control_names": [
+        "curvature_k"
+      ],
+      "fixed_condition_ids": [
+        "bgate_fast"
+      ],
+      "mechanism_ids": [
+        "curvature_power_law"
+      ],
+      "readout_names": [
+        "curvature_distribution"
+      ],
+      "statement": "The normalization constants N_POI and N_GUE are not explicitly given; the paper only states they are normalization constants. The power-law form for large k omits the normalization, so the exact prefactor is unknown."
+    }
+  ]
+}

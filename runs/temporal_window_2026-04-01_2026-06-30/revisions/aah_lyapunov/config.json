@@ -1,0 +1,740 @@
+{
+  "generation": {
+    "max_output_tokens": 32768,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "provider": {
+    "api": "chat_completions",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "model": "deepseek-v4-flash",
+    "reasoning_effort": null,
+    "thinking": "disabled",
+    "timeout_s": 180.0
+  },
+  "runner": "temporal_warmup",
+  "schema": "role_benchmark.temporal_runner_config",
+  "science_card_focus": "Use only the supplement-closed Lyapunov-exponent twin identified by review. Public controls lambda_1 and lambda_2 on the conservative source-supported common interval [0.2,0.67]; common readout Lyapunov_exponent. Private branch eta=0 returns max(0,log(lambda_0)); private branch eta=0.1 returns max(0,log(lambda_0)-2*pi*0.1). In both lambda_0=lambda_2*(1+sqrt(1-lambda_1^2))/(lambda_1*(1+sqrt(1-lambda_2^2))). Every structural constant must be an anchored parameter; eta must be a branch-private fixed condition. Record the source inconsistency between main-text eta_PT wording and the supplement/numeric value. Do not use sigma, P(t), binary step, or placeholder lambda0.",
+  "science_card_review_guidance": {
+    "decision": "card_revision_required",
+    "issues": [
+      {
+        "code": "card.oracle_outputs_do_not_compute_sigma",
+        "detail": "metal_insulator_transition_hermitian maps step(lambda_1-lambda_2) to sigma_t6. This returns only 0 or 1, whereas the source defines sigma as the standard deviation of the full position probability distribution and reports only qualitative time scaling (linear versus constant), not sigma=step(lambda_1-lambda_2). At the critical pair lambda_1=lambda_2 the AST returns zero even though a six-step probability distribution has a nonnegative spread not stated to vanish. The qualitative phase boundary cannot be renamed as a numerical sigma readout.",
+        "line_ranges": [
+          {
+            "line_end": 82,
+            "line_start": 82
+          },
+          {
+            "line_end": 134,
+            "line_start": 132
+          }
+        ]
+      },
+      {
+        "code": "card.pt_claim_uses_wrong_observable",
+        "detail": "pt_symmetry_breaking_transition likewise maps step(eta-0.119) to sigma_t6, but the source detects PT breaking through complex quasienergies and the time-dependent overall photon probability P(t). It does not define or report sigma(t=6) as the PT order parameter. A binary PT indicator and a spatial standard deviation are different quantities, so the two retained claims do not share an operational readout despite reusing the same JSON key.",
+        "line_ranges": [
+          {
+            "line_end": 125,
+            "line_start": 117
+          },
+          {
+            "line_end": 147,
+            "line_start": 141
+          },
+          {
+            "line_end": 202,
+            "line_start": 198
+          }
+        ]
+      },
+      {
+        "code": "card.pt_threshold_formula_conflicts_with_source_values",
+        "detail": "The card states eta_PT=-log(lambda_0) while also assigning eta_PT=0.119 for lambda_1=0.25, lambda_2=0.5. The source definition yields lambda_0 approximately 2.10956, hence -log(lambda_0) approximately -0.74648, not +0.119. The reported 0.119 instead equals log(lambda_0)/(2*pi) approximately 0.11881 and is consistent with the supplementary equations L=max(0,log(lambda_0)-2*pi*abs(eta)). The TeX itself contains missing-factor/sign inconsistencies in main-text and supplementary prose, so a revised card must record this source ambiguity and anchor executable truth to the mutually consistent defining equations and reported numeric value; it may not assert the current formula as resolved fact.",
+        "line_ranges": [
+          {
+            "line_end": 104,
+            "line_start": 95
+          },
+          {
+            "line_end": 112,
+            "line_start": 109
+          },
+          {
+            "line_end": 125,
+            "line_start": 125
+          },
+          {
+            "line_end": 152,
+            "line_start": 152
+          },
+          {
+            "line_end": 227,
+            "line_start": 211
+          },
+          {
+            "line_end": 367,
+            "line_start": 357
+          },
+          {
+            "line_end": 415,
+            "line_start": 400
+          }
+        ]
+      },
+      {
+        "code": "card.invented_lambda0_placeholder",
+        "detail": "lambda0_metal_insulator=1 is not reported by the source and the card explicitly calls it a placeholder for evaluating a formula. lambda_0 varies with lambda_1 and lambda_2; at the source pair (0.25,0.5) it is approximately 2.10956. Remove the placeholder and encode the complete lambda_0 expression in each oracle AST using the public controls and the source definitions lambda_i'=sqrt(1-lambda_i^2).",
+        "line_ranges": [
+          {
+            "line_end": 104,
+            "line_start": 95
+          },
+          {
+            "line_end": 112,
+            "line_start": 109
+          }
+        ]
+      },
+      {
+        "code": "card.control_domains_break_reported_parameter_pairing",
+        "detail": "The Hermitian examples are the three paired settings (0.67,0.2), (0.435,0.435), and (0.2,0.67), not an empirical nine-point Cartesian table of independently combined values. For the PT claim, eta_PT=0.119 is reported only for (lambda_1,lambda_2)=(0.25,0.5), while the card also permits the swapped and equal pairs. Its eta values 0.135 and 0.335 come from the separate second-spectral-transition experiment at the fixed localized pair and do not supply sigma observations over the declared three-control Cartesian product.",
+        "line_ranges": [
+          {
+            "line_end": 82,
+            "line_start": 82
+          },
+          {
+            "line_end": 117,
+            "line_start": 117
+          },
+          {
+            "line_end": 154,
+            "line_start": 147
+          }
+        ]
+      },
+      {
+        "code": "card.pt_fixed_conditions_do_not_match_measurement",
+        "detail": "The PT claim fixes the single polarization state used for the six-step spatial distributions, but the source's P(t) PT test explicitly uses different or arbitrary initial states and is a time evolution rather than a single t=6 sigma value. The fixed initial-state and six_step_walk conditions therefore do not reproduce the evidence named in the claim's statistical_basis.",
+        "line_ranges": [
+          {
+            "line_end": 117,
+            "line_start": 117
+          },
+          {
+            "line_end": 143,
+            "line_start": 141
+          },
+          {
+            "line_end": 154,
+            "line_start": 147
+          }
+        ]
+      },
+      {
+        "code": "card.no_current_shared_matched_interface",
+        "detail": "The Hermitian claim uses controls lambda_1,lambda_2 and qualitative spatial spreading; the PT claim additionally controls eta and is supported by total-probability dynamics. Their fixed regimes, control sets, and genuine readouts differ, so they cannot be selected as two worlds of one matched family. The declared dependency on the Hermitian sigma claim does not repair this: the PT theory depends on the lambda_0 definition, not on that experimental sigma claim.",
+        "line_ranges": [
+          {
+            "line_end": 134,
+            "line_start": 107
+          },
+          {
+            "line_end": 154,
+            "line_start": 138
+          }
+        ]
+      },
+      {
+        "code": "card.omits_source_closed_lyapunov_twin",
+        "detail": "The paper remains repairable. Add two claims with common public controls lambda_1 and lambda_2, common readout Lyapunov_exponent, and common irrational-Phi/model conditions. For private eta=0, encode L=max(0,log(lambda_0)); for private eta=0.1, encode L=max(0,log(lambda_0)-2*pi*0.1). In both, compute lambda_0=lambda_2*(1+sqrt(1-lambda_1^2))/(lambda_1*(1+sqrt(1-lambda_2^2))). Use named, anchored parameters for every structural constant. A conservative shared continuous domain lambda_1,lambda_2 in [0.2,0.67] lies inside the source's 0-to-1 coupling ranges, avoids division by zero, and is covered by the reported full-parameter-space phase scans. eta=0 versus eta=0.1 must be private and absent from Player-visible background.",
+        "line_ranges": [
+          {
+            "line_end": 112,
+            "line_start": 95
+          },
+          {
+            "line_end": 227,
+            "line_start": 218
+          },
+          {
+            "line_end": 425,
+            "line_start": 400
+          }
+        ]
+      },
+      {
+        "code": "card.spurious_sigma_unit_ambiguity",
+        "detail": "sigma_definition_units is not an unresolved source ambiguity. The source defines x as the lattice-site position and sigma as its standard deviation, which directly makes sigma a spread in lattice-site units. Retain that operational unit in the readout definition but remove the ambiguity entry.",
+        "line_ranges": [
+          {
+            "line_end": 134,
+            "line_start": 130
+          }
+        ]
+      }
+    ],
+    "paper_id": "paper_2508_08255v1",
+    "previous_science_card": {
+      "assessment": "The source packet provides a complete experimental and theoretical description of the unitary almost-Mathieu operator (UAMO) and its non-Hermitian extension (PUAMO) realized via single-photon quantum walks. The selected quantitative cluster focuses on the metal-insulator transition in the Hermitian regime (eta=0) and the PT-symmetry-breaking transition in the non-Hermitian regime, both characterized by the standard deviation sigma(t) of the walker's probability distribution at time step t=6. The source reports explicit manipulated values of the coupling constants lambda_1 and lambda_2, the non-Hermitian parameter eta, and the measured standard deviation sigma, along with theoretical predictions. The extraction captures the central quantitative relations: the Lyapunov exponent lambda_0, the critical PT-breaking value eta_PT = -log(lambda_0), and the second spectral transition eta_0 = arcsinh(lambda_1'/lambda_1)/(2*pi). The source provides sufficient numeric controls, readouts, and quantitative mechanisms to support an objective source-grounded response, so case_authoring_ready is set to true.",
+      "case_authoring_ready": true,
+      "claims": [
+        {
+          "anchors": [
+            {
+              "line_end": 134,
+              "line_start": 132,
+              "support": "States that for lambda_1 > lambda_2, sigma grows linearly (sigma ~ t), and for lambda_1 < lambda_2, sigma remains constant (sigma ~ const), with the phase boundary at lambda_1 = lambda_2."
+            },
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "Reports the measured and simulated sigma and the phase diagram at t=6."
+            }
+          ],
+          "applicability": "The claim applies to the Hermitian regime (eta=0) with theta=0, initial state |0>⊗(|H>+i|V>)/sqrt(2), Phi=(sqrt(5)-1)/2, and t=6. The phase boundary in the bottom-left region (small lambda_1) is not sharply defined because the walker hardly moves at short times.",
+          "claim_id": "metal_insulator_transition_hermitian",
+          "control_domains": [
+            {
+              "allowed_values": [
+                0.2,
+                0.435,
+                0.67
+              ],
+              "anchors": [
+                {
+                  "line_end": 82,
+                  "line_start": 82,
+                  "support": "Reports lambda_1=0.67, 0.435, 0.2 in the Hermitian quantum walk."
+                }
+              ],
+              "control_name": "lambda_1",
+              "domain_kind": "numeric_values",
+              "domain_statement": "The source reports lambda_1 values 0.67, 0.435, 0.2 for the Hermitian metal-insulator transition.",
+              "maximum": null,
+              "minimum": null
+            },
+            {
+              "allowed_values": [
+                0.2,
+                0.435,
+                0.67
+              ],
+              "anchors": [
+                {
+                  "line_end": 82,
+                  "line_start": 82,
+                  "support": "Reports lambda_2=0.2, 0.435, 0.67 in the Hermitian quantum walk."
+                }
+              ],
+              "control_name": "lambda_2",
+              "domain_kind": "numeric_values",
+              "domain_statement": "The source reports lambda_2 values 0.2, 0.435, 0.67 for the Hermitian metal-insulator transition.",
+              "maximum": null,
+              "minimum": null
+            }
+          ],
+          "control_names": [
+            "lambda_1",
+            "lambda_2"
+          ],
+          "depends_on": [],
+          "fixed_condition_ids": [
+            "hermitian_theta_zero",
+            "initial_state_hermitian",
+            "irrational_field_phi",
+            "six_step_walk"
+          ],
+          "mechanism_ids": [
+            "uamo_metal_insulator"
+          ],
+          "oracle_outputs": {
+            "sigma_t6": {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "var": "lambda_1"
+                    },
+                    {
+                      "var": "lambda_2"
+                    }
+                  ],
+                  "op": "subtract"
+                }
+              ],
+              "op": "step"
+            }
+          },
+          "quantitative_form": "sigma(t) ~ t for lambda_1 > lambda_2; sigma(t) ~ const for lambda_1 < lambda_2",
+          "readout_names": [
+            "sigma_t6"
+          ],
+          "statement": "In the Hermitian regime (eta=0), the UAMO exhibits a metal-insulator transition: for lambda_1 > lambda_2, the standard deviation sigma(t) grows linearly with time (ballistic transport), while for lambda_1 < lambda_2, sigma(t) remains constant (localized). At the critical line lambda_1 = lambda_2, eigenstates are critical.",
+          "statistical_basis": "Measured standard deviation sigma at t=6 compared with simulated values; error bars due to statistical uncertainty in photon number counting.",
+          "uncertainty": "Error bars are due to statistical uncertainty in photon number counting; the specific convention is not further specified."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 143,
+              "line_start": 141,
+              "support": "States that for lambda_1 > lambda_2, PT symmetry is broken for any non-zero eta and P(t) increases exponentially; for lambda_1 < lambda_2, PT symmetry is preserved at finite eta and P(t) remains approximately constant."
+            },
+            {
+              "line_end": 125,
+              "line_start": 125,
+              "support": "States that PT symmetry is spontaneously broken at eta_PT = -log(lambda_0)."
+            }
+          ],
+          "applicability": "The claim applies to the non-Hermitian regime with theta=0, initial state |0>⊗(|H>+i|V>)/sqrt(2), Phi=(sqrt(5)-1)/2, and t=6. For lambda_1=0.25, lambda_2=0.5, the critical values are eta_PT=0.119 and eta_0=0.328.",
+          "claim_id": "pt_symmetry_breaking_transition",
+          "control_domains": [
+            {
+              "allowed_values": [
+                0.25,
+                0.5
+              ],
+              "anchors": [
+                {
+                  "line_end": 117,
+                  "line_start": 117,
+                  "support": "Reports lambda_1=0.5 and 0.25 in the non-Hermitian quantum walk."
+                }
+              ],
+              "control_name": "lambda_1",
+              "domain_kind": "numeric_values",
+              "domain_statement": "The source reports lambda_1 values 0.5 and 0.25 for the non-Hermitian PT transition.",
+              "maximum": null,
+              "minimum": null
+            },
+            {
+              "allowed_values": [
+                0.25,
+                0.5
+              ],
+              "anchors": [
+                {
+                  "line_end": 117,
+                  "line_start": 117,
+                  "support": "Reports lambda_2=0.25 and 0.5 in the non-Hermitian quantum walk."
+                }
+              ],
+              "control_name": "lambda_2",
+              "domain_kind": "numeric_values",
+              "domain_statement": "The source reports lambda_2 values 0.25 and 0.5 for the non-Hermitian PT transition.",
+              "maximum": null,
+              "minimum": null
+            },
+            {
+              "allowed_values": [
+                0.135,
+                0.335
+              ],
+              "anchors": [
+                {
+                  "line_end": 147,
+                  "line_start": 147,
+                  "support": "Reports eta=0.135 and eta=0.335 for the non-Hermitian quantum walk."
+                }
+              ],
+              "control_name": "eta",
+              "domain_kind": "numeric_values",
+              "domain_statement": "The source reports eta values 0.135 and 0.335 for the non-Hermitian PT transition.",
+              "maximum": null,
+              "minimum": null
+            }
+          ],
+          "control_names": [
+            "lambda_1",
+            "lambda_2",
+            "eta"
+          ],
+          "depends_on": [
+            "metal_insulator_transition_hermitian"
+          ],
+          "fixed_condition_ids": [
+            "nonhermitian_theta_zero",
+            "initial_state_nonhermitian",
+            "irrational_field_phi",
+            "six_step_walk"
+          ],
+          "mechanism_ids": [
+            "pseudo_uamo_pt_transition"
+          ],
+          "oracle_outputs": {
+            "sigma_t6": {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "var": "eta"
+                    },
+                    {
+                      "param": "eta_PT_pt_transition"
+                    }
+                  ],
+                  "op": "subtract"
+                }
+              ],
+              "op": "step"
+            }
+          },
+          "quantitative_form": "eta_PT = -log(lambda_0), with lambda_0 = lambda_2(1+lambda_1')/(lambda_1(1+lambda_2'))",
+          "readout_names": [
+            "sigma_t6"
+          ],
+          "statement": "In the non-Hermitian regime, the PUAMO exhibits a PT-symmetry-breaking transition at eta_PT = -log(lambda_0). For lambda_1 > lambda_2, PT symmetry is broken for any non-zero eta, and the overall probability P(t) increases exponentially. For lambda_1 < lambda_2, PT symmetry is preserved for |eta| < -log(lambda_0), and P(t) remains approximately constant.",
+          "statistical_basis": "Measured overall probability P(t) and standard deviation sigma at t=6 compared with numerical simulations; error bars due to statistical uncertainty in photon number counting.",
+          "uncertainty": "Error bars are due to statistical uncertainty in photon number counting; the specific convention is not further specified."
+        }
+      ],
+      "controls": [
+        {
+          "allowed_values": [
+            0.2,
+            0.25,
+            0.435,
+            0.5,
+            0.67
+          ],
+          "anchors": [
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "Reports lambda_1=0.67, 0.435, 0.2 in the Hermitian quantum walk."
+            },
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "Reports lambda_1=0.5 and 0.25 in the non-Hermitian quantum walk."
+            }
+          ],
+          "definition": "Coupling constant controlling the strength of coupling between neighboring lattice sites in the shift operator S_lambda1_eta.",
+          "domain_kind": "numeric_values",
+          "domain_statement": "The source reports specific values of lambda_1 used in experiments: 0.67, 0.435, 0.2 for the Hermitian metal-insulator transition, and 0.5, 0.25 for the non-Hermitian PT transition.",
+          "maximum": null,
+          "minimum": null,
+          "name": "lambda_1",
+          "unit": "dimensionless"
+        },
+        {
+          "allowed_values": [
+            0.2,
+            0.25,
+            0.435,
+            0.5,
+            0.67
+          ],
+          "anchors": [
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "Reports lambda_2=0.2, 0.435, 0.67 in the Hermitian quantum walk."
+            },
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "Reports lambda_2=0.25 and 0.5 in the non-Hermitian quantum walk."
+            }
+          ],
+          "definition": "Coupling constant controlling the coupling of the shift in the synthetic dimension in the coin operator Q_lambda2_theta.",
+          "domain_kind": "numeric_values",
+          "domain_statement": "The source reports specific values of lambda_2 used in experiments: 0.2, 0.435, 0.67 for the Hermitian metal-insulator transition, and 0.25, 0.5 for the non-Hermitian PT transition.",
+          "maximum": null,
+          "minimum": null,
+          "name": "lambda_2",
+          "unit": "dimensionless"
+        },
+        {
+          "allowed_values": [
+            0.0,
+            0.135,
+            0.335
+          ],
+          "anchors": [
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "Reports eta=0 for the Hermitian quantum walk."
+            },
+            {
+              "line_end": 147,
+              "line_start": 147,
+              "support": "Reports eta=0.135 and eta=0.335 for the non-Hermitian quantum walk."
+            }
+          ],
+          "definition": "Non-Hermitian parameter quantifying the imbalance of the shift operator between left-moving and right-moving modes.",
+          "domain_kind": "numeric_values",
+          "domain_statement": "The source reports specific values of eta used in experiments: 0 for the Hermitian regime, and 0.135 and 0.335 for the non-Hermitian PT transition.",
+          "maximum": null,
+          "minimum": null,
+          "name": "eta",
+          "unit": "dimensionless"
+        }
+      ],
+      "fixed_conditions": [
+        {
+          "anchors": [
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "States 'For all plots, we set theta=0' and the initial state is |0>⊗(|H>+i|V>)/sqrt(2)."
+            },
+            {
+              "line_end": 107,
+              "line_start": 107,
+              "support": "Defines the Hermitian setting as eta=0."
+            }
+          ],
+          "condition_id": "hermitian_theta_zero",
+          "statement": "In the Hermitian regime, the phase theta is set to 0 and the non-Hermitian parameter eta is 0."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "States 'with theta=0' for the non-Hermitian quantum walk."
+            },
+            {
+              "line_end": 147,
+              "line_start": 147,
+              "support": "States 'with theta=0' for the non-Hermitian quantum walk."
+            }
+          ],
+          "condition_id": "nonhermitian_theta_zero",
+          "statement": "In the non-Hermitian regime, the phase theta is set to 0."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "States 'used the initial state |psi(0)> = |0>⊗(|H>+i|V>)/sqrt(2)'."
+            }
+          ],
+          "condition_id": "initial_state_hermitian",
+          "statement": "The initial state is |psi(0)> = |0> ⊗ (|H> + i|V>)/sqrt(2)."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "States 'the initial state for each is |psi(0)> = |0>⊗(|H>+i|V>)/sqrt(2)'."
+            }
+          ],
+          "condition_id": "initial_state_nonhermitian",
+          "statement": "The initial state is |psi(0)> = |0> ⊗ (|H> + i|V>)/sqrt(2) for the non-Hermitian quantum walk."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 107,
+              "line_start": 107,
+              "support": "States 'we focus exclusively on irrational fields, specifically Phi=(sqrt(5)-1)/2'."
+            }
+          ],
+          "condition_id": "irrational_field_phi",
+          "statement": "The quasiperiodic field Phi is set to the irrational value (sqrt(5)-1)/2."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "States 'Measured phase diagram evaluated by the standard deviation sigma at time step t = 6'."
+            },
+            {
+              "line_end": 134,
+              "line_start": 134,
+              "support": "States 'after quantum-walk steps t=6'."
+            }
+          ],
+          "condition_id": "six_step_walk",
+          "statement": "The quantum walk is run for 6 time steps (t=6) for the phase diagram measurements."
+        }
+      ],
+      "mechanisms": [
+        {
+          "anchors": [
+            {
+              "line_end": 112,
+              "line_start": 107,
+              "support": "States the metal-insulator transition about the self-dual line lambda_1=lambda_2, with ballistic transport for lambda_1>lambda_2 and Anderson localization for lambda_1<lambda_2, and defines lambda_0 and the Lyapunov exponent."
+            }
+          ],
+          "equations": [
+            "lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2'))",
+            "L_lambda1_lambda2_Phi = log(lambda_0) for lambda_1<lambda_2"
+          ],
+          "mechanism_id": "uamo_metal_insulator",
+          "parameters": [
+            {
+              "anchors": [
+                {
+                  "line_end": 112,
+                  "line_start": 109,
+                  "support": "Defines lambda_0 = lambda_2(1+lambda_1')/(lambda_1(1+lambda_2')) and states L = log(lambda_0) > 0 in the localized phase."
+                }
+              ],
+              "name": "lambda0_metal_insulator",
+              "role": "The ratio lambda_0 = lambda_2(1+lambda_1')/(lambda_1(1+lambda_2')) that determines the Lyapunov exponent in the localized phase; the central value is not a single number but a formula, so this parameter is a placeholder for the formula's evaluation.",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 1.0
+            }
+          ],
+          "statement": "In the Hermitian regime (eta=0), the UAMO exhibits a metal-insulator transition about the self-dual line lambda_1=lambda_2. For lambda_1>lambda_2, transport is ballistic; for lambda_1<lambda_2, the system displays Anderson localization. The Lyapunov exponent L_lambda1_lambda2_Phi vanishes on the spectrum for lambda_1>=lambda_2 and equals log(lambda_0)>0 in the localized phase, where lambda_0 = lambda_2(1+lambda_1')/(lambda_1(1+lambda_2')).",
+          "variable_names": [
+            "lambda_1",
+            "lambda_2",
+            "lambda_1'",
+            "lambda_2'",
+            "lambda_0",
+            "L_lambda1_lambda2_Phi"
+          ]
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 125,
+              "line_start": 120,
+              "support": "Describes the PT-symmetry-breaking transition at eta_PT = -log(lambda_0) and the second spectral transition at eta_0 = arcsinh(lambda_1'/lambda_1)/(2*pi), with winding number characterization."
+            }
+          ],
+          "equations": [
+            "eta_PT = -log(lambda_0)",
+            "eta_0 = arcsinh(lambda_1'/lambda_1)/(2*pi)"
+          ],
+          "mechanism_id": "pseudo_uamo_pt_transition",
+          "parameters": [
+            {
+              "anchors": [
+                {
+                  "line_end": 125,
+                  "line_start": 125,
+                  "support": "States that PT symmetry is spontaneously broken at eta_PT = -log(lambda_0)."
+                },
+                {
+                  "line_end": 152,
+                  "line_start": 152,
+                  "support": "Reports the critical point eta_PT = 0.119 for lambda_1=0.25, lambda_2=0.5."
+                }
+              ],
+              "name": "eta_PT_pt_transition",
+              "role": "Critical value of the non-Hermitian parameter eta for PT-symmetry breaking, given by eta_PT = -log(lambda_0). The value 0.119 is reported for lambda_1=0.25, lambda_2=0.5.",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 0.119
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 125,
+                  "line_start": 125,
+                  "support": "Defines eta_0 = arcsinh(lambda_1'/lambda_1)/(2*pi) as the second spectral transition."
+                },
+                {
+                  "line_end": 152,
+                  "line_start": 152,
+                  "support": "Reports the critical point eta_0 = 0.328 for lambda_1=0.25, lambda_2=0.5."
+                }
+              ],
+              "name": "eta_0_spectral_transition",
+              "role": "Critical value of the non-Hermitian parameter eta for the second spectral transition, given by eta_0 = arcsinh(lambda_1'/lambda_1)/(2*pi). The value 0.328 is reported for lambda_1=0.25, lambda_2=0.5.",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 0.328
+            }
+          ],
+          "statement": "The PUAMO (eta != 0) is PT-symmetric and exhibits a PT-symmetry-breaking transition at eta_PT = -log(lambda_0). For |eta| < -log(lambda_0), the winding number nu_eta(z)=0 and PT symmetry is unbroken; for eta > eta_PT, PT symmetry is spontaneously broken and |nu_eta(z)|=1 for some z on the unit circle. A second spectral transition occurs at eta_0 = arcsinh(lambda_1'/lambda_1)/(2*pi), beyond which all quasienergies become purely imaginary and |nu_eta(z)|=1 for all z on the unit circle.",
+          "variable_names": [
+            "eta",
+            "eta_PT",
+            "eta_0",
+            "lambda_0",
+            "lambda_1",
+            "lambda_1'",
+            "nu_eta(z)"
+          ]
+        }
+      ],
+      "paper_scope": "The paper reports the first experimental realization of the unitary almost-Mathieu operator (UAMO) and its non-Hermitian extension (PUAMO) using single-photon quantum walks. It observes metal-insulator transitions in the Hermitian limit, PT-symmetry-breaking transitions, and a novel spectral transition where all quasienergies become purely imaginary. The selected quantitative cluster focuses on the metal-insulator transition in the Hermitian regime (eta=0) and the PT-symmetry-breaking transition in the non-Hermitian regime, both characterized by the standard deviation sigma(t) of the walker's probability distribution at time step t=6.",
+      "readouts": [
+        {
+          "anchors": [
+            {
+              "line_end": 134,
+              "line_start": 134,
+              "support": "Defines sigma(t) = sqrt(sum_x P(x,t) x^2 - (sum_x P(x,t) x)^2) and states it is used to quantify the localization transition."
+            },
+            {
+              "line_end": 82,
+              "line_start": 82,
+              "support": "States 'Measured (symbols) and simulated (lines) standard deviation sigma of the Hermitian quantum walk' and 'phase diagram evaluated by the standard deviation sigma at time step t = 6'."
+            }
+          ],
+          "definition": "Standard deviation of the walker's probability distribution at time step t=6, defined as sigma(t) = sqrt(sum_x P(x,t) x^2 - (sum_x P(x,t) x)^2).",
+          "name": "sigma_t6",
+          "resolution": null,
+          "statistic": "Measured standard deviation of the probability distribution at t=6, compared with simulated values.",
+          "uncertainty": "Error bars are due to statistical uncertainty in photon number counting; the specific convention is not further specified.",
+          "unit": "lattice sites"
+        }
+      ],
+      "source": {
+        "arxiv_versioned_id": "2508.08255v1",
+        "citation": "Quan Lin, Observation of Metal-Insulator and Spectral Phase Transitions in Aubry-André-Harper Models, Physical Review Letters (2026), DOI:10.1103/tz2n-lqxx",
+        "journal_doi": "10.1103/tz2n-lqxx"
+      },
+      "source_ambiguities": [
+        {
+          "ambiguity_id": "sigma_definition_units",
+          "anchors": [
+            {
+              "line_end": 134,
+              "line_start": 134,
+              "support": "Defines sigma(t) = sqrt(sum_x P(x,t) x^2 - (sum_x P(x,t) x)^2), where x is the lattice site index."
+            }
+          ],
+          "claim_ids": [
+            "metal_insulator_transition_hermitian",
+            "pt_symmetry_breaking_transition"
+          ],
+          "control_names": [
+            "lambda_1",
+            "lambda_2",
+            "eta"
+          ],
+          "fixed_condition_ids": [
+            "hermitian_theta_zero",
+            "nonhermitian_theta_zero",
+            "initial_state_hermitian",
+            "initial_state_nonhermitian",
+            "irrational_field_phi",
+            "six_step_walk"
+          ],
+          "mechanism_ids": [
+            "uamo_metal_insulator",
+            "pseudo_uamo_pt_transition"
+          ],
+          "readout_names": [
+            "sigma_t6"
+          ],
+          "statement": "The standard deviation sigma(t) is defined in lattice-site units, but the source does not explicitly state the unit for sigma in the figures; the unit is inferred from the definition."
+        }
+      ]
+    },
+    "source": {
+      "arxiv_versioned_id": "2508.08255v1",
+      "citation": "Quan Lin, Observation of Metal-Insulator and Spectral Phase Transitions in Aubry-André-Harper Models, Physical Review Letters (2026), DOI:10.1103/tz2n-lqxx",
+      "journal_doi": "10.1103/tz2n-lqxx"
+    }
+  },
+  "target_accepted": 1
+}

@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2507.23753v3\", \"citation\": \"W. Joe Meese, Compatible Instability: Gauge Constraints of Elasticity Inherited by Electronic Nematic Criticality, Physical Review Letters (2026), DOI:10.1103/wytr-kd9j\", \"journal_doi\": \"10.1103/wytr-kd9j\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main_S.tex =====\nL000002\t\nL000003\t\\documentclass[aps,prb, twocolumn, superscriptaddress, amsmath, amsfonts, amssymb, amsthm]{revtex4-2}\nL000004\t\nL000005\t\\usepackage{graphicx}\nL000006\t\\usepackage{dcolumn}\nL000007\t\nL000008\t\nL000009\t\nL000010\t\\usepackage[unicode=true,\nL000011\t bookmarks=false,\nL000012\t breaklinks=true,pdfborder={0 0 1},backref=false,colorlinks=true]\nL000013\t {hyperref}\nL000014\t\\hypersetup{pdfcreator={},pdfproducer={LaTeX with hyperref},linkcolor=blue,anchorcolor=blue,citecolor=blue,filecolor=red,menucolor=red,urlcolor=blue,pdfstartview=FitV,pdfhighlight=/I,hypertexnames=true}\nL000015\t\nL000016\t\nL000017\t\\usepackage{lmodern}\nL000018\t\\usepackage{mathptmx, newtxtext, newtxmath, xspace}\nL000019\t\\usepackage{colortbl}\nL000020\t\\usepackage{array}\nL000021\t\\usepackage{bbm}\nL000022\t\\usepackage{siunitx}\nL000023\t\nL000024\t\\usepackage{comment}\nL000025\t\\usepackage[table, dvipsnames]{xcolor}\nL000026\t\\newcommand{\\hhbar}{\\mathchar'26\\mkern-9mu h}\nL000027\t\nL000028\t\\usepackage{bm}\nL000029\t\\usepackage{braket}\nL000030\t\nL000031\t\nL000032\t\nL000033\t\\usepackage{ragged2e}\nL000034\t\nL000035\t\\usepackage{natbib}\nL000036\t\\setcitestyle{numbers}\nL000037\t\nL000038\t\\renewcommand{\\eqref}[1]{Eq. (\\ref{#1})}\nL000039\t\nL000040\t\\newcommand{\\joe}[1]{{\\color{orange} JOE: #1}}\nL000041\t\\newcommand{\\joesout}[1]{{\\color{lightgray} \\sout{#1}}}\nL000042\t\nL000043\t\\begin{document}\nL000044\t\\title{Compatible Instability: Gauge Constraints of Elasticity Inherited by Electronic Nematic Criticality}\nL000045\t\\author{W. Joe Meese}\nL000046\t\\affiliation{Department of Physics, The Grainger College of Engineering, University of Illinois Urbana-Champaign, Urbana, IL 61801, USA}\nL000047\t\\affiliation{Anthony J. Leggett Institute for Condensed Matter Theory, The Grainger College of Engineering, University of Illinois Urbana-Champaign, Urbana, IL 61801, USA}\nL000048\t\\author{Rafael M. Fernandes}\nL000049\t\\affiliation{Department of Physics, The Grainger College of Engineering, University of Illinois Urbana-Champaign, Urbana, IL 61801, USA}\nL000050\t\\affiliation{Anthony J. Leggett Institute for Condensed Matter Theory, The Grainger College of Engineering, University of Illinois Urbana-Champaign, Urbana, IL 61801, USA}\nL000051\t\\date{March 10, 2026}\nL000052\t\\begin{abstract}\nL000053\tElectronic nematicity is widely observed in quantum materials with varying degrees of electronic correlation, manifesting through charge, spin, orbital, or superconducting degrees of freedom. A phenomenological model capable of describing this broad set of systems must also account for nemato-elasticity, by which nematic and elastic degrees of freedom become intertwined. However, being a tensor gauge field theory, elasticity must satisfy the compatibility relations which guarantee the integrability of lattice deformations. Here, we develop a formalism for nemato-elasticity that manifestly respects the elastic compatibility relations. We show that these constraints bifurcate the phase space of nematic fluctuations into two orthogonal sectors: one compatible and thus critical, the other incompatible and therefore gapped. The suppression of the latter leads to universal direction-selective nematic criticality in any crystal lattice. Moreover, the critical nematic modes are protected from pinning effects induced by microscopic defect strains, which necessarily induce both longitudinal and transverse correlated random fields. Finally, our results also reconcile seemingly contradictory nematic phenomena, such as the mean-field character of the nematic transition and the widespread presence of domain formation.\nL000054\t\\end{abstract}\nL000055\t\\maketitle\nL000056\t\nL000057\tElectronic nematicity, the spontaneous breaking of rotational symmetry by electronic degrees of freedom, has been reported in a wide range of systems such as 2DEGs \\cite{Eisenstein99_nem,Feldman16_nem},\nL000058\tiron-based superconductors \\cite{Chu2010_nem,Chuang2010_nem,Fernandes2014},\nL000059\tcuprates \\cite{Hinkov08_nem,Davis10_nem}, correlated $f$-electron\nL000060\tmaterials \\cite{Ronning17_nem,Rosenberg2019_nem,Seo2020_nem,Massat2022_nem,Jiang2025},\nL000061\tdoped topological insulators \\cite{Tamegai2019_nem,Cho2020_nem},\nL000062\tflat-band kagome metals \\cite{Drucker2024_nem}, 2D van der Waals\nL000063\tantiferromagnets \\cite{RMF08_Potts_nematic_strain,Hwangbo2024_nem,Sun2024_nem,Tan2024_nem},\nL000064\tBernal bilayer graphene \\cite{Geim11_nem}, transition metal dichalcogenides\nL000065\t\\cite{Little2020_nem,Hamill2021_nem,Cho2022_nem,Silber2024_nem},\nL000066\tcolossal magnetoresistance materials \\cite{Beaudin2022_nem}, ruthenates\nL000067\t\\cite{Mackenzie07_nem}, twisted moir\\'e systems \\cite{Jiang2019_nem,Cao2021_nem,RubioVerdu2022_nem,Zhang2022_nem},\nL000068\tand topological semimetals \\cite{Siddiquee2022_nem,Venkatesan2024_nem,Hossain2024_nem}. Since this vast list encompasses materials with very distinct properties (metals, insulators, and superconductors), a phenomenological description of electronic nematicity is necessary to gain a broad understanding of this phenomenon. In analogy to the phenomenological theory of classical liquid crystals, one can define a symmetric and traceless rank-2 tensorial order parameter $\\varphi_{ij}$ \\cite{Oganesyan01}, whose five independent components correspond to the many-body expectation values of quadrupolar order in the charge, orbital, magnetic, or superconducting sector.  They are usually expressed as in-plane $\\varphi_{x^2-y^2}, \\varphi_{xy}$ and out-of-plane  $\\varphi_{z^2}$, $\\varphi_{yz}$, $\\varphi_{xz}$ quadrupolar order parameters, where the subscripts refer to the standard $d$-wave form factors in Cartesian coordinates.\nL000069\t\nL000070\tA crucial difference with respect to liquid crystals is that electronic nematicity takes place on a lattice, which explicitly breaks rotational symmetry. Phenomenologically, this effect is captured through a bilinear coupling between  $\\varphi_{ij}$  and the traceless part of the elastic tensor $\\varepsilon_{ij}-\\frac{1}{3}\\varepsilon_{ii} \\delta_{ij}$. The latter is defined as $\\varepsilon_{ij}=\\tfrac{1}{2}(\\partial_i u_j + \\partial_j u_i)$, where the lattice displacement vector $ \\boldsymbol{u}(\\boldsymbol{x})$ describes the geometric deformation of the medium by displacing every element from $\\boldsymbol{x}$ to $\\boldsymbol{x} + \\boldsymbol{u}(\\boldsymbol{x})$. Some consequences of this coupling between nematicity and physical displacements of the lattice, dubbed nemato-elastic coupling, are well-known in the literature.  For instance,  nematic order triggers a symmetry-breaking lattice distortion that lowers the point group of the crystal \\cite{Fradkin_review,Fernandes2014}. Conversely, the rotational symmetry-breaking promoted by nematic order can only be discrete, and the continuous nematic order parameter is split in $q$-state Potts or clock order parameters \\cite{RMF14_classification_nematics}.\nL000071\t\nL000072\tThrough this nemato-elastic coupling, two different types of lattice fluctuations impact the electronic nematic critical properties in sharply distinct ways. Elastic \\textit{thermal fluctuations} generate effective long-ranged nematic interactions, resulting in a sharp, mean-field like nematic transition \\cite{Karahasanovic16, Paul17, Fernandes2020, sanchezQuantitativeRelationshipStructural2022, Hecker2022, stewardElasticQuantumCriticality2025}. Conversely, there are also \\textit{statistical fluctuations} associated with the random strain fields generated by quenched crystalline defects \\citep{tanatarDirectImagingStructural2009, jescheCouplingStructuralMagnetic2010, Ran2011, Forrest2016, Ren2021, bohmerNematicityNematicFluctuations2022, curroNematicityGlassyBehavior2022}. These random strains locally break the rotational symmetry of the lattice and couple to the nematic order parameter as a random conjugate field, an effect known to destabilize long-range order in favor of domain formation \\cite{schneiderRandomfieldInstabilityFerromagnetic1977, Imry_Ma, Binder1983, nattermannInstabilitiesIsingSystems1983, grinsteinSurfaceTensionRoughening1983, Carlson2006, Dahmen2010, carlsonUsingDisorderDetect2011, Phillabaum2012, vojtaPhasesPhaseTransitions2013, nieQuenchedDisorderVestigial2014, vojtaDisorderQuantumManyBody2019, mirandaPhaseDiagramFrustrated2021, yeStripeOrderImpurities2022, RMF01_RFBM, RMF06_Potts_nematic_strain,yangCoarseningDynamicsIsingnematic2025}.\nL000073\tThis leads to a seemingly contradictory scenario in which the \\textit{same} nemato-elastic coupling favors \\textit{both} mean-field nematic behavior (and hence a sharp transition) \\textit{and} nematic domain breakup (and hence a smeared transition). This contradiction is further exacerbated by experiments, as macroscopic probes observe typical signatures of a sharp mean-field nematic transition \\citep{Ran2011, Forrest2016, Chu2010_nem, Chu12_nem, bohmerNematicityNematicFluctuations2022, Kuo16_nem, Hwangbo2024_nem}, whereas local probes often report mesoscopic nematic domain formation due to disorder \\citep{tanatarDirectImagingStructural2009, Ran2011, Forrest2016, Ren2021, Dioguardi2015, Dioguardi2016, Hwangbo2024_nem, maMicrostructureTetragonaltoorthorhombicPhase2009, Rosenthal2014, RMF08_Potts_nematic_strain}. Addressing this fundamental problem in our understanding of electronic nematic phenomena requires a theoretical approach that treats the intertwined nematic and elastic degrees of freedom on an equal footing.\nL000074\t\nL000075\tIn this paper, we develop such an approach for electronic nematic phase transitions that take place at nonzero temperatures. While quantum critical nematicity is of obvious interest \\citep{chandraIsingTransitionFrustrated1990, readLargeNExpansionFrustrated1991, gorkovNontrivialMagneticOrder1992, kivelsonElectronicLiquidcrystalPhases1998, fradkinLiquidcrystalPhasesQuantum1999, halboth$d$WaveSuperconductivityPomeranchuk2000, fradkinNematicPhaseTwoDimensional2000, yamaseInstabilityFormationQuasiOneDimensional2000, zaanenDuality2+2004, dellannaFermiSurfaceFluctuations2006, wuFermiLiquidInstabilities2007, xuIsingSpinOrders2008, qiGlobalPhaseDiagram2009, zachariasMultiscaleQuantumCriticality2009, maslovFermiLiquidPomeranchuk2010, garstElectronSelfenergyNematic2010, metlitskiQuantumPhaseTransitions2010, yamaseNematicQuantumCriticality2011, kieselUnconventionalFermiSurface2013, maciejkoFieldTheoryQuantum2013, youTheoryNematicFractional2014, metlitskiCooperPairingNonFermi2015, yamaseElectronicNematicPhase2015, boettcherUnconventionalSuperconductivityLuttinger2018, yamaseTheoreticalInsightsElectronic2021}, the role of dynamics lies outside the scope of the present work. Instead, we focus on the classical field theoretical description and derive a consistent model for nemato-elastic phenomena by embracing a key aspect of elasticity: being a theory of geometric deformations, elasticity is a tensor gauge field theory.\nL000076\tMuch like gauge invariance in electrostatics imposes constraints on the electric field encoded in $(\\boldsymbol{\\nabla} \\times \\boldsymbol{E})_i = \\epsilon_{ijk}\\partial_j E_k = 0$, where $\\epsilon_{ijk}$ is the Levi-Civita symbol, gauge invariance in elasticity enforces constraints on the strain tensor that can be written concisely as $\\text{inc}(\\varepsilon)_{ij} \\equiv \\epsilon_{ikl}\\epsilon_{jmn}\\partial_k\\partial_m\\varepsilon_{ln} = 0$ \\citep{kronerekkehartContinuumTheoryDefects1981, Dewit1973, kleinertGaugeFieldsSolids1989}. Here, $\\text{inc}(\\varepsilon)_{ij}$ is known as the incompatibility operator, and the three independent second-order partial differential equations that follow from vanishing incompatible strain are known as the Saint Venant compatibility relations \\cite{kronerekkehartContinuumTheoryDefects1981,muratoshioMicromechanicsDefectsSolids1987}. Ultimately, these constraints are required because  $\\boldsymbol{u}$  has \\textit{three} independent degrees of freedom while $\\varepsilon_{ij}$ has \\textit{six}.\nL000077\t\nL000078\tThe compatibility relations are known to have a pronounced effect on various types of phase transition, such as the martensitic\nL000079\t\\cite{Kartha1995,Shenoy1999,Rasmussen2001,Lookman2003}, the metal-to-insulator\nL000080\t\\cite{Guzman2019}, and the ferroelectric \\cite{Littlewood2014,Kimber2023}. Moreover, the strain field generated by lattice defects such as dislocations, disclinations, and vacancies fail to satisfy the compatibility relations, and are thus described in terms of a non-zero incompatibility tensor \\citep{eshelbyContinuumTheoryLattice1956, dewitLinearTheoryStatic1970, Dewit1973, dewitTheoryDisclinationsIII1973, dewitTheoryDisclinationsIV1973, kronerekkehartContinuumTheoryDefects1981, kleinertGaugeFieldsSolids1989, valsakumarGaugeTheoryDefects1988, beekmanDualGaugeField2017, Pretko2018_PRL, Pretko2019, gaaFractonelasticityDualityTwisted2021}. Nevertheless, their impact on electronic nematicity remains little explored. While it has been recognized that residual strain generated by these unavoidable crystalline defects act as a random conjugate field to the nematic order parameter, and that they can significantly impact the nematic critical properties \\cite{Carlson2006,Phillabaum2012,RMF01_RFBM}, the inhomogeneous strains are often assumed to be random and uncorrelated, which is inconsistent with the properties of the incompatibility tensor.\nL000081\t\nL000082\tTo illustrate how the compatibility relations fundamentally alter nematic critical properties, consider for example the condition encoded in  $\\text{inc}(\\varepsilon)_{33} = 0$:\nL000083\t\\begin{equation}\nL000084\t\\nabla^{2}\\left(\\varepsilon_{xx}+\\varepsilon_{yy}\\right)=\\left(\\partial_{x}^{2}-\\partial_{y}^{2}\\right)\\left(\\varepsilon_{xx}-\\varepsilon_{yy}\\right)+\\left(2\\partial_{x}\\partial_{y}\\right)\\left(2\\varepsilon_{xy}\\right).\\label{eq:2D_SVCR}\nL000085\t\\end{equation}\nL000086\tThis relationship establishes the interdependence between the symmetry-preserving, volume-changing \\textit{dilatation} strain component $\\varepsilon_{xx}+\\varepsilon_{yy}$ and the in-plane symmetry-breaking, volume-preserving \\textit{deviatoric}  $\\varepsilon_{xx} - \\varepsilon_{yy}$ and \\textit{shear} $\\varepsilon_{xy}$ strain components. Despite the fact that these different types of strain have different symmetry properties (i.e., transform as different irreducible representations in group-theory language), they become entangled by the compatibility relations for all \\textit{inhomogeneous} deformations. Importantly, while the deviatoric and shear strains have a symmetry-allowed coupling to the nematic order parameter, the dilatation does not.  However, the compatibility relation in \\eqref{eq:2D_SVCR} shows that generic spatial fluctuations of the nematic order parameter will generate dilatations, meaning that nematic fluctuations can incur a higher elastic energy cost than expected along symmetry grounds alone.\nL000087\t\nL000088\t\\begin{figure}\nL000089\t    \\centering\nL000090\t    \\includegraphics[width=\\columnwidth]{amplitudes_and_orbitals.pdf}\nL000091\t    \\caption{\\justifying Nonlocal transformations between the $d$-orbital nematic basis, $\\boldsymbol{\\varphi}$, and the co-rotating helical basis, $\\boldsymbol{\\Phi}$.\nL000092\t    Along each $\\hat{q}$, the fivefold degenerate electronic nematic order parameter in the helical basis is split by the compatibility relations. \\textbf{(a)} The splitting is shown for $\\hat{q} = \\hat{z}$. In this case, the $d$-orbital doublets $(\\varphi_{2yz}, \\varphi_{2zx})$ and $(\\varphi_{x^2-y^2}, \\varphi_{2xy})$  map onto $(\\Phi_{2}, \\Phi_{3})$ and $ (\\Phi_{4}, \\Phi_{5})$, respectively, while  $\\varphi_{z^2}$ maps onto $\\Phi_1$. \\textbf{(b, c, d)} Mappings from the nematic $d$-orbital order parameter $\\boldsymbol{\\varphi}$ onto selected nematic helical order parameters, $\\Phi_{1,2,4}$, as functions of momentum. The colormaps indicate when each $\\Phi_{1,2,4}$  function has the strongest overlap with each of the $d$-orbital basis functions from $\\boldsymbol{\\varphi}$.\nL000093\t    }\nL000094\t    \\label{fig:PhiAmplitude_Decomp_Orbitals}\nL000095\t\\end{figure}\nL000096\t\nL000097\tIn this Letter and in the accompanying paper \\citep{LongPaper}, we develop a general phenomenological theory of nemato-elasticity that automatically obeys the non-analytic geometrical constraints enforced by the compatibility relations for electronic nematic fluctuations with infinitesimal, but nonzero, momenta.  This is accomplished by expressing the five components of the nematic order parameter $\\varphi_{ij}$  not in the usual quadrupolar Cartesian basis $\\{\\varphi_{x^2-y^2}, \\varphi_{xy},\\varphi_{z^2}, \\varphi_{yz}, \\varphi_{xz} \\}$ (which we dub ``$d$-orbital basis''), but in a new ``helical basis'' $\\{\\Phi_a\\}$  (with $a=1,...,5$) \\citep{RMF14_classification_nematics, LongPaper}. Its defining property is that the five order parameters are orthogonal for every momentum $\\boldsymbol{q}$. As a result, the transformation between bases is nonlocal in real-space, and the $d$-orbital content of a given helical nematic order parameter $\\Phi_a$ changes depending on its momentum direction $\\hat{q}$, as sketched in Fig. \\ref{fig:PhiAmplitude_Decomp_Orbitals}. The main advantage of using the helical basis is that one can immediately separate the strain components that satisfy the compatibility conditions from those that do not. In contrast, in the $d$-orbital basis, one would need to ensure via complicated boundary conditions that the compatibility conditions are satisfied.\nL000098\t\nL000099\tEmploying this helical basis for the general case of a three-dimensional isotropic solid undergoing a nematic transition, we demonstrate four main consequences of the compatibility relations on nemato-elastic criticality. (i) Only two of the five helical order parameters are ever critical, and they map onto a single orbital nematic order parameter only along particular momentum directions. (ii) Direction-selective criticality is a universal property of the nematic transition regardless of the underlying crystal structure. While previous works have attributed this phenomenon to the anisotropy of the phonon dispersion in certain crystals \\cite{Karahasanovic16,Paul17,Fernandes2020}, here we show that it actually originates from the prohibition of incompatible nematic fluctuations. (iii) Structural disorder, quantified through the violation of the compatibility relations, couples only to the three non-critical helical nematic order parameters. These three components are thus responsible for the phenomenon of nemato-plasticity. (iv) Projection of the three incompatible nematic order parameters onto the orbital basis reveals domain breakup due to the emergence of long-range correlated longitudinal and transverse random fields associated with incompatible strain and crystalline defects.\nL000100\t\nL000101\tWe demonstrate these results by considering nemato-elasticity in an isotropic elastic medium. The electronic nematic order parameter transforms as the $\\ell = 2$ irreducible representation of the rotation group $\\text{SO}(3)$, i.e., as a quadrupolar order parameter. It is thus defined, for example, by the traceless rank-2 symmetric tensor\nL000102\t\\begin{equation}\nL000103\t    \\varphi_{ij}\\left(\\boldsymbol{x}\\right)=-\\left\\langle \\hat{\\psi}^{\\dagger}\\left(\\boldsymbol{x}\\right)\\left(\\partial_{i}\\partial_{j}-\\tfrac{1}{3}\\delta_{ij}\\nabla^{2}\\right)\\hat{\\psi}\\left(\\boldsymbol{x}\\right)\\right\\rangle , \\label{eq:electronic_nematic_tensor}\nL000104\t\\end{equation}\nL000105\twhere $\\hat{\\psi}(\\boldsymbol{x})$ is the electronic wavefunction in real-space \\citep{Oganesyan01, Fradkin_review, RMF14_classification_nematics}. It is straightforward to generalize this expression for orbital, spin, or superconducting operators. This tensor can be reorganized as the five-component vector\nL000106\t$\\boldsymbol{\\varphi}\\equiv( \\varphi_{z^2}, \\varphi_{x^2-y^2}, \\varphi_{2yz}, \\varphi_{2zx}, \\varphi_{2xy})^{\\text{T}}$ whose components explicitly transform as the five electronic $d$-orbitals. In an anisotropic crystal, $\\boldsymbol{\\varphi}$ is split in irreducible representations of the point group \\citep{RMF14_classification_nematics}. For instance, tetragonal systems like cuprates and iron-based superconductors have the familiar Ising-nematic order parameters $\\varphi_{2xy} \\equiv 2\\varphi_{xy}$  or $\\varphi_{x^2-y^2} \\equiv \\varphi_{xx}-\\varphi_{yy}$ \\citep{chubukovOriginNematicOrder2015, fernandesIronPnictidesChalcogenides2022,achkarNematicityStripeorderedCuprates2016}, whereas in hexagonal systems like Bi$_2$Se$_3$, these two planar nematic components transform as a doublet described in terms of a 3-state Potts order parameter  \\citep{Cho2020_nem, RMF08_Potts_nematic_strain, Hwangbo2024_nem, RMF14_classification_nematics, galiCriticalNematicPhase2024, hattoriOrbitalMoireQuadrupolar2024}. To keep our considerations general and show that our results are not caused by the anisotropies of the lattice, but instead by the compatibility relations, we consider the ideal case of an isotropic medium. In this case, the strain tensor $\\varepsilon_{ij}$ has six components, five of which comprise the symmetry-breaking, \\textit{deviatoric} strains that also transform as the $\\ell = 2$  irreducible representation of $\\text{SO}(3)$, $\\boldsymbol{\\varepsilon}\\equiv (\\varepsilon_{z^2},\\varepsilon_{x^2-y^2},\\varepsilon_{2yz},\\varepsilon_{2zx},\\varepsilon_{2xy})^{\\text{T}}$. Thus, the nemato-elastic coupling appears in the free energy as $f_{\\text{ne}} = -\\lambda_0 (\\boldsymbol{\\varphi}\\cdot \\boldsymbol{\\varepsilon})$, where $\\lambda_0$  is the single symmetry-allowed nemato-elastic coupling constant in $\\text{SO}(3)$.\nL000107\t\nL000108\tGiven that the compatibility relations entangle symmetry-breaking deviatoric strain $\\boldsymbol{\\varepsilon}$ with symmetry-preserving dilatation strain $\\varepsilon_0\\equiv \\varepsilon_{ii}$ for infinitesimal momentum (see Eq. \\ref{eq:2D_SVCR}), they are cumbersome to be implemented in the $d$-orbital basis for nemato-elasticity. Instead, we define a basis that co-rotates with the momentum, which we dub the ``helical nematic\" basis \\citep{LongPaper}. It is constructed at each momentum $\\boldsymbol{q}$ via an orthonormal set of basis vectors $\\{\\hat{e}_{1,2,3}\\}$, with $\\hat{e}_1 \\equiv \\boldsymbol{q}/q$ longitudinal to the momentum and $\\hat{e}_2$, $\\hat{e}_3$, corresponding to the transverse azimuthal and polar directions, respectively. In Fourier space, the three helical strain components $\\varepsilon_\\alpha^h \\equiv \\text{i}q(\\hat{e}_\\alpha \\cdot \\boldsymbol{u})$ are sufficient to completely determine the six strain components in the Cartesian basis  \\citep{LongPaper}:\nL000109\t\\begin{equation}\nL000110\t    \\varepsilon_{ij}=\\mathcal{Q}_{ij}^{1\\alpha}\\varepsilon_{\\alpha}^{h},\\quad\\mathcal{Q}_{ij}^{\\alpha\\beta}\\equiv\\tfrac{1}{2}\\left(\\hat{e}_{\\alpha,i}\\hat{e}_{\\beta,j}+\\hat{e}_{\\alpha,j}\\hat{e}_{\\beta,i}\\right), \\label{eq:def_helical_strain_Qabij}\nL000111\t\\end{equation}\nL000112\twhere we have omitted the $\\boldsymbol{q}$-dependence for brevity and the sum over Greek indices is implicit ($\\alpha=1,2,3$).  Crucially, the strain tensor only depends on \\textit{three}  helical strain amplitudes, despite the fact it has \\textit{six} components. By applying the incompatibility operator to $\\mathcal{Q}^{\\alpha\\beta}$, one obtains $\\text{inc}(\\mathcal{Q}^{\\alpha\\beta})_{ij} = -q^2\\epsilon_{1\\alpha\\gamma}\\epsilon_{1\\beta\\delta}\\mathcal{Q}^{\\gamma\\delta}_{ij}$. As a result, the compatibility relations are automatically satisfied in the helical basis.\nL000113\t\nL000114\t\\begin{figure*}\nL000115\t    \\centering\nL000116\t    \\includegraphics[width=\\linewidth]{compatible_and_incompatible_deformations.pdf}\nL000117\t    \\caption{\\justifying Schematic of compatible and incompatible nematic fluctuations. Each figure shows the distortion of a simple cubic grid (gray dots) of linear size $L$ in the presence of a nematic fluctuating mode $\\varphi_{2xy}$ with wavevector along $\\hat{q}$.\nL000118\t    \\textbf{(a)} Twin nematic domains are generated for $\\boldsymbol{q} \\propto [010]$, in which case $\\varphi_{2xy} \\propto \\Phi_2$.\nL000119\t    \\textbf{(b)} Energetically costly longitudinal elastic dilatation is generated for $\\boldsymbol{q} \\propto [110]$, in which case  $\\varphi_{2xy}\\propto \\Phi_1$. \\textbf{(c)} Incompatible deformations are generated when $\\boldsymbol{q} \\propto [001]$, for which $\\varphi_{2xy}\\propto \\Phi_4$. The incompatibility manifests in the multi-valuedness required to displace the gray dots simultaneously to both the blue and orange positions. This leads to cracking and material overlap along the interface between blue and orange regions. }\nL000120\t    \\label{fig:in-compatibility_side_by_side}\nL000121\t\\end{figure*}\nL000122\t\nL000123\tTo make the connection between helical and $d$-orbital bases clearer, we use the set of five symmetric Gell-Mann matrices, $\\boldsymbol{\\lambda}\\equiv\\left(\\lambda^{8},\\lambda^{3},\\lambda^{6},\\lambda^{4},\\lambda^{1}\\right)^{\\text{T}}$, to express the deviatoric strain tensor as $\\boldsymbol{\\varepsilon} = \\boldsymbol{\\lambda}_{ij}\\varepsilon_{ij}$. In contrast, the longitudinal ($\\varepsilon^h_1$)  and transverse ($\\varepsilon^h_{2,3}$) strain amplitudes can be expressed in terms of the three orthonormal helical-basis vectors, $\\boldsymbol{\\hat{Q}}_1 = \\frac{\\sqrt{3}}{2} \\boldsymbol{\\lambda}_{ij}\\mathcal{Q}_{ij}^{11}$, $\\boldsymbol{\\hat{Q}}_2 = \\boldsymbol{\\lambda}_{ij}\\mathcal{Q}_{ij}^{12}$, and $\\boldsymbol{\\hat{Q}}_3 = \\boldsymbol{\\lambda}_{ij}\\mathcal{Q}_{ij}^{13}$, with $\\mathcal{Q}_{ij}^{\\alpha\\beta}$  defined in \\eqref{eq:def_helical_strain_Qabij}.  These three vectors \\textit{do not} form a complete basis in the five-dimensional quadrupolar space, however, even though they \\textit{do} account for all compatible strains. The remaining two unit vectors are given by $\\boldsymbol{\\hat{Q}}_4 \\equiv \\boldsymbol{\\lambda}_{ij}\\mathcal{Q}_{ij}^{23}$  and $\\boldsymbol{\\hat{Q}}_5 = \\frac{1}{2} \\boldsymbol{\\lambda}_{ij}(\\mathcal{Q}_{ij}^{22} - \\mathcal{Q}_{ij}^{33})$. These basis vectors are representations of the $\\ell = 2$ basis functions (i.e., of any quadrupolar tensor) in the \\textit{helical basis} at \\textit{each} wavevector. When applied to nemato-elasticity, the nematic order parameter and deviatoric strain vectors are given by\nL000124\t\\begin{equation}\nL000125\t    \\boldsymbol{\\varphi} = \\sum_{a = 1}^5 \\Phi_a \\boldsymbol{\\hat{Q}}_a, \\quad \\boldsymbol{\\varepsilon} = \\frac{2}{\\sqrt{3}}\\varepsilon^h_1 \\boldsymbol{\\hat{Q}}_1 + \\sum_{a = 2}^3 \\varepsilon^h_a \\boldsymbol{\\hat{Q}}_a.\nL000126\t\\end{equation}\nL000127\tHence, the nemato-elastic coupling in the free energy acquires the simplified form:\nL000128\t\\begin{equation}\nL000129\t    \\boldsymbol{\\varphi}\\cdot \\boldsymbol{\\varepsilon} = \\tfrac{2}{\\sqrt{3}}\\Phi_{1}^{\\phantom{h}}\\varepsilon_{1}^{h}+\\Phi_{2}^{\\phantom{h}}\\varepsilon_{2}^{h}+\\Phi_{3}^{\\phantom{h}}\\varepsilon_{3}^{h}, \\label{eq:iso_nematoelastic_bilinear}\nL000130\t\\end{equation}\nL000131\tUnlike the compatible strain tensor, the electronic nematic order parameter fluctuates within the full five-dimensional $\\ell = 2$ representation of $\\text{SO}(3)$ at each $\\boldsymbol{q}$,  being represented in the helical basis through the five amplitudes, $\\{ \\Phi_a\\}$. The mapping between them and the $d$-orbital basis functions is shown in Fig. \\ref{fig:PhiAmplitude_Decomp_Orbitals}. Panel (a) shows that, for a given momentum direction, the five helical components $\\{ \\Phi_a\\}$ are split into one longitudinal ``singlet'' and two transverse ``doublets''. Panels (b)-(d) illustrate that, in general, a given nematic helical component $\\Phi_a$ maps onto a combination of nematic $d$-orbital components $\\varphi_b$, except along certain directions. For instance, $\\Phi_1$ maps onto a pure $\\varphi_{x^2-y^2}$ only along the $q_x=q_z=0$ and $q_y=q_z=0$ directions, and onto $\\varphi_{2xy}$ along $q_x=\\pm q_y$, $q_z=0$.\nL000132\t\nL000133\tSince the helical strain components satisfy the compatibility relations by construction, it is safe now to integrate them out and obtain the compatible nemato-elastic free energy. Considering an isotropic medium described by the Lam\\'e coefficient,  $\\lambda$, and the shear modulus,  $\\mu$, we obtain a correction to the nematic free energy of the form\nL000134\t$\\Delta f_{\\text{nem}} = - \\frac{1}{2} \\boldsymbol{\\varphi} \\cdot \\mathcal{M}(\\hat{q}) \\cdot \\boldsymbol{\\varphi}$. Here, $\\mathcal{M}\\left(\\hat{q}\\right)=\\frac{\\lambda_{0}^{2}}{\\mu}(\\boldsymbol{\\hat{Q}}_{2}^{\\phantom{\\text{T}}}\\boldsymbol{\\hat{Q}}_{2}^{\\text{T}}+\\boldsymbol{\\hat{Q}}_{3}^{\\phantom{\\text{T}}}\\boldsymbol{\\hat{Q}}_{3}^{\\text{T}}+\\varrho\\boldsymbol{\\hat{Q}}_{1}^{\\phantom{\\text{T}}}\\boldsymbol{\\hat{Q}}_{1}^{\\text{T}})$ is a  $5\\times 5$  matrix and $\\varrho \\equiv 4\\mu/3(\\lambda + 2\\mu)\\in (0,1)$  is a dimensionless, non-universal number. Using the completeness relation among the $\\{\\boldsymbol{\\hat{Q}}_a\\}$ basis vectors, we obtain for the effective nematic free energy:\nL000135\t{\\small\nL000136\t\\begin{equation}\nL000137\t   f_{\\text{eff}}=\\tfrac{1}{2}\\left\\{ \\left(r-\\tfrac{\\lambda_{0}^{2}}{\\mu}+q^{2}\\right)\\boldsymbol{\\varphi}\\cdot\\boldsymbol{\\varphi}+\\tfrac{\\lambda_{0}^{2}}{\\mu}\\left[\\left(1-\\varrho\\right)\\Phi_{1}^{2}+\\Phi_{4}^{2}+\\Phi_{5}^{2}\\right]\\right\\} +\\dots.\\label{eq:effective_nematic_free_energy_density}\nL000138\t\\end{equation}}\nL000139\t\\unskip\\hspace{0pt}where $r$  measures the distance to the bare nematic critical point. The first term is an isotropic renormalization that enhances the bare nematic critical temperature from $r_c^0 = 0$ to the \\textit{nemato-elastic} critical temperature,  $r_c = \\lambda^2_0/\\mu$.\nL000140\t\nL000141\tMore importantly, \\eqref{eq:effective_nematic_free_energy_density} implies that the nematic criticality is direction-dependent. Indeed, the nematic instability occurs when the three helical nematic components $\\Phi_1$, $\\Phi_4$, and $\\Phi_5$ simultaneously vanish, which can only happen along specific momentum-space directions, as illustrated in Fig. \\ref{fig:PhiAmplitude_Decomp_Orbitals}. This also breaks the $\\text{SO}(3)$  symmetry of the isotropic elastic medium, reducing the critical manifold to a two-dimensional space spanned by $\\Phi_{2,3}$ with only $\\text{SO}(2)$ symmetry. We dub this type of second-order phase transition \\textit{compatible electronic nematic criticality}, which is a fundamental distinction between the phenomenologies of electronic nematicity in solids and nematicity in classical liquid crystals. Importantly, while a higher-order cubic invariant is allowed in the bare electronic nematic free energy on the isotropic lattice, we find that for a sufficiently small cubic coefficient, the interplay between the gapped and critical helical electronic nematic modes ensure that the transition remains second-order \\cite{LongPaper}.\nL000142\t\nL000143\tIt is instructive to interpret these results in terms of the conventional orbital basis of nematicity, where each component $\\varphi_a$ can be readily identified with a type of quadrupolar order. The implication  of \\eqref{eq:effective_nematic_free_energy_density} is that the nematic instability described by a given  $\\varphi_a$ can only be critical  when $\\varphi_a$  completely overlaps with either $\\Phi_2$  or $\\Phi_3$. For example, the Ising-nematic order parameter $\\varphi_{2xy}$ for tetragonal systems is only critical when the momentum lies along the $[100]$ or $[010]$  axes, in which case  $\\varphi_{2xy}$ completely overlaps with $\\Phi_2$, see  Fig. \\ref{fig:PhiAmplitude_Decomp_Orbitals}(c) . In contrast, for momenta along the $[110]$ or $[\\bar{1}10]$  axes,   $\\varphi_{2xy}$ completely overlaps with $\\Phi_1$, which incurs an additional energy cost according to  \\eqref{eq:effective_nematic_free_energy_density}. Physically, this energy cost arises because fluctuating nematicity with these momenta directions generate, via the nemato-elastic coupling,  strain dilatation $\\varepsilon^h_1$, in agreement with the compatibility relation, \\eqref{eq:2D_SVCR}.  This is illustrated in  Fig. \\ref{fig:in-compatibility_side_by_side}(b), which shows the strain pattern generated by the nematic mode $\\varphi_{2xy}$ with a small wavevector along  $[110]$. In contrast, when the wavevector is along  $[100]$, as shown in  Fig. \\ref{fig:in-compatibility_side_by_side}(a), no dilatation (i.e., longitudinal) strain is generated. Interestingly, the energy cost encoded in  \\eqref{eq:effective_nematic_free_energy_density} is even larger when the momentum is along the  the $[001]$ axis. In this case,  $\\varphi_{2xy}$  completely overlaps with  $\\Phi_4$, which in turn does not couple to the compatible strains. As shown in Fig. \\ref{fig:in-compatibility_side_by_side}(c), the strain generated in this scenario deforms each volume element in a way that is discontinuous, such that cracks and overlaps develop along the boundaries of these elements.  We note that direction-selective criticality for the Ising-nematic order parameter was pointed out before \\cite{Karahasanovic16,Paul17} and attributed to the anisotropic phonon dispersions of a crystal. Our results instead show that direction-selective nematic criticality is a universal behavior that arises from the compatible geometry of deformation and not from the anisotropy of the crystal, since in our case the underlying crystal is isotropic.\nL000144\t\nL000145\tSince only $\\Phi_{2,3}$ are critical in nemato-elasticity, one must elucidate the role of the non-critical $\\Phi_{1,4,5}$ amplitudes which, as shown in Fig. \\ref{fig:in-compatibility_side_by_side}(c), can generate incompatible strain patterns. The violation of the compatibility relations in continuum elasticity, which puts the system in the plastic regime, is due to crystalline defects \\citep{eshelbyContinuumTheoryLattice1956, dewitLinearTheoryStatic1970, Dewit1973, dewitTheoryDisclinationsIII1973, dewitTheoryDisclinationsIV1973, kronerekkehartContinuumTheoryDefects1981, kleinertGaugeFieldsSolids1989, valsakumarGaugeTheoryDefects1988}. Mathematically, the latter are described in terms of a non-zero incompatibility tensor $\\text{inc}(\\varepsilon)_{ij}$, which can be readily incorporated in our helical formalism for nemato-elasticity (details in \\citep{LongPaper}).\nL000146\t\nL000147\t\\begin{figure}\nL000148\t    \\centering\nL000149\t    \\includegraphics[width=1.0\\columnwidth]{planar_real-space_correlations_dislocs.pdf}\nL000150\t    \\caption{\\justifying Normalized real-space strain-strain correlation functions calculated from an ensemble of quenched, independent, randomly distributed straight edge dislocations, in an isotropic medium of linear size $L$. These functions are computed explicitly in Ref. \\citep{LongPaper}, where the double-bracket $\\llbracket \\cdot \\rrbracket$ denotes the disorder-average. In order to satisfy the compatibility relations in disordered media, anisotropic spatial autocorrelations develop for the $h_{x^2 - y^2}$ and $h_{2xy}$ elastic strains (left and center panels, respectively). Additonally, radially independent anisotropic cross-correlations develop between $h_{x^2 -y^2}$ and $h_{2xy}$ despite their distinct symmetries (right panel), showing that both longitudinal and transverse random nematic fields emerge from crystal defects.}\nL000151\t    \\label{fig:real-space-strain-correlations}\nL000152\t\\end{figure}\nL000153\t\nL000154\tThe key point is that, in the presence of defects, the combination $\\mathscr{E}_{ij} \\equiv \\varepsilon_{ij} - \\varepsilon_{ij}^p$ is gauge-invariant, whereas the compatible strain $\\varepsilon_{ij}$  and the incompatible ``plastic strain\" $\\varepsilon_{ij}^p$ are not. Since the free-energy must be gauge invariant, the nemato-elastic bilinear from Eq. \\ref{eq:iso_nematoelastic_bilinear} is replaced by $ \\boldsymbol{\\varphi}\\cdot \\boldsymbol{\\mathscr{E}} $. Minimization of the free energy with respect to the three compatible helical strain components yields the  \\textit{nemato-plastic} contribution to the free energy \\citep{LongPaper}:\nL000155\t\\begin{equation}\nL000156\t    f_{\\text{np}} = \\tfrac{2\\lambda_0}{\\sqrt{3}}(1-\\varrho) \\Phi_1^{\\phantom{p}}\\Delta_p +\\lambda_0(\\Phi_4^{\\phantom{p}}\\varepsilon_4^p + \\Phi_5^{\\phantom{p}}\\varepsilon_5^p),\nL000157\t\\end{equation}\nL000158\twhere  $\\varepsilon^p_{a}$  are the plastic strain components in the helical basis and $\\Delta_p \\equiv \\frac{\\sqrt{3}}{2}\\varepsilon^p_1 - \\varepsilon^p_0$ is the incompatible dilatation. Remarkably, this equation implies that strains generated by lattice defects couple only to the non-critical electronic nematic modes  $\\Phi_{1,4,5}$. In contrast, nematic criticality is preserved in the compatible $\\Phi_{2,3}$  nematic subspace, since these degrees of freedom are blind to crystalline defects. Thus, the minimization of  \\eqref{eq:effective_nematic_free_energy_density} can be interpreted as minimizing incompatible electronic nematicity.\nL000159\t\nL000160\tIt is instructive to change back to the $d$-orbital basis to elucidate the impact of nemato-plasticity in terms of the nematic order parameter $\\boldsymbol{\\varphi}$. Performing this transformation, which is non-local in real space, reveals the emergence of the effective conjugate nematic field:\nL000161\t\\begin{equation}\nL000162\t    \\begin{aligned}\nL000163\t        \\boldsymbol{h}_{\\boldsymbol{q}} &\\equiv -\\left\\{\\boldsymbol{\\Gamma}_0(\\hat{q})\\varepsilon_{0,\\boldsymbol{q}}^p + \\Gamma(\\hat{q}) \\cdot \\boldsymbol{\\varepsilon}^p_{\\boldsymbol{q}}\\right\\},\nL000164\t    \\end{aligned}\nL000165\t\\end{equation}\nL000166\twhere the projection operators $\\boldsymbol{\\Gamma}_0(\\hat{q}) \\equiv -\\frac{2}{\\sqrt{3}}(1-\\varrho)\\boldsymbol{\\hat{Q}}_1$ and $\\Gamma(\\hat{q}) \\equiv (1-\\varrho)\\boldsymbol{\\hat{Q}}_1^{\\phantom{\\text{T}}}\\boldsymbol{\\hat{Q}}_1^{\\text{T}} + \\boldsymbol{\\hat{Q}}_4^{\\phantom{\\text{T}}}\\boldsymbol{\\hat{Q}}_4^{\\text{T}} + \\boldsymbol{\\hat{Q}}_5^{\\phantom{\\text{T}}}\\boldsymbol{\\hat{Q}}_5^{\\text{T}}$ extract only the physical contribution from the plastic strain $\\varepsilon^p_{ij}(\\boldsymbol{x})$. As we show in detail in \\citep{LongPaper}, it turns out that the Fourier transformed $\\boldsymbol{h}(\\boldsymbol{x})$  is nothing but the elastic strain emanating from defects in the absence of electronic nematicity. Thus, since the nemato-plastic free-energy can also be expressed $\\boldsymbol{\\varphi}(\\boldsymbol{x})\\cdot \\boldsymbol{h}(\\boldsymbol{x})$, it implies that \\textit{all} \\textit{$d$-orbital} nematic order parameters experience a highly nonlocal disorder field due to defects. Assuming the defects to be quenched at low temperatures, the defect strains are long-ranged, spatially correlated, random fields for the electronic nematic order parameter. A crucial consequence of this result is that, in an elastic medium, the inhomogeneous strain generated by lattice defects cannot be modeled as a simple uncorrelated distribution of strain values, like what is often assumed in, e.g., the random-field Ising-model \\cite{Carlson2006, nieQuenchedDisorderVestigial2014, vojtaPhasesPhaseTransitions2013, vojtaDisorderQuantumManyBody2019}. As an example, we compute the in-plane components $h_{x^2-y^2}$ and $h_{2xy}$  generated by an ensemble of straight edge dislocations randomly placed within an isotropic medium (details in Ref. \\citep{LongPaper}). The corresponding real-space correlation functions are shown in Fig. \\ref{fig:real-space-strain-correlations}, illustrating the correlated, long-range nature of the conjugate field. Importantly, the cross-correlation between $h_{x^2-y^2}$ and $h_{2xy}$ is unavoidable and demonstrates that defects necessarily create both longitudinal and transverse random nematic fields. Since correlated random fields have an even greater tendency to break-up long-range order in domains (when compared to the uncorrelated case) \\citep{weinribCriticalPhenomenaSystems1983, nattermannInstabilitiesIsingSystems1983, vojtaPhasesPhaseTransitions2013, vojtaDisorderQuantumManyBody2019}, we expect that the local nematic order parameter $\\boldsymbol{\\varphi}(\\boldsymbol{x})$ will generally be inhomogeneous in the presence of defects. This happens even at nemato-elastic critically due to the momentum-direction-dependent mapping between the $d$-orbital basis and the helical basis.\nL000167\t\nL000168\tTo conclude, electronic nematicity is a common and robust phase of matter because elasticity both promotes and protects it. While the rotational symmetry breaking associated with nematicity is driven by electronic correlations, the lattice is not a passive bystander in nematic criticality. Gauge constraints from elastic compatibility restrict which nematic modes soften at the transition, enforcing direction-selective criticality by suppressing the incompatible ones that directly couple to microscopic plastic deformations. These results are relevant more broadly for quantum materials, given that electronic nematicity often arises as a vestigial order associated with other phases of matter such as spin and charge density-waves \\cite{Fradkin2019,Fernandes2019}, and given its connection to quantum criticality and unconventional superconductivity \\cite{Lederer2015,Lederer2017,Klein2018}.\nL000169\t\nL000170\t\\textit{Acknowledgments.} The authors would like to thank J. Freedberg, P. Littlewood, J. Vi\\~nals, A. Rastogi, A. Chakraborty, and R. Aquino for many insightful discussions.\nL000171\t\nL000172\t \\bibliography{bibliography_nematics.bib, additional_references.bib}\nL000173\t\\end{document}\nL000174\t===== END FILE: main_S.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

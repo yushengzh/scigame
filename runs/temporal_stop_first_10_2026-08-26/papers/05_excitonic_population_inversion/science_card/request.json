@@ -1,0 +1,553 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered LaTeX source. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nOnly encode a quantity as a continuous control when the source supports responses across that interval. Two isolated reported condition values do not license interpolation: represent them as separate fixed regime conditions instead. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nPrioritize complete, coherent quantitative clusters that share controls and readouts across source-reported regimes. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce those responses. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, executable expression trees, or code.\n\nScienceCard JSON Schema:\n{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"minimum\",\"maximum\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statistic\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2412.03705v1\", \"citation\": \"Jacob A. Warshauer et al., Long-Lived Population Inversion in Resonantly Driven Excitonic Antiferromagnet, Physical Review Letters (2025), DOI:10.1103/physrevlett.134.016901\", \"journal_doi\": \"10.1103/physrevlett.134.016901\"}\n\nThe line numbers below are the only valid locator coordinate system.\n\nL000001\t===== BEGIN FILE: NPS.tex =====\nL000002\t\nL000003\t\\documentclass[\nL000004\t reprint,\nL000005\tsuperscriptaddress,\nL000006\t\nL000007\t amsmath,amssymb,\nL000008\t aps,\nL000009\t\nL000010\t]{revtex4-2}\nL000011\t\\usepackage{xcolor}\nL000012\t\nL000013\t\\usepackage{graphicx}\nL000014\t\\usepackage{dcolumn}\nL000015\t\\usepackage{bm}\nL000016\t\nL000017\t\\begin{document}\nL000018\t\nL000019\t\\preprint{APS/123-QED}\nL000020\t\nL000021\t\\title{Long-lived population inversion in resonantly driven excitonic antiferromagnet}\nL000022\t\nL000023\t\\author{Jacob A. Warshauer}\nL000024\t\\author{Huyongqing Chen}\nL000025\t\\author{Daniel Alejandro Bustamante Lopez}\nL000026\t\\affiliation{Department of Physics, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000027\t\\author{Qishuo Tan}\nL000028\t\\affiliation{Department of Chemistry, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000029\t\\author{Jing Tang}\nL000030\t\\affiliation{Department of Chemistry, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000031\t\\author{Xi Ling}\nL000032\t\\affiliation{Department of Chemistry, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000033\t\\affiliation{Division of Materials Science and Engineering, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000034\t\\affiliation{Photonics Center, Boston University, 8 Saint Mary's St., Boston, MA 02215, USA}\nL000035\t\\author{Wanzheng Hu}\nL000036\t\\email{wanzheng@bu.edu}\nL000037\t\\affiliation{Department of Physics, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000038\t\\affiliation{Division of Materials Science and Engineering, Boston University, 590 Commonwealth Avenue, Boston, MA 02215, USA}\nL000039\t\\affiliation{Photonics Center, Boston University, 8 Saint Mary's St., Boston, MA 02215, USA}\nL000040\t\nL000041\t\\date{\\today}\nL000042\t\nL000043\t\\begin{abstract}\nL000044\tVan der Waals magnets are an emerging material family for investigating light-matter interactions and spin-correlated excitations. Here, we report the discovery of a photo-induced state with a lifetime of 17 ps in the van der Waals antiferromagnet NiPS$_3$, which appears exclusively with resonant pumping at 1.476 eV in the antiferromagnetic state. The long-lived state comes with a negative photoconductivity, a characteristic optical response of population inversion. Our findings demonstrate a promising pathway to  potentially achieve long-lived lasing at terahertz frequencies in reduced dimensions.\nL000045\t\\end{abstract}\nL000046\t\nL000047\t\\maketitle\nL000048\tExcitons are electron-hole pairs bound by Coulomb attraction that broadly exist in condensed matter systems. Optically driven excitonic systems host a vast range of compelling features, including intraexcitonic resonances\\cite{Kaindl2003}, the Hubbard exciton\\cite{Mehio2023}, exciton sensing of coherent magnon\\cite{Bae2022}, and spin-polarized spatially indirect exciton\\cite{Mori2023}. The beauty of rich excitonic physics, however, is eventually limited by the exciton's lifetime before the electron-hole recombination. Long-lived excitons are appealing for the realization of exciton condensation\\cite{Eisenstein2014,Kogar2017,Haque2024} and optoelectronic device applications\\cite{Mak2016}, making materials with long-lived excitonic states highly sought after.\nL000049\t\nL000050\tVan der Waals magnets are an emerging material family for investigating light-matter interactions and spin-correlated excitations\\cite{Kang2020,Wang2021,Hwangbo2021, Kim2023, Dirnberger2022,Afanasiev2021,Belvin2021,Ergeçen2022,Mai2021,Lee2016,Tan2022}. The discovery of an ultra-narrow photoluminescence (PL) peak in the antiferromagnetic material NiPS$_3$, identified as a spin-correlated exciton state, opening up novel opportunities to study coherent many-body excitons\\cite{Kang2020, Jana, Dirnberger2022, Klaproth2023}. The 330-$\\mu$eV linewidth of the exciton peak in NiPS$_3$\\cite{Wang2021,Hwangbo2021} is significantly narrower than the typical sub-10 meV exciton linewidth found in two-dimensional semiconductors\\cite{Ross2013,Cadiz2017,Wierzbowski2017}, which makes NiPS$_3$ an ideal platform to investigate the exciton dynamics. Apart from the ultra-narrow exciton linewidth, the other fascinating character is the connection between the exciton and magnetic ordering. The exciton PL peak appears only in the antiferromagnetic phase\\cite{Wang2021,Hwangbo2021,Kim2023} and displays a splitting under the application of an in-plane magnetic field\\cite{Jana, Wang2024}. The exciton peak is highly anisotropic with a temperature dependence following the in-plane magnetic susceptibility anisotropy\\cite{Hwangbo2021}, and the exciton dispersion follows closely the double-magnon dispersion\\cite{He2024}, indicating a close relationship between the exciton and the magnetic order. Despite extensive interest in the ultra-narrow spin-correlated exciton, there are no studies on resonant driving at exciton levels in NiPS$_3$ or other van der Waals magnets in this family.\nL000051\t\nL000052\tHere we use resonant optical excitation to populate the spin-correlated exciton state in the antiferromagnet NiPS$_3$. We probe the charge dynamics using time-resolved terahertz (THz) spectroscopy, which has played a major role in probing intra-exciton transitions\\cite{Kaindl2003,Mehio2023,Huber2006}. By tuning the pump photon energy to two of the excitonic features and an energy above the absorption onset, we identify a distinct state tied to the spin-correlated exciton with a lifetime of 17 ps. Further, we show that the long-lived state exhibits a negative photoconductivity over the entire THz probe range, which we attribute to population inversion involving the excitonic ground state.\nL000053\t\nL000054\tMillimeter-thick bulk single crystals of NiPS$_3$ with a N\\'eel temperature ($T_N$) of 155 K were grown by the chemical vapor transport method\\cite{Wang2021}. Within individual NiPS$_3$ layers, the spins on the Ni lattice are antiferromagnetically ordered along the $b$ axis and form a zigzag pattern along the $a$ axis. Highly anisotropic exciton features develop in the antiferromagnetic state\\cite{Kang2020,Wang2021,Hwangbo2021,Kim2023}. Peak I, seen at 1.476 eV in the optical absorption (Figure \\ref{fig:PL}(a)), is a spin-orbit-entangled exciton\\cite{Kang2020,Klaproth2023}. This exciton, probed by the PL, is highly polarized with the largest signal along the $b$ axis\\cite{Wang2021}, where the spins are antiferromagnetically ordered (Figure \\ref{fig:PL}(a) inset). The second sharp optical transition (peak II in Fig.\\ref{fig:PL}(a)) is 22 meV above peak I and is identified as a magnon sideband of the exciton peak I\\cite{Kang2020,Kaneko}.\nL000055\t\nL000056\t\\begin{figure}\nL000057\t\\includegraphics[scale = 0.55]{Figure1.pdf}\nL000058\t\\caption{ (a) Equilibrium absorption coefficient $\\alpha$ at 4 K (data from Ref.\\cite{Kang2020}), and three excitation spectra used in this study (shaded peaks). (Inset) The PL intensity maximizes along the $b$ axis, where the spins on the Ni lattice are antiferromagnetically ordered. (b) The transient state was probed by THz pulses using normal incidence reflection.}{\\label{fig:PL} }\nL000059\t\\end{figure}\nL000060\t\nL000061\tOptical excitation at three selected frequencies was used to drive NiPS$_3$ out of equilibrium: (1) resonant pumping of the exciton at 1.476 eV, (2) resonant pumping of the magnon sideband of the exciton at 1.494 eV, and (3) off-resonant pumping at 1.61 eV which is slightly above the absorption onset\\cite{Ho2021} at 7 K. The shaded peaks in Fig. \\ref{fig:PL}(a) are the spectra of three excitation energies used in this study. The pump beam polarization was parallel to the $a$ axis of NiPS$_3$. We performed time-resolved THz spectroscopy to probe the dynamics of the driven state. The THz probe reached the sample at normal incidence in reflection geometry (Fig.\\ref{fig:PL}(b)). The probe polarization was set parallel to the $b$ axis of NiPS$_3$. Further details on the pump-probe measurement can be found in the Supplemental Material \\cite{Supp}.\nL000062\t\nL000063\t\\begin{figure*}\nL000064\t\\includegraphics[scale = 0.65]{Figure2.pdf}\nL000065\t\\caption{(a) Pump-induced change in the THz electric field ($\\Delta E/E$) with resonant pumping at peak I at 7 K. $\\Delta E/E$ quickly switches sign and remains negative for several tens of picosecond. Meanwhile, an oscillation with a frequency of 1.2 THz (left inset) is seen, corresponding to a magnon mode (right inset). (b) At 7 K, when the pump frequency is tuned to peak II (1.494 eV, triangles) or to above the absorption onset (1.610 eV, squares), $\\Delta E/E$ is short lived and remains positive. (c) Temperature evolution of $\\Delta E/E$ with 1.476 eV pumping. (d) N\\'eel temperature (155 K) characterized by the splitting of a 180-cm$^{-1}$ Raman phonon along the parallel (solid squares) and cross (open squares) polarization geometry\\cite{Kim2019}.}{\\label{fig:DEoverE}}\nL000066\t\\end{figure*}\nL000067\t\nL000068\tWe first present the spectrally-integrated transient dynamics. Figure \\ref{fig:DEoverE}(a) shows the time-domain pump-probe response at 7 K with resonant excitation at peak I. Here, $\\Delta E$ is the pump-induced change in the reflected THz field at the peak value, and $E$ is the peak value of the equilibrium THz waveform. After excitation, the pump-probe signal reaches maximum and then decreases to negative values, remaining negative for several tens of picoseconds. Fitting over an extended time window (Fig. S3) reveals two time constants of the transient response. The sign-changing response is short-lived with a lifetime of 0.2 ps, which is likely the time of exciton formation\\cite{Steinleitner2017}. The long-lived negative signal has a lifetime of 17 ps, which is on the same order as the lifetime of the exciton\\cite{Wang2021,Hwangbo2021,Li2024}. In addition, an oscillatory response is seen with a frequency of 1.2 THz (5.0 meV). This corresponds to an out-of-plane magnon according to the solutions to the Landau–Lifshitz–Gilbert equations (Supplemental Material section S7 \\cite{Supp}) and agrees with the magnon frequency observed by Raman scattering\\cite{Jana} and THz emission\\cite{Belvin2021,Allington2024}. The lifetime of the magnon signal is 70 ps according to our calculation, which fits the THz time trace (Fig. \\ref{fig:DEoverE}(a) and Fig. S3).\nL000069\t\nL000070\tThe negative pump-probe response with a long lifetime is unique to resonant pumping at peak I. As illustrated in Fig. \\ref{fig:DEoverE}(b), when pumping at peak II (1.494 eV) or above the absorption edge (1.610 eV) at the same base temperature of 7 K, the pump-probe signals are nearly identical. Only a positive response is seen, and the dynamics are much shorter lived with a lifetime on the order of 3 ps for both cases. A positive $\\Delta E/E$ is not surprising for optically excited insulator, as the pump photons above the absorption onset can create hot carriers which enhance material's reflectivity at THz frequencies. In the antiferromagnetic state, pumping away from peak I also leads to a significant reduction in the magnon signature, similar to case of antiferromagnetic NiO\\cite{Bossini2021}.\nL000071\t\nL000072\tWe then demonstrate the temperature evolution of the pump-probe dynamics. Figure \\ref{fig:DEoverE}(c) shows a set of pump-probe overlap scans at various temperatures across $T_N$ = 155 K (see Fig. \\ref{fig:DEoverE}(d)) with the same excitation energy of 1.476 eV. With increasing temperature, the exciton peak red-shifts and broadens considerably at 70 K, before nearly disappearing at 130 K\\cite{Kang2020,Wang2021,Hwangbo2021,Kim2023}. Accordingly, the suppression in $\\Delta E/E$ significantly weakens from 7 K to 70 K, and it is barely recognizable at 130 K. Additionally, the absorption onset also redshifts continuously with increasing temperature so that at room temperature 1.476 eV is above the absorption onset\\cite{Ho2021}. Consistently, a positive $\\Delta E/E$ is seen at room temperature with 1.476 eV pumping, similar to the off-resonant case at 7 K (Fig. \\ref{fig:DEoverE}(b)).\nL000073\t\nL000074\t\\begin{figure*}\nL000075\t\\includegraphics[scale = 0.9]{Figure3.pdf}\nL000076\t\\caption{(a-d) Resonant pumping at the exciton energy (peak I) results in a long-lived transient suppression in $\\sigma_1$ and an increase in $\\sigma_2$. The solid circles present the data, and the red curves are fits. (e) The Drude and inverted Lorentz terms used to fit the 2 ps data. (f) Time dependence of the fitting parameters at 7 K with 1.476 eV pumping. $\\omega_{pL}^2$ and $\\omega_{pD}^2$ represent the oscillator strength of the inverted Lorentz term and the Drude term, respectively. The thin solid lines are exponential decay fits. A global $\\omega_p^2$ represented by  the optical spectral weight under $\\Delta\\sigma_1(\\omega)$ in between 4 and 10 meV ($\\Delta\\text{SW}$). The thick blue line is a rescaled exponential fit used for $\\Delta E/E$. (Inset) Transient change in spectral weight as a function of incident pump fluence at $t=3 ps$. (g) Pumping at peak II results in positive $\\Delta\\sigma_1$ and $\\Delta\\sigma_2$ (solid triangles) which can be fit with a single Drude term (red lines). (h) The Drude term used to fit \\textbf{g} across a broader spectral region. }{\\label{fig:Ds1Ds2}}\nL000077\t\\end{figure*}\nL000078\tWe now investigate the unique long-lived state by the frequency-resolved optical response. Figure \\ref{fig:Ds1Ds2}(a-d) shows the time evolution of the light-induced change in the complex optical conductivity, defined as $\\Delta\\sigma(\\omega) = \\sigma(\\omega)^{\\text{transient}} - \\sigma(\\omega)^{\\text{equilibrium}}$. At the maximum response (Fig. \\ref{fig:Ds1Ds2}(a)), $\\Delta\\sigma_1(\\omega)$ is positive at low energies and becomes negative in between 6 and 10 meV, while $\\Delta\\sigma_2(\\omega)$ is positive over the entire energy window. At later time delays, $\\Delta\\sigma_1(\\omega)$ remains negative from 4 to 10 meV, while $\\Delta\\sigma_2(\\omega)$ remains positive (Fig. \\ref{fig:Ds1Ds2}(b-d)). The real and imaginary part of optical conductivity can be fit simultaneously with a Drude term plus a Lorentz component with a negative amplitude. A typical fit is shown in Fig. \\ref{fig:Ds1Ds2}(e). The Drude term gives a positive contribution to $\\Delta\\sigma_1(\\omega)$ for all frequencies, and the inverted Lorentz term brings $\\sigma_1(\\omega)$ to negative values. Varying the pump-probe time delay, the oscillator strengths for the Drude and inverted Lorentz terms change with different rates, while their widths remain constant ($\\gamma^{\\text{Drude}}$=1.5 meV and $\\gamma^{\\text{Lorentz}}$=5 meV). Figure \\ref{fig:Ds1Ds2}(f) plots the time evolution of the Drude and Lorentz oscillator strengths. The Drude oscillator strength $\\omega_{pD}^2$ can be fit with a single exponential decay with a time constant of 2.4 ps. The inverted Lorentz oscillator strength $\\omega_{pL}^2$ reaches maximum at 2 ps then decays with 2 ps and 15 ps time constants. The transient spectral weight, defined as $\\Delta SW=\\frac{120}{\\pi}\\int_{\\omega_1}^{\\omega_2}\\Delta\\sigma_1(\\omega) \\,d\\omega$, in the range between 4 and 10 meV (open squares in Fig. \\ref{fig:Ds1Ds2}(f)) qualitatively follows the exponential fit for the spectrally-integrated response presented in Fig. \\ref{fig:DEoverE}(a). A suppression in spectral weight as a result of the negative $\\Delta\\sigma_1$ is seen up to 30 ps. The frequency-resolved optical response verifies that the overall pump-probe dynamics comes from two contributions with different time scales. We are particularly interested in the inverted Lorentz term, which is a non-thermal response.\nL000079\t\nL000080\tThis unique non-thermal response disappears when pumping away from peak I. Figure \\ref{fig:Ds1Ds2}(g) shows the transient change of the complex optical conductivity with pumping at peak II, which is about 20 meV above peak I. In this configuration, $\\Delta\\sigma_1(\\omega)$ remains positive over the entire energy window, decreasing at higher probe energies, while $\\Delta\\sigma_2(\\omega)$ peaks near 7 meV. This is characteristic of a free-carrier Drude response (Fig. \\ref{fig:Ds1Ds2}(h))\\cite{Dressel2002}. Similar Drude behavior is seen for 1.476 eV pumping at room temperature (Figure S5) where the exciton disappears and the pump energy is above the absorption edge. These frequency-resolved responses agree with the positive $\\Delta E/E$ dynamics as shown in Fig. \\ref{fig:DEoverE}(b), thereby verifying the high sensitivity of the transient state to the excitation photon energy: as soon as the excitation energy is at or above the absorption onset, the Drude response dominates.\nL000081\t\nL000082\tWe now explore possible origins of the long-lived state with resonant pumping at peak I. As the negative $\\Delta\\sigma_1(\\omega)$ is only observed with the resonant excitation of peak I, and the lifetime of this state is comparable to that of the exciton lifetime\\cite{Wang2021,Hwangbo2021,Li2024}, this response must come from optical population of the 1.476 eV exciton level. A negative $\\Delta\\sigma_1(\\omega)$ has been observed in other exciton systems and was interpreted as stimulated emission from population inversion of intraexcitonic levels\\cite{Huber2006}. At first, a population inversion is formed by resonant excitation by the optical pump, and then the THz probe photons stimulate a coherent emission similar to the process of lasing. In our case, the reflected THz peak field (Fig. \\ref{fig:DEoverE}(a)) encompasses multiple contributions including a co-existent Drude term. We therefore focus on the negative $\\Delta\\sigma_1(\\omega)$ in the following discussion.\nL000083\t\nL000084\tThe population inversion picture is further verified by the incident pump fluence dependence of the negative spectral weight, $-\\Delta$SW, which follows a threshold-saturation behavior expected for population inversion between excited energy levels, as shown in the inset of Fig. \\ref{fig:Ds1Ds2}(f) and Supplemental Material section S6 \\cite{Supp}. As each pump spectrum covers a relatively broad frequency range with respect to the narrow exciton linewidth (see Fig. \\ref{fig:PL}(a)), the exciton state (peak I) can be either the lower or higher level of the population inversion state. Multiple exciton states close to peak I have been predicted by first-principles calculations\\cite{Lane2022,Hamad2024}. Additionally, shoulder peaks at closely spaced energies above the 1.476 eV peak have been observed in photoluminescence and absorption measurements\\cite{Kang2020}. Therefore, our observation reflects a population inversion involving the 1.476 eV exciton and another nearby exciton level. Note that the inverted Lorentz term in $\\Delta\\sigma_1(\\omega)$ peaks at 5 meV, overlapping with the magnon energy as shown in Fig. \\ref{fig:DEoverE}(a) inset. One may speculate that the negative $\\Delta\\sigma_1(\\omega)$ comes from a magnon-facilitated THz emission; however, this is not likely the case because the suppression in $\\Delta\\sigma_1(\\omega)$ has a much broader energy width than the magnon feature\\cite{Belvin2021}.\nL000085\t\nL000086\tWe briefly comment on other possibilities which can lead to a negative $\\Delta\\sigma_1(\\omega)$. In metallic systems such as graphene, optical excitation leads to a dominant increase in the scattering rate of the existing carriers\\cite{Jnawali2013, Frenzel2014}. Here, NiPS$_3$ is insulating with no free-carrier response at equilibrium. Similarly, we can rule out trion formation as the cause of the negative $\\Delta\\sigma_1(\\omega)$. Trions arise from the pre-existing free carriers bound with the photo-generated excitons\\cite{Liu2014}, but there are no pre-existing free carriers in our case. Finally, although a reduction of the Lorentz oscillator strength of the absorption near 2.2 eV\\cite{Kim2018} can result in a negative $\\Delta\\sigma_1(\\omega)$ and a positive $\\Delta\\sigma_2(\\omega)$ in the THz range, no significant changes in the reflectivity near 2.2 eV was observed under similar pumping conditions\\cite{Ergeçen2022}. Further pump-probe studies are needed to investigate the dynamics of the multiple excitonic features near 1.5 eV under resonant excitations.\nL000087\t\nL000088\tIn conclusion, we discover a long-lived light-induced state with negative photoconductivity in bulk NiPS$_3$ by resonant pumping at the exciton energy. We interpret this as a population inversion state involving the excitonic ground state. Our study provides new insights to understand the nature of the spin-orbit-entangled exciton and the fine optical features nearby, for which limited data and diverse interpretations exist\\cite{Kang2020,Wang2021,Klaproth2023,Jana,Kim2023,He2024,Hamad2024}. The long-lived state is unique to resonant pumping at the exciton level, while increasing the pump photon energy by about 20 meV results in short-lived free-carrier response. As the narrow-band optical excitations used in this study are approachable for a wide range of table-top time-resolved techniques and large scale facilities such as femtosecond X-rays from free-electron lasers, our findings open up broad research opportunities to explore long-lived excitonic phases in optically driven nonequilibrium states. In particular, the long lifetime of the spin-orbit-entangled exciton and the exciton-magnon coupling in NiPS$_3$ are appealing for exploring exciton dynamics, exciton condensation and exciton-magnon interactions in light-driven states. Furthermore, since the exciton linewidth in NiPS$_3$ remains narrow down to the trilayer level\\cite{Wang2021}, atomically-thin NiPS$_3$ can serve as a building block for van der Waals heterojunctions or superlattices to potentially achieve long-lived lasing at terahertz frequencies in reduced dimensions.\nL000089\t\nL000090\tThis material is based upon work supported by the National Science Foundation under Grant No. 1944957. H. C., D. A. B. L. and W. H. acknowledge support from the U.S. Department of Energy, Office of Science, Office of Basic Energy Sciences Early Career Research Program under Award Number DE-SC-0021305. Work by Q. T., J. T. and X. L. were supported by the National Science Foundation (NSF) under Grant No. (1945364) and the U.S. Department of Energy, Office of Science, Basic Energy Sciences under Award DE-SC0021064. Q.T. acknowledges support of the Laursen Graduate Research Award. We acknowledge the helpful discussions with Matteo Mitrano, Yue Cao, Gregory Fiete and Martin Eckstein. We thank Boston University Photonics Center for technical support.\nL000091\t\nL000092\t\\begin{thebibliography}{40}\nL000093\t\\bibitem{Kaindl2003}\nL000094\tR. A. Kaindl, M. A. Carnahan, D. H\\\"{a}gele, R. L\\\"{o}venich,\nL000095\tand D. S. Chemla, Ultrafast terahertz probes of transient\nL000096\tconducting and insulating phases in an electron–hole gas,\nL000097\tNature 423, 734 (2003).\nL000098\t\\bibitem{Mehio2023}O. Mehio, X. Li, H. Ning, Z. Lenar\\v{c}i\\v{c}, Y. Han, M. Buchhold,\nL000099\tZ. Porter, N. J. Laurita, S. D. Wilson, and D. Hsieh,\nL000100\tA Hubbard exciton fluid in a photo-doped antiferromagnetic\nL000101\tMott insulator, Nat. Phys. 19, 1876 (2023).\nL000102\t\\bibitem{Bae2022}Y. J. Bae, J. Wang, A. Scheie, J. Xu, D. G. Chica, G. M.\nL000103\tDiederich, J. Cenker, M. E. Ziebel, Y. Bai, H. Ren, C. R.\nL000104\tDean, M. Delor, X. Xu, X. Roy, A. D. Kent, and X. Zhu,\nL000105\tExciton-coupled coherent magnons in a 2D semiconductor,\nL000106\tNature 609, 282 (2022).\nL000107\t\\bibitem{Mori2023}R. Mori, S. Ciocys, K. Takasan, P. Ai, K. Currier, T. Morimoto,\nL000108\tJ. E. Moore, and A. Lanzara, Spin-polarized spatially\nL000109\tindirect excitons in a topological insulator, Nature\nL000110\t614, 249 (2023).\nL000111\t\\bibitem{Eisenstein2014}J. Eisenstein, Exciton Condensation in Bilayer Quantum\nL000112\tHall Systems, Annu. Rev. Condens. Matter Phys. 5, 159\nL000113\t(2014).\nL000114\t\\bibitem{Kogar2017}\nL000115\tA. Kogar, M. S. Rak, S. Vig, A. A. Husain, F. Flicker,\nL000116\tY. I. Joe, L. Venema, G. J. MacDougall, T. C. Chiang,\nL000117\tE. Fradkin, J. van Wezel, and P. Abbamonte, Signatures\nL000118\tof exciton condensation ina transition metal dichalcogenide,\nL000119\tScience 358, 1314 (2017).\nL000120\t\\bibitem{Haque2024}\nL000121\tS. R. U. Haque, M. H. Michael, J. Zhu, Y. Zhang,\nL000122\tL. Windg¨atter, S. Latini, J. P. Wakefield, G.-F. Zhang,\nL000123\tJ. Zhang, A. Rubio, J. G. Checkelsky, E. Demler, and\nL000124\tR. D. Averitt, Terahertz parametric amplification as a\nL000125\treporter of exciton condensate dynamics, Nat. Mater.\nL000126\t(2024).\nL000127\t\\bibitem{Mak2016}\nL000128\tK. F. Mak and J. Shan, Photonics and optoelectronics of\nL000129\t2D semiconductor transition metal dichalcogenides, Nature\nL000130\tPhotonics 10, 216 (2016).\nL000131\t\\bibitem{Kang2020}\nL000132\tS. Kang, K. Kim, B. H. Kim, J. Kim, K. I. Sim, J.-U.\nL000133\tLee, S. Lee, K. Park, S. Yun, T. Kim, A. Nag, A. Walters,\nL000134\tM. Garcia-Fernandez, J. Li, L. Chapon, K.-J. Zhou,\nL000135\tY.-W. Son, J. H. Kim, H. Cheong, and J.-G. Park, Coherent\nL000136\tmany-body exciton in van der Waals antiferromagnet\nL000137\tNiPS$_3$, Nature 583, 785 (2020).\nL000138\t\\bibitem{Wang2021}\nL000139\tX. Wang, J. Cao, Z. Lu, A. Cohen, H. Kitadai, T. Li,\nL000140\tQ. Tan, M. Wilson, C. H. Lui, D. Smirnov, S. Sharifzadeh,\nL000141\tand X. Ling, Spin-induced linear polarization of\nL000142\tphotoluminescence in antiferromagnetic van der Waals\nL000143\tcrystals, Nature Materials 20, 964 (2021).\nL000144\t\\bibitem{Hwangbo2021}\nL000145\tK. Hwangbo, Q. Zhang, Q. Jiang, Y. Wang, J. Fonseca,\nL000146\tC. Wang, G. M. Diederich, D. R. Gamelin, D. Xiao, J.-H. Chu, W. Yao, and X. Xu, Highly anisotropic excitons\nL000147\tand multiple phonon bound states in a van der Waals\nL000148\tantiferromagnetic insulator, Nature Nanotechnology 16,\nL000149\t655 (2021).\nL000150\t\\bibitem{Kim2023}\nL000151\tD. S. Kim, D. Huang, C. Guo, K. Li, D. Rocca, F. Y.\nL000152\tGao, J. Choe, D. Lujan, T.-H. Wu, K.-H. Lin, E. Baldini,\nL000153\tL. Yang, S. Sharma, R. Kalaivanan, R. Sankar, S.-F. Lee,\nL000154\tY. Ping, and X. Li, Anisotropic Excitons Reveal Local\nL000155\tSpin Chain Directions in a van der Waals Antiferromagnet,\nL000156\tAdvanced Materials 35, 2206585 (2023).\nL000157\t\\bibitem{Dirnberger2022}\nL000158\tF. Dirnberger, R. Bushati, B. Datta, A. Kumar, A. H.\nL000159\tMacDonald, E. Baldini, and V. M. Menon, Spincorrelated\nL000160\texciton–polaritons in a van der Waals magnet,\nL000161\tNature Nanotechnology 17, 1060 (2022).\nL000162\t\\bibitem{Afanasiev2021}\nL000163\tD. Afanasiev, J. R. Hortensius, M. Matthiesen, S. Ma\\~{n}as-\nL000164\tValero, M. \\v{S}i\\v{s}kins, M. Lee, E. Lesne, H. S. J. van der\nL000165\tZant, P. G. Steeneken, B. A. Ivanov, E. Coronado, and\nL000166\tA. D. Caviglia, Controlling the anisotropy of a van der\nL000167\tWaals antiferromagnet with light, Science Advances 7,\nL000168\teabf3096 (2021).\nL000169\t\\bibitem{Belvin2021}\nL000170\tC. A. Belvin, E. Baldini, I. O. Ozel, D. Mao, H. C. Po,\nL000171\tC. J. Allington, S. Son, B. H. Kim, J. Kim, I. Hwang,\nL000172\tJ. H. Kim, J.-G. Park, T. Senthil, and N. Gedik, Excitondriven\nL000173\tantiferromagnetic metal in a correlated van der\nL000174\tWaals insulator, Nat. Commun. 12, 4837 (2021).\nL000175\t\\bibitem{Ergeçen2022}\nL000176\tE. Erge\\c{c}en, B. Ilyas, D. Mao, H. C. Po, M. B. Yilmaz,\nL000177\tJ. Kim, J.-G. Park, T. Senthil, and N. Gedik, Magnetically\nL000178\tbrightened dark electron-phonon bound states in\nL000179\ta van der Waals antiferromagnet, Nat. Commun. 13, 98\nL000180\t(2022).\nL000181\t\\bibitem{Mai2021}\nL000182\tT. T. Mai, K. F. Garrity, A. McCreary, J. Argo, J. R.\nL000183\tSimpson, V. Doan-Nguyen, R. V. Aguilar, and A. R. H.\nL000184\tWalker, Magnon-phonon hybridization in 2D antiferromagnet\nL000185\tMnPSe$_3$, Sci. Adv. 7, eabj3106 (2021).\nL000186\t\\bibitem{Lee2016}\nL000187\tJ.-U. Lee, S. Lee, J. H. Ryoo, S. Kang, T. Y. Kim,\nL000188\tP. Kim, C.-H. Park, J.-G. Park, and H. Cheong, Ising-\nL000189\tType Magnetic Ordering in Atomically Thin FePS$_3$,\nL000190\tNano Lett. 16, 7433 (2016).\nL000191\t\\bibitem{Tan2022}\nL000192\tQ. Tan, W. Luo, T. Li, J. Cao, H. Kitadai, X. Wang, and\nL000193\tX. Ling, Charge-transfer-enhanced d–d emission in antiferromagnetic\nL000194\tNiPS$_3$, Appl. Phys. Rev. 9, 041406 (2022).\nL000195\t\\bibitem{Jana}\nL000196\tD. Jana, P. Kapuscinski, I. Mohelsky, D. Vaclavkova,\nL000197\tI. Breslavetz, M. Orlita, C. Faugeras, and M. Potemski,\nL000198\tMagnon gap excitations and spin-entangled optical\nL000199\ttransition in van derWaals antiferromagnet NiPS$_3$, Phys.\nL000200\tRev. B 108, 144415 (2023).\nL000201\t\\bibitem{Klaproth2023}\nL000202\tT. Klaproth, S. Aswartham, Y. Shemerliuk, S. Selter, O. Janson, J. van den Brink, B. B\\\"{u}chner, M. Knupfer,\nL000203\tS. Pazek, D. Mikhailova, A. Efimenko, R. Hayn,\nL000204\tA. Savoyant, V. Gubanov, and A. Koitzsch, Origin of the\nL000205\tMagnetic Exciton in the van der Waals Antiferromagnet\nL000206\tNiPS$_3$, Phys. Rev. Lett. 131, 256504 (2023).\nL000207\t\\bibitem{Ross2013}\nL000208\tJ. S. Ross, S. Wu, H. Yu, N. J. Ghimire, A. M. Jones,\nL000209\tG. Aivazian, J. Yan, D. G. Mandrus, D. Xiao, W. Yao,\nL000210\tand X. Xu, Electrical control of neutral and charged excitons\nL000211\tin a monolayer semiconductor, Nat. Commun. 4,\nL000212\t1474 (2013).\nL000213\t\\bibitem{Cadiz2017}\nL000214\tF. Cadiz, E. Courtade, C. Robert, G. Wang, Y. Shen,\nL000215\tH. Cai, T. Taniguchi, K. Watanabe, H. Carrere, D. Lagarde,\nL000216\tM. Manca, T. Amand, P. Renucci, S. Tongay,\nL000217\tX. Marie, and B. Urbaszek, Excitonic Linewidth Approaching\nL000218\tthe Homogeneous Limit in MoS$_2$-Based van\nL000219\tderWaals Heterostructures, Physical Review X 7, 021026\nL000220\t(2017).\nL000221\t\\bibitem{Wierzbowski2017}\nL000222\tJ. Wierzbowski, J. Klein, F. Sigger, C. Straubinger,\nL000223\tM. Kremser, T. Taniguchi, K.Watanabe, U.Wurstbauer,\nL000224\tA. W. Holleitner, M. Kaniber, K. M\\\"{u}ller, and J. J. Finley,\nL000225\tDirect exciton emission from atomically thin transition\nL000226\tmetal dichalcogenide heterostructures near the lifetime\nL000227\tlimit, Scientific Reports 7, 12383 (2017).\nL000228\t\\bibitem{Wang2024}\nL000229\tX. Wang, Q. Tan, T. Li, Z. Lu, J. Cao, Y. Ge, L. Zhao, J. Tang, H. Kitadai, M. Guo, Y. Li, W. Xu, R. Cheng, D. Smirnov, and X. Ling, Unveiling the spin evolution in van der Waals antiferromagnets via magneto-exciton effects,\nL000230\tNature Communications 15, 8011 (2024).\nL000231\t\\bibitem{He2024}\nL000232\tW. He, Y. Shen, K. Wohlfeld, J. Sears, J. Li, J. Pelliciari,\nL000233\tM. Walicki, S. Johnston, E. Baldini, V. Bisogni,\nL000234\tM. Mitrano, and M. P. M. Dean, Magnetically propagating\nL000235\tHund’s exciton in van der Waals antiferromagnet\nL000236\tNiPS$_3$, arXiv:2404.10827v1.\nL000237\t\\bibitem{Huber2006}\nL000238\tR. Huber, B. A. Schmid, Y. R. Shen, D. S. Chemla, and\nL000239\tR. A. Kaindl, Stimulated Terahertz Emission from Intraexcitonic\nL000240\tTransitions in Cu$_2$O, Phys. Rev. Lett. 96,\nL000241\t017402 (2006).\nL000242\t\\bibitem{Kaneko}\nL000243\tT. Kaneko, Y. Murakami, D. Gole\\v{z}, Z. Sun, and A. J.\nL000244\tMillis, Exciton-spin interactions in antiferromagnetic\nL000245\tcharge-transfer insulators, Phys. Rev. B 108, 205121\nL000246\t(2023).\nL000247\t\\bibitem{Ho2021}\nL000248\tC.-H. Ho, T.-Y. Hsu, and L. C. Muhimmah, The bandedge\nL000249\texcitons observed in few-layer NiPS$_3$, npj 2D Materials\nL000250\tand Applications 5, 8 (2021).\nL000251\t\\bibitem{Supp}\nL000252\tSee Supplemental Material at \\textbf{[url]} for further details on experimental methods, data fitting, and theory calculations, which includes Refs. \\cite{Siskins2022, Fausti2011, Guenther2018, Verdeyen1995, Wildes2022}.\nL000253\t\\bibitem{Siskins2022}\nL000254\tM. \\v{S}i\\v{s}kins, M. Lee, S. Ma\\~{n}as-Valero, E. Coronado, Y. M. Blanter, H. S. J. van der Zant, and P. G. Steeneken, Magnetic and electronic phase transitions probed by nanomechanical resonators, Nature Communications 11, 2698 (2020).\nL000255\t\\bibitem{Fausti2011}\nL000256\tD. Fausti, R. I. Tobey, N. Dean, S. Kaiser, A. Dienst, M. C. Hoffmann, S. Pyon, T.Takayama, H. Takagi, and A. Cavalleri, Light-Induced Superconductivity in a Stripe-Ordered Cuprate, Science 331, 189 (2011).\nL000257\t\\bibitem{Guenther2018}\nL000258\tR. D. Guenther and D. Steel, \\textit{Encyclopedia of Modern Optics} (Academic Press, San Diego, CA, 2018).\nL000259\t\\bibitem{Verdeyen1995}\nL000260\tJ. T. Verdeyen, \\textit{Laser Electronics} (Presntice-Hall, 1995).\nL000261\t\\bibitem{Wildes2022}\nL000262\tA. R. Wildes, J. R. Stewart, M. D. Le, R. A. Ewings, K. C. Rule, G. Deng, and K. Anand, Magnetic dynamics of NiPS$_3$, Phys. Rev. B 106, 174422 (2022).\nL000263\t\\bibitem{Kim2019}\nL000264\tK. Kim, S. Y. Lim, J.-U. Lee, S. Lee, T. Y. Kim, K. Park,\nL000265\tG. S. Jeon, C.-H. Park, J.-G. Park, and H. Cheong, Suppression\nL000266\tof magnetic ordering in XXZ-type antiferromagnetic\nL000267\tmonolayer NiPS$_3$, Nat. Commun. 10, 345 (2019).\nL000268\t\\bibitem{Steinleitner2017}\nL000269\tP. Steinleitner, P. Merkl, P. Nagler, J. Mornhinweg,\nL000270\tC. Sch\\\"{u}ller, T. Korn, A. Chernikov, and R. Huber, Direct\nL000271\tObservation of Ultrafast Exciton Formation in a Monolayer\nL000272\tof WSe$_2$, Nano Letters 17, 1455 (2017).\nL000273\t\\bibitem{Li2024}\nL000274\tY. Li, G. Liang, C. Kong, B. Sun, and X. Zhang, Charge-Transfer-Mediated Exciton Dynamics in Van der Waals Antiferromagnet NiPS$_3$, Adv. Funct. Mater. 2402161\nL000275\t(2024).\nL000276\t\\bibitem{Allington2024}\nL000277\tC. J. Allington, C. A. Belvin, U. F. P. Seifert, M. Ye,\nL000278\tT. Tai, E. Baldini, S. Son, J. Kim, J. Park, J.-G. Park,\nL000279\tL. Balents, and N. Gedik, Distinct Optical Excitation\nL000280\tMechanisms of a Coherent Magnon in a van der Waals\nL000281\tAntiferromagnet, arXiv:2402.17041v1.\nL000282\t\\bibitem{Bossini2021}\nL000283\tD. Bossini, M. Pancaldi, L. Soumah, M. Basini,\nL000284\tF. Mertens, M. Cinchetti, T. Satoh, O. Gomonay, and\nL000285\tS. Bonetti, Ultrafast Amplification and Nonlinear Magnetoelastic\nL000286\tCoupling of Coherent Magnon Modes in an\nL000287\tAntiferromagnet, Phys. Rev. Lett. 127, 077202 (2021).\nL000288\t\\bibitem{Dressel2002}\nL000289\tM. Dressel and G. Gr\\\"{u}ner, \\textit{Electrodynamics of Solids}\nL000290\t(Cambridge University Press, 2002).\nL000291\t\\bibitem{Lane2022}\nL000292\tC. Lane and J.-X. Zhu, An ab initio study of electronhole\nL000293\tpairs in a correlated van der Waals antiferromagnet:\nL000294\tNiPS$_3$, arXiv:2209.13051v2.\nL000295\t\\bibitem{Hamad2024}\nL000296\tI. J. Hamad, C. S. Helman, L. O. Manuel, A. E. Feiguin,\nL000297\tand A. A. Aligia, Singlet polaron theory of low-energy\nL000298\toptical excitations in NiPS$_3$, arXiv: 2404.12449.\nL000299\t\\bibitem{Jnawali2013}\nL000300\tG. Jnawali, Y. Rao, H. Yan, and T. F. Heinz, Observation\nL000301\tof a Transient Decrease in Terahertz Conductivity\nL000302\tof Single-Layer Graphene Induced by Ultrafast Optical\nL000303\tExcitation, Nano. Lett. 13, 524 (2013).\nL000304\t\\bibitem{Frenzel2014}\nL000305\tA. J. Frenzel, C. H. Lui, Y. C. Shin, J. Kong, and\nL000306\tN. Gedik, Semiconducting-to-Metallic Photoconductivity\nL000307\tCrossover and Temperature-Dependent Drude Weight in\nL000308\tGraphene, Phys. Rev. Lett. 113, 056602 (2014).\nL000309\t\\bibitem{Liu2014}\nL000310\tC. H. Lui, A. J. Frenzel, D. V. Pilon, Y.-H. Lee, X. Ling,\nL000311\tG. M. Akselrod, J. Kong, and N. Gedik, Trion-Induced\nL000312\tNegative Photoconductivity in Monolayer MoS$_2$, Phys.\nL000313\tRev. Lett. 113, 166801 (2014).\nL000314\t\\bibitem{Kim2018}\nL000315\tS. Y. Kim, T. Y. Kim, L. J. Sandilands, S. Sinn, M.-C.\nL000316\tLee, J. Son, S. Lee, K.-Y. Choi, W. Kim, B.-G. Park,\nL000317\tC. Jeon, H.-D. Kim, C.-H. Park, J.-G. Park, S. J. Moon,\nL000318\tand T. Noh, Charge-Spin Correlation in van der Waals\nL000319\tAntiferromagnet NiPS$_3$, Phys. Rev. Lett. 120, 136402\nL000320\t(2018).\nL000321\t\\end{thebibliography}\nL000322\t\\end{document}\nL000323\t\nL000324\t===== END FILE: NPS.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "latex"
+  },
+  "response_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "minimum",
+            "maximum",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statistic": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

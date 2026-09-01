@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2512.08761v2\", \"citation\": \"Noah Grodzinski, Spontaneous Ratchet Currents and Transition Dynamics in Active Wetting, Physical Review Letters (2026), DOI:10.1103/sq25-hfsb\", \"journal_doi\": \"10.1103/sq25-hfsb\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: active_wetting_manuscript.tex =====\nL000002\t\\documentclass[\nL000003\t reprint,\nL000004\t amsmath,amssymb,\nL000005\t aps,\nL000006\t prl,\nL000007\t nofootinbib\nL000008\t]{revtex4-2}\nL000009\t\nL000010\t\\usepackage{graphicx}\nL000011\t\\usepackage{dcolumn}\nL000012\t\\usepackage{bm}\nL000013\t\\usepackage{physics}\nL000014\t\\usepackage{enumerate}\nL000015\t\\usepackage[hidelinks]{hyperref}\nL000016\t\\usepackage{tikz}\nL000017\t\\usepackage{xcolor}\nL000018\t\\renewcommand{\\div}{\\nabla \\cdot }\nL000019\t\\renewcommand{\\grad}{\\nabla}\nL000020\t\\renewcommand{\\appendixname}{APPENDIX}\nL000021\t\\setlength{\\intextsep}{5pt}\nL000022\t\\setlength{\\textfloatsep}{10pt}\nL000023\t\\setlength{\\floatsep}{8pt}\nL000024\t\\setlength{\\abovecaptionskip}{3pt}\nL000025\t\\setlength{\\belowcaptionskip}{0pt}\nL000026\t\nL000027\t\nL000028\t\nL000029\t\\begin{document}\nL000030\t\\preprint{APS/123-QED}\nL000031\t\\title{Spontaneous Ratchet Currents and Transition Dynamics in Active Wetting}\nL000032\t\nL000033\t\\author{Noah Grodzinski$^{1}$}\\thanks{Corresponding author: njbg2@cam.ac.uk (he/him)}\nL000034\t\\author{Robert L. Jack$^{1,2}$}\nL000035\t\\author{Michael E. Cates$^{1}$}\nL000036\t\nL000037\t\\affiliation{$^1$Department of Applied Mathematics and Theoretical Physics, University of Cambridge, Wilberforce Road, Cambridge, United Kingdom}\nL000038\t\\affiliation{$^2$ Yusuf Hamied Department of Chemistry, University of Cambridge, Lensfield Road, Cambridge, United Kingdom}\nL000039\t\\date{\\today}\nL000040\t\\begin{abstract}\nL000041\t\nL000042\tSelf-propelled particles accumulate on repulsive barriers in so-called active wetting, whose relationship with equilibrium wetting remains unclear. Using an exact (noiseless) hydrodynamic framework for an active lattice gas, we show, using a slit geometry with periodic boundary conditions, that active matter exhibits both fully-wet and partially-wet states, with a critical wetting transition between them. Furthermore, we demonstrate the existence of a spontaneous-symmetry-breaking ratchet current in the partially-wet state, leading to departure of the bulk densities from their binodal values and the emergence of a novel dynamical pathway for the full-to-partial wetting transition. We elucidate this modified dynamical pathway using a minimal model. The results, while establishing a direct connection between active and equilibrium wetting, also identify the nonequilibrium consequences of activity.\nL000043\t\nL000044\t\\end{abstract}\nL000045\t\nL000046\t\nL000047\t\nL000048\t\\maketitle\nL000049\t\\textit{Introduction--}\nL000050\tActive matter includes a broad class of self-propelled particle systems, locally consuming energy to produce directed motion \\cite{Marchetti2013, Ramaswamy2010}. This leads to a range of intrinsically nonequilibrium behaviours, including motility-induced phase separation (MIPS) into liquid and vapour~\\cite{Cates2015, Cates2025}. Examples of active systems range from flocking birds \\cite{Vicsek1995, Toner1998} to swimming bacteria \\cite{Tailleur2008, Elgeti2015}. Much of the collective behaviour in such systems depends weakly on the microscopic details and interactions \\cite{Cates2013, Ramaswamy2010}. Therefore, particle-level \\cite{Fily2012, Redner2013, Digregorio2018} and field-theoretic \\cite{Wittkowski2014, Tjhung2018, Cates2025} models of active matter are natural settings for studying emergent collective behaviour.\nL000051\t\nL000052\tBoundaries play a significant role in active systems. They can induce accumulation, drive steady-state currents, and even destroy bulk structure \\cite{BenDor2022, Galajda2007, Reichhardt2017, Bechinger2016, Elgeti2015, Stenhammar2016, Granek2024, Mangeat2024}. {One prominent boundary-driven effect is the accumulation/adsorption of active particles on purely repulsive barriers \\cite{Das2018, Elgeti2013, Sepulveda2017, Sepulveda2018, Caprini2024, Wysocki2020}, arising from the persistent self-propulsion of particles into the barrier. This process has become known as active wetting \\cite{Thiele2026}, and is implicated in a variety of biological processes~\\cite{Douezan2011, Joanny2013, Lauga2006, Chai2024, Harshey2003, PerezGonzalez2018, Brugues2014}.}\nL000053\t\nL000054\t{In equilibrium systems, adsorption (a microscopically thin film of fluid near a surface) is carefully distinguished from genuine wetting transitions \\cite{Binder1988, DeGennes1985, Sullivan1986, Dietrich1988, Schick1990, Bonn2009}. In particular, equilibrium critical wetting is a continuous surface phase transition on varying a surface attraction parameter at two-phase coexistence, at which the adsorbed film thickness diverges. A complete wetting transition involves the divergence of the wetting film, on approaching bulk coexistence from the wet side of the wetting transition. Simulations have suggested that in systems undergoing MIPS, accumulation of active particles \\cite{Sepulveda2018, Sepulveda2017, Das2018, Elgeti2013} can develop into macroscopic wetting \\cite{Turci2024, Zhao2026}, with transitions analogous to equilibrium complete wetting \\cite{Neta2021} and critical wetting \\cite{Turci2021, Das2020, PerezBastias2025, Das2025} (see also \\cite{Grodzinski2026a}).} However, a unified theory of active and passive wetting has remained elusive, due to the confounding role of steady-state currents and\nL000055\tactive interfacial phenomena (which lack a single effective surface tension) \\cite{Zhao2026, Bialke2015, Turci2024, Adkins2022, Granek2024, Zakine2020}.\nL000056\t\nL000057\tIn this Letter, we study active wetting by analysing a lattice model of self-propelled particles whose large-scale (hydrodynamic) behaviour can be derived exactly~\\cite{KourbaneHoussene2018, Mason2023a, Erignoux2024}. The hydrodynamic limit suppresses noise, allowing study of active wetting in a context free of fluctuation-driven effects (so that critical behaviour is of mean-field type). We investigate wetting in a setup analogous to the ``slit geometry'' of classical wetting.\nL000058\t\nL000059\tUsing this hydrodynamic framework, we uncover two key results. First, active accumulation on barriers leads robustly to fully-wet {(or, completely-wet)} and partially-wet steady-states in the thermodynamic (many particle, large-scale) limit. While this has been observed previously in simulations \\cite{Turci2024, Zhao2026, Neta2021, Turci2021, Das2020, PerezBastias2025, Das2025}, an exact description of these wetting states has not been available. {We also show that the transition between these wetting states shares phenomenology with equilibrium critical wetting (i.e. a continuous wetting transition on tuning the wall attraction at coexistence)}. This aspect of our work is discussed fully in the companion paper \\cite{Grodzinski2026a}. Here we focus on our second key result, which is the demonstration of a ratchet effect in active wetting, arising due to spontaneously broken symmetry, as opposed to any asymmetry in the underlying geometry. We show that this drives an intrinsically nonequilibrium transition pathway between the full- and partial-wetting states.\nL000060\t\nL000061\tOur results establish active wetting as a genuine surface phase transition, with an exact hydrodynamic description that directly parallels equilibrium {critical} wetting despite the absence of attractive inter-particle or particle-wall interactions. This generalises the analogy between bulk MIPS and equilibrium phase separation~\\cite{Cates2015} to include surface phenomena, confirming that classical concepts of liquid-gas physics near surfaces remain relevant far from equilibrium. Simultaneously, the active nature of the particles manifests in \\emph{qualitatively} new physics: in the slit geometry, spontaneous symmetry breaking produces circulating ratchet currents, modifying both the steady-states and the dynamical transition pathways. We expect such modified behaviour to be generic to systems that undergo MIPS.\nL000062\t\nL000063\t\\textit{Model--}\nL000064\tWe study the active lattice gas introduced in~\\cite{Mason2023a}. Particles move on an $N \\times N$ square lattice, with at most one particle per site, in an external potential $V$; the lattice occupies an $L\\times L$ domain. The hydrodynamic limit is $N\\to\\infty$ at fixed $L$, and fixed mean occupancy $\\bar{\\rho}.$ Each particle $i$ has a position $\\vb{x}_i$ and an orientation vector $\\vb{e}(\\theta_i) = (\\cos(\\theta_i), \\sin(\\theta_i))$. The angle $\\theta_i$ undergoes Brownian motion with diffusivity $D_O$, while the position $\\vb{x}_i$ is governed by diffusion ($D_E$), self-propulsion (in the direction $\\vb{e}_i$ at velocity $v_0$), and the external potential $V$. These processes have non-trivial dependence on $N$ such that both diffusion and activity remain relevant in the hydrodynamic limit \\cite{KourbaneHoussene2018, Mason2023a}. The full microscopic dynamics, alongside a discussion of this hydrodynamic limit, are given in \\cite{Grodzinski2026a}.  The system is described in the hydrodynamic limit by a probability density $f(\\vb{x}, \\theta, t)$ for particles with spatial position $\\vb{x}$ and orientation $\\theta$ at time $t$.\nL000065\tThe local density (mean occupancy) and polarisation are defined as $\\rho(\\vb{x}, t) = \\int_0^{2\\pi} f(\\vb{x}, \\theta, t) \\dd{\\theta}\\in [0, 1]$ and  $\\vb{p}(\\vb{x}, t) = \\int_0^{2\\pi} f(\\vb{x}, \\theta, t) \\ {\\vb{e}}(\\theta) \\dd{\\theta}$ respectively.\nL000066\tThe deterministic evolution of $f$ obeys:\nL000067\t\\begin{equation}\\label{eq:ABP_evolution}\nL000068\t  \\pdv{f}{t} = - \\div \\vb{J}_\\text{diff} - \\text{Pe} \\ \\div \\vb{J}_\\text{activity} + \\partial_\\theta^2 f,\nL000069\t\\end{equation}\nL000070\twhere\nL000071\t\\begin{align}\nL000072\t  &\\vb{J}_\\text{diff} = -d_s(\\rho) \\grad f - f \\mathcal{D}(\\rho) \\grad \\rho - f(1 - \\rho) \\grad V, \\label{eq:J_diff}\\\\\nL000073\t  &\\vb{J}_\\text{activity} = (\\mathcal{D}(\\rho) - 1) f \\vb{p} + \\vb{e}(\\theta) d_s(\\rho) f. \\label{eq:J_act}\nL000074\t\\end{align}\nL000075\tThe function $d_s(\\rho)$ is accurately approximated by a polynomial (see \\cite{Mason2023b, Mason2023a, Grodzinski2026a}); we define $ \\mathcal{D}(\\rho) = [1 - d_s(\\rho)]/\\rho$ for ease of writing.\nL000076\tThe first two terms in $\\vb{J}_\\text{diff}$ were derived in \\cite{Mason2023a}, while the final term (involving $V$) is derived in \\cite{Grodzinski2026a}. While $D_E, D_O, v_0$ may be chosen arbitrarily, an equation of form (\\ref{eq:ABP_evolution}) can always be obtained by rescaling $t \\rightarrow D_O t$, $x \\rightarrow x / \\sqrt{D_E/D_O}$, such that the unit of time is the reorientation time $\\tau \\equiv D_O^{-1}$, and the length unit is the distance travelled by a particle due to diffusion in that time, $l_D \\equiv \\sqrt{D_E/D_O}$. The Péclet number, describing the strength of self-propulsion \\cite{Mason2023a}, is $\\text{Pe} \\equiv \\frac{v_0}{\\sqrt{D_ED_O}} = v_0 \\tau / l_D$.\nL000077\t\nL000078\t\\begin{figure*}[t!]\nL000079\t    \\centering\nL000080\t    \\includegraphics[width=\\linewidth]{Figure1.png}\nL000081\t    \\caption{(a.1) Illustration of the system geometry. (a.2) Surface phase diagram; individual points are labelled according to their extrapolated steady-state. (b.1-2) Example full- and partial-wetting states; orientation-dependent density $f(x, \\theta, t)$ is shown in colour; arrows show current (arbitrary scale); integrated spatial density $\\rho(x, t)$ is shown with overlaid line. (c) Critical wetting phenomena. (c.1) Divergence of the thin film width. (c.2) Pitchfork bifurcation in the asymmetry, scanning $\\mathcal A$ as a function of $\\epsilon$ up (orange) and down (blue). (c.3) Linear stability of a fully-wet initial condition with weak noise; measured at early times, when asymmetry growth is approximately linear. See \\cite{Grodzinski2026a} for further details of numerics.\nL000082\t    }\nL000083\t    \\label{fig:wetting_states}\nL000084\t\\end{figure*}\nL000085\t\nL000086\t\nL000087\tEquilibrium wetting can be investigated in a \\textit{slit geometry}, where a fixed mass of fluid at liquid-vapour coexistence is confined between planar walls \\cite{Evans2019, VanLeeuwen1989, Sikkenk1987, Nijmeijer1990}. This allows investigation of wetting transitions without confounding effects such as curved interfaces, prewetting, or capillary condensation.\nL000088\tTo investigate active wetting, we choose an analogous geometry, inserting a planar barrier in a periodic geometry, at fixed total mass of active particles (as in~\\cite{Turci2021, Das2020}). Since our model is deterministic and only one dimension does not have translational symmetry, densities depend only on one (periodic) spatial dimension $x$; our hydrodynamic results should apply in higher dimensions provided that planar MIPS interfaces are stable. As in the equilibrium analogue, fully-wet, partially-wet, and unpinned states correspond to macroscopic liquid layers on both sides, one side, and neither side of the barrier respectively (see \\cite{Grodzinski2026a, Turci2021}). {Partially-wet states have only been observed in active systems on soft or penetrable walls \\cite{Turci2021, Turci2024, Zhao2026, Das2020} --- these may model cell membranes or gel films separating fluid compartments. Therefore, to access the wetting transition,} and following \\cite{Turci2021}, we study the case of a repulsive barrier with a smooth, finite potential $V(x) = \\epsilon \\left[ \\cos\\left( 2\\pi x \\right) + 1 \\right]\nL000089\tH(1/2 - \\abs{x})$ for Heaviside step $H(x)$. Our chosen geometry is illustrated in Figure \\ref{fig:wetting_states}(a.1).\nL000090\t\nL000091\tWe vary two control parameters: the self-propulsion strength $\\text{Pe}$, and barrier height $\\epsilon$. For simplicity, the mean particle density is fixed at its critical value $\\bar{\\rho} = 0.659$ \\cite{Mason2023a, Grodzinski2026a} throughout. The chosen system size $\\ell_s = L/l_D$ is much larger than the typical interfacial width.\nL000092\t\nL000093\t\nL000094\t\nL000095\t\\textit{Wetting States--}\nL000096\tFigure \\ref{fig:wetting_states}(a.2) shows the surface phase diagram, for a range of $\\epsilon, \\text{Pe}$.\nL000097\tTo obtain this, we initialise the system in a homogeneous state, with a small spatially uncorrelated perturbation. The system is then evolved until steady-state, numerically solving (\\ref{eq:ABP_evolution}); this procedure is discussed further in \\cite{Grodzinski2026a}. With a barrier present, above the critical activity, we observe fully-wet and partially-wet states; see Figure \\ref{fig:wetting_states}(b.1-2). Unpinned (dry) states are not observed for $\\epsilon > 0$, as expected; any barrier breaks the translational symmetry, localising the liquid layer in our noiseless dynamics.  The homogeneous state, in which phase-separation is not observed, occurs for $\\text{Pe}< \\text{Pe}^* = 4.33$.\nL000098\t\nL000099\tAlongside demonstrating the existence of full- and partial-wetting states, our hydrodynamic framework allows an investigation of the transition between them. We find that the four main features of a critical wetting transition (see \\cite{Grodzinski2026a, Turci2021, DeGennes1985}) are all displayed in the active system, see Figure \\ref{fig:wetting_states}(c.1-3). The first is a continuous divergence of the thin film width $\\zeta^*$ (on the side of the barrier without a macroscopic liquid layer in the partial-wetting scenario). The second is a pitchfork bifurcation in the spatial asymmetry,\nL000100\t$\nL000101\t    \\mathcal{A} = \\frac{1}{\\ell_s(\\bar{\\rho} - \\rho_v)}\\int_0^{\\ell_s/2} \\rho(x) - \\rho(\\ell_s-x) \\ \\dd{x},\nL000102\t$\nL000103\t(whose random sign results from spontaneous symmetry breaking).\nL000104\tThe third is a vanishing hysteresis loop; transitions from fully-wet to partially-wet states do not display metastability. Finally, the onset of linear instability of the fully-wet state occurs exactly at the transition, confirming absence of metastability.\nL000105\t\nL000106\tIn the Cahn theory of equilibrium wetting \\cite{Cahn1977}, critical wetting occurs when the wall significantly reduces the attractions between particles in its neighbourhood (see \\cite{Cahn1977, DeGennes1985, Grodzinski2026a}). In the active wetting scenario, the large polarisation $\\vb{p}$ means that active particles near the barrier are locally aligned. Since effective attractions in MIPS stem from collisions between oppositely aligned particles~\\cite{Cates2015}, the barrier inhibits the attractive inter-particle interactions dramatically (absolutely so in the large-Pe limit). This explains physically our observation of a critical active wetting transition.\nL000107\t\nL000108\t\nL000109\t\\textit{Ratchet Currents--}\nL000110\tThe partially-wet state displays a steady-state ratchet current normal to the barrier, which flows from the ``dry'' side to the ``wet'' side, circulating around the periodic domain. Although the ratchet principle predicts such currents for any system of (non-momentum-conserving) active particles in an {\\em asymmetric} potential \\cite{Reichhardt2017, Metzger2025}, the current here is a result of spontaneously broken mirror symmetry about a \\textit{symmetric} barrier.\nL000111\tThis is also distinct from \\textit{flocking} behaviour \\cite{Toner1998}, for which particles must have aligning interactions.\nL000112\t\nL000113\tWe define the \\textit{density} current $J^{(\\rho)}(x)$ such that $\\partial_t \\rho = - \\partial_x J^{(\\rho)}$.\nL000114\tIntegrating (\\ref{eq:ABP_evolution}) over orientations $\\theta$ yields:\nL000115\t\\begin{equation}\\label{Eq:density_dynamics}\nL000116\t    J^{(\\rho)}(x) = - [\\partial_x \\rho + \\rho (1-\\rho) \\partial_x V ] + \\text{Pe} (1-\\rho) p_x\nL000117\t\\end{equation}\nL000118\tThis current must be a constant in steady-state; using the steady-state identity $\\int_0^{\\ell_s} \\vb{p}(x) \\ \\dd x = \\vb{0}$, we obtain (see Appendix):\nL000119\t\\begin{equation}\\label{eq:SS_current}\nL000120\t    J_{\\mathrm{ss}}^{(\\rho)} = -M[\\rho] \\int_0^{\\ell_s} \\rho(x) \\pdv{V}{x} \\ \\dd x,\nL000121\t\\end{equation}\nL000122\twhere the effective mobility\nL000123\t$\nL000124\tM[\\rho] = \\{\\int_0^{\\ell_s} [1-\\rho(x)]^{-1} \\dd x\\}^{-1}\nL000125\t$\nL000126\tis strictly positive. From (\\ref{eq:SS_current}), we see that current flows from the dry (low-density) side of the barrier to the wet (high-density) side, which is in the opposite direction to a diffusive flux through the barrier.\nL000127\t\nL000128\tFor large systems $\\ell_s \\to \\infty$, the mobility decays as $M \\sim \\ell_s^{-1}$; the integrand in \\eqref{eq:SS_current} is non-zero only for $|x|< 1/2$, so the integral remains of order unity.  Hence the current is suppressed in large systems as\nL000129\t$\nL000130\tJ_{\\mathrm{ss}}^{(\\rho)} \\sim \\ell_s^{-1} \\; .\nL000131\t$\nL000132\tPhysically, this scaling arises because the ratchet acts as a localized driving force, while the friction is distributed across all particles.\nL000133\t\nL000134\t\\begin{figure}[h!]\nL000135\t    \\centering\nL000136\t    \\includegraphics[width=1.0\\linewidth]{Figure2.pdf}\nL000137\t    \\caption{Illustration of steady-state current in the partially-wet state. (a) Steady-state current as a function of system size, tending to $\\sim1/\\ell_s$. (b) Steady-state current vanishes continuously as $\\epsilon \\to \\epsilon^*$ (same parameters as Figure \\ref{fig:wetting_states}(c.2)).}\nL000138\t    \\label{fig:current}\nL000139\t\\end{figure}\nL000140\t\nL000141\tThe system-size dependence of $J^{(\\rho)}_\\text{ss}$ is illustrated in Figure \\ref{fig:current}(a). Alongside the expected asymptotic scaling, current flows in the predicted direction and is uniform to numerical accuracy. The steady-state current is also observed (see Figure \\ref{fig:current}(b)) to vanish continuously as $\\epsilon \\to \\epsilon^*(\\rm Pe)$, as expected for a critical transition. The numerical solutions reveal moreover that the steady-state density profile in the partially-wet state is modified, with the liquid layer developing a linear density gradient across its bulk, see Figure \\ref{fig:wetting_states}(b.2, magnified panel). A similar gradient develops in the vapour phase, but is less obvious as the tail of the liquid-vapour interface into the vapour bulk is more pronounced (as $d_s(\\rho_v) > d_s(\\rho_l)$).\nL000142\tAs the gradients must scale inversely with system size, and the bulk layers scale directly with  system size, we expect an asymptotically constant density drop across the bulk layers. {Hence, the ratchet current produces an $\\mathcal{O}(1)$ departure of the bulk densities from their binodal values that persists as $\\ell_s \\to \\infty$, as a non-local consequence of the wet barrier.  There is no such bulk effect in equilibrium wetting.}\nL000143\t\nL000144\t\nL000145\tThe ratchet current identified in our framework is qualitatively different to that discussed in \\cite{Zhao2026}, which showed how a \\textit{local} circulating current around the contact line modifies the contact angle in active wetting droplets. In our case, activity induces a spontaneous \\textit{global} current through a permeable barrier, with the consequences below.\nL000146\t\nL000147\t\\begin{figure}[h]\nL000148\t    \\centering\nL000149\t    \\includegraphics[width=1.0\\linewidth]{Figure3.pdf}\nL000150\t    \\caption{(a.1) Full-to-partial transition pathway at $\\text{Pe}=15$. (a.2) $\\mathcal{A}(t)$ for this process. (b.1, b.2) Pathway and asymmetry for partial-to-full transition at $\\text{Pe}=8$.}\nL000151\t    \\label{fig:dynamical_pathways}\nL000152\t\\end{figure}\nL000153\t\nL000154\t\\textit{Dynamical Transitions--} The ratchet current has important dynamical effects, despite being suppressed in large systems. As shown below, it modifies the \\textit{dynamical transition pathway} from fully-wet to partially-wet states, thereby qualitatively changing the wetting behaviour of active systems compared to their passive counterparts.\nL000155\t\nL000156\tTo dynamically observe a full-to-partial wetting transition, we initialise the system in a fully-wet state with $\\epsilon>\\epsilon^*$, then lower $\\epsilon$ to below the critical barrier height such that a partially-wet state becomes the (only) stable stationary solution to (\\ref{eq:ABP_evolution}). We observe that the transition pathway then proceeds in three distinct stages (see Figure \\ref{fig:dynamical_pathways}(a)):\nL000157\t\nL000158\t\\textit{(i) Linear instability about the barrier.} A small initial asymmetry about the barrier is amplified by the anti-diffusive ratchet current, leading to an exponentially growing asymmetry,\nL000159\t$\\mathcal{A}(t) = \\mathcal{A}_1 e^{\\lambda (\\epsilon^* - \\epsilon) t} $  (up to time $t_1 \\simeq 250$, independent of liquid-layer width).\nL000160\t\nL000161\t\\textit{(ii) Evaporation of one liquid layer.} The ratchet-driven instability induces a depression in density on one side of the barrier, causing its liquid layer to ``pinch off'' and form a droplet. This droplet then evaporates at approximately constant rate (see below), leading to a linear increase in the asymmetry,\nL000162\t$\nL000163\t    \\mathcal{A}(t) \\simeq \\mathcal{A}_2 t\nL000164\t$ (up to time $t_2 \\simeq 650$).\nL000165\t\nL000166\t\\textit{(iii) Bursting and saturation.} The liquid droplet then ``bursts\", redistributing its mass onto the other liquid layer and the boundary. Soon afterward (at time $t_3 \\simeq 800$), a saturated partially-wet state is reached with constant asymmetry, $\\mathcal{A}(t) = \\mathcal{A}_3$.\nL000167\t\nL000168\tAfter stage (i) described above, the asymmetric density profile on the barrier is very weakly dependent on time, leading to an approximately constant current through the barrier. This ratchet current redistributes mass from the detached liquid layer to the other (wet) side, meaning that layer evaporates in a time approximately linear in its width.\nL000169\t\nL000170\tIn contrast, the partial-to-full wetting transition (like the passive counterpart) proceeds via interaction between the exponential tails of the liquid-vapour interface and the barrier. This process becomes extremely slow in the late, distant-interface, stage of the transition, see Figure \\ref{fig:dynamical_pathways}(b.2). The ratchet-induced dynamical pathway therefore provides a \\textit{much faster} mechanism for full-to-partial wetting transitions than any passive counterpart, especially in large systems. Indeed, a smaller system size and a smaller value of Pe are required in Figure \\ref{fig:dynamical_pathways}(b) for that transition to occur in a reasonable time.\nL000171\t\nL000172\t\nL000173\t\\textit{Minimal model--} To further understand this ratchet-driven dynamical pathway, we seek a minimal model which captures the ratchet dynamics while excluding other active effects. A derivation of this model as an approximation of the full dynamics is contained in the Appendix. We consider a scalar field $\\phi: [-\\ell_s/2, \\ell_s/2) \\rightarrow \\mathbb{R}$, whose dynamics is given by:\nL000174\t\\begin{equation}\\label{eq:minimal_model_dynamics}\nL000175\t    \\pdv{\\phi}{t} = - \\partial_x \\left(  \\partial_x  \\qty(\\frac{\\delta F^\\phi_\\text{PS}}{\\delta \\phi}) + \\eta \\, \\delta(x) \\, \\partial_x \\phi  \\right)\\,.\nL000176\t\\end{equation}\nL000177\tHere the first term represents passive Cahn-Hilliard phase separation, and the second an active pump at the origin with strength $\\eta$, which induces a current with the same system-size scaling as (\\ref{eq:SS_current}). The free energy is of Cahn-Hilliard type with minima at $\\phi_{v,l} = 0, 1$:\nL000178\t\\begin{equation}\\label{eq:minimal_F_PS}\nL000179\t    F^{\\phi}_{\\mathrm{PS}} =\nL000180\t\\int_{-\\ell_s/2}^{\\ell_s/2} \\! \\dd{x} \\,\nL000181\t\\left\\{\nL000182\t\\frac{\\kappa}{2} \\left( \\partial_x \\phi \\right)^2\nL000183\t+ \\frac{\\alpha}{4} \\phi^2 (\\phi - 1)^2\nL000184\t\\right\\}.\nL000185\t\\end{equation}\nL000186\t\nL000187\tIn this model, we can solve for the linear instability of a bulk liquid domain of length $\\ell_L$ which contains at its centre a pump-- modelling the full-wetting state. This instability, which always leads to a partial-wetting state (with the liquid bulk on only one side of the origin), occurs for $\\eta > \\eta^*$ (see Appendix), where $\\eta^* = \\sqrt{2 \\alpha \\kappa} + \\mathcal{O}(\\ell_L^{-1})$.\nL000188\t\\begin{figure}[t]\nL000189\t    \\includegraphics[width=\\linewidth]{Figure4.pdf}\nL000190\t    \\caption{(a) Density profile over time for a full-to-partial transition in the minimal model ($\\alpha = \\kappa = 1, \\eta = 2$). (b) Asymmetry over time. Comparing with Figure \\ref{fig:dynamical_pathways}(a), one sees that the minimal model captures the three-stage transition found in the full dynamics.}\\label{fig:minimal_model}\nL000191\t  \\end{figure}\nL000192\tSince $\\eta^*$ does not diverge as $\\ell_L \\to \\infty$,  a finite localised pump can trigger a wetting transition even in the large-system limit.\nL000193\tAdditionally, the fact that $\\eta^*$ is non-vanishing implies that passive physics is sufficient to prevent a transition to the partially-wet state for a weak pump. Overall, the full-to-partial dynamical pathway in the minimal model, as shown in Figure \\ref{fig:minimal_model}, appears very similar to the full dynamics, even though the barrier and fluid are greatly simplified.\nL000194\t\nL000195\t\\textit{Conclusion--} We have shown that active wetting on repulsive barriers is a genuine surface phase transition, directly analogous to equilibrium wetting. Using an exact hydrodynamic framework, we obtain  steady states and demonstrate that fully- and partially-wet configurations, alongside a critical wetting transition, persist robustly in the thermodynamic limit. Our Letter therefore extends the analogy between MIPS and equilibrium phase separation to include surface phenomena.\nL000196\t\nL000197\tAt the same time, we uncover  intrinsically nonequilibrium behaviour. The partially-wet state exhibits spontaneous symmetry breaking, leading to a circulating ratchet current. (While in one spatial dimension this requires periodic boundaries, we expect a similar outcome, albeit with a more complicated current pattern, in higher dimensions under general distant boundary conditions.)  This current causes a departure of the bulk densities from their binodal values, and drives a qualitatively new transition pathway between wetting states which proceeds much faster than any passive analogue. We expect this behaviour to be generic to active wetting, and evident even in the large-system limit. These results reveal active wetting as a fertile setting in which equilibrium-like surface transitions and intrinsically nonequilibrium effects meet.\nL000198\t\nL000199\tRecent advances in colloidal systems \\cite{Palacci2014, Buttinoni2013, FinsCarreira2024} suggest several promising routes for experimental tests of these findings. For example, light-activated Janus particles can be confined within quasi-one-dimensional channels, in circular/toroidal geometries where periodicity is enforced by design. Inserting a permeable barrier \\cite{Bechinger2016} in such a setup could experimentally test the existence of active wetting states, and the nonequilibrium effects predicted above.\nL000200\t\nL000201\t\nL000202\t\\textit{Acknowledgments--} We thank Robert Evans, Francesco Turci, Maria Bruna, {Nigel Wilding, and Uwe Thiele} for insightful discussions and valuable feedback throughout this work. This work was supported by Engineering and\nL000203\tPhysical Sciences Research Council under Grants No.\\ EP/W524633/1\nL000204\t(Project Reference 2927750) and No.\\ EP/Z534766/1.\nL000205\t\nL000206\t\\textit{Data Availability--} The code and data that support our results are openly available at~\\cite{Grodzinski2026b}.\nL000207\t\nL000208\t\\bibliography{apssamp}\nL000209\t\nL000210\t\nL000211\t\\section{APPENDIX}\nL000212\t\\subsection{Derivation of the Ratchet Current}\\label{app:ratchet_current}\nL000213\tWe derive \\eqref{eq:SS_current} for the steady state density current, working from the dimensionless dynamics (\\ref{eq:ABP_evolution}). We start from the expression for the spatial probability current in (\\ref{eq:J_diff}, \\ref{eq:J_act}), for which only the x-component is non-vanishing:\nL000214\t\\begin{multline}\nL000215\t  J_x(x, \\theta) = - \\left[ d_s(\\rho) \\partial_x f + f \\mathcal{D}(\\rho) \\partial_x \\rho + (1-\\rho) f \\partial_x V \\right] \\\\ + \\text{Pe} \\left[  (\\mathcal{D}(\\rho)-1) f p_x + \\cos(\\theta) f d_s(\\rho) \\right] \\;\nL000216\t\\end{multline}\nL000217\tIntegrating over $\\theta$ and making use of the definition of $\\mathcal{D}(\\rho)$, we obtain the spatial density current\nL000218\t\\begin{equation}\nL000219\t    J^{(\\rho)} =  -\\left[ \\partial_x \\rho + (1-\\rho)\\rho \\partial_x V \\right] + \\text{Pe} (1-\\rho) p_x \\label{eq:appendix_density_current}\nL000220\t\\end{equation}\nL000221\t\nL000222\tIn steady state, the density current must be divergence-free, and so its one non-vanishing component must be a constant $J^{(\\rho)}(x) = J^{(\\rho)}_{\\text{ss}}$. Dividing (\\ref{eq:appendix_density_current}) through by $1-\\rho$, integrating over space with periodic boundaries, and using the identity $\\int_0^{\\ell_s} \\vb{p} \\ \\dd x = 0$ in steady-state\\footnote{Orientational dynamics is independent of position, so the total polarisation must generically vanish. This can be proven easily from the dynamics.}, yields:\nL000223\t\\begin{equation}\nL000224\t   J^{(\\rho)}_{\\text{ss}} = M[\\rho] \\int_0^{\\ell_s} V(x) \\, \\partial_x \\rho \\dd{x} \\;\nL000225\t   \\label{equ:J-MM-parts}\nL000226\t\\end{equation}\nL000227\twhere $M[\\rho] = [ \\int_0^{\\ell_s} \\frac{1}{(1-\\rho)} \\dd x]^{-1}$.  Integration by parts on \\eqref{equ:J-MM-parts} yields \\eqref{eq:SS_current}.\nL000228\t\nL000229\t\\subsection{Derivation of Minimal Model}\\label{app:minimal_model}\nL000230\t\nL000231\tWe motivate the minimal model as an approximation to the dynamics of the active lattice gas.\nL000232\t\nL000233\t\nL000234\tStarting with the dynamics of the density field in the full model and integrating \\eqref{eq:ABP_evolution} over the particles' orientations $\\theta$ yields\nL000235\t\\begin{equation}\\label{eq:dynamics_mobility}\nL000236\t    \\partial_t \\rho({x}) = - \\partial_x [{J}^{(\\rho)}({x})] \\equiv- \\partial_x \\qty[ \\mathcal{M}(\\rho({x})) \\mathcal{F}({x}) ]\nL000237\t\\end{equation}\nL000238\twhere $\\mathcal{M}(\\rho) = 1-\\rho \\geq 0$ plays the role of a mobility. The generalised force $\\mathcal{F}({x})$ can be split into two contributions:\nL000239\t\\begin{equation}\\label{eq:gen_forces}\nL000240\t    \\mathcal{F} = \\overbrace{\\partial_x \\ln(1 - \\rho) + \\text{Pe} \\, p_x}^{\\mathcal{F}_\\text{PS}} - \\overbrace{\\rho \\, \\partial_x V}^{\\mathcal{F}_\\text{barr}}\nL000241\t\\end{equation}\nL000242\twhere the phase-separating force $\\mathcal{F}_\\text{PS}$ gives rise to MIPS, and $\\mathcal{F}_\\text{barr}$ arises from the barrier. To simplify this expression, we first seek a closed-form expression for the polarisation $p_x$.\nL000243\tWe first use the definition of $\\vb{p}$ to write\nL000244\t\\begin{multline}\nL000245\t    \\partial_t p_i = \\div \\qty[ d_s(\\rho) \\grad p_i + \\mathcal{D}(\\rho) p_i \\grad \\rho + (1-\\rho) p_i \\grad V ] \\\\\nL000246\t    - \\text{Pe}\\ \\div \\qty[ (\\mathcal{D}(\\rho)-1) p_i \\vb{p}] -\\text{Pe}\\ \\sum_j \\partial_j \\qty[\\frac{d_s(\\rho)}{2} Q_{ij} ]\\\\\nL000247\t    -\\text{Pe}\\ \\partial_i \\qty[\\frac{d_s(\\rho)}{2} \\rho] - p_i,\nL000248\t\\end{multline}\nL000249\twhere the nematic alignment tensor is $Q_{ij} (\\vb x, t) = 2 \\int f(\\vb x, \\theta, t) (\\vb{e}_\\theta)_i (\\vb{e}_\\theta)_j \\dd \\theta - \\rho(\\vb x,t) \\delta_{ij}$.\nL000250\t\nL000251\tFocusing on regions away from the barrier, we seek an effective theory for the density alone.  To this end, we make three approximations: (i) the polarisation $\\vb{p}$ relaxes faster than the density $\\rho$ allowing an adiabatic elimination; (ii) density gradients are not too large, which enables gradient expansion; (iii) particles' alignment is weak, which means $|\\bm{p}|^2 \\ll 1$ and $\\underline{\\underline{Q}}\\approx 0$.  This last approximation is natural, given the previous two.\nL000252\t\nL000253\tNext, considering regions away from the barrier we use weak alignment, and adiabatic elimination of the ``fast'' field $\\vb{p}$, to obtain:\nL000254\t\\begin{equation}\\label{eq:p_implicit}\nL000255\t    p_i = \\div \\qty[ d_s(\\rho) \\grad p_i + \\mathcal{D}(\\rho)p_i \\grad \\rho] - \\frac{\\text{Pe}}{2} \\partial_i [\\rho \\, d_s(\\rho)]\nL000256\t\\end{equation}\nL000257\t\nL000258\tPlugging (\\ref{eq:p_implicit}) into itself recursively, and retaining only terms up to third-order in the gradient, yields\nL000259\t\nL000260\t\\begin{multline}\\label{eq:p_explicit_app}\nL000261\t    p_i = - \\frac{\\text{Pe}}{2} \\div \\bigg[ d_s(\\rho) \\partial_i \\grad (\\rho \\, d_s(\\rho)) \\\\ + \\mathcal{D}(\\rho) \\partial_i (\\rho \\, d_s(\\rho))\\grad \\rho \\bigg] - \\frac{\\text{Pe}}{2} \\partial_i [\\rho \\, d_s(\\rho)]\nL000262\t\\end{multline}\nL000263\tPhysically, the main effect of the third-order gradient terms on the dynamics is to prevent density gradients from growing too large.  The same effect can be accomplished in a simpler way by approximating the polarisation as\nL000264\t\\begin{equation}\nL000265\t    p_x = -\\frac{\\text{Pe}}{2} \\partial_x [\\rho \\, d_s(\\rho)]  + \\kappa_0 \\, \\partial_x^3 \\rho\nL000266\t\\end{equation}\nL000267\twith constant $\\kappa_0>0$. Substituting this expression into the phase-separating force $\\mathcal{F}_\\text{PS}$ from \\eqref{eq:gen_forces}, and defining $\\kappa = \\text{Pe} \\, \\kappa_0$ yields:\nL000268\t\\begin{equation}\nL000269\t    \\mathcal{F}_\\text{PS} = \\partial_x \\qty[ \\ln(1-\\rho) - \\frac{\\text{Pe}^2}{2} \\rho \\, d_s(\\rho)] + \\kappa\\,  \\partial_x^3 \\rho\nL000270\t\\end{equation}\nL000271\tWe recognise $\\mathcal{F}_\\text{PS}$ as the gradient of a free energy $F_\\text{PS}$:\nL000272\t\\begin{align}\nL000273\t    \\mathcal{F}_\\text{PS} &=- \\partial_x \\qty(\\frac{\\delta F_\\text{PS}}{\\delta \\rho}) \\\\\nL000274\t    F_\\text{PS} &= \\int_0^{\\ell_s} \\dd{x} \\qty{ \\frac{\\kappa}{2} (\\partial_x \\rho)^2 + f_\\rho(\\rho) }\nL000275\t\\end{align}\nL000276\twhere the bulk free energy density is\nL000277\t\\begin{equation}\nL000278\t    f_\\rho(\\rho) = \\int \\frac{\\text{Pe}^2}{2} \\rho \\, d_s(\\rho) - \\ln(1-\\rho) \\dd{\\rho}\nL000279\t\\end{equation}\nL000280\tThis function becomes a double-welled potential for $\\text{Pe} > \\text{Pe}^*$, giving rise to MIPS.\nL000281\t\nL000282\tWe now seek a scalar field in one dimension $\\phi(x)$ whose dynamics minimally recreates the behaviour of $\\rho$, with the same periodic boundary conditions. We simplify the full dynamics by replacing $f_\\rho$ with a simple double-well potential $f_\\phi = \\frac{\\alpha}{4} \\phi^2 (1-\\phi)^2$. The resulting free energy of the minimal model is then \\eqref{eq:minimal_F_PS}.\nL000283\t\nL000284\tTo model the barrier within the minimal model, we only include its ratchet effect.  To this end,\nL000285\twe replace the potential $V$ with a simplified form $V(x) = \\eta \\, \\delta(x)$ in $\\mathcal{F}_\\text{barr}$, yielding\nL000286\t\\begin{align}\nL000287\t    \\mathcal{F}_\\text{barr}(\\vb{x}) &= -\\eta \\, \\rho(\\vb{x}) \\grad \\delta(x) \\\\\nL000288\t    &=  -\\eta \\grad \\qty[\\rho(\\vb{x}) \\, \\delta(x)] + \\eta \\, \\delta(x) \\grad \\rho \\,  . \\label{eq:F_barr_two_terms}\nL000289\t\\end{align}\nL000290\tThe first term of \\eqref{eq:F_barr_two_terms} models\nL000291\tthe effect of volume exclusion from the barrier. This does not contribute to the steady-state current overall as it takes the form of a total derivative, and so its integral over space vanishes. We therefore drop this term and retain only the second term of \\eqref{eq:F_barr_two_terms} in the minimal model, identifying this as a pumping (ratchet) effect of the barrier. The resulting force in the minimal model is\nL000292\t\\begin{equation}\nL000293\t    \\mathcal{F}^\\phi_\\text{pump}(x) = \\eta \\, (\\partial_x \\phi) \\, \\delta(x).\nL000294\t\\end{equation}\nL000295\tTo complete the minimal model, we replace the density-dependent mobility $\\mathcal{M}(\\rho)$ of \\eqref{eq:dynamics_mobility} with a constant (taken without loss of generality to be $1$).\nL000296\tWe finally arrive at the minimal model \\eqref{eq:minimal_model_dynamics}. This model replaces MIPS with Cahn-Hilliard phase-separation, while the effect of the barrier is reduced to a local pumping effect at the origin; volume exclusion and all other consequences of the barrier have been removed.\nL000297\t\nL000298\tWe also note that the momentum injection term in the minimal model results in a steady-state current with the same scaling as the full dynamics, in the limit of a large system.\nL000299\t\nL000300\t\\subsection{Onset of Instability in the Minimal Model}\nL000301\tAs noted above, the fully-wet state always exists as a steady-state solution of the minimal dynamics.  However, this state may not be linearly stable.   The critical wetting transition corresponds to the onset of linear instability of this state, just as in equilibrium \\cite{Cahn1977, Grodzinski2026a}.\nL000302\t\nL000303\tWe find this instability by considering a small perturbation of a homogeneous liquid state.   We substitute a periodic, mass-conserving perturbation\nL000304\t$\nL000305\t    \\phi(x, t) = \\phi_l + \\sum_{n \\geq 1} A_n \\sin(q_n x) + B_n \\cos(q_n x)\nL000306\t$\nL000307\tinto the dynamics, where $q_n=2\\pi n/L$; the even cosine modes play no role, and we obtain at leading order $  \\dot{A}_n = \\Gamma_{nm} A_m$, with\nL000308\t\\begin{align}\nL000309\t   \\Gamma_{nm} = - \\left( \\frac{\\alpha}{2} q_n^2 + \\kappa q_n^4 \\right) \\delta_{nm} + \\frac{2\\eta}{L} q_n  q_m\nL000310\t\\end{align}\nL000311\t\nL000312\tThe (infinite) matrix $\\Gamma$ has the form\nL000313\t$\nL000314\t    \\Gamma = D + \\beta \\vb{q} \\vb{q}^T\nL000315\t$,\nL000316\twhere $D = \\text{diag}(\\{ -\\frac{\\alpha}{2} q_n^2 - \\kappa q_n^4 \\})$ and $\\beta = \\frac{2\\eta}{L}$. All the eigenvalues of $D$ are negative (as $\\alpha, \\kappa \\geq 0$).\nL000317\tThe Sherman-Morrison formula \\cite{Sherman1950} states, for a rank-1 update of a diagonal matrix:\nL000318\t\\begin{equation}\nL000319\t    \\det(D + \\beta \\vb{q} \\vb{q}^T - \\lambda I) = \\det(D- \\lambda I)( 1 + \\beta \\vb{q}^T (D- \\lambda I)^{-1} \\vb{q} ).\nL000320\t\\end{equation}\nL000321\tThe eigenvalues of $\\Gamma$ can therefore be obtained by finding the roots of its characteristic polynomial, $\\det(\\Gamma-\\lambda I)$.  Using that $D$ is diagonal we obtain:\nL000322\t\\begin{align}\nL000323\t    0 & = \\det(D- \\lambda I) \\left( 1 + \\beta \\sum_{m} \\frac{q_m q_m}{d_m - \\lambda} \\right)\nL000324\t\\nonumber\\\\\nL000325\t    & = \\prod_n \\left( d_n - \\lambda \\right) \\,  \\left( 1 - \\beta \\sum_{m} \\frac{q_m^2}{\\frac{\\alpha}{2} q_m^2 + \\kappa q_m^4 + \\lambda} \\right)\nL000326\t\\end{align}\nL000327\twhere $d_m = -\\frac{\\alpha}{2} q_m^2 - \\kappa q_m^4$ are the eigenvalues of $D$.\nL000328\t\nL000329\tThe matrix $\\Gamma$ is real-symmetric so its eigenvalues are real.  Hence the boundary of linear stability occurs when this matrix has a single zero eigenvalue, with all others being negative.  Setting $\\lambda=0$ and noting that $d_n<0$ for all $n$ we find\nL000330\t$\nL000331\t0 = 1- \\beta \\sum_{m} \\frac{1}{ (\\alpha/2) + \\kappa q_m^2}\nL000332\t$. Using the identity $\\sum_{n=1}^\\infty \\frac{1}{n^2 + a^2} = \\frac{a \\pi \\coth(a \\pi) - 1}{2a^2}$ (where $a = \\frac{L}{2 \\pi}\\sqrt{\\frac{\\alpha}{2 \\kappa}}$) and rearranging,  we obtain an explicit expression for the critical pumping strength $\\eta^*$ at which the system becomes unstable:\nL000333\t\\begin{equation}\nL000334\t    \\eta^* = \\frac{\\sqrt{2 \\alpha \\kappa}}{\\coth(L \\sqrt{\\frac{\\alpha}{8 \\kappa}}) - \\frac{1}{L}\\sqrt{\\frac{8 \\kappa}{\\alpha}}}\nL000335\t\\end{equation}\nL000336\tFor large $L$, this tends to $\\sqrt{2\\alpha\\kappa}$. Simulations confirm this instability boundary represents the onset of partial wetting, even when the ratchet is embedded in a liquid layer of finite width $L$ surrounded by vapour (instead of a periodic domain of the liquid density).\nL000337\t\nL000338\t\nL000339\t\\end{document}\nL000340\t===== END FILE: active_wetting_manuscript.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

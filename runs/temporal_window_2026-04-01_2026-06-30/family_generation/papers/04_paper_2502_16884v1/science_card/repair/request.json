@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2502.16884v1\", \"citation\": \"Weitao Chen, Critical Dynamics of the Anderson Transition on Small-World Graphs, Physical Review Letters (2026), DOI:10.1103/tyrf-2yf7\", \"journal_doi\": \"10.1103/tyrf-2yf7\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: draft-short.tex =====\nL000002\t\nL000003\t\nL000004\t\nL000005\t\nL000006\t\nL000007\t\nL000008\t\nL000009\t\nL000010\t\nL000011\t\nL000012\t\nL000013\t\nL000014\t\nL000015\t\nL000016\t\nL000017\t\nL000018\t\nL000019\t\nL000020\t\nL000021\t\nL000022\t\nL000023\t\\documentclass[twocolumn,showpacs,floatfix,\nL000024\t\nL000025\tsuperscriptaddress,\nL000026\t\nL000027\t\nL000028\t\nL000029\t\nL000030\t\nL000031\t\nL000032\t\nL000033\t\nL000034\t\nL000035\tlongbiblography,\nL000036\tamsmath,amssymb,\nL000037\taps,\nL000038\t\nL000039\t\nL000040\t\nL000041\t\nL000042\t\nL000043\t\nL000044\tprl]{revtex4-2}\nL000045\t\nL000046\t\nL000047\t\\usepackage{graphicx}\nL000048\t\\usepackage{dcolumn}\nL000049\t\\usepackage{amsmath}\nL000050\t\\usepackage{bm}\nL000051\t\\usepackage{appendix}\nL000052\t\\usepackage{soul}\nL000053\t\nL000054\t\nL000055\t\\usepackage{multirow}\nL000056\t\nL000057\t\\usepackage[bookmarks=true,colorlinks=true,urlcolor=blue,linkcolor=blue,citecolor=blue,breaklinks]{hyperref}\nL000058\t\\usepackage[mathlines]{lineno}\nL000059\t\nL000060\t\nL000061\t\nL000062\t\nL000063\t\nL000064\t\nL000065\t\nL000066\t\nL000067\t\nL000068\t\\usepackage{inconsolata}\nL000069\t\\usepackage[usenames,dvipsnames]{color}\nL000070\t\\usepackage{listings}\nL000071\t\nL000072\t\\lstset{\nL000073\tbasicstyle=\\ttfamily,\nL000074\tcolumns=fullflexible,\nL000075\tnumberstyle=\\small\\ttfamily\\color{Gray},\nL000076\tstepnumber=1,\nL000077\tnumbersep=10pt,\nL000078\tnumberfirstline=true,\nL000079\tnumberblanklines=true,\nL000080\ttabsize=4,\nL000081\tlineskip=-1.5pt,\nL000082\textendedchars=true,\nL000083\tbreaklines=true,\nL000084\tkeywordstyle=\\color{Blue}\\bfseries,\nL000085\tidentifierstyle=,\nL000086\tcommentstyle=\\sffamily\\color{OliveGreen},\nL000087\tstringstyle=\\color{Maroon},\nL000088\tshowstringspaces=false,\nL000089\tshowtabs=false,\nL000090\tupquote=false,\nL000091\ttexcl=true\nL000092\t}\nL000093\t\nL000094\t\nL000095\t\\usepackage{pdfpages}\nL000096\t\\usepackage{pgffor}\nL000097\t\\usepackage{xr}\nL000098\t\nL000099\t\nL000100\t\\makeatletter\nL000101\t\\AtBeginDocument{\\let\\LS@rot\\@undefined}\nL000102\t\\makeatother\nL000103\t\nL000104\t\nL000105\t\nL000106\t\nL000107\t\nL000108\t\nL000109\t\nL000110\t\nL000111\t\nL000112\t\nL000113\t\nL000114\t\\def\\new{\\textcolor{magenta}}\nL000115\t\nL000116\t\\newcommand\\underrel[2]{\\mathrel{\\mathop{#2}\\limits_{#1}}}\nL000117\t\\newcommand{\\gl}[1]{{\\color{magenta} #1}}\nL000118\t\\newcommand{\\cwt}[1]{{\\color{NavyBlue} #1}}\nL000119\t\\newcommand{\\GJ}{\\textcolor{red}}\nL000120\t\\newcommand{\\jm}[1]{{\\color{OliveGreen} #1} }\nL000121\t\\newcommand{\\cy}[1]{{\\color{cyan} #1} }\nL000122\t\\newcommand{\\red}[1]{{\\color{red} #1} }\nL000123\t\\newcommand{\\bg}[1]{{\\color{green} #1} }\nL000124\t\\renewcommand{\\selectlanguage}[1]{}\nL000125\t\\begin{document}\nL000126\t\nL000127\t\\preprint{APS/123-QED}\nL000128\t\nL000129\t\\title{Critical Dynamics of the Anderson Transition on Small-World Graphs}\nL000130\t\nL000131\t\nL000132\t\nL000133\t\nL000134\t\nL000135\t\nL000136\t\\author{Weitao Chen}\nL000137\t\\affiliation{Department of Physics, National University of Singapore, Singapore.}\nL000138\t\\affiliation{MajuLab, CNRS-UCA-SU-NUS-NTU International Joint Research Unit, Singapore.}\nL000139\t\\affiliation{Centre for Quantum Technologies, National University of Singapore, Singapore.}\nL000140\t\\author{Ignacio García-Mata}\nL000141\t\\affiliation{Instituto de Investigaciones Físicas de Mar del Plata (IFIMAR),\nL000142\tCONICET–UNMdP, Funes 3350, B7602AYL Mar del Plata, Argentina.}\nL000143\t\\affiliation{Consejo Nacional de Investigaciones Científicas y Tecnológicas (CONICET), Argentina.}\nL000144\t\\author{John Martin}\nL000145\t\\affiliation{Institut de Physique Nucléaire, Atomique et de Spectroscopie,\nL000146\tCESAM, University of Liège, B-4000 Liège, Belgium.}\nL000147\t\\author{Jiangbin Gong}\nL000148\t\\affiliation{Department of Physics, National University of Singapore, Singapore.}\nL000149\t\\affiliation{MajuLab, CNRS-UCA-SU-NUS-NTU International Joint Research Unit, Singapore.}\nL000150\t\\affiliation{Centre for Quantum Technologies, National University of Singapore, Singapore.}\nL000151\t\\author{Bertrand Georgeot}\nL000152\t\\affiliation{Laboratoire de Physique Théorique, Université de Toulouse, CNRS, UPS, France.}\nL000153\t\\author{Gabriel Lemarié}\nL000154\t\\email{ lemarie@irsamc.ups-tlse.fr}\nL000155\t\\affiliation{MajuLab, CNRS-UCA-SU-NUS-NTU International Joint Research Unit, Singapore.}\nL000156\t\\affiliation{Centre for Quantum Technologies, National University of Singapore, Singapore.}\nL000157\t\\affiliation{Department of Physics, National University of Singapore, Singapore.}\nL000158\t\\affiliation{Laboratoire de Physique Théorique, Université de Toulouse, CNRS, UPS, France.}\nL000159\t\nL000160\t\nL000161\t\nL000162\t\\date{\\today}\nL000163\t\nL000164\t\nL000165\t\\begin{abstract}\nL000166\tThe Anderson transition on random graphs draws interest through its resemblance to the many-body localization (MBL) transition with similarly debated properties. In this Letter, we construct a unitary Anderson model on Small-World graphs to characterize long time and large size wave-packet dynamics across the Anderson transition. We reveal the logarithmically slow non-ergodic dynamics in the critical regime, confirming recent random matrix predictions. Our data clearly indicate two localization times: an average localization time that diverges, while the typical one saturates. In the delocalized regime, the dynamics are initially non-ergodic but cross over to ergodic diffusion at long times and large distances. Finite-time scaling then allows us to characterize the critical dynamical properties: the logarithm of the average localization time diverges algebraically, while the ergodic time diverges exponentially. Our results could be used to clarify the dynamical properties of MBL and could guide future experiments with quantum simulators.\nL000167\t\nL000168\t\nL000169\t\nL000170\t\nL000171\t\\end{abstract}\nL000172\t\nL000173\t\nL000174\t\nL000175\t\\maketitle\nL000176\t\nL000177\t\nL000178\t\nL000179\t\\emph{Introduction.\\textemdash} The Anderson transition is a well-known metal-insulator transition driven by the interplay of interference and disorder \\cite{PhysRev.109.1492, abrahams201050, RevModPhys.57.287, Kramer_1993, RevModPhys.80.1355}. While it is well understood in low-dimensional systems—both theoretically \\cite{PhysRevB.19.783, Efetov1983, WEGNER1989663, RevModPhys.80.1355}, numerically \\cite{PhysRevLett.76.1687,PhysRevB.65.113109,PhysRevB.75.174203,doi:10.7566/JPSJ.83.084711,PhysRevLett.82.382,PhysRevB.84.134209,PhysRevLett.105.046403,PhysRevLett.102.106406,PhysRevLett.105.090601}, and experimentally \\cite{Garreau2017,PhysRevLett.103.155703,PhysRevLett.101.255702,PhysRevLett.108.095701,PhysRevLett.45.1723,PhysRevLett.48.1284,PhysRevB.98.214201,hu2008localization,jendrzejewski2012three,semeghini2015measurement}—its critical properties in the high-dimensional limit remain a subject of debate  \\cite{PhysRevB.95.094204, zirnbauer2023wegner, altshuler2024renormal}.\nL000180\t\nL000181\tInterest has naturally turned to the study of the Anderson transition in infinite dimensions ($\\text{AT}^{\\infty}$) \\cite{PhysRevLett.72.526, mirlin1994statistical, arenz2023wegnermodeltreegraph, zirnbauer2023wegner, PhysRevB.109.174216}. Early efforts focused on the Anderson model on the Bethe lattice \\cite{PhysRevB.34.6394, ZIRNBAUER1986375, Monthus_2011, biroli2012difference, Parisi_2020, PhysRevB.105.094202, PhysRevLett.113.046806, PhysRevB.96.214204, KRAVTSOV2018148}. Recently, strong interest has arisen in the Anderson model defined on random graphs featuring effective infinite dimensionality, such as Random Regular Graphs (RRG) and Small-World Graphs (SWG), due to their resemblance to the Fock-space graph of a Many-Body Localized (MBL) system \\cite{PhysRevLett.78.2803, PhysRevLett.95.206603, BASKO20061126, TIKHONOV2021168525}. The MBL transition is another ergodic-to-non-ergodic phase transition for isolated quantum many-body systems driven by disorder, with crucial implications for the foundations of statistical mechanics and quantum information theory \\cite{RevModPhys.91.021001, sierant2024manybody,collins2016random}. Several key insights from the Anderson model on random graphs have found successful applications in advancing the understanding of the MBL problem and vice versa \\cite{PhysRevB.96.201114, PhysRevLett.118.166801, PhysRevResearch.2.012020, PhysRevB.106.214202, PhysRevLett.123.180601, PhysRevLett.125.250402, TIKHONOV2021168525, PhysRevB.101.134202, PhysRevResearch.2.023159, PhysRevB.103.064204, PhysRevB.104.024202, PhysRevB.104.174201, PhysRevB.106.054203, PhysRevB.109.214203, PhysRevB.110.014205, sun2024characterizing, niedda2024renormal}, providing valuable analogies.\nL000182\t\nL000183\tThe two transitions have been marked by ambiguity and challenges: the existence or not of a non-ergodic delocalized phase and the critical properties of the Anderson transition \\cite{PhysRevB.94.184203,PhysRevB.109.174216, ADMirlin_1991, fyodorov1992novel,PhysRevLett.76.1687,PhysRevB.99.024202,PhysRevB.99.214202,PhysRevB.110.184210,PhysRevResearch.6.L032024,PhysRevB.110.014210,Kravtsov_2015,kravtsov2020localization,PhysRevResearch.2.043346,PhysRevResearch.2.012020,10.21468/SciPostPhys.6.1.014,10.21468/SciPostPhys.11.2.045, PhysRevB.94.220203,PhysRevLett.118.166801,PhysRevLett.117.156601,KRAVTSOV2018148,SciPostPhys.15.2.045,PhysRevResearch.2.042031,PhysRevB.109.184204, PhysRevB.106.214202, doi:10.1073/pnas.2401955121}, as well as the value of the critical disorder and the nature of the transition for the many-body localized problem \\cite{PhysRevB.95.155129,PhysRevB.105.174205,PhysRevB.106.L020202,leonard2022signatures,PhysRevB.100.104204,PhysRevE.102.062144,PhysRevB.102.064207,PhysRevB.103.024203,PhysRevE.104.054105,PhysRevLett.127.230603,ABANIN2021168415,PhysRevLett.124.186601,Panda_2019,PhysRevB.102.100202,PhysRevLett.133.116502}. Among the most debated aspects are the critical dynamics. These systems commonly exhibit slow relaxation, strongly affected by finite-size effects \\cite{Panda_2019,ABANIN2021168415, TIKHONOV2021168525}, which have fueled controversies regarding the nature of the delocalized phase of the AT$^\\infty$ \\cite{PhysRevB.98.134205,PhysRevB.101.100201,PhysRevB.105.174207} and even the very existence of an MBL phase \\cite{PhysRevLett.131.106301,PhysRevB.100.104204,PhysRevB.103.024203, PhysRevB.108.134204,PhysRevB.109.224206,PhysRevB.108.L140201}.\nL000184\tThis highlights the fundamental importance of these problems within the broader context of phase transition research.\nL000185\t\nL000186\t\nL000187\t\nL000188\t\nL000189\t\nL000190\t\nL000191\t\\begin{figure*}\nL000192\t\\includegraphics[width=0.99\\textwidth]{PI2_SWQKR.png}\nL000193\t\nL000194\t\\caption{\\label{FigWavePacket} Wave packet (WP) dynamics across the Anderson transition on Small-World graphs: The upper panels (a–c) show the average WP profile $\\Pi(r,t)$, while the lower panels (d–f) display the typical WP profile $\\Pi_{\\mathrm{typ}}(r,t)$. Curves from dark blue to pale orange correspond to evolution times $t=18,48,126,329,853,2212,5736,14873,38566,10^5$.\nL000195\tA strong distinction between average and typical WPs emerges in the localized and critical regimes and at times shorter than the ergodic time in the delocalized regime (lower blue curves in (c) and (f)), highlighting non-ergodicity. Notably, the typical WP saturates after the short typical localization time $\\tau_{\\mathrm{loc}}^{\\mathrm{typ}}$ (see also Fig.~\\ref{Fig2}(b), inset), forming an exponentially localized profile with localization length $\\xi_\\perp$, even at criticality (where $\\xi_\\perp^c\\approx (2 \\ln m)^{-1}$, a universal value \\cite{PhysRevB.106.214202, PhysRevResearch.2.012020}). Conversely, the average WP exhibits slow logarithmic dynamics, a power-law spatial decay at criticality, and much slower convergence with exponential localization in the localized regime.\nL000196\tBlack dashed lines represent theoretical fits \\cite{PhysRevB.99.214202, PhysRevResearch.6.L032024, PhysRevB.110.014210,PhysRevB.106.214202, PhysRevResearch.2.012020}. Blue dashed lines in (b) and (c) indicate the wavefront $r^*$, marking deviations from power-law decay \\cite{PhysRevE.108.054127, PhysRevResearch.6.L032024, PhysRevB.110.014210}, with insets showing $r^* \\sim \\ln t$. Red dashed lines in (c) and (f) highlight the spatially ergodic behavior at large times and distances in the delocalized regime.\nL000197\tIn (c) and (f), the first five short-time curves are shifted vertically (blue $y$-axis), while the long-time curves align with the red $y$-axis for clarity. Results are averaged over 5400 disorder realizations with $N=2^{19}$ and $p=0.1$.\nL000198\t}\nL000199\t\\end{figure*}\nL000200\t\nL000201\t\nL000202\t\nL000203\tThe dynamics of wave packets have become a key observable in recent experiments with cold atoms and classical waves  \\cite{PhysRevLett.103.155703,PhysRevLett.101.255702,PhysRevLett.108.095701}. These dynamics encode rich information about the critical properties of the Anderson transition \\cite{PhysRevLett.101.255702,lemarie2009universality,OhtsukiKawarabayashi,PhysRevA.94.033615,PhysRevA.100.043612,PhysRevLett.124.186601,PhysRevE.108.054127,PhysRevResearch.6.L032024,PhysRevB.110.014210}.\nL000204\tFurthermore, in finite dimensions, kicked Floquet (time-periodic) systems, such as the kicked rotor \\cite{santhanam2022quantum}, have proven exceptionally useful for studying Anderson localization. Notably, the experimental realization of the quasi-periodic kicked rotor has enabled the experimental determination of the critical exponent for the 3D and 4D Anderson transitions \\cite{PhysRevLett.101.255702, PhysRevLett.108.095701, PhysRevLett.105.090601,PhysRevA.80.043626, madani2024exploring}. Numerically, the dynamics of such kicked models can be simulated with great efficiency using Fast Fourier Transforms, making it possible to reach the large times and system sizes that are crucial for studying critical dynamics.\nL000205\t\nL000206\t\nL000207\t\nL000208\t\nL000209\t\nL000210\t\nL000211\t\nL000212\t\nL000213\t\nL000214\t\nL000215\tIn this letter, we address the critical dynamics of the $\\text{AT}^{\\infty}$  by introducing a unitary and kicked (Floquet) version of the Anderson model on SWGs \\cite{watts1998collective,PhysRevLett.118.166801}—a variant of the Quantum Kicked Rotor (QKR) \\cite{CHIRIKOV1979263,IZRAILEV1990299,PhysRevLett.75.4598,PhysRevA.29.1639}—which enables exact numerical simulations with large system sizes and long evolution times.\nL000216\t\nL000217\t\nL000218\t\nL000219\tWe exploit the ability of our model to directly access the dynamics of the spatial profile of wave packets, allowing us\nL000220\tto study several critical properties of AT$^\\infty$.\nL000221\tThrough this approach, we reveal the logarithmically slow dynamics in the non-ergodic critical regime, confirming recent random matrix predictions \\cite{PhysRevResearch.6.L032024, PhysRevB.110.014210}. We contrast the distinct behaviors of\nL000222\ttypical and average wave packets across the localized phase up to criticality, confirming the existence of two localization lengths \\cite{PhysRevResearch.2.012020, PhysRevB.106.214202} and revealing the existence of two localization times.\nL000223\tUsing finite-time scaling analysis, we\nL000224\tdemonstrate the ergodic nature of the delocalized regime at large times and distances beyond non-ergodic bubbles. Finally we extract critical exponents and compare\nL000225\tthem with previous predictions and determinations from eigenstate and spectral properties \\cite{PhysRevLett.118.166801, PhysRevB.99.024202,PhysRevB.99.214202, PhysRevB.110.184210}.\nL000226\t\nL000227\t\nL000228\t\nL000229\t\nL000230\t\nL000231\t\nL000232\t\nL000233\t\nL000234\t\nL000235\t\nL000236\t\\emph{Unitary Anderson model on Small-World graphs (UASW).\\textemdash}\nL000237\tWe construct the UASW starting from the 1D QKR \\cite{CHIRIKOV1979263,IZRAILEV1990299,PhysRevLett.75.4598,PhysRevA.29.1639}, a paradigmatic model of quantum chaos that can be interpreted as a unitary Anderson model \\cite{hamza2009dynamical}. The evolution operator for the QKR over a single period is defined as $\nL000238\tU_{1} = \\sum_{i,j}^N e^{{\\rm i}\\Phi_i\\delta_{ij}} \\sum_{k=1}^{N} F_{ik} e^{-{\\rm i}K V(2\\pi k/N)} F_{kj}^{-1} |i\\rangle\\langle j|$,\nL000239\twhere $V(x) = \\cos x$, and $F_{jk} = e^{2{\\rm i}\\pi jk/N}/\\sqrt{N}$ are discrete Fourier transform factors. Here, $i$ and $j$ are indices within $[\\![1, N]\\!]$, representing a 1D lattice of size $N$ with periodic boundary conditions. The phases $\\Phi_i$ are randomly and uniformly distributed over $[0, 2\\pi)$, and $K$ is the kicking strength, a crucial tuning parameter in this study that controls the hopping strengths between different sites.\nL000240\t\nL000241\tTo extend this unitary model to a SWG rather than a 1D lattice, we introduce long-range links with probability $0 < p < 1/2$ (the results presented here correspond to $p=0.1$). These links connect pairs of sites $\\{j_\\alpha, k_\\alpha\\}$, randomly chosen such that $|j_\\alpha - k_\\alpha| > 1$, resulting in $\\lfloor pN \\rfloor$ long-range links. This procedure constructs a SWG with an effective branching number $m \\approx 1 + 2p$ \\cite{watts1998collective}.\nL000242\tThe modification is implemented by multiplying the QKR evolution operator $U_1$ with unitary transition matrices $U_2^\\alpha$ connecting $\\{j_\\alpha, k_\\alpha\\}$, $\nL000243\tU_{2}^\\alpha = \\frac{1}{\\sqrt{2}} \\left(|j_\\alpha\\rangle\\langle j_\\alpha| + |k_\\alpha\\rangle\\langle k_\\alpha| - |j_\\alpha\\rangle\\langle k_\\alpha| + |k_\\alpha\\rangle\\langle j_\\alpha|\\right)\nL000244\t+ \\sum_{i \\neq j_\\alpha, k_\\alpha}^N |i\\rangle\\langle i|$.\nL000245\tThe successive application of these $\\lfloor pN \\rfloor$ unitary matrices can be expressed as $U_{2} = \\prod_{\\alpha=1}^{\\lfloor pN \\rfloor} U_{2}^\\alpha$. The resulting $U = U_1 U_2$ defines the Floquet operator of our UASW.\nL000246\t\nL000247\tThe kicked unitary nature of this model enables large-scale exact diagonalization through polynomial filtering techniques \\cite{luitz2021polynomial}. This has allowed for a detailed finite-size scaling analysis of eigenstate and spectral properties of the UASW model, following \\cite{PhysRevLett.118.166801,PhysRevResearch.2.012020,PhysRevB.106.214202}, to pinpoint the critical point at $K_c \\approx 1.95$ for $p=0.1$ and characterize the critical properties of the transition, corroborating the findings of \\cite{PhysRevLett.118.166801,PhysRevResearch.2.012020,PhysRevB.106.214202}. This analysis will be reported elsewhere \\cite{LongPaper}.\nL000248\t\nL000249\t\nL000250\t\nL000251\t\nL000252\t\nL000253\t\nL000254\t\nL000255\t\nL000256\t\nL000257\t\nL000258\t\\begin{figure}\nL000259\t\\includegraphics[width=0.5\\textwidth]{R0_loc_a.png}\nL000260\t\\includegraphics[width=0.46\\textwidth]{R0_loc.png}\nL000261\t\\caption{\\label{Fig2} Finite-time scaling of the return probability $\\Pi(0,t)$ in the localized phase of the Anderson transition on Small-World graphs. $K$ varies from $K=1.0$ (strongest localization, upper blue) to $K=1.95$ (critical, lower purple curve), with evolution times ranging from $t=10$ to $t=10^5$. (a) Raw data for the coarse-grained $\\Pi(0,t)$ (see text) show a slow convergence to a finite value, indicating asymptotic localization. At the critical point $K_c=1.95$, the return probability $\\Pi_c(0,t)$ decays logarithmically as $\\Pi_c(0,t) \\approx A(\\ln t)^{-\\mu}+\\Pi_c(0,\\infty)$ (black dashed line), with $\\mu=0.24$ (fixed) and $A, \\Pi_c(0,\\infty) \\approx 0.107$ as fitting parameters, signaling critical localization \\cite{PhysRevResearch.6.L032024, PhysRevB.110.014210,PhysRevB.99.214202}. (b) Single-parameter scaling of $\\Pi(0,t)$. The data in (a) collapse onto a single scaling function when plotted as $\\ln t / \\ln \\tau_{\\mathrm{loc}}$, where $\\tau_{\\mathrm{loc}}$ is the average localization time. The inset shows $\\ln \\tau_{\\mathrm{loc}}$ vs. $K$, along with the typical localization time $\\tau_{\\mathrm{loc}}^{\\mathrm{typ}}$, defined as the time beyond which $\\Pi_{\\mathrm{typ}}(r=20,t)$ saturates (see Fig.~\\ref{FigWavePacket}(d,e)). While $\\tau_{\\mathrm{loc}}^{\\mathrm{typ}}$ saturates at a finite value at the transition, the average localization time logarithm diverges algebraically as $\\ln \\tau_{\\mathrm{loc}} \\sim |K - K_c|^{-\\nu_{\\text{loc}}}$ with $\\nu_{\\mathrm{loc}} \\approx 1.06$, in perfect agreement with the critical exponent $\\nu=1$ for averaged observables in the localized phase \\cite{PhysRevLett.118.166801, PhysRevResearch.2.012020, PhysRevB.106.214202}. Results are averaged over $3,600$ to $18,000$ disorder configurations for a system size $N = 2^{17}$ and for $p=0.1$.\nL000262\t }\nL000263\t\nL000264\t\\end{figure}\nL000265\t\nL000266\t\nL000267\t\nL000268\t\nL000269\t\nL000270\t\nL000271\t\nL000272\t\nL000273\t\nL000274\t\nL000275\t\\emph{{WP dynamics across the Anderson transition in the UASW model.}\\textemdash}\nL000276\tHere we discuss the time evolution of wave packets (WP) which provides a direct probe of the critical dynamical properties. For a \\jm{wave function} initially localized \\jm{on} a single site, \\( |\\psi(t=0)\\rangle = |i_0\\rangle \\) we define the \\textit{average} and \\textit{typical} WP as\nL000277\t$\\Pi(r,t) = \\left\\langle \\sum_{i:d(i,i_0)=r} |\\psi(i,t)|^2 \\right\\rangle$\nL000278\tand\nL000279\t$\\Pi_{\\mathrm{typ}}(r,t) = \\langle N(r)\\rangle \\exp\\left\\langle  \\sum_{i: d(i,i_0)=r} \\ln |\\psi(i,t)|^2/N(r) \\right\\rangle$, respectively.\nL000280\tThe distance \\( r = d(i,i_0) \\) is the graph (or Hamming) distance between site $i$ and the initial site $i_0$, and the sum runs over the $N(r)$ sites \\( i \\) at distance \\( r \\) from \\( i_0 \\), with \\(\\langle N(r) \\rangle \\sim m^r \\) (\\( m\\approx1.3 \\) for $p=0.1$).\nL000281\t\nL000282\t\nL000283\t\nL000284\t\nL000285\t\nL000286\t\nL000287\t\nL000288\tThe distinction between the average and typical WPs, shown in Fig.~\\ref{FigWavePacket}, is made to shed light on the nonergodic properties of the localized (\\( K=1.5 \\), panels $(a,d)$) and critical (\\( K=1.95 \\), panels $(b,e)$) regimes, and at times shorter than the ergodic time in the delocalized regime (\\( K=2.5 \\), panels $(c,f)$) \\cite{PhysRevResearch.2.012020, PhysRevB.106.214202}. The different behaviors of these WPs are discussed in the next sections.\nL000289\t\nL000290\t\nL000291\t\nL000292\t\nL000293\t\nL000294\t\nL000295\t\nL000296\t\nL000297\t\\emph{{Logarithmically slow critical dynamics.}\\textemdash}\nL000298\t\nL000299\tAt the critical point, the spatial profile decays algebraically\nL000300\t$\\Pi(r,t) \\sim \\Pi(0,t) r^{-(1+\\mu)}$ for $r < r^*(t)$ and decays rapidly for $r > r^*(t)$, where $r^*(t)$ characterizes the wavefront.\nL000301\tFrom the numerical data shown in Fig.~\\ref{FigWavePacket} (b), we find $\\mu = 0.24$ and $r^*(t) \\sim \\ln t$. These dynamical properties of the WP reproduce the \\textit{critical localization} behavior predicted by random-matrix models of $\\text{AT}^\\infty$ \\cite{PhysRevResearch.6.L032024, PhysRevB.110.014210}, similar to the behavior predicted for RRG (with $\\mu = 0.5$ in that case) \\cite{PhysRevB.99.214202}. The spatial profile of the typical WP shown in Fig.~\\ref{FigWavePacket} (e) is distinct from the average one, and converges after a finite typical localization time $\\tau_{\\mathrm{loc}}^{\\mathrm{typ}}$ (see inset of Fig.~\\ref{Fig2}(b)) to a localized profile with the finite localization length $\\xi_{\\perp}^c \\approx (2\\ln m)^{-1}$, i.e., $\\Pi_{\\mathrm{typ}} (r,t)/\\Pi_{\\mathrm{typ}} (0,t) \\sim m^r e^{-r/\\xi_{\\perp}^c}$, consistent with Refs.~\\cite{PhysRevResearch.2.012020, PhysRevB.106.214202}.\nL000302\t\nL000303\tThe critical behavior is also encoded in the dynamics of the return probability, $\\Pi(0,t)$, which is predicted to decay as $\\Pi_c(0,t) \\sim (\\ln t)^{-\\mu} + \\Pi_c(0,\\infty)$ \\cite{PhysRevResearch.6.L032024, PhysRevResearch.2.012020, PhysRevB.110.014210, PhysRevB.99.024202}. This logarithmically slow decay is extremely challenging to characterize numerically. To mitigate fluctuations and considering the relationship between $\\Pi(0,t)$ and the inverse participation ratio \\( P_2 \\) at large times, it is important to work with coarse-grained wave packets (WPs), starting from an initial flat distribution over \\( N_{\\text{init}} > 1 \\) sites. In Fig.~\\ref{Fig2}(a), we show the return probability of coarse-grained WPs initialized as\nL000304\t\\(\nL000305\t|\\psi(t=0)\\rangle = \\sum_{i_0=1}^{N_{\\text{init}}} \\frac{e^{i\\phi_{i_0}}}{\\sqrt{N_{\\text{init}}}} |i_0\\rangle,\nL000306\t\\)\nL000307\twhere \\( \\phi_{i_0} \\) are independent random phases that we average over, and \\( N_{\\text{init}} = 32 \\).\nL000308\t\nL000309\tThe lowest curve represents $\\Pi_c(0,t)$ for system size $N = 2^{17}$ and large evolution times up to $t = 10^5$ and is found compatible with the predicted behavior with $\\mu = 0.24$ (determined from Fig.~\\ref{FigWavePacket} (b)) and a small fitted value $\\Pi_c(0,\\infty) \\approx 0.1$.\nL000310\t\nL000311\t\nL000312\t\nL000313\t\nL000314\t\\emph{Localized dynamics and finite-time scaling hypothesis.\\textemdash} The localized phase exhibits significant non-ergodic properties \\cite{PhysRevResearch.2.012020, PhysRevB.106.214202}, as highlighted by the distinct spatial profiles of the average and typical WPs (see Fig.~\\ref{FigWavePacket} (a) and (d)). The average WP converges slowly, after an average localization time $\\tau_{\\mathrm{loc}}$ which diverges at the transition (see Fig.~\\ref{Fig2}), into a profile characterized by the critical WP modulated by exponential decay, governed by the average localization length $\\xi_\\parallel$, i.e., $\\Pi (r,\\infty)/\\Pi (0,\\infty)\\sim r^{-(1+\\mu)}e^{-r/\\xi_\\parallel}$. On the other hand, the typical WP rapidly adopts, after a small typical $\\tau_{\\mathrm{loc}}^{\\mathrm{typ}}$ that saturates at a finite value at the transition, a purely exponential localized profile with decay controlled by $\\xi_{\\perp}\\ll \\xi_\\parallel$, specifically, $\\Pi_{\\mathrm{typ}} (r,\\infty)/\\Pi_{\\mathrm{typ}} (0,\\infty)\\sim m^r e^{-r/\\xi_{\\perp}}$. These observations strongly corroborate the existence of two distinct localization lengths \\cite{PhysRevResearch.2.012020, PhysRevB.106.214202, PhysRevResearch.6.L032024, PhysRevB.110.014210, zirnbauer2023wegner, vanoni2023renormalization, LongPaper} but also reveal the existence of two localization times.\nL000315\t\nL000316\tTo characterize the divergence of $\\tau_{\\text{loc}}$ near criticality, we perform a finite-time scaling analysis of the return probability $\\Pi(0,t)$. In the infinite-time limit, $\\Pi(0,\\infty) \\simeq P_2 \\approx  \\xi_{\\parallel}^{-\\mu} + P_2^{\\infty}$ \\cite{PhysRevB.103.064204, PhysRevE.108.054127, LongPaper}. Drawing an analogy with the finite-size scaling of eigenstate moments, we propose the following finite-time scaling behavior for the dynamics \\cite{PhysRevLett.105.090601,PhysRevA.80.043626,madani2024exploring,PhysRevLett.118.166801,PhysRevB.106.214202,LongPaper}:\nL000317\t\\begin{equation}\nL000318\t    \\frac{\\Pi(0,t) - \\Pi_c(0,\\infty)}{\\Pi_c(0,t) - \\Pi_c(0,\\infty)} = F\\left(\\frac{\\ln t}{\\ln \\tau_{\\text{loc}}}\\right),\nL000319\t\\end{equation}\nL000320\twith $F(X) \\rightarrow 1$ for $X \\ll 1$ and $F(X) \\rightarrow c X^{\\mu}$ for $X \\gg 1$. This scaling law in $\\ln t/\\ln \\tau_{\\text{loc}}$ is analogous to the linear finite-size scaling in $\\ln N/\\xi_{\\parallel}$ found in \\cite{PhysRevResearch.2.012020,PhysRevB.106.214202,PhysRevB.99.024202,LongPaper} as times scale like volumes. In Fig.~\\ref{Fig2}(b), we present the collapse of numerical data when plotted as $\\ln t/\\ln \\tau_{\\text{loc}}$, revealing a divergence behavior of $\\ln \\tau_{\\text{loc}} \\sim |K - K_c|^{-\\nu_{\\text{loc}}}$ with $\\nu_{\\text{loc}} \\approx 1$, in perfect agreement with the critical exponent $\\nu=1$ for averaged observables in the localized phase \\cite{PhysRevLett.118.166801, PhysRevResearch.2.012020, PhysRevB.103.064204}.\nL000321\t\nL000322\t\nL000323\t\nL000324\t\nL000325\t\\begin{figure}\nL000326\t\nL000327\t\\includegraphics[width=0.49\\textwidth]{R0_del_ab.png}\nL000328\t\nL000329\t\nL000330\t\\caption{\\label{FigDelocalized} Ergodic time scaling in the delocalized phase.\nL000331\t(a) Time evolution of the return probability $\\Pi(0,t)$ for $K=2.1, 2.2, ..., 2.8$ (top to bottom). To minimize finite-size effects, data beyond the point where dynamics for system sizes $N = 2^{17}$ and $N = 2^{18}$ deviate are excluded. The dashed lines represent fits by $A(\\ln t)^{-d}\\exp\\left[-(t/\\tau_{\\mathrm{ergo}})^{\\beta_d}\\right]$ with $\\beta_d=0.61$ the fixed stretch exponent of classical diffusion on SWGs we determined independently, and $A, d, \\tau_{\\mathrm{ergo}}$ as fitting parameters. Results are averaged over 18,000 disorder configurations.\nL000332\t(b) Dependence of the ergodic time $\\tau_{\\mathrm{ergo}}$ on $K>K_c$, extracted from the fits. The solid line shows a fit of the form $A|K-K_c|^{-\\nu}+C$, with $\\nu=0.5$ (fixed).}\nL000333\t\nL000334\t\\end{figure}\nL000335\t\nL000336\t\nL000337\t\\emph{Delocalized dynamics and ergodicity.\\textemdash}\nL000338\tIn the delocalized regime, the average WP profile, shown in Fig.~\\ref{FigWavePacket}(c), exhibits two different behaviors as a function of time. (I) At sufficiently small times, the profile follows a power-law spatial decay $\\Pi(r, t) / \\Pi(0, t) \\sim r^{-\\alpha(K)}$ with $\\alpha(K) < \\mu$, resembling the critical behavior but with a different exponent. When $\\alpha(K) < 1$, this indicates \\textit{logarithmic multifractality}, as introduced in random-matrix ensembles \\cite{PhysRevResearch.6.L032024, PhysRevB.110.014210}. A wavefront $r^*(t)$, beyond which the WP decays rapidly, follows $r^*(t) \\sim \\ln t$. (II) At large times, a non-ergodic radius emerges. The WP profile stabilizes to $\\Pi(r, t) / \\Pi(0, t) \\sim r^{-\\gamma}$ with $\\gamma \\approx 1.5$ at sufficiently small distances, but crosses over to ergodic behavior $\\Pi(r, t) / \\Pi(0, t) \\sim N(r)$ at large distances. Thus, beyond a characteristic time or spatial scale, ergodicity is restored. This is further supported by the typical WP in Fig.~\\ref{FigWavePacket}(f), where ergodic behavior reappears at long times and large distances. However, the average and typical WPs differ at short times and distances, revealing non-ergodic bubbles.\nL000339\t\nL000340\t\nL000341\t\nL000342\t\nL000343\tTo quantitatively assess the ergodic time $\\tau_{\\mathrm{ergo}}$, which separates non-ergodic critical-like behavior from ergodic transport, we analyze the return probability $\\Pi(0,t)$. Care is needed in its interpretation. First, delocalized dynamics suffers from strong finite-size effects, in addition to the finite-time effects we focus on. To minimize these, we exclude data beyond the time when the results for system sizes $N = 2^{17}$ and $N = 2^{18}$ start to diverge from each other. Second, classical diffusion on SWG exhibits ``glassy'' relaxation, with the return probability decaying as a stretched exponential at long times, $\\Pi(0,t) \\sim t^{-1/2}e^{-ct^{\\beta_d}}$, where $c$ depends on $m$ \\cite{PhysRevB.38.11461, monasson1999diffusion, PhysRevE.62.4405}. Our simulations of classical diffusion on SWG yield $\\beta_d \\approx 0.61$ (see \\cite{LongPaper}).  This contrasts with the exponential decay found in RRG \\cite{PhysRevB.99.024202} and Bethe lattice \\cite{Monthus1996}.\nL000344\t\nL000345\t\nL000346\t\nL000347\t\nL000348\t\nL000349\tBased on the picture provided by WPs, at short times the system resides in a non-ergodic bubble, where the return probability decays logarithmically slowly, $\\Pi(0,t) \\sim (\\ln t)^{-d(K)}$ \\cite{PhysRevResearch.6.L032024, PhysRevB.110.014210}. We propose that the quantum decay follows the behavior:\nL000350\t\\begin{equation}\nL000351\t\\Pi(0,t) \\sim (\\ln t)^{-d(K)} e^{-[t/\\tau_{\\mathrm{ergo}}(K)]^{\\beta_d}}\\;.\nL000352\t\\end{equation}\nL000353\tIn Fig.~\\ref{FigDelocalized} (a), the numerical data re well fitted by this formula, and the ergodic time shown in panel (b) aligns with the analytical prediction, $\\tau_{\\text{ergo}}(K) \\sim e^{\\mathrm{cst} |K-K_c|^{-\\nu}}$, with $\\nu = 0.5$ \\cite{PhysRevB.99.024202}. Thus, $\\tau_{\\mathrm{ergo}}(K)$ behaves as the correlation volume \\cite{PhysRevLett.118.166801, PhysRevB.99.024202,PhysRevB.99.214202, PhysRevB.110.184210}.\nL000354\t\nL000355\t\nL000356\t\nL000357\t\nL000358\t\nL000359\t\nL000360\t\nL000361\t\nL000362\t\\emph{Conclusion.\\textemdash}\nL000363\tWe have characterized the critical dynamics of the Anderson transition in infinite dimensions using a unitary Anderson model on Small-World graphs, enabling large-scale, long-time simulations. By directly probing wave packet expansion, we reveal logarithmically slow dynamics at criticality, two distinct localization times in the localized phase, and ergodic diffusion at large scales and times in the delocalized regime. Finite-time scaling yields critical exponents $\\nu_\\text{loc} \\approx 1$ for localization time and $\\nu \\approx 1/2$ for ergodic time. Our results confirm key analytical predictions \\cite{PhysRevResearch.6.L032024, PhysRevB.110.014210, PhysRevB.99.214202, TIKHONOV2021168525} while challenging recent findings on other graphs and random matrices \\cite{PhysRevB.98.134205, PhysRevB.101.100201, 10.21468/SciPostPhys.6.1.014, 10.21468/SciPostPhys.11.2.045}, highlighting the need for a systematic comparison of methods and models. Our study provides a quantitative framework for dynamical scaling that may offer insights into Many-Body Localization. Experimental realizations in cold-atom and quantum simulator platforms, where graph structures in Hilbert space can be engineered \\cite{PhysRevLett.123.130601,yao2023observation}, appear within reach.\nL000364\t\nL000365\t\nL000366\t\nL000367\t\nL000368\t\\acknowledgements\nL000369\tWe wish to thank O. Giraud for\nL000370\tfruitful discussions. This study has been (partially) supported through the EUR grant NanoX ANR-17-EURE-\nL000371\t0009 in the framework of the ``Programme des Investisse-\nL000372\tments d’Avenir\", the France 2030 program (Grant No. ANR-23-PETQ-0002), the French-Argentinian IRP COQSYS, research funding Grants No.~ANR-18-CE30-0017, ANR-19-CE30-0013 and ManyBodyNet, and by the Singapore Ministry of Education Academic Research Funds Tier II (WBS No. A-8001527-02-00 and A-8002396-00-00). We thank Calcul en Midi-Pyrénées\nL000373\t(CALMIP), the National Supercomputing Centre (NSCC) of Singapore, and the Consortium des Equipements de Calcul Intensif (CECI), funded by the Fonds de la Recherche Scientifique de Belgique (F.R.S.-FNRS) under Grant No. 2.5020.11 for computational resources and assistance. W.~Chen is supported by the President's Graduate Fellowship at National University of Singapore and the Merlion Ph.D. Scholarship awarded by the French Embassy in Singapore. I.G.-M. received support from Argentinian Agencia I$+$D$+$i (Grants No. PICT-2020-SERIEA-00740 and PICT-2020-SERIEA-01082) as well as  from CNRS (France) through the International Research Project (IRP) “Complex Quantum Systems” (CoQSys).\nL000374\t\nL000375\t\nL000376\t\nL000377\t\nL000378\t\nL000379\t\nL000380\t\nL000381\t\nL000382\t\nL000383\t\\bibliography{refs.bib}\nL000384\t\nL000385\t\nL000386\t\nL000387\t\nL000388\t\nL000389\t\nL000390\t\\end{document}\nL000391\t===== END FILE: draft-short.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides a quantitative study of wave-packet dynamics across the Anderson transition on small-world graphs, with two distinct regimes (localized and delocalized) that share controls (K, t) and readouts (Pi(0,t), tau_loc, tau_ergo). The localized regime yields a finite-time scaling law with exponent nu_loc ~ 1.06, and the delocalized regime yields an ergodic time scaling with exponent nu = 0.5. These form a coherent quantitative cluster suitable for authoring.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Weitao Chen, Critical Dynamics of the Anderson Transition on Small-World Graphs, Physical Review Letters (2026), DOI:10.1103/tyrf-2yf7\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/tyrf-2yf7\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2502.16884v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper studies the critical dynamics of the Anderson transition on small-world graphs using a unitary kicked model (UASW). It focuses on wave-packet dynamics, return probability, localization times, and ergodic time scaling across localized, critical, and delocalized regimes.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"localized_finite_time_scaling\\\",\\n      \\\"statement\\\": \\\"In the localized phase, the return probability Pi(0,t) obeys a finite-time scaling law in ln t / ln tau_loc, where tau_loc is the average localization time that diverges algebraically as ln tau_loc ~ |K - K_c|^{-nu_loc} with nu_loc ~ 1.06.\\\",\\n      \\\"equations\\\": [\\n        \\\"(Pi(0,t) - Pi_c(0,inf)) / (Pi_c(0,t) - Pi_c(0,inf)) = F(ln t / ln tau_loc)\\\",\\n        \\\"ln tau_loc ~ |K - K_c|^{-nu_loc}\\\"\\n      ],\\n      \\\"variable_names\\\": [\\\"Pi(0,t)\\\", \\\"Pi_c(0,t)\\\", \\\"Pi_c(0,inf)\\\", \\\"tau_loc\\\", \\\"K\\\", \\\"K_c\\\", \\\"nu_loc\\\"],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"nu_loc_localized\\\",\\n          \\\"value\\\": 1.06,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"critical exponent for localization time divergence\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 261,\\n              \\\"line_end\\\": 261,\\n              \\\"support\\\": \\\"Caption states ln tau_loc ~ |K - K_c|^{-nu_loc} with nu_loc ~ 1.06.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"K_c_localized\\\",\\n          \\\"value\\\": 1.95,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"critical kicking strength for p=0.1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 247,\\n              \\\"line_end\\\": 247,\\n              \\\"support\\\": \\\"Text states critical point at K_c ~ 1.95 for p=0.1.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption describes finite-time scaling collapse and divergence of ln tau_loc with nu_loc ~ 1.06.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 320,\\n          \\\"line_end\\\": 320,\\n          \\\"support\\\": \\\"Text states collapse of data when plotted as ln t / ln tau_loc, revealing ln tau_loc ~ |K - K_c|^{-nu_loc} with nu_loc ~ 1.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"delocalized_ergodic_time_scaling\\\",\\n      \\\"statement\\\": \\\"In the delocalized phase, the return probability decays as Pi(0,t) ~ (ln t)^{-d(K)} exp[-(t/tau_ergo)^{beta_d}], and the ergodic time diverges exponentially as tau_ergo(K) ~ exp(cst |K - K_c|^{-nu}) with nu = 0.5.\\\",\\n      \\\"equations\\\": [\\n        \\\"Pi(0,t) ~ (ln t)^{-d(K)} exp[-(t/tau_ergo)^{beta_d}]\\\",\\n        \\\"tau_ergo(K) ~ exp(cst |K - K_c|^{-nu})\\\"\\n      ],\\n      \\\"variable_names\\\": [\\\"Pi(0,t)\\\", \\\"d(K)\\\", \\\"tau_ergo\\\", \\\"beta_d\\\", \\\"K\\\", \\\"K_c\\\", \\\"nu\\\"],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"beta_d_delocalized\\\",\\n          \\\"value\\\": 0.61,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"stretch exponent of classical diffusion on SWGs\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 331,\\n              \\\"line_end\\\": 331,\\n              \\\"support\\\": \\\"Caption states beta_d=0.61 as fixed stretch exponent.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 343,\\n              \\\"line_end\\\": 343,\\n              \\\"support\\\": \\\"Text states simulations yield beta_d ~ 0.61.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"nu_delocalized\\\",\\n          \\\"value\\\": 0.5,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"critical exponent for ergodic time divergence\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 332,\\n              \\\"line_end\\\": 332,\\n              \\\"support\\\": \\\"Caption states fit with nu=0.5 (fixed).\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 353,\\n              \\\"line_end\\\": 353,\\n              \\\"support\\\": \\\"Text states tau_ergo(K) ~ exp(cst |K-K_c|^{-nu}) with nu=0.5.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"K_c_delocalized\\\",\\n          \\\"value\\\": 1.95,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"critical kicking strength for p=0.1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 247,\\n              \\\"line_end\\\": 247,\\n              \\\"support\\\": \\\"Text states critical point at K_c ~ 1.95 for p=0.1.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 331,\\n          \\\"line_end\\\": 331,\\n          \\\"support\\\": \\\"Caption describes fits by A(ln t)^{-d} exp[-(t/tau_ergo)^{beta_d}] with beta_d=0.61.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 353,\\n          \\\"line_end\\\": 353,\\n          \\\"support\\\": \\\"Text states tau_ergo(K) ~ exp(cst |K-K_c|^{-nu}) with nu=0.5.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"p_equals_0_1\\\",\\n      \\\"statement\\\": \\\"Long-range link probability p = 0.1.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 241,\\n          \\\"line_end\\\": 241,\\n          \\\"support\\\": \\\"Text states results correspond to p=0.1.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"N_2_17_localized\\\",\\n      \\\"statement\\\": \\\"System size N = 2^17 for localized regime data.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption states system size N = 2^17 for localized data.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"N_2_17_delocalized\\\",\\n      \\\"statement\\\": \\\"System size N = 2^17 for delocalized regime data.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 331,\\n          \\\"line_end\\\": 331,\\n          \\\"support\\\": \\\"Caption states data for N = 2^17 and N = 2^18 are used; data beyond divergence excluded.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"N_init_32\\\",\\n      \\\"statement\\\": \\\"Coarse-grained wave packets initialized over N_init = 32 sites.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 307,\\n          \\\"line_end\\\": 307,\\n          \\\"support\\\": \\\"Text states N_init = 32.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"K\\\",\\n      \\\"definition\\\": \\\"Kicking strength of the UASW model, controlling hopping strengths.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [1.0, 1.5, 1.95, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8],\\n      \\\"domain_statement\\\": \\\"K varies from 1.0 to 1.95 in localized regime, and from 2.1 to 2.8 in delocalized regime.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption states K varies from K=1.0 to K=1.95.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 331,\\n          \\\"line_end\\\": 331,\\n          \\\"support\\\": \\\"Caption states K=2.1, 2.2, ..., 2.8.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"t\\\",\\n      \\\"definition\\\": \\\"Evolution time in Floquet periods.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 10,\\n      \\\"maximum\\\": 100000,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"Evolution times range from t=10 to t=10^5.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption states evolution times ranging from t=10 to t=10^5.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"Pi_0_t\\\",\\n      \\\"definition\\\": \\\"Return probability, the average wave-packet probability at the initial site.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Averaged over disorder realizations (3,600 to 18,000 configurations).\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 277,\\n          \\\"line_end\\\": 277,\\n          \\\"support\\\": \\\"Definition of average WP Pi(r,t) as ensemble average of |psi(i,t)|^2.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption describes Pi(0,t) as return probability.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"tau_loc\\\",\\n      \\\"definition\\\": \\\"Average localization time, the time scale for the average WP to converge to its asymptotic profile.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Extracted from finite-time scaling collapse.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption defines tau_loc as average localization time.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"tau_ergo\\\",\\n      \\\"definition\\\": \\\"Ergodic time, the time scale separating non-ergodic critical-like behavior from ergodic transport in the delocalized phase.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Extracted from fits to Pi(0,t) decay.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 343,\\n          \\\"line_end\\\": 343,\\n          \\\"support\\\": \\\"Text defines tau_ergo as separating non-ergodic from ergodic behavior.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"localized_tau_loc_divergence\\\",\\n      \\\"statement\\\": \\\"In the localized phase, the average localization time tau_loc diverges algebraically as ln tau_loc ~ |K - K_c|^{-nu_loc} with nu_loc ~ 1.06.\\\",\\n      \\\"quantitative_form\\\": \\\"ln(tau_loc) = A * |K - K_c|^{-nu_loc}\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"tau_loc\\\": {\\n          \\\"op\\\": \\\"exp\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"multiply\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"param\\\": \\\"A_localized\\\"\\n                },\\n                {\\n                  \\\"op\\\": \\\"power\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"subtract\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"var\\\": \\\"K\\\"\\n                        },\\n                        {\\n                          \\\"param\\\": \\\"K_c_localized\\\"\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"negate\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"param\\\": \\\"nu_loc_localized\\\"\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"localized_finite_time_scaling\\\"],\\n      \\\"control_names\\\": [\\\"K\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"K\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [1.0, 1.5, 1.95],\\n          \\\"domain_statement\\\": \\\"K values in localized regime from 1.0 to 1.95.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 261,\\n              \\\"line_end\\\": 261,\\n              \\\"support\\\": \\\"Caption states K varies from K=1.0 to K=1.95.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"tau_loc\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"p_equals_0_1\\\", \\\"N_2_17_localized\\\"],\\n      \\\"applicability\\\": \\\"Localized phase, K < K_c, with K_c = 1.95 for p=0.1.\\\",\\n      \\\"statistical_basis\\\": \\\"Averaged over 3,600 to 18,000 disorder configurations.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption states ln tau_loc ~ |K - K_c|^{-nu_loc} with nu_loc ~ 1.06.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 320,\\n          \\\"line_end\\\": 320,\\n          \\\"support\\\": \\\"Text states divergence behavior of ln tau_loc with nu_loc ~ 1.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"delocalized_tau_ergo_divergence\\\",\\n      \\\"statement\\\": \\\"In the delocalized phase, the ergodic time tau_ergo diverges exponentially as tau_ergo(K) ~ exp(cst |K - K_c|^{-nu}) with nu = 0.5.\\\",\\n      \\\"quantitative_form\\\": \\\"tau_ergo = A * exp(cst * |K - K_c|^{-nu})\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"tau_ergo\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"param\\\": \\\"A_delocalized\\\"\\n            },\\n            {\\n              \\\"op\\\": \\\"exp\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"multiply\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"param\\\": \\\"cst_delocalized\\\"\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"power\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"subtract\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"var\\\": \\\"K\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"K_c_delocalized\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"negate\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"nu_delocalized\\\"\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"delocalized_ergodic_time_scaling\\\"],\\n      \\\"control_names\\\": [\\\"K\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"K\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8],\\n          \\\"domain_statement\\\": \\\"K values in delocalized regime from 2.1 to 2.8.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 331,\\n              \\\"line_end\\\": 331,\\n              \\\"support\\\": \\\"Caption states K=2.1, 2.2, ..., 2.8.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"tau_ergo\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"p_equals_0_1\\\", \\\"N_2_17_delocalized\\\"],\\n      \\\"applicability\\\": \\\"Delocalized phase, K > K_c, with K_c = 1.95 for p=0.1.\\\",\\n      \\\"statistical_basis\\\": \\\"Averaged over 18,000 disorder configurations.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 332,\\n          \\\"line_end\\\": 332,\\n          \\\"support\\\": \\\"Caption states fit of form A|K-K_c|^{-nu}+C with nu=0.5 (fixed).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 353,\\n          \\\"line_end\\\": 353,\\n          \\\"support\\\": \\\"Text states tau_ergo(K) ~ exp(cst |K-K_c|^{-nu}) with nu=0.5.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"nu_loc_value_discrepancy\\\",\\n      \\\"statement\\\": \\\"The text in the main body states nu_loc ~ 1, while the figure caption states nu_loc ~ 1.06. The paper does not reconcile these values.\\\",\\n      \\\"claim_ids\\\": [\\\"localized_tau_loc_divergence\\\"],\\n      \\\"mechanism_ids\\\": [\\\"localized_finite_time_scaling\\\"],\\n      \\\"control_names\\\": [\\\"K\\\"],\\n      \\\"readout_names\\\": [\\\"tau_loc\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"p_equals_0_1\\\", \\\"N_2_17_localized\\\"],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 261,\\n          \\\"line_end\\\": 261,\\n          \\\"support\\\": \\\"Caption states nu_loc ~ 1.06.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 320,\\n          \\\"line_end\\\": 320,\\n          \\\"support\\\": \\\"Text states nu_loc ~ 1.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"parameters.outputs.tau_loc.args[0].args[0].param is not an allowed parameter\",\"path\":\"$.claims[0].oracle_outputs\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

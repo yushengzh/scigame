@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2605.00274v1\", \"citation\": \"Viktor Berger, Universal Low-Temperature Depletion of Superfluid Density in the Absence of Galilean Symmetry, Physical Review Letters (2026), DOI:10.1103/gdzs-3hwl\", \"journal_doi\": \"10.1103/gdzs-3hwl\"}\n\nSource-grounded routing hint from pre-screening:\nExtract only the d=2 low-temperature superfluid-density depletion law Delta_n_s(T)=-K*T^3 from source Eq delta_ns lines189-216. Historical private branch is the 2D lattice central parameter set t=a=1,kappa=.2974,c=2.087,nu=1.763,gamma=-.10,sigma=-.10 as actually used by the source, yielding n_s=c^2*kappa and K=.11020937712391092. Alternate source-explicit Galilean special case uses gamma=sigma=0,nu=1/m,m=1 with the same d=2,c=2.087 and K=.030253569098739025. Public control T_over_t in conservative benchmark interval [.01,1/6], with upper low-temperature anchor from source lines278-296 and lower value only an interface cutoff. Same exact AST minus(K*power(T,3)), readout theoretical central Delta_n_s; no Monte Carlo noise. Do not use measured sigma=-.15(10) in place of source plotted sigma=-.1 and add no claims.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main.tex =====\nL000002\t\nL000003\t\nL000004\t\\documentclass[aps,twocolumn,nopacs,floats,superscriptaddress]{revtex4-2}\nL000005\t\nL000006\t\nL000007\t\\usepackage{graphicx}\nL000008\t\\usepackage{dcolumn}\nL000009\t\\usepackage{bm}\nL000010\t\\usepackage{amsmath}\nL000011\t\\usepackage{amssymb}\nL000012\t\\usepackage{color}\nL000013\t\\def\\red{\\color{red}}\nL000014\t\\def\\magenta{\\color{magenta}}\nL000015\t\\def\\blue{\\color{blue}}\nL000016\t\\def\\green{\\color{green}}\nL000017\t\nL000018\t\\usepackage{xcolor}\nL000019\t\\newcommand\\comment[1]{\\textcolor{red}{#1}}\nL000020\t\\definecolor{cardinal}{rgb}{0.6,0,0}\nL000021\t\\definecolor{darkgreen}{rgb}{0,0.4,0}\nL000022\t\\definecolor{golden}{rgb}{0.92, 0.7, 0}\nL000023\t\\definecolor{midnight}{rgb}{0, 0, 0.5}\nL000024\t\\definecolor{darkblue}{rgb}{0, 0, 0.7}\nL000025\t\\newcommand{\\Red}{\\color{red}}\nL000026\t\\newcommand{\\Blue}{\\color{blue}}\nL000027\t\\newcommand{\\DarkGreen}{\\color{darkgreen}}\nL000028\t\\newcommand{\\Cardinal}{\\color{cardinal}}\nL000029\t\\newcommand{\\Golden}{\\color{golden}}\nL000030\t\\newcommand{\\Midnight}{\\color{midnight}}\nL000031\t\\newcommand{\\DarkBlue}{\\color{darkblue}}\nL000032\t\\def\\he4{$^4$He}\nL000033\t\\def\\hel3{$^3$He}\nL000034\t\\def\\Am3{\\AA$^{-3}$}\nL000035\t\\def\\beq{\\begin{equation}}\nL000036\t\\def\\eeq{\\end{equation}}\nL000037\t\\newcommand{\\LR}[1]{{\\bf \\Midnight LR:} {\\DarkBlue\\it #1}}\nL000038\t\\newcommand{\\pt}{{\\partial}}\nL000039\t\\newcommand{\\s}{{\\sigma}}\nL000040\t\\newcommand{\\rv}{{\\bf r}}\nL000041\t\\newcommand{\\dv}{{\\bm{\\delta}}}\nL000042\t\\newcommand{\\thv}{{\\bm{\\theta}}}\nL000043\t\\newcommand{\\chiv}{{\\bm{\\chi}}}\nL000044\t\\newcommand{\\av}{{\\bf a}}\nL000045\t\\newcommand{\\cv}{{\\bf c}}\nL000046\t\\newcommand{\\A}{{\\bf A}}\nL000047\t\\newcommand{\\B}{{\\bf B}}\nL000048\t\\newcommand{\\J}{{\\bf J}}\nL000049\t\\newcommand{\\D}{{\\bf D}}\nL000050\t\\newcommand{\\E}{{\\bf E}}\nL000051\t\\newcommand{\\C}{{\\bf C}}\nL000052\t\\newcommand{\\xv}{{\\bf x}}\nL000053\t\\newcommand{\\kv}{{\\bf k}}\nL000054\t\\newcommand{\\eps}{{\\varepsilon}}\nL000055\t\\newcommand{\\bv}{{\\bf b}}\nL000056\t\\newcommand{\\ev}{{\\bf e}}\nL000057\t\\newcommand{\\uv}{{\\bf u}}\nL000058\t\\newcommand{\\vv}{{\\bf v}}\nL000059\t\\newcommand{\\jv}{{\\bf j}}\nL000060\t\\newcommand{\\tv}{{\\bm\\tau}}\nL000061\t\\newcommand{\\qv}{{\\bf q}}\nL000062\t\\newcommand{\\Sv}{\\vec{S}}\nL000063\t\\newcommand{\\Mv}{\\vec{M}}\nL000064\t\\newcommand{\\nv}{{\\bf{n}}}\nL000065\t\nL000066\t\\newcommand{\\mv}{\\vec{m}}\nL000067\t\\newcommand{\\thh}{{\\hat{t}}}\nL000068\t\\newcommand{\\nh}{{\\hat n}}\nL000069\t\\newcommand{\\mh}{{\\hat m}}\nL000070\t\\newcommand{\\lh}{{\\hat \\ell}}\nL000071\t\\newcommand{\\Nh}{{\\hat N}}\nL000072\t\\newcommand{\\Sh}{{\\hat S}}\nL000073\t\\newcommand{\\xh}{{\\hat x}}\nL000074\t\\newcommand{\\yh}{{\\hat y}}\nL000075\t\\newcommand{\\zh}{{\\hat{\\bf z}}}\nL000076\t\\newcommand{\\psih}{{\\hat\\psi}}\nL000077\t\\newcommand{\\eh}{{\\hat e}}\nL000078\t\\def\\mm#1{\\underline{\\underline{{#1}}}}\nL000079\t\\newcommand{\\um}{{\\mm{u} }}\nL000080\t\\newcommand{\\Lm}{{\\mm{\\Lambda} }}\nL000081\t\\newcommand{\\pv}{{\\bf p}}\nL000082\t\\newcommand{\\Tr}{{\\rm Tr}}\nL000083\t\\newcommand{\\px}{{\\partial_x}}\nL000084\t\\newcommand{\\py}{{\\partial_y}}\nL000085\t\\newcommand{\\ppi}{{\\partial_i}}\nL000086\t\\newcommand{\\ppj}{{\\partial_j}}\nL000087\t\\newcommand{\\pz}{{\\partial_z}}\nL000088\t\\newcommand{\\ppk}{{\\partial_k}}\nL000089\t\\newcommand{\\ppl}{{\\partial_l}}\nL000090\t\\newcommand{\\oh}{{\\frac{1}{2}}}\nL000091\t\\newcommand{\\nsm}{{n$\\sigma$m\\ }}\nL000092\t\\newcommand{\\tRe}{{\\text{Re}}}\nL000093\t\\newcommand{\\cH}{{\\mathcal H}}\nL000094\t\\newcommand{\\cL}{{\\mathcal L}}\nL000095\t\\newcommand{\\tphi}{{\\tilde\\phi}}\nL000096\t\\newcommand{\\grad}{{\\bm{\\nabla}}}\nL000097\t\\newcommand{\\tchi}{\\tilde\\chi}\nL000098\t\\newcommand{\\tK}{\\tilde K}\nL000099\t\\newcommand{\\be}{\\begin{equation}}\nL000100\t\\newcommand{\\ee}{\\end{equation}}\nL000101\t\\newcommand{\\bea}{\\begin{eqnarray}}\nL000102\t\\newcommand{\\eea}{\\end{eqnarray}}\nL000103\t\\newcommand{\\bse}{\\begin{subequations}}\nL000104\t\\newcommand{\\ese}{\\end{subequations}}\nL000105\t\\newcommand{\\dr}{\\mathrm{d}}\nL000106\t\\def\\rf#1{(\\ref{#1})}\nL000107\t\\def\\rfs#1{Eq.~\\rf{#1}}\nL000108\t\nL000109\t\nL000110\t\nL000111\t\\begin{document}\nL000112\t\nL000113\t\nL000114\t\nL000115\t\\author{Viktor Berger}\nL000116\t\\affiliation{Department of Physics, University of Massachusetts, Amherst, MA 01003, USA}\nL000117\t\nL000118\t\nL000119\t\\author{Nikolay Prokof'ev}\nL000120\t\\affiliation{Department of Physics, University of Massachusetts, Amherst, MA 01003, USA}\nL000121\t\nL000122\t\\author{Boris Svistunov}\nL000123\t\\affiliation{Department of Physics, University of Massachusetts, Amherst, MA 01003, USA}\nL000124\t\nL000125\t\nL000126\t\nL000127\t\\title{Universal\nL000128\tLow-temperature Depletion of Superfluid Density in the Absence of Galilean Symmetry\nL000129\t}\nL000130\t\nL000131\t\nL000132\t\nL000133\t\\begin{abstract}\nL000134\tLandau theory of superfluidity associates low-temperature flow of the normal component with the phonon wind. This picture does not apply to superfluids in which Galilean invariance is broken either by disorder, porous media, or lattice potential,\nL000135\tand the phonon wind is no longer solely responsible for depletion of the superfluid component.\nL000136\tBased on Popov's hydrodynamic action with anharmonic terms,\nL000137\twe present a general theory for low-temperature ($T$) dependence of the superfluid stiffness, which reproduces Landau result as a special case when several parameters of the hydrodynamic action are fixed by Galilean invariance, and validate it with numerical simulations of interacting lattice bosons.\nL000138\tIn a broader context, our approach reveals universal low-temperature thermodynamics of superfluids with an intrinsic connection between finite-$T$ and finite-size ($L$) effects implying universal scaling, $T^{d+1}$ and $1/L^{d+1}$, respectively, for a large class of thermodynamic quantities. We discuss the experimental detection of this law, and compare our prediction to the existing literature.\nL000139\t\\end{abstract}\nL000140\t\nL000141\t\\maketitle\nL000142\t\nL000143\t\nL000144\t\nL000145\t\nL000146\t\\textit{Introduction.}\nL000147\tThe concept of superfluid phase \\cite{Anderson_1966} is central for the modern theory of superfluidity. It is in terms of the superfluid phase field that one accounts for all universal properties of superfluids such as quantization of the superfluid velocity circulation \\cite{Onsager_1949,Feynman_1955}, isolated vortexes and vortex arrays \\cite{Feynman_1955, Andronikashvili1966},\nL000148\tAC Josephson effect \\cite{Josephson}, and universality classes of superfluid transitions; for a review, see, e.g., Ref.~\\cite{book}. In a sharp contrast, the foundational Landau theory of superfluidity \\cite{Landau_1941} directly associates the universal low-temperature normal flow with the phonon wind---a ballistic flow of thermally equilibrated phonon subsystem past superfluid vacuum, thereby creating an impression that full understanding of the universal mechanism of low-temperature depletion of the superfluid density can be achieved without invoking the notion of superfluid phase.\nL000149\t\nL000150\tThe key questions then are how the problem is solved using the concept of superfluid phase and whether Landau-type arguments can be generalized to systems with continuous translation symmetry being broken either by periodic or disordered external potential (we answer this question \\textit{negatively}).\nL000151\tImportant examples of such systems include ultracold atoms in optical lattices, supersolids, \\he4 in porous media \\cite{Mehl1968}, \\he4 films on substrates \\cite{Boninsegni2010}, as well as superfluid and supersolid excitons in double-layer structures \\cite{conti2023chester, rios2018evidence}. The two-fluid picture\nL000152\tneeds to be seriously revised in all such cases because at $T=0$ only the superfluid component is flowing while the non-zero normal component is pinned by external potential. Nevertheless, a well-defined long-wave phonon\nL000153\tsubsystem exists even in this case. The hydrodynamic Hamiltonian describing the phonon subsystem is translation invariant, and one may\nL000154\tthink that the temperature dependence of depletion can be explained by\nL000155\tthe phonon wind.\nL000156\t\nL000157\tIn Landau theory, normal flow and phonon wind are synonymous, yielding a straightforward way of calculating the depletion of $\\rho_s$ at low temperature: By Galilean invariance, the\nL000158\tphonon wind in the reference frame moving with the superfluid velocity exactly corresponds to the pure superflow in the reference frame in which the phonon subsystem is at rest.  Therefore, the momentum density of the equilibrium phonon wind as a function of its (infinitesimal) velocity immediately yields the normal density $\\rho_n$ and\nL000159\t$\\Delta \\rho_s =-\\rho_n$:\nL000160\t\\be\nL000161\t\\Delta \\rho_s=-\\frac{I_d}{d}\\frac{d+1}{mc(c\\beta)^{(d+1)}},\nL000162\t\\quad I_d=\\int\\frac{\\mathrm{d}^dq}{(2\\pi)^d}\\frac{q}{e^q-1},\nL000163\t\\label{Landau}\nL000164\t\\ee\nL000165\twhere $m$ is the particle mass, $c$ is the sound velocity, and\nL000166\t$\\beta = 1/ T$.\nL000167\tTo ``quantify\" the power and limitations of Landau theory, observe that this derivation\nL000168\trests on the Galilean relation between the mass density flux, ${\\bf j}_m$,\nL000169\tand momentum density, ${\\bf p}$:\nL000170\t\\be\nL000171\t{\\bf j}_m \\, =\\, {\\bf p} \\qquad \\qquad \\mbox{(Galilean system)} \\, .\nL000172\t\\label{j_to_p}\nL000173\t\\ee\nL000174\tThis relation is true no matter whether the system is in the low-temperature regime, where $\\rho_n$ corresponds to a dilute gas of elementary excitations (phonons), or it is in a strongly correlated regime of critical fluctuations on approach to the critical temperature.\nL000175\tHowever, only at sufficiently low temperature is Eq.~(\\ref{j_to_p})\nL000176\tpractically useful for obtaining $\\Delta \\rho_s$ through the calculation\nL000177\tof the momentum density of non-interacting elementary excitations subject to\nL000178\tGibbs distribution.\nL000179\t\nL000180\tIn the absence of continuous translation invariance, the phonon wind will always decay and the genuinely equilibrium superflow regime implies the absence of phonon wind! On the one hand, it would be na\\\"ive---and, as we will argue, fundamentally wrong---to directly relate the phonon wind momentum as a function of velocity to the depletion of superfluid density.\nL000181\tOn the other hand, it is reasonable to expect (given that at $T\\to 0$ phonons are the only elementary excitations described by the universal hydrodynamic Hamiltonian) that the temperature dependence of depletion is still universal and even reminiscent of the Landau result, but is controlled by several parameters of the hydrodynamic Hamiltonian\nL000182\tthat can take rather arbitrary values in a general case.\nL000183\t\nL000184\tOn the qualitative side, the general theory of depletion requires going beyond the harmonic effective Hamiltonian/action. While early treatments of anharmonic terms in the Hamiltonian,\nL000185\t$\\mathcal{H}$, focused on the kinetics of elementary excitations \\cite{khalatnikov2018introduction}, our statistical treatment also considers higher-order fluctuations of the superfluid phase field. Reproducing Landau result---originally based on a purely harmonic treatment bootstrapped by the relation (\\ref{j_to_p})---using anharmonic terms in $\\mathcal{H}$ is both instructive and immediately reveals how special the Galilean invariant systems are. In the general case, even the very notion of\nL000186\ttemperature-induced ``depletion\" becomes questionable because $\\rho_s$ may increase\nL000187\twith temperature, i.e. the theory allows depletion to be ``negative\"!\nL000188\t\nL000189\tIn this Letter, we find that the low-temperature change of superfluid stiffness,\nL000190\t$\\Delta n_s(n,\\beta) =  n_s(n,\\beta)-n_s(n,\\infty)$, of a $d$-dimensional superfluid\nL000191\tat fixed total number density $n$ (canonical ensemble) is given by the formula\nL000192\t($n_s$ and $\\rho_s$ are simply related by $\\rho_s= m n_s$)\nL000193\t\\be\\label{eqn:delta_ns_final}\nL000194\t\\Delta n_s(n,\\beta)=-\\frac{I_d}{d}\\frac{\\nu^2(d+1)-d\\gamma n_s -(d+2)\\sigma/\\varkappa}{c(c\\beta)^{(d+1)}}\\,,\nL000195\t\\ee\nL000196\t\nL000197\t\nL000198\t\nL000199\t\\be\\label{eqn:nu}\nL000200\t\\nu=\\frac{\\dr n_s}{\\dr n}\\,, \\quad \\gamma=\\frac{1}{2}\\frac{\\dr^2n_s}{\\dr n^2}\\,, \\quad \\sigma = 2\\frac{\\partial^2 \\mathcal{E}(n,k_0^2)}{\\partial(k_0^2)^2}\\bigg|_{k_0=0}\\, ,\nL000201\t\\ee\nL000202\twhere all parameters refer to various ground-state properties such as\nL000203\t$c=\\sqrt{n_s/\\varkappa}$,\nL000204\tcompressibility $\\varkappa = d n / d \\mu$,\nL000205\tchemical potential $\\mu$,\nL000206\tenergy density ${\\cal E}(n, k_0^2)$\nL000207\t(as a function of $n$ and the square of the superflow wavevector $k_0$),\nL000208\tand its derivatives:\nL000209\tsuperfluid stiffness $n_s \\equiv n_s(T=0) = 2 \\partial  {\\cal E}(n, k_0^2)/\\partial (k_0^2) $,\nL000210\t$\\nu$, $\\gamma$, and $\\sigma$.\nL000211\tUnless stated otherwise, we will work in units where Planck's constant is set equal to unity.\nL000212\t[The superfluid stiffness and superflow wavevector are the most convenient quantities to discuss the general case, especially lattice models.]\nL000213\t\nL000214\tOur result, Eqs.~(\\ref{eqn:delta_ns_final})--(\\ref{eqn:nu}),\nL000215\tdiffers from the original Landau formula (\\ref{Landau}) by a factor.\nL000216\tIn a Galilean system, both $\\gamma$  and $\\sigma$ have to be identically zero and $\\nu=1/m$; this is how Eqs.~(\\ref{eqn:delta_ns_final})--(\\ref{eqn:nu}) recover the Landau expression, while revealing its quantitative and conceptual deficiency in a general case. The relations $\\nu=1/m$ and $\\gamma=0$ follow from the simple fact that in a Galilean system, the superfluid density is equal to the normal density at zero temperature, while $\\sigma=0$ is enforced by the transformation of the system energy under a Galilean boost, see the discussion under Eq.~(\\ref{eqn:H_hydro_0}). On the technical side, we derive Eqs.~(\\ref{eqn:delta_ns_final})--(\\ref{eqn:nu}) starting from Popov's $(d+1)$-dimensional hydrodynamic action \\cite{Popov} based on the above-mentioned parameters and without invoking reference frame transformations.\nL000217\t\nL000218\tStrictly speaking, both Landau theory and our generalized description\nL000219\tmay go beyond Eqs.~(\\ref{eqn:delta_ns_final})--(\\ref{eqn:nu}) corresponding to the asymptotic regime when only the acoustic part of the phonon branch is excited.\nL000220\tOn the one hand, as long as the gas of elementary excitations\nL000221\tmay be treated as non-interacting, Landau formula remains valid\nL000222\tregardless of the phonon dispersion relation, e.g. it correctly captures\nL000223\tthe roton contribution in \\he4. [Achieving the same goal in the general case is far more challenging because one needs to include a large number of higher-order aharmonic terms.]\nL000224\tOn the other hand, experimental observation of universal scaling $1/c(\\beta c)^{d+1}$ is extremely challenging even in bulk \\he4 under ambient pressure.\nL000225\tSince roton contribution to the system thermodynamics cannot be neglected already at temperature $T>0.5~K$ this power-law scaling is limited to low temperature $T<0.5~K$\nL000226\twhen thermal depletion of $n_s$ drops below experimental resolution. The same limitation applies to \\he4 experiments in porous/powder media where the typical pore size significantly exceeds the roton wavelength.\nL000227\t\nL000228\tBelow we present the theory of low-temperature depletion of the superfluid stiffness, which yields Eq.~(\\ref{eqn:delta_ns_final}) when applied to the case of an infinite system  without Galilean symmetry. Based on our predictions, we discuss\nL000229\texperiments on \\he4 in disordered media. While there exists experimental evidence in support of our theory, we conclude that further studies are needed to determine whether the observed scaling is truly representative of the asymptotic low-temperature regime.\nL000230\t\nL000231\t\nL000232\tIn a companion paper \\cite{companion}, we present all the technical details of our theory\nL000233\tand also explain how to produce explicit formulas for the depletion of $n_s$ in the most general case, including finite-size effects and the grand-canonical description.\nL000234\tThe companion paper also discusses the mathematically similar problem of finite-size corrections to the superfluid stiffness in finite-temperature classical-field U(1) systems, as well as provides (extra) supportive numeric results, for both classical and quantum systems.\nL000235\t\nL000236\t\\textit{The theory.} There are two ways to calculate $n_s$ within Popov's formalism.\nL000237\tOne can either employ the hydrodynamic Hamiltonian\nL000238\tor, equivalently, use the Lagrangian framework.\nL000239\tFor reasons explained below, we proceed here with the former approach.\nL000240\t\nL000241\tBy definition, the superfluid stiffness relates the supercurrent density $\\langle\\mathbf{j}\\rangle$ to the infinitesimal superflow wavevector $\\mathbf{k_0}$\nL000242\t(constant phase gradient):\nL000243\t\nL000244\t\nL000245\t\\be\\label{eqn:ns_def}\nL000246\t\\langle\\mathbf{j}\\rangle=n_s\\mathbf{k}_0 \\qquad \\qquad (k_0\\rightarrow0)\\, .\nL000247\t\\ee\nL000248\tIn the long-wave limit, current density is given by \\cite{book}\nL000249\t\nL000250\t\\be\\label{eqn:current_def}\nL000251\t\\mathbf{j} = \\frac{\\partial\\mathcal{H}(\\eta, \\nabla\\Phi)}{\\partial(\\nabla\\Phi)} \\, ,\nL000252\t\\ee\nL000253\twhere ${\\cal H}(\\eta,\\nabla\\Phi)$ is the hydrodynamic Hamiltonian expressed in terms of the phase gradient $\\nabla\\Phi$ and the number density fluctuations $\\eta$ around the expectation value $n$ at equilibrium. It can be derived from a perturbative expansion of the ground-state energy $\\mathcal{E}(n,k_0^2)$ in $\\eta$ and $k_0^2$, with subsequent replacement  $k_0^2\\to(\\nabla\\Phi)^2$. For the purpose of computing the leading contribution to $\\Delta n_s$, the relevant terms in the hydrodynamic Hamiltonian are\nL000254\t\\begin{align}\\label{eqn:H_hydro_0}\nL000255\t\\begin{split}\nL000256\t\\mathcal{H}(\\eta,\\nabla\\Phi) & = \\frac{n_s^{(0)}}{2}(\\nabla\\Phi)^2+\\frac{\\eta^2}{2\\varkappa}+\\frac{\\nu\\eta}{2}(\\nabla\\Phi)^2 \\\\\nL000257\t& + \\frac{\\gamma\\eta^2}{2}(\\nabla\\Phi)^2+\\frac{\\sigma}{4}(\\nabla\\Phi)^4\\,.\nL000258\t\\end{split}\nL000259\t\\end{align}\nL000260\tAt this point it becomes clear why we must have $\\sigma=0$ in the Galilean system: The transformation law for the energy forbids terms of order $k_0^4$ and higher, implying that corresponding terms in the hydrodynamic Hamiltonian must vanish.\nL000261\t\nL000262\tBy default, Popov's hydrodynamic formalism works in the grand canonical ensemble. As such, there will be two contributions to the superfluid stiffness; the ``pure\" depletion due to thermal excitations, as well as depletion due to temperature-induced change in the total density. For the purpose of generalizing Landau theory, this is a problem since Landau's theory is formulated in the canonical ensemble. This is where the advantages of the hydrodynamic Hamiltonian are revealed. Apart from yielding an explicit expression for the current density through Eq.~(\\ref{eqn:current_def}), when expressed in terms of phase gradients and density deviations the Hamiltonian formalism allows one to identify the contributions to $\\Delta n_s$ originating from changes in total density. Indeed, when the phase field is separated into fluctuations around a homogeneous infinitesimal superflow (assumed to be in the $\\hat{\\mathbf{x}}$-direction),\nL000263\t\\be\\label{eqn:phi_decomp}\nL000264\t\\Phi = k_0x+\\varphi\\, ,\nL000265\t\\ee\nL000266\tthe $x$-component of the current density becomes (to the first order in $k_0$)\nL000267\t\\bea\nL000268\tj_x  =  n_s^{(0)}k_0     &+& k_0[\\gamma \\eta^2 +  2 \\sigma \\varphi_x^2 + \\sigma (\\nabla \\varphi)^2 ] + \\nu \\eta \\varphi_x \\nonumber \\\\\nL000269\t &+&\\,  n_s^{(0)} \\varphi_x  \\,+\\, \\nu k_0  \\, \\eta  \\,  +\\,  \\sigma (\\nabla \\varphi)^2 \\varphi_x \\, .\nL000270\t\\label{j_hydro_new}\nL000271\t\\eea\nL000272\tFrom here, we observe that in the canonical ensemble, the expectation value of $\\eta$ is identically equal to zero, meaning that the corresponding term in the second line of Eq.~(\\ref{j_hydro_new}) should be omitted. Combining Eqs.~(\\ref{eqn:ns_def}) and~(\\ref{j_hydro_new}) reveals that the problem of computing superfluid stiffness depletion now has been reduced to computing a finite number of correlation functions of the fields $\\eta$ and $\\varphi$. For extracting the leading contribution to the depletion, it is sufficient to compute these correlators with the bi-linearized Hamiltonian\nL000273\t\\be\\label{eqn:H_hydro}\nL000274\t\\cH(\\eta,\\nabla\\varphi)\\, =\\, \\frac{n_s^{(0)}}{2}(\\nabla\\varphi)^2+\\frac{\\eta^2}{2\\varkappa}+k_0\\nu\\eta\\varphi_x\\,.\nL000275\t\\ee\nL000276\tThis implies that the remaining two terms in the second line of Eq.~(\\ref{j_hydro_new}) can be omitted as they are based on odd powers of $\\varphi$. Straightforward (although lengthy) calculations of the expectation value of the first line in Eq.~(\\ref{j_hydro_new}) yields the result~(\\ref{eqn:delta_ns_final}). All technical details of these calculations can be found in Ref.~\\cite{companion}.\nL000277\t\nL000278\t\\textit{Numerics.} To verify Eqs.~(\\ref{eqn:delta_ns_final})--(\\ref{eqn:nu}), we performed Worm Algorithm path-integral Monte Carlo simulations \\cite{Worm,PRE} of soft-core bosons on a two-dimensional square lattice at low temperatures and system volume $V=64\\times64$. The model is defined by the Bose-Hubbard Hamiltonian\nL000279\t\\begin{equation}\\label{eqn:bose_hubbard}\nL000280\t    H = -t\\sum_{\\langle i,j\\rangle}(c_i^{\\dagger}c_j+\\text{H.c.})+U\\sum_in_i^2-\\mu\\sum_in_i \\, ,\nL000281\t\\end{equation}\nL000282\twhere $c_i^{\\dagger}$ ($c_i$) is bosonic creation (annihilation) operator\nL000283\ton site $i$.\nL000284\tBy varying chemical potential in conjunction with temperature to keep the number density constant, we work in the canonical ensemble, and, thus,\nL000285\texpect the superfluid stiffness depletion to be described by Eq.~(\\ref{eqn:delta_ns_final}). All parameters entering Eq.~(\\ref{eqn:delta_ns_final}) can be straightforwardly simulated either through direct Monte Carlo estimators or through numerical derivatives. For $U/t=4$\nL000286\tand filling factor $n\\approx0.693$ we find compressibility $\\varkappa=0.2974(5)t$ and sound velocity $c=2.087(3)ta$. Numerical derivatives yield the parameters $\\nu=1.763(5)ta^2$ and $\\gamma=-0.10(7)ta^4$. The most difficult parameter to estimate is $\\sigma$, for which we find $\\sigma=-0.15(10)t$. The fit-free theoretical prediction with $\\sigma=-0.1t$ is compared to numerical results for $n_s$ in Fig.~\\ref{fig:nsT3soft}. The\nL000287\tfit-free theoretical prediction falls perfectly within the statistical\nL000288\terror bars of computed $n_s(T)$ points.\nL000289\t\nL000290\t\\begin{figure}\nL000291\t    \\centering\nL000292\t    \\includegraphics[width=0.9\\linewidth]{nsT3soft.pdf}\nL000293\t    \\caption{Superfluid stiffness depletion as a function of $x=(cT)^3$\nL000294\t    for soft-core bosons in 2D with $U/t=4$ (for system size $L\\times L=64\\times64$).\nL000295\t    Solid (black) curve is the $f(x) = A + Bx$ theoretical prediction\nL000296\t    with $A=n_s(T=t/6)$ and $B$ fixed by the measured system parameters according to Eq.~(\\ref{eqn:delta_ns_final}).\nL000297\t    }\nL000298\t    \\label{fig:nsT3soft}\nL000299\t\\end{figure}\nL000300\t\nL000301\t\\textit{Universal thermodynamics.} As mentioned above, the main advantage of the hydrodynamic Hamiltonian formalism is that it allows us to work in the canonical ensemble by systematically identifying and discarding terms originating from the temperature-induced change in total density. The problem of calculating depletion in the grand canonical ensemble is simpler, and arguably more illuminating. The canonical depletion $\\Delta n_s(n, T)$\nL000302\tfollows from the grand canonical depletion $\\Delta n_s(\\mu, T)$\nL000303\tby a simple relation\nL000304\t\\begin{equation}\\label{eqn:ns_n_relation}\nL000305\t    \\Delta n_s(n,T) = \\Delta n_s(\\mu,T)-\\nu \\Delta n(\\mu,T) \\, ,\nL000306\t\\end{equation}\nL000307\twhere $\\Delta n(\\mu, T)$ is the equation of state.\nL000308\t\nL000309\tIn the absence of constraints on the total density, we can work directly with the phase-only version of Popov's hydrodynamic action, defined by the Lagrangian density\nL000310\t\\begin{equation}\\label{eqn:phase_lagrangian}\nL000311\t    \\begin{split}\nL000312\t    \\mathcal{L}(\\Phi) = &-\\frac{n_s^{(0)}}{2}(\\nabla\\Phi)^2-\\frac{\\varkappa}{2}\\dot{\\Phi}^2-\\frac{i\\varkappa\\nu}{2}\\dot{\\Phi}(\\nabla\\Phi)^2 \\\\\nL000313\t    &+\\frac{\\varkappa^2\\tilde{\\gamma}}{2}\\dot{\\Phi}^2(\\nabla\\Phi)^2-\\frac{\\tilde{\\sigma}}{4}(\\nabla\\Phi)^4\\,,\nL000314\t    \\end{split}\nL000315\t\\end{equation}\nL000316\twhere\nL000317\t\\begin{equation}\nL000318\t    \\tilde{\\gamma}=\\gamma-\\frac{\\varkappa\\nu\\lambda}{2},\\qquad\\tilde{\\sigma}=\\sigma-\\frac{\\varkappa\\nu^2}{2}\\,,\nL000319\t\\end{equation}\nL000320\tand\nL000321\t\\be\\label{eqn:lambda_derivative}\nL000322\t\\lambda \\, =\\, \\frac{\\partial^3 \\mathcal{E}(n,k_0^2)}{\\partial n^3}\\bigg|_{k_0=0} \\, .\nL000323\t\\ee\nL000324\tPerfoming decomposition~(\\ref{eqn:phi_decomp}) and keeping only bilinear terms in the Lagrangian~(\\ref{eqn:phase_lagrangian}) allows one to calculate the partition function explicitly in Fourier space as a function of $k_0$. Thermodynamic quantities are generated by taking derivatives of the grand potential density, which takes the form\nL000325\t\\begin{equation}\\label{eqn:grand_potential}\nL000326\t\\frac{1}{V}\\Omega(\\mu, T, k_0) = \\frac{T}{2V}\\sum_{\\mathbf{k},\\omega}\\ln \\epsilon(\\mathbf{k},\\omega) \\, ,\nL000327\t\\end{equation}\nL000328\twhere\nL000329\t\\begin{equation}\\label{eqn:epsilon_def}\nL000330\t    \\begin{split}\nL000331\t    \\epsilon(\\mathbf{k},\\omega)=\\pi^{-1}[&(n_s^{(0)}+\\tilde{\\sigma}k_0^2)k^2+(\\varkappa-\\varkappa^2\\tilde{\\gamma}k_0^2)\\omega^2 \\\\\nL000332\t    & +2i\\varkappa\\nu k_0\\omega k_x + 2\\tilde{\\sigma}k_0^2k_x^2]\nL000333\t    \\end{split}\nL000334\t\\end{equation}\nL000335\tis a bi-linear function of the Fourier wavevector $\\mathbf{k}$ and bosonic Matsubara frequency $\\omega$. Upon proper UV-regularization of Eq.~(\\ref{eqn:grand_potential}),\nL000336\tit generates $\\Delta n_s(\\mu,T)$  and $\\Delta n(\\mu, T)$ through derivatives over\nL000337\t$k_0$ and $\\mu$.\nL000338\tThe bi-linear structure of $\\epsilon(\\mathbf{k}, \\omega)$ implies\nL000339\tuniversal $T^{d+1}$ scaling (in an infinitely large system) of $\\Omega$, and,\nL000340\tcorrespondingly, the thermodynamic functions generated by $\\Omega$.\nL000341\t\nL000342\t\\textit{Helium in disordered media.} Multiple studies have been performed on superfluid density depletion in disordered media: \\he4 in compressed lampblack and Vycor~\\cite{reppy1972,reppy1975sound, reppy1986torsion} and \\hel3 in aerogel~\\cite{halperin2018aerogel}. Thus, it is natural to ask whether the experimental findings are consistent with (or relevant to) our asymptotic theory. The data for \\hel3 in aerogel are not sufficient to clearly resolve the low-temperature regime and therefore cannot be directly compared with our results.\nL000343\t\nL000344\tThe low-temperature data for \\he4 do exist, but are quite controversial.\nL000345\tIn compressed lampblack \\cite{reppy1972}, the depletion measured by two different techniques---via temperature dependence of the frequency of U-tube and fourth-sound oscillations---was found to be linear in $T$. In Vycor, it was found \\cite{reppy1975sound} that the finite-temperature correction to the frequency of the fourth-sound mode scaled as $T^2$, in contrast to $T$ found in lampblack and $T^4$ predicted by our theory.\nL000346\t\nL000347\tFinally, an almost perfect $T^4$ scaling was observed for \\he4 in Vycor,\nL000348\tsee Fig.~\\ref{fig:reppy_data} showing low-temperature data from Ref.~\\cite{reppy1986torsion} in the torsional oscillator setup at constant pressure. The change of the superfluid density in Vycor is due to two different effects, both, however, supposed to demonstrate the same $T^4$ low-temperature scaling: (i) the finite-temperature depletion at fixed density and (ii) the ground-state change of the superfluid density due to the change in the chemical potential (induced by the change of the temperature of the bulk helium at fixed pressure). Unfortunately, measured temperatures are not sufficiently low to claim the asymptotic regime. Nevertheless, the absence of visible $T$ and $T^2$ corrections within the given temperature interval suggests that these terms are negligible or absent altogether.\nL000349\t\nL000350\t\\begin{figure}\nL000351\t    \\centering\nL000352\t    \\includegraphics[width=0.9\\linewidth]{260205_reppy_fig11_1,08bar_T4.png}\nL000353\t    \\caption{Period of torsional oscillator as a function of $T^4$ for liquid \\he4 in Vycor. Data was digitized from the 1.08 bar curve in Fig.~11 in Ref.~\\cite{reppy1986torsion}. Dashed line is a fit to a $T^4$ power law. The data was obtained in the experimental setup  consisting of a torsional oscillator containing a cylinder of Vycor glass with \\he4 admitted to the Vycor through a narrow tube connected to a reservoir of bulk helium, kept at a constant pressure.}\nL000354\t    \\label{fig:reppy_data}\nL000355\t\\end{figure}\nL000356\t\nL000357\t\\textit{Concluding remarks.} In a Galilean system, Landau theory relates\nL000358\tthe depletion of the superfluid stiffness to the wind of elementary exitations.\nL000359\tHowever, a na\\\"ive  attempt to apply Landau theory to systems with broken Galilean symmetry immediately fails. The reason becomes clear by studying Eq.~(\\ref{eqn:delta_ns_final}). Landau's theory of the phonon wind is fully captured by the parameter $\\nu$, originating from the cubic term in the hydrodynamic Hamiltonian~(\\ref{eqn:H_hydro_0}). To correctly describe the leading contribution to the depletion, one must also include the quartic terms in the second line of Eq.~(\\ref{eqn:H_hydro_0}). In fact, there exist systems with certain symmetries, for instance particle-hole symmetry, where $\\nu$ is identically equal to zero. In this case, the depletion is controlled entirely by the parameters $\\gamma$ and $\\sigma$ fundamentally absent in Landau theory. The particle-hole symmetry may be realized by taking $U\\rightarrow\\infty$ in the Hamiltonian~(\\ref{eqn:bose_hubbard}) while keeping $\\mu=0$ (the \\textit{hard-core boson} model). Superfluid stiffness depletion in this model has been thoroughly explored in the companion paper \\cite{companion}.\nL000360\t\nL000361\tThe other issue addressed in Ref.~\\cite{companion} is interplay between finite-size and finite-temperature effects on the depletion of superfluid stiffness. At harmonic level, inverse temperature plays the role of the $(d+1)$-st spatial direction in the theory. This implies, in addition to the universal $T^{d+1}$ scaling, a universal $1/L^{d+1}$ scaling of $\\Delta n_s$ in systems at $T=0$ with slab geometries.\nL000362\t\nL000363\tA large portion of existing experimental data on the low-temperature depletion of $\\rho_s$ in \\he4 in three-dimensional disordered media is profoundly inconsistent with both the universal $T^4$ scaling and with each other---suggesting either linear or quadratic laws. Our asymptotically exact theory calls for further experimental studies towards resolving the controversy. Among the reasons why the low-temperature experiment with \\he4 in disordered media did not demonstrate the universal behavior found in our work we would like to emphasize (i) potential lack of adiabaticity of the response of the superfluid to torsional oscillations and (ii) possible effects of long-range-correlated disorder. Extensive numeric simulations of low-temperature disordered superfluids might shed a direct light on the relevance of the latter reason.\nL000364\t\nL000365\t\nL000366\t\\begin{acknowledgments}\nL000367\tThis work was stimulated by numerous conversations (though without reaching a consensus \\cite{hegg2024universallowtemperaturefluctuationunconventional}) with Wei Ku about the scientific status of Landau theory. The discussion of experiments in helium was inspired by an exchange with Grigory Volovik.\nL000368\tThis work was supported by the National Science Foundation under Grant DMR-2335904.\nL000369\t\\end{acknowledgments}\nL000370\t\nL000371\t\nL000372\t\\bibliography{refs.bib}\nL000373\t\nL000374\t\\end{document}\nL000375\t\nL000376\t\nL000377\t\nL000378\t\nL000379\t {\\color{red} OLD INTO: The breathtaking simplicity and asymptotic accuracy (in the low-$T$ limit) of Landau theory of superfluidity \\cite{Landau_1941} come at a significant price of leaving behind the fundamental concept of superfluid phase \\cite{Anderson_1966} and all associated phenomena, such as quantization of the superfluid velocity circulation \\cite{Onsager_1949,Feynman_1955}, isolated vortexes and\nL000380\tvortex arrays \\cite{Feynman_1955, Andronikashvili1966},\nL000381\tAC Josephson effect \\cite{Josephson}, etc.\nL000382\tFurthermore, one can observe that Landau theory can hardly be used\nL000383\tin addressing its own cornerstone question:\nL000384\t``What is the general theory (if any) of the low-temperature\nL000385\tdependence of the superfluid density $\\rho_s$?\"}\nL000386\t===== END FILE: main.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,656 @@
+{
+  "assessment": "Independent source-closure review confirmed every Player-visible field, both reviewed central-fit Oracle branches, their statistics and applicability, the selector-free Identification projection, all diagnostic/hidden predictions, and the four matched runtime views against the frozen source packet.",
+  "decision": "source_closed",
+  "family": "kz_incompressible_energy_temperature_regimes",
+  "issues": [],
+  "paper_id": "paper_2506_21670v3",
+  "review_material": {
+    "candidate": {
+      "apparatus": {
+        "description": "A homogeneous condensate simulator with an adjustable quench duration and an ensemble-level vortical kinetic-energy readout at an operationally defined equilibration time.",
+        "name": "quenched_bec_energy_simulator"
+      },
+      "background": "A homogeneous Bose gas is driven through condensation by a finite-duration chemical-potential ramp. Its vortical flow contribution is summarized by a kinetic-energy readout at equilibration.",
+      "budget": 6,
+      "claim": "The source reports two temperature-regime power laws for total incompressible kinetic energy as a function of quench duration.",
+      "common_fixed_conditions": [
+        {
+          "condition_id": "equilibration_time_definition",
+          "statement": "The readout is evaluated at the source-defined equilibration time, identified from the condensate-growth crossover."
+        },
+        {
+          "condition_id": "simulation_parameters",
+          "statement": "The box, relaxation protocol, chemical-potential ramp, interaction strength, damping, and numerical cutoff are held at the source-reported settings."
+        },
+        {
+          "condition_id": "quench_protocol",
+          "statement": "The chemical potential follows the source-defined finite-duration ramp."
+        }
+      ],
+      "confidence_threshold": 0.9,
+      "controls": [
+        {
+          "allowed_values": [],
+          "description": "Duration of the prescribed chemical-potential ramp.",
+          "maximum": 1000.0,
+          "minimum": 100.0,
+          "name": "tau_q",
+          "unit": "dimensionless"
+        }
+      ],
+      "counterfactual_change": "Only the private temperature-regime selector changes, choosing the alternate fitted law reported by the same source.",
+      "diagnostic_conditions": [
+        {
+          "tau_q": 100.0
+        },
+        {
+          "tau_q": 300.0
+        },
+        {
+          "tau_q": 1000.0
+        }
+      ],
+      "family": "kz_incompressible_energy_temperature_regimes",
+      "hidden_conditions": [
+        {
+          "tau_q": 200.0
+        },
+        {
+          "tau_q": 500.0
+        },
+        {
+          "tau_q": 800.0
+        }
+      ],
+      "initial_observations": [
+        "The apparatus reports an ensemble-mean readout for each allowed quench duration."
+      ],
+      "max_replicates": 1,
+      "notes": [
+        "All unlisted apparatus settings remain fixed at source-reported values."
+      ],
+      "oracle": {
+        "counterfactual_applicability": [
+          "Valid for quench durations tau_Q in [100, 1000] at temperature T=1, at equilibration time."
+        ],
+        "counterfactual_fixed_conditions": [
+          {
+            "condition_id": "temp_one_branch",
+            "statement": "Temperature T = 1 in dimensionless simulation units."
+          },
+          {
+            "condition_id": "ensemble_one_branch",
+            "statement": "The reported fit is based on an ensemble mean over 1000 stochastic realizations; plotted error bars are one standard deviation."
+          }
+        ],
+        "counterfactual_parameters": {
+          "ei_amplitude_t_low": 197740.0,
+          "ei_amplitude_t_one": 95430.0,
+          "ei_exponent_t_low": -0.971,
+          "ei_exponent_t_one": -0.935,
+          "temperature_regime_selector": 1.0
+        },
+        "kind": "closed_form",
+        "outputs": {
+          "e_i": {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      1.0,
+                      {
+                        "param": "temperature_regime_selector"
+                      }
+                    ],
+                    "op": "subtract"
+                  },
+                  {
+                    "param": "ei_amplitude_t_low"
+                  },
+                  {
+                    "args": [
+                      {
+                        "var": "tau_q"
+                      },
+                      {
+                        "param": "ei_exponent_t_low"
+                      }
+                    ],
+                    "op": "power"
+                  }
+                ],
+                "op": "multiply"
+              },
+              {
+                "args": [
+                  {
+                    "param": "temperature_regime_selector"
+                  },
+                  {
+                    "param": "ei_amplitude_t_one"
+                  },
+                  {
+                    "args": [
+                      {
+                        "var": "tau_q"
+                      },
+                      {
+                        "param": "ei_exponent_t_one"
+                      }
+                    ],
+                    "op": "power"
+                  }
+                ],
+                "op": "multiply"
+              }
+            ],
+            "op": "add"
+          }
+        },
+        "paper_applicability": [
+          "Valid for quench durations tau_Q in [100, 1000] at temperature T=10^-6, at equilibration time."
+        ],
+        "paper_fixed_conditions": [
+          {
+            "condition_id": "temp_low_branch",
+            "statement": "Temperature T = 10^-6 in dimensionless simulation units."
+          },
+          {
+            "condition_id": "ensemble_low_branch",
+            "statement": "The reported fit is based on an ensemble mean over 2000 stochastic realizations; plotted error bars are one standard deviation."
+          }
+        ],
+        "paper_parameters": {
+          "ei_amplitude_t_low": 197740.0,
+          "ei_amplitude_t_one": 95430.0,
+          "ei_exponent_t_low": -0.971,
+          "ei_exponent_t_one": -0.935,
+          "temperature_regime_selector": 0.0
+        }
+      },
+      "readouts": [
+        {
+          "description": "Total incompressible kinetic energy of the solenoidal density-weighted velocity field at equilibration time.",
+          "name": "e_i",
+          "resolution": null,
+          "resolution_kind": null,
+          "statistic": "Ensemble mean over stochastic realizations.",
+          "uncertainty": "Error bars denote 1 standard deviation.",
+          "unit": "dimensionless"
+        }
+      ],
+      "relative_tolerance": 0.05,
+      "source": {
+        "arxiv_versioned_id": "2506.21670v3",
+        "citation": "Seong-Ho Shinn et al., Spontaneous Quantum Turbulence in a Newborn Bose-Einstein Condensate via the Kibble-Zurek Mechanism, Physical Review Letters (2026), DOI:10.1103/b16v-hwp2",
+        "journal_doi": "10.1103/b16v-hwp2",
+        "locator": "source_packet lines 148-170, 187-200, 390, 394-445, 491-507, and 1110-1112",
+        "role": "The two source-reported temperature-regime fits define the matched worlds."
+      },
+      "title": "Incompressible kinetic energy after a condensate quench"
+    },
+    "counterfactual_derivation": {
+      "counterfactual_claim_ids": [
+        "Ei_scaling_T_one"
+      ],
+      "counterfactual_value": 1.0,
+      "description": "The selector switches between the low-temperature and unit-temperature fitted laws explicitly reported by the source.",
+      "historical_value": 0.0,
+      "kind": "reported_regime_selection",
+      "paper_claim_ids": [
+        "Ei_scaling_T_low"
+      ],
+      "paper_defined_equations_unchanged": true,
+      "selector_parameter": "temperature_regime_selector",
+      "source_claim_ids": [
+        "Ei_scaling_T_low",
+        "Ei_scaling_T_one"
+      ],
+      "source_mechanism_ids": [
+        "KZ_Ei_scaling"
+      ]
+    },
+    "design_summary": "A private selector chooses between the two independently reported temperature-regime fits; the Player sees only the shared apparatus, control, readout, and common fixed conditions.",
+    "identification_contract": {
+      "counterfactual_values": {
+        "e_i_exponent": -0.935,
+        "e_i_scale": 95430.0
+      },
+      "formula": "Expression template: {\"outputs\":{\"e_i\":{\"args\":[{\"param\":\"e_i_scale\"},{\"args\":[{\"var\":\"tau_q\"},{\"param\":\"e_i_exponent\"}],\"op\":\"power\"}],\"op\":\"multiply\"}}}",
+      "historical_values": {
+        "e_i_exponent": -0.971,
+        "e_i_scale": 197740.0
+      },
+      "model": "case_specific_closed_form",
+      "parameters": [
+        "e_i_scale",
+        "e_i_exponent"
+      ]
+    },
+    "information_boundary": {
+      "identification_only": {
+        "claim_ids": [
+          "Ei_scaling_T_low",
+          "Ei_scaling_T_one"
+        ],
+        "fixed_condition_ids": [],
+        "items": [
+          "The response belongs to the source-reported power-law skeleton; its unknown coefficient and exponent must be identified through experiments."
+        ],
+        "line_ranges": [
+          {
+            "line_end": 417,
+            "line_start": 414
+          },
+          {
+            "line_end": 443,
+            "line_start": 443
+          }
+        ],
+        "mechanism_ids": [
+          "KZ_Ei_scaling"
+        ]
+      },
+      "oracle_only": {
+        "claim_ids": [
+          "Ei_scaling_T_low",
+          "Ei_scaling_T_one"
+        ],
+        "fixed_condition_ids": [
+          "temp_low_branch",
+          "temp_one_branch",
+          "ensemble_low_branch",
+          "ensemble_one_branch",
+          "equilibration_time_definition",
+          "simulation_parameters",
+          "quench_protocol"
+        ],
+        "items": [
+          "The two exact central fitted equations, the private active temperature regime, and the source-reported applicability and statistical details."
+        ],
+        "line_ranges": [
+          {
+            "line_end": 390,
+            "line_start": 390
+          },
+          {
+            "line_end": 157,
+            "line_start": 148
+          },
+          {
+            "line_end": 200,
+            "line_start": 187
+          },
+          {
+            "line_end": 413,
+            "line_start": 394
+          },
+          {
+            "line_end": 417,
+            "line_start": 414
+          },
+          {
+            "line_end": 444,
+            "line_start": 443
+          },
+          {
+            "line_end": 445,
+            "line_start": 445
+          },
+          {
+            "line_end": 170,
+            "line_start": 167
+          },
+          {
+            "line_end": 492,
+            "line_start": 491
+          },
+          {
+            "line_end": 507,
+            "line_start": 505
+          },
+          {
+            "line_end": 157,
+            "line_start": 156
+          },
+          {
+            "line_end": 1112,
+            "line_start": 1110
+          }
+        ],
+        "mechanism_ids": [
+          "KZ_Ei_scaling"
+        ]
+      },
+      "shared_player": [
+        {
+          "claim_ids": [
+            "Ei_scaling_T_low",
+            "Ei_scaling_T_one"
+          ],
+          "field": "title",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 390,
+              "line_start": 390
+            },
+            {
+              "line_end": 443,
+              "line_start": 443
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [
+            "Ei_scaling_T_low",
+            "Ei_scaling_T_one"
+          ],
+          "field": "background",
+          "fixed_condition_ids": [
+            "equilibration_time_definition"
+          ],
+          "line_ranges": [
+            {
+              "line_end": 157,
+              "line_start": 148
+            },
+            {
+              "line_end": 170,
+              "line_start": 167
+            },
+            {
+              "line_end": 200,
+              "line_start": 187
+            },
+            {
+              "line_end": 413,
+              "line_start": 394
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [
+            "Ei_scaling_T_low",
+            "Ei_scaling_T_one"
+          ],
+          "field": "apparatus",
+          "fixed_condition_ids": [
+            "equilibration_time_definition",
+            "simulation_parameters",
+            "quench_protocol"
+          ],
+          "line_ranges": [
+            {
+              "line_end": 157,
+              "line_start": 148
+            },
+            {
+              "line_end": 170,
+              "line_start": 167
+            },
+            {
+              "line_end": 200,
+              "line_start": 187
+            },
+            {
+              "line_end": 390,
+              "line_start": 390
+            },
+            {
+              "line_end": 492,
+              "line_start": 491
+            },
+            {
+              "line_end": 157,
+              "line_start": 156
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [
+            "Ei_scaling_T_low",
+            "Ei_scaling_T_one"
+          ],
+          "field": "control.tau_q",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 148,
+              "line_start": 148
+            },
+            {
+              "line_end": 157,
+              "line_start": 156
+            },
+            {
+              "line_end": 1112,
+              "line_start": 1110
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [
+            "Ei_scaling_T_low",
+            "Ei_scaling_T_one"
+          ],
+          "field": "readout.e_i",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 148,
+              "line_start": 148
+            },
+            {
+              "line_end": 200,
+              "line_start": 187
+            },
+            {
+              "line_end": 413,
+              "line_start": 394
+            },
+            {
+              "line_end": 390,
+              "line_start": 390
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [
+            "Ei_scaling_T_low",
+            "Ei_scaling_T_one"
+          ],
+          "field": "initial_observation.0",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 390,
+              "line_start": 390
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [],
+          "field": "fixed_condition.equilibration_time_definition",
+          "fixed_condition_ids": [
+            "equilibration_time_definition"
+          ],
+          "line_ranges": [
+            {
+              "line_end": 170,
+              "line_start": 167
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [],
+          "field": "fixed_condition.simulation_parameters",
+          "fixed_condition_ids": [
+            "simulation_parameters"
+          ],
+          "line_ranges": [
+            {
+              "line_end": 492,
+              "line_start": 491
+            },
+            {
+              "line_end": 507,
+              "line_start": 505
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [],
+          "field": "fixed_condition.quench_protocol",
+          "fixed_condition_ids": [
+            "quench_protocol"
+          ],
+          "line_ranges": [
+            {
+              "line_end": 157,
+              "line_start": 156
+            }
+          ],
+          "mechanism_ids": []
+        },
+        {
+          "claim_ids": [],
+          "field": "note.0",
+          "fixed_condition_ids": [
+            "equilibration_time_definition",
+            "simulation_parameters",
+            "quench_protocol"
+          ],
+          "line_ranges": [
+            {
+              "line_end": 170,
+              "line_start": 167
+            },
+            {
+              "line_end": 492,
+              "line_start": 491
+            },
+            {
+              "line_end": 507,
+              "line_start": 505
+            },
+            {
+              "line_end": 157,
+              "line_start": 156
+            }
+          ],
+          "mechanism_ids": []
+        }
+      ]
+    },
+    "predictions": [
+      {
+        "alternate": {
+          "e_i": 1287.3152788572147
+        },
+        "controls": {
+          "tau_q": 100.0
+        },
+        "group": "diagnostic",
+        "index": 0,
+        "paper": {
+          "e_i": 2259.9276192132947
+        }
+      },
+      {
+        "alternate": {
+          "e_i": 460.867996160474
+        },
+        "controls": {
+          "tau_q": 300.0
+        },
+        "group": "diagnostic",
+        "index": 1,
+        "paper": {
+          "e_i": 777.6958679812643
+        }
+      },
+      {
+        "alternate": {
+          "e_i": 149.5150546204206
+        },
+        "controls": {
+          "tau_q": 1000.0
+        },
+        "group": "diagnostic",
+        "index": 2,
+        "paper": {
+          "e_i": 241.59866480100177
+        }
+      },
+      {
+        "alternate": {
+          "e_i": 673.3205629886762
+        },
+        "controls": {
+          "tau_q": 200.0
+        },
+        "group": "hidden",
+        "index": 0,
+        "paper": {
+          "e_i": 1152.9073397237996
+        }
+      },
+      {
+        "alternate": {
+          "e_i": 285.8564327483274
+        },
+        "controls": {
+          "tau_q": 500.0
+        },
+        "group": "hidden",
+        "index": 1,
+        "paper": {
+          "e_i": 473.58142023767687
+        }
+      },
+      {
+        "alternate": {
+          "e_i": 184.20261275196083
+        },
+        "controls": {
+          "tau_q": 800.0
+        },
+        "group": "hidden",
+        "index": 2,
+        "paper": {
+          "e_i": 300.05036019525215
+        }
+      }
+    ],
+    "relationship_targets": [
+      {
+        "control": "tau_q",
+        "counterfactual_direction": "decreasing",
+        "counterfactual_shape": "reported power law with central exponent minus zero point nine three five",
+        "historical_direction": "decreasing",
+        "historical_shape": "reported power law with central exponent minus zero point nine seven one",
+        "readout": "e_i",
+        "source_claim_ids": [
+          "Ei_scaling_T_low",
+          "Ei_scaling_T_one"
+        ]
+      }
+    ]
+  },
+  "reviewer": "Independent family source reviewer (Codex subagent B)",
+  "source": {
+    "arxiv_versioned_id": "2506.21670v3",
+    "citation": "Seong-Ho Shinn et al., Spontaneous Quantum Turbulence in a Newborn Bose-Einstein Condensate via the Kibble-Zurek Mechanism, Physical Review Letters (2026), DOI:10.1103/b16v-hwp2",
+    "journal_doi": "10.1103/b16v-hwp2"
+  }
+}

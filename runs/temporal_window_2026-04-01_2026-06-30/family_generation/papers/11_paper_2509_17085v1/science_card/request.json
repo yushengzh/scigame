@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2509.17085v1\", \"citation\": \"Yidan Wang, Universal Two-Excitation Scattering in Two-Dimensional Subwavelength Atomic Arrays, Physical Review Letters (2026), DOI:10.1103/2mvc-8tc4\", \"journal_doi\": \"10.1103/2mvc-8tc4\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: Short_arxiv_submission.tex =====\nL000002\t\nL000003\t\nL000004\t\\documentclass[\nL000005\t floatfix,twocolumn,superscriptaddress, prl,aps\nL000006\t\nL000007\t\nL000008\t\nL000009\t\nL000010\t\nL000011\t\nL000012\t\nL000013\t\nL000014\t\nL000015\t\nL000016\t amsmath,amssymb,\nL000017\t aps,\nL000018\t\nL000019\t\nL000020\t\nL000021\t\nL000022\t\nL000023\t\nL000024\t]{revtex4-2}\nL000025\t\\usepackage[utf8]{inputenc}\nL000026\t\\usepackage{amsmath}\nL000027\t\\usepackage{amsfonts}\nL000028\t\\usepackage{amssymb,amsthm}\nL000029\t\nL000030\t\nL000031\t\nL000032\t\nL000033\t\\usepackage[subrefformat=parens,labelformat=parens,caption=false]{subfig}\nL000034\t\nL000035\t\\usepackage{graphicx}\nL000036\t\\usepackage{multirow}\nL000037\t\\usepackage[]{hyperref}\nL000038\t\\usepackage{bbold}\nL000039\t\\usepackage{cancel}\nL000040\t\\hypersetup{\nL000041\t  colorlinks = true,\nL000042\t  urlcolor = magenta,\nL000043\t  linkcolor = red,\nL000044\t  citecolor = blue\nL000045\t}\nL000046\t\\usepackage[normalem]{ulem}\nL000047\t\\usepackage{braket}\nL000048\t\\usepackage[all]{hypcap}\nL000049\t\\usepackage{url}\nL000050\t\\usepackage{float}\nL000051\t\nL000052\t\nL000053\t\nL000054\t\nL000055\t\nL000056\t\nL000057\t\nL000058\t\nL000059\t\\usepackage{xcolor}\nL000060\t\nL000061\t\nL000062\t\\newcommand{\\red}[1]{\\textcolor{red}{#1}}\nL000063\t\\newcommand{\\blue}[1]{\\textcolor{blue}{#1}}\nL000064\t\\newcommand{\\orange}[1]{\\textcolor{orange}{#1}}\nL000065\t\\newcommand{\\brown}[1]{\\textcolor{brown}{#1}}\nL000066\t\\newtheorem{theorem}{Theorem}\nL000067\t\\newtheorem{lemma}[theorem]{Lemma}\nL000068\t\\newtheorem{corollary}{Corollary}[theorem]\nL000069\t\nL000070\t\\usepackage[]{hyperref}\nL000071\t\\usepackage{bbold}\nL000072\t\\usepackage{bm}\nL000073\t\\usepackage{cancel}\nL000074\t\\newcommand{\\eq}[1]{\\begin{align}#1\\end{align}}\nL000075\t\\newcommand{\\ie}{i.\\,e.,\\ }\nL000076\t\nL000077\t\nL000078\t\nL000079\t\nL000080\t\nL000081\t\nL000082\t\nL000083\t\\usepackage{graphicx}\nL000084\t\\graphicspath {{figures/}}\nL000085\t\nL000086\t\\begin{document}\nL000087\t\nL000088\t\\title{Universal two-excitation scattering in two-dimensional subwavelength atomic arrays\nL000089\t}\nL000090\t\nL000091\t\\author{Yidan Wang}\nL000092\t\\affiliation{Department of Physics, Harvard University, Cambridge, Massachusetts 02138, USA}\nL000093\t\\author{Oriol Rubies-Bigorda}\nL000094\t\\affiliation{Physics Department, Massachusetts Institute of Technology, Cambridge, Massachusetts 02139, USA}\nL000095\t\\author{Valentin Walther}\nL000096\t \\affiliation{Department of Physics and Astronomy, Purdue University, West Lafayette, Indiana 47907, USA}\nL000097\t \\affiliation{Department of Chemistry, Purdue University, West Lafayette, Indiana 47907, USA}\nL000098\t\nL000099\t\\author{Susanne F. Yelin}\nL000100\t\\affiliation{Department of Physics, Harvard University, Cambridge, Massachusetts 02138, USA}\nL000101\t\nL000102\t\\begin{abstract}\nL000103\tSubwavelength atomic arrays are a leading platform for engineering strong light-matter interactions, presenting exciting opportunities for quantum science. However, a full understanding of their multi-excitation dynamics remains a significant challenge. In this work, we uncover a remarkable universal phenomenon that emerges in these arrays. Using scattering theory to analyze two-excitation interactions, we reveal a profound simplification near critical points of the collective atomic excitation band structure, determined solely from single-excitation properties. At these critical points, scattering becomes universal\nL000104\t and the full two-excitation scattering matrix decomposes into a block-diagonal form.\nL000105\t\nL000106\tRemarkably, all scattering processes involving the photon field are completely suppressed, resulting in the perfect isolation of a unitary, nonlinear interaction channel between collective dark spin waves. Our findings provide exact analytical insights into few-body nonlinearities and establish a universal framework for analyzing complex scattering phenomena in ordered atomic systems.\nL000107\t\nL000108\t\nL000109\t\\end{abstract}\nL000110\t\\maketitle\nL000111\t\nL000112\t\nL000113\t\nL000114\t\nL000115\t\\begin{figure}\nL000116\t    \\centering\nL000117\t\\includegraphics[width=1\\linewidth]{illu_2D_c.pdf}\nL000118\t\nL000119\t\\caption{\nL000120\t   \\textbf{(a)} Schematic of a subwavelength atomic array in real space, where the lattice spacing $d$ is smaller than half the resonant atomic wavelength ($\\lambda_0$).\nL000121\t   \\textbf{(b)} Universal structure of the S-matrix at critical energies. The S-matrix, $S_{\\alpha\\beta}$, connects input ($\\alpha$) and output ($\\beta$) channels defined by their constituent excitations, shown in momentum space. These excitations are photons and dark spin waves. Each photon (orange arrow) has an in-plane momentum corresponding to a bright spin wave (dashed arrow) inside the light cone (LC), while dark spin waves (blue wavy arrows) have momenta outside the LC. Generically, all kinematically allowed channels are coupled (faint gray arrows). At the critical energies, however, the S-matrix becomes block-diagonal: the purely atomic channel ($\\alpha,\\beta=0$) becomes unitary, while all nonlinearities are suppressed in the photonic sectors ($\\alpha,\\beta > 0$), leaving only single-particle dynamics.\nL000122\t}\nL000123\t    \\label{fig:scattering_illu}\nL000124\t\\end{figure}\nL000125\t\nL000126\t The pursuit of universal principles that distill simple, predictable behaviors from complex underlying dynamics is a central goal of modern physics. This principle of universality reveals that disparate systems can exhibit identical limiting behaviors, irrespective of their microscopic intricacies. For instance, in condensed matter, different physical systems can exhibit identical critical exponents near a phase transition, determined only by fundamental symmetries rather than microscopic details \\cite{Goldenfeld1992, Chaikin1995}. Similarly, in fluid dynamics, the Navier-Stokes equations describe  the long-wavelength behavior of materials as different as water and plasma using only a few universal parameters like viscosity and density \\cite{Landau1987, Batchelor1967}.\nL000127\t\nL000128\tHere, we demonstrate that this principle of universality provides a powerful framework for understanding the nonlinear quantum  optics of subwavelength atomic arrays. These systems, where atoms are spaced closer than their resonant wavelength, have emerged as promising platforms to engineer light-matter interactions and advance various quantum technologies~\\cite{bettles2016enhanced, ExponentialAsenjoGarcia2017, shahmoon2017cooperative, Manzoni2018, bekenstein2020quantum, Patti2021, rui2020subradiant, wei2021generation, srakaew2023subwavelength, Shah2024, Rubies-Bigorda2025Deterministic}. In the single-excitation limit, their collective behavior is well understood: they act as tunable mirrors for photons and support long-lived, dark spin waves~\\cite{Manzoni2018, ExponentialAsenjoGarcia2017,shahmoon2017cooperative, bettles2016enhanced}.\nL000129\tTogether, photons and spin waves serve as the fundamental excitations of the system.\nL000130\t\nL000131\tHowever, harnessing atomic arrays for quantum nonlinear optics requires moving beyond this single-excitation picture. Two-excitation scattering is a crucial step into this nonlinear regime, but it presents a formidable challenge. A complete description must track the many possible scattering processes between incident pairs of photons and dark spin waves (see Fig.\\ \\ref{fig:scattering_illu}), a problem complicated by the mixed dimensionality of the excitations (3D photons and 2D spin waves). Consequently, existing approaches often rely on numerical simulations, which are inherently limited to finite systems~\\cite{moreno2021quantum, zhang2022photon}, or employ various approximations~\\cite{cidrim2020photon, bettles2020quantum, williamson2020superatom, Ostermann2024, RubiesBigorda2023, Scarlatella2024, scarlatella2024subwavelength}. Other methods are restricted to specific scenarios ~\\cite{Solomons2023, Pedersen2024, Zhang2019, Iversen2021}, leaving a holistic, analytical understanding elusive.\nL000132\t\nL000133\tIn this Letter, we overcome this complexity by discovering a universal structure governing two-excitation scattering. We demonstrate that near specific characteristic energies, the entire two-body S-matrix (which encompasses all photon-photon, photon-spin wave, and spin wave-spin wave processes) adopts a universal form. Crucially, the energies where this universality emerges can be predicted from the system’s single-excitation properties alone, circumventing the need to solve the full, complex two-body problem. We employ a comprehensive scattering formalism, developed in a parallel work~\\cite{Wang2025MultiExcitation}, to calculate the relevant scattering observables and thereby analytically verify this universal behavior. This discovery offers a powerful predictive shortcut, providing holistic and analytical insights into the rich nonlinear scattering properties of 2D atomic arrays.\nL000134\t\nL000135\t\nL000136\t\nL000137\t\\textit{System Hamiltonian.---}The total Hamiltonian $H = H_{\\text{quad}} + U$, derived in detail in our parallel work \\cite{Wang2025MultiExcitation}, comprises a single-excitation part $H_{\\text{quad}}$ and a two-excitation interaction $U$. $H_{\\text{quad}}$ conserves lattice momentum $\\bm{p}$ (the quasi-momentum along the array dimension) and decomposes as\nL000138\t$H_{\\text{quad}} = \\int_{\\text{BZ}} d\\bm{p} \\, H_{\\bm{p}}$~\\footnote{Here and throughout, $d\\bm{k}$ denotes the integration measure over the 2D momentum space, i.e., $d^2k = dk_x dk_y$.}, where BZ denotes the atomic Brillouin zone.\nL000139\t Each component $H_{\\bm{p}}$ governs the dynamics of collective atomic spin waves, created by the bosonic operators $b^\\dagger_{\\bm{p}}$, and their coupling to the corresponding photon channels.\nL000140\t The atomic resonance frequency $\\omega_{eg}$ defines the light cone radius $k_0 = \\omega_{eg}/c$. In the subwavelength regime, where the lattice spacing $d < \\lambda_0/\\sqrt{2}$ (with $\\lambda_0 = 2\\pi c/\\omega_{eg}$), this light cone is contained entirely within the Brillouin zone, thereby defining two physically distinct regions of momentum space. We work in a rotating frame at the atomic resonance frequency $\\omega_{eg}$, effectively setting it as the zero of energy for excitations.\nL000141\tOutside the light cone ($\\|\\bm{p}\\| > p_0$), excitations $b^\\dagger_{\\bm{p}}$ are decoupled from propagating photons, forming long-lived dark spin waves with Hamiltonian $H_{\\bm{p}} = \\Delta(\\boldsymbol{p}) b^\\dagger_{\\boldsymbol{p}} b_{\\boldsymbol{p}}$, where $\\Delta(\\bm{p})$ is the  collective Lamb shift obtained by tracing out off-resonant vacuum electromagnetic modes~\\cite{ExponentialAsenjoGarcia2017}.\nL000142\tInside the light cone ($\\|\\bm{p}\\| < p_0$), excitations $b^\\dagger_{\\bm{p}}$ couple radiatively to effective 1D photon channels $C_{\\bm{p}}(\\chi)$ and are referred to as bright spin waves. Each channel $C_{\\bm{p}}(\\chi)$ represents photons propagating away from the array with 3D wavevectors $(\\bm{p}, \\chi)$ and $(\\bm{p}, -\\chi)$, sharing the same in-plane momentum $\\bm{p}$ as the spin wave $b_{\\bm{p}}$. Here, $\\chi( >0)$ is the magnitude of the out-of-plane momentum. The Hamiltonian in the light cone reads\nL000143\t\\begin{align}\nL000144\tH_{\\bm{p}} ={}&   \\Delta(\\boldsymbol{p}) b^\\dagger_{\\boldsymbol{p}} b_{\\boldsymbol{p}} + \\int_{0}^{\\infty} \\!\\!\\! d\\chi \\, E_{\\bm{p}}(\\chi) C_{\\boldsymbol{p}}^{\\dagger}(\\chi) C_{\\boldsymbol{p}}(\\chi) \\nonumber \\\\\nL000145\t&+ \\int_{0}^{\\infty} \\!\\!\\! d\\chi \\, \\left[ g_{\\boldsymbol{p}}(\\chi) C_{\\boldsymbol{p}}^{\\dagger}(\\chi) b_{\\boldsymbol{p}} + \\text{h.c.} \\right] \\quad (\\text{for } \\|\\bm{p}\\| < p_0),\nL000146\t\\label{eq:Hp_bright_rev}\nL000147\t\\end{align}\nL000148\twith photon energy $E_{\\bm{p}}(\\chi) = c\\sqrt{\\|\\bm{p}\\|^2 + \\chi^2}-\\omega_{eg}$. The dispersion $\\Delta(\\bm{p})$ for lattice constant $d=0.2\\lambda_0$ is shown in Fig.~\\ref{fig:results_all}(a).\nL000149\t\nL000150\tThe effective interaction $U$, resulting from the two-level nonlinearity of atoms ($u \\to \\infty$), conserves total momentum $\\bm{P}$ while scattering relative momentum $\\bm{q} \\to \\bm{q}'$:\nL000151\t\\begin{equation}\nL000152\tU = \\frac{u}{2} \\! \\int \\! d\\bm{q} \\, d\\bm{q}' \\! \\int \\! d\\bm{P} \\, b^\\dagger_{\\boldsymbol{P}/2+\\bm{q}'} b^\\dagger_{\\boldsymbol{P}/2-\\bm{q}'} b_{\\boldsymbol{P}/2-\\bm{q}} b_{\\boldsymbol{P}/2+\\bm{q}}.\nL000153\t\\label{eq:U_interaction_revised}\nL000154\t\\end{equation}\nL000155\tThis term mediates scattering between atomic spin waves.\nL000156\t\nL000157\t\nL000158\t\nL000159\t\nL000160\t\\emph{Two-excitation scattering.---} We focus on the two-excitation manifold where scattering involves pairs of photons (\\(C^\\dagger_{\\bm{p}}(\\chi)\\), \\(\\|\\bm{p}\\| < p_0\\)) and/or dark spin waves (\\(b^\\dagger_{\\bm{p}}\\), \\(\\|\\bm{p}\\| > p_0\\)), which serve as the stable asymptotic states of the  scattering process. Bright spin waves (\\(b^\\dagger_{\\bm{p}}, \\|\\bm{p}\\| < p_0\\)) are transient states that decay into photons, making them unstable and unsuitable as asymptotic states. Incoming photons can be prepared using laser beams, while dark spin waves can be initialized through techniques such as rapid modulation of the lattice spacing, dynamic light shifts \\cite{Rubies-Bigorda2022}, or multi-photon excitation schemes \\cite{Rusconi2021}.\nL000161\t\nL000162\t\nL000163\t\nL000164\t\nL000165\t \\begin{figure}\nL000166\t     \\centering     \\includegraphics[width=1\\linewidth]{result_figure4.pdf}\nL000167\t\\caption{\nL000168\tUniversal scattering signatures near critical points for \\(\\bm{P}=\\bm{0}\\).\nL000169\tWe consider a square array with lattice spacing \\(d = 0.2\\lambda_0\\) and \\(\\sigma^+\\)atomic polarization with respect to the out-of-plane quantization axis.\nL000170\t\nL000171\t\\textbf{(a)} The two-dark-wave dispersion relation \\(\\Delta^{(2)}(\\bm{0}, \\bm{q})=2\\Delta(\\bm{q})\\). The blue box outlines the two-excitation Brillouin zone, \\(BZ^{(2)}\\). Red and yellow markers correspond to the band maximum (\\(E_{\\text{max}}\\)) and saddle points (\\(E_{\\text{sadd}}\\)), respectively. The orange semicircle (\\(D_2\\)) marks the subspace of two bright spin waves.\nL000172\t\nL000173\t\\textbf{(b)} The non-trivial eigenvalue of the S-matrix for two incoming dark spin waves, $s(E)$, as a function of their total energy $E$. In agreement with the universal prediction of Eq.~\\eqref{eqSEmax0_final}, the squared magnitude \\(|s(E)|^2\\) (black line) approaches 1 at the critical points, while the phase \\(\\text{arg}[s]\\) (green dashed line) approaches 0 (at \\(E_{\\text{max}}\\)) and \\(\\pm\\pi\\) (at \\(E_{\\text{sadd}}\\)).\nL000174\t\\textbf{(c)} Cross section for incident dark waves (\\(\\alpha=0\\)) as a function of their incoming relative momentum \\(\\bm{q}\\). \\textbf{(c1)} The total cross section \\(\\sigma_{0,\\text{tot}}\\) is enhanced at the critical points and suppressed along the saddle lines. \\textbf{(c2)} The branching ratio into photons, \\(\\sigma_{0,2}/\\sigma_{0,\\text{tot}}\\), vanishes at the saddle points and along the saddle lines, but remains finite at the maximum, revealing the distinct universal character of the two critical energies.\nL000175\t\nL000176\t\\textbf{(d)} For two normally incident photons (\\(\\alpha=2\\)), all cross sections vanish at the critical energies, confirming the decoupling of photons and dark spin waves.\nL000177\t}\nL000178\t\\label{fig:results_all}\nL000179\t \\end{figure}\nL000180\tThe full scattering process, illustrated conceptually in Fig.~\\ref{fig:scattering_illu}, connects incoming and outgoing states across nine sectors defined by the number of photons and dark waves, and conserves the total lattice momentum \\(\\bm{P}\\) and energy \\(E\\). We label the subspace with \\(\\alpha\\) photons as channel \\(\\alpha\\), for \\(\\alpha \\in \\{0, 1, 2\\}\\).\nL000181\t\nL000182\t\nL000183\t\nL000184\tIn our companion paper \\cite{Wang2025MultiExcitation}, we demonstrate that the full, multi-channel scattering process can be constructed from the dynamics of the atomic spin waves. Because of the separation of  time  scales  between the atomic resonance and decay rate, the atomic dynamics can be described by an effective Hamiltonian \\cite{Lehmberg1970,ExponentialAsenjoGarcia2017}, where photons are traced out of the system.\nL000185\tThe scattering of atomic spin waves is thus described by a complex dispersion relation \\(\\epsilon^{(2)}(\\bm{P}, \\bm{q}) \\equiv \\epsilon(\\bm{P}/2 + \\bm{q}) + \\epsilon(\\bm{P}/2 - \\bm{q})\\). The single-excitation dispersion \\(\\epsilon(\\bm{p})\\) is purely real for dark spin waves (\\(\\|\\bm{p}\\| > p_0\\)), where \\(\\epsilon(\\bm{p}) = \\Delta(\\bm{p})\\), but acquires an imaginary part for bright spin waves (\\(\\|\\bm{p}\\| < p_0\\)), \\(\\epsilon(\\bm{p}) = \\Delta(\\bm{p}) - i\\Gamma(\\bm{p})/2\\), where $\\Gamma(\\bm{p})$  represents their decay rate into photons \\cite{bettles2015cooperative,Adams2019}.\nL000186\t\nL000187\t\nL000188\t\nL000189\t\nL000190\t \\emph{Universal behavior in the S-matrix.---} We first focus on the purely atomic scattering within the subspace of two dark spin waves (channel \\(\\alpha=0\\)). The corresponding S-matrix, \\(S_0(\\bm{P}, E)\\), which acts on the manifold of two-excitation dark spin waves \\(\\mathcal{M}_0(\\bm{P},E)\\) with the same total momentum \\(\\bm{P}\\) and energy \\(E\\), has a simple structure due to the momentum-independence of the interaction. It possesses a single non-trivial eigenvalue \\(s(\\bm{P}, E)\\) with a corresponding normalized eigenvector of the form~\\cite{Wang2025MultiExcitation}\nL000191\t\\begin{equation}\nL000192\t|\\psi(\\bm{P}, E)\\rangle = \\mathcal{N} \\int_{\\mathcal{M}_0(\\bm{P}, E)} d\\bm{q} \\, \\frac{|\\bm{P}, \\bm{q}\\rangle}{\\sqrt{v_g(\\bm{P}, \\bm{q})}},\nL000193\t\\label{eq:psi_definition}\nL000194\t\\end{equation}\nL000195\t where \\(\\mathcal{N}\\) is a normalization factor and \\(v_g(\\bm{P},\\bm{q})=|\\nabla_{\\bm{q}}\\Delta^{(2)}(\\bm{P},\\bm{q})|\\) is the relative group velocity.\nL000196\tThe corresponding eigenvalue \\(s(\\bm{P}, E)\\) is given by \\(s(\\bm{P}, E) = L(\\bm{P}, E - i0) / L(\\bm{P}, E + i0)\\) \\cite{Wang2025MultiExcitation}.\nL000197\t This central quantity, the local propagator \\(L(\\bm{P}, \\omega)\\), represents the system's on-site Green's function\nL000198\t\\eq{\nL000199\tL(\\bm{P}, \\omega) &= \\int_{BZ^{(2)}} d\\bm{q} \\frac{1}{\\omega - \\epsilon^{(2)}(\\bm{P}, \\bm{q})}.\\label{eqLint2D_final}\nL000200\t}\nL000201\tHere, the integral is over the two-excitation Brillouin zone \\(BZ^{(2)}\\) [Fig.~\\ref{fig:results_all}(a)], which accounts for the indistinguishability of the two bosonic excitations.\nL000202\tIts imaginary part, \\(\\text{Im}[L]\\), is proportional to the total density of available on-shell atomic spin-wave states (both bright and dark). Its real part represents the density of the off-shell atomic excitations.\nL000203\t\nL000204\t\nL000205\t\nL000206\t\nL000207\tUniversality emerges as the energy \\(E\\) approaches the critical energies ($E_{\\text{crit}}$) of the dark-spin-wave dispersion \\(\\Delta^{(2)}(\\bm{P}, \\bm{q})\\). These critical energies correspond to the relative momentum \\(\\bm{q}\\) where the group velocity vanishes, which generically occur at band maxima ($E_{\\text{max}}$) and saddle points ($E_{\\text{sadd}}$) [red and yellow markers in Fig.~\\ref{fig:results_all}(a), respectively] \\footnote{The spectrum of the dark atomic spin waves approaches $-\\infty$ near the light cone, hence for square lattices there is no band minimum.} \\footnote{The location and multiplicity of the critical points can be tuned by the choice of total momentum \\(\\bm{P}\\) and the lattice geometry.}. As the energy approaches these values, the local propagator \\(L\\) diverges logarithmically, but the nature of this divergence is different for both types of critical energies:\nL000208\t\\eq{\nL000209\t L(\\bm{P}, E\\pm i0)\nL000210\t\\propto\nL000211\t\\begin{cases}\nL000212\t- \\log\\left(|E - E_{\\text{max}}|\\right) & \\text{as } E \\rightarrow E_{\\text{max}} \\\\\nL000213\t\\pm i \\log\\left(|E - E_{\\text{sadd}}|\\right) & \\text{as } E \\rightarrow E_{\\text{sadd}}\nL000214\t\\end{cases} \\label{eqLsaddlelog_final}\nL000215\t}\nL000216\tThe distinct scaling of $L$ near the two types of critical points is a direct consequence of their differing dispersion topologies.\nL000217\t\nL000218\tThe local dispersion is homeomorphic to \\(-(q_x^2+q_y^2)\\) near a maximum but to \\(q_x^2-q_y^2\\) near a saddle point, a difference formally captured by the transformation \\(q_x \\to iq_x\\),  which introduces the relative factor of $i$ in the resulting integral.\nL000219\t\nL000220\t\nL000221\tThis reversal of whether the real or imaginary part of \\(L\\) diverges leads to distinct universal limits for the S-matrix eigenvalue:\nL000222\t\\begin{equation}\nL000223\ts(\\bm{P}, E) \\rightarrow \\begin{cases}\nL000224\t1 & \\text{as } E \\rightarrow E_{\\text{max}} \\\\[4pt]\nL000225\t-1 & \\text{as } E \\rightarrow E_{\\text{sadd}}\nL000226\t\\end{cases}\nL000227\t\\label{eqSEmax0_final}\nL000228\t\\end{equation}\nL000229\tEvaluating \\(L(E\\pm i0)\\) numerically, we plot \\(s(\\bm{P}=\\bm{0}, E)\\) in Fig.~\\ref{fig:results_all}(b), which precisely follows this universal prediction near the critical points.\nL000230\t\nL000231\tAt \\(E \\to E_{\\text{max}}^-\\), \\(s \\to 1\\), meaning the S-matrix becomes the identity operator and the dark waves pass through each other without interaction. At \\(E \\to E_{\\text{sadd}}\\), \\(s \\to -1\\), and the scattering eigenstate acquires a \\(\\pi\\) phase shift.\nL000232\t\nL000233\t\nL000234\t\nL000235\t\nL000236\tThe physical pictures behind these limits are distinct and intuitive. At a band maximum \\(E_{\\text{max}}\\), the density of on-shell states is finite, but the  density of off-shell excitations\nL000237\tdiverges (\\(\\text{Re}[L] \\to -\\infty\\)). The excitations become ``dressed\" by an infinitely heavy cloud of off-shell excitations, which suppresses their interaction and leads to \\(s \\to 1\\). Conversely, at a saddle point \\(E_{\\text{sadd}}\\), the density of available on-shell states diverges (\\(|\\text{Im}[L]| \\to \\infty\\)). The incoming spin wave pair encounters this infinite reservoir of states to scatter into, which forces a strong scattering event corresponding to a \\(\\pi\\) phase shift, and thus \\(s \\to -1\\).\nL000238\t\nL000239\t\nL000240\t\nL000241\t\nL000242\t\nL000243\tCrucially, the scattering behavior is not uniform across the equi-energy contour. At \\(E = E_{\\text{sadd}}\\), the Hilbert space effectively fractures: the scattering eigenstate \\(|\\psi(\\bm{P},E_{\\text{sadd}})\\rangle\\) becomes localized only on the discrete saddle points in momentum space. This means that dark-wave pairs on the ``saddle lines\" connecting these points [yellow dashed lines in Fig.~\\ref{fig:results_all}(a)] are orthogonal to the scattering eigenstate and form a separate, non-interacting channel where the S-matrix is simply the identity operator.\nL000244\t\nL000245\t\nL000246\tThe unitarity of the S-matrix, \\(|s(\\bm{P}, E)| \\to 1\\), at these critical energies is the central mechanism of this work, with profound consequences for the entire scattering problem.\nL000247\tThe probability of scattering to photon-containing output channels is $1 - |s|^2$, and is non-zero for generic energies. At the critical energies, the unitarity implies that the channel of two dark spin waves becomes completely decoupled from the photon-containing channels.\nL000248\tThis decoupling has a far-reaching effect: in all other scattering channels (i.e., for $\\alpha, \\beta > 0$), inter-excitation interactions are completely suppressed, and each excitation evolves independently according to single-excitation dynamics~\\cite{Wang2025MultiExcitation}.\nL000249\t\nL000250\t\nL000251\t\nL000252\t\nL000253\t\\emph{Universal features in scattering cross sections.---}\nL000254\tThe universal S-matrix behavior has interesting and non-trivial  implications for the corresponding scattering cross sections.\nL000255\tWhen two plane-wave excitations in channel $\\alpha$ impinge on each other with flux \\(R\\) in their center of mass frame, \\(\\sigma_{\\alpha,\\beta} R\\) gives the number of pairs of excitations scattered into channel \\(\\beta\\) per unit time.\nL000256\tGiven an incoming state with a specific momentum, this partial scattering cross section is given by\nL000257\t\\eq{\nL000258\t\\sigma_{\\alpha, \\beta}=  \\frac{4\\pi a_\\alpha}{v_g} |\\bar{T}(\\bm{P}, E+i0)|^2 \\text{Im}[L_\\beta(\\bm{P}, E+i0)], \\label{eqsigma_CS_revised}\nL000259\t}\nL000260\twhere \\(\\bm{P}\\) is the projection of the total momentum of the incoming state onto the array, and $E$ is the energy of the incoming state.\nL000261\tThis expression is a product of four distinct factors:  (1) a prefactor $a_\\alpha$, representing the conversion amplitude from the incoming state to the spin-wave modes of the array~\\cite{Wang2025MultiExcitation}, which remains finite and does not contribute to the universal scaling;\nL000262\t(2) the inverse group velocity of the incoming state, \\(v_g^{-1}\\); (3) the density of states  \\(\\text{Im}[L_\\beta]\\) of $\\beta$ bright spin waves and $2-\\beta$ dark spin waves at $(\\bm{P},E)$; and (4) the core scattering probability \\(|\\bar{T}(\\bm{P}, E+i0)|^2\\), where we introduce the atomic T-matrix   \\(\\bar{T}(\\bm{P}, E+i0) = -L(\\bm{P}, E+i0)^{-1}\\).\nL000263\tThe fact that \\(|\\bar{T}|^2\\) is independent of the incoming and outgoing momentum is a direct consequence of the hard-core interaction, representing a uniform scattering probability into any available pair of atomic spin-wave states.\nL000264\tTo define \\(L_\\beta\\), we partition $\\textrm{BZ}^{(2)}$ into domains \\(D_\\beta\\) based on the number of constituent bright spin waves [see Fig.~\\ref{fig:results_all}(a)].\nL000265\tWithin this formalism, the components \\(\\text{Im}[L_{\\beta > 0}]\\) represent the density of states for the transient bright-wave modes that serve as the direct gateway to the photonic outgoing states.\nL000266\tThis analytical transparency allows the universal properties of \\(L\\) to be directly mapped onto all scattering observables, making the origin of the universal phenomena particularly clear.\nL000267\t\nL000268\t\nL000269\tFor\nL000270\tincoming states containing photons (\\(\\alpha=1,2\\)), the group velocity \\(v_g\\) is finite.\nL000271\t As the energy \\(E\\) approaches a critical energy \\(E_{\\text{crit}}\\), \\(\\sigma_{\\alpha,\\beta}\\) always vanishes logarithmically, with the specific scaling laws detailed in our summary table, Fig.~\\ref{fig:summary_table}.  This universal suppression is confirmed in Fig.~\\ref{fig:results_all}(d) for the case of two normally incident photons.\nL000272\t\nL000273\t\nL000274\tIn stark contrast, for an incoming state of two dark spin waves (\\(\\alpha=0\\)) with relative momentum \\(\\bm{q}\\) approaching a critical point \\(\\bm{q}_{\\text{crit}}\\), the group velocity vanishes as \\(v_g \\propto \\sqrt{\\Delta E}\\), where $\\Delta E=|E-E_{\\mathrm{crit}}|$. The diverging  inverse group velocity  \\(v_g^{-1} \\propto \\Delta E^{-1/2}\\) overpowers the vanishing $|T|^2\\text{Im}[L]$, leading to a divergent total cross section \\(\\sigma_{0,\\mathrm{tot}}=\\sum_{\\beta} \\sigma_{0,\\beta}\\) \\brown{\\footnote{Divergent scattering cross sections have also been reported in spin-orbit coupled systems \\cite{PhysRevA.91.022706, PhysRevA.94.022706}}}.\nL000275\tAs also detailed in  Fig.~\\ref{fig:summary_table}, the specific scaling of this divergence depends on the critical point. The behavior of the total cross section \\(\\sigma_{0,\\text{tot}}\\) as a function of the incoming relative momentum \\(\\bm{q}\\) is plotted in  Fig.~\\ref{fig:results_all}(c1).\nL000276\tThis plot reveals that the cross section is enhanced at the critical points, which are indicated in the figure by the yellow and red markers.\nL000277\tConversely, for incoming states on the saddle lines but away from the saddle points, \\(v_g\\) is finite, and the total cross section is consequently suppressed, as the figure also demonstrates.\nL000278\t\nL000279\t\nL000280\t\nL000281\t The branching ratio into channel $\\beta$, $\\sigma_{0,\\beta}/\\sigma_{0,\\text{tot}}$, simplifies to $\\text{Im}[L_\\beta]/\\text{Im}[L]$. This ratio reveals further universal signatures:\nL000282\t\\begin{itemize}\nL000283\t    \\item Approaching a saddle point (\\(\\bm{q} \\to \\bm{q}_{\\text{sadd}}\\)): The ratio of scattering into photons vanishes as the divergence of \\(\\text{Im}[L]\\) is dominated by the dark-spin-wave contribution \\(\\text{Im}[L_0]\\).\nL000284\t    \\item Approaching a band maximum (\\(\\bm{q} \\to \\bm{q}_{\\text{max}}\\)): The ratio approaches a finite, non-zero value because all partial densities of states \\(\\text{Im}[L_\\beta]\\) remain finite.\nL000285\t\\end{itemize}\nL000286\tAlong the saddle lines, where the total cross section is already suppressed, the branching ratio into photons also vanishes. Figure~\\ref{fig:results_all}(c2) perfectly confirms all of these distinct behaviors.\nL000287\t\nL000288\t\nL000289\t\nL000290\t\nL000291\t\nL000292\t\nL000293\t\nL000294\t\\begin{figure}\nL000295\t    \\centering\nL000296\t\\includegraphics[width=0.9\\linewidth]{table_cs_illu3.pdf}\nL000297\t\\caption{Universal scaling of partial cross sections \\(\\sigma_{\\alpha,\\beta}\\) near critical energies (\\(\\Delta E = |E - E_{\\text{crit}}|\\)). The colors denote four scaling behaviors: \\(\\Delta E^{-1}\\log(\\Delta E)^{-1}\\) (dark orange), \\(\\Delta E^{-1}\\log(\\Delta E)^{-2}\\) (light orange), \\(\\log(\\Delta E)^{-1}\\) (light blue), and \\(\\log(\\Delta E)^{-2}\\) (dark blue). The tables classify the behavior for each scattering channel \\((\\alpha, \\beta)\\) at \\(E_{\\text{max}}\\) and \\(E_{\\text{sadd}}\\), where for \\(E_{\\text{sadd}}\\) the \\(\\alpha=0\\) channel is further divided based on whether the incoming relative momentum is at the saddle point (\\(\\bm{q}_{\\text{sadd}}\\)).}\nL000298\t    \\label{fig:summary_table}\nL000299\t\\end{figure}\nL000300\t\nL000301\t\nL000302\t\nL000303\tFinally, we resolve an apparent paradox at $E_{\\text{max}}$: the S-matrix becomes trivial ($s \\to 1$), while the cross section $\\sigma_{0,\\text{tot}}$ diverges. Near the band edge, the trivial S-matrix implies that the scattering probability per unit time per excitation pair vanishes, but the vanishing group velocity ($v_g \\to 0$) of the incoming excitations means the density of excitations within the scattering region increases (when keeping the incident flux constant). The long interaction time afforded by the slow-moving excitations enhances the total cross section, which is the rate of excitations scattered nonlinearly per unit incoming flux. In other words, the diverging cross sections reflects a subtle interplay in which the scattering probability vanishes more slowly than the interaction time grows.\nL000304\t\nL000305\t\nL000306\t\nL000307\t\nL000308\t\nL000309\t\nL000310\t\nL000311\t\nL000312\t\nL000313\t\nL000314\t\nL000315\t\nL000316\t\nL000317\t\nL000318\t\nL000319\t\nL000320\t\nL000321\t\nL000322\t\\emph{Discussion.---}\nL000323\tBy fixing the scattering behavior at the critical energies, the universal physics discovered provides a qualitative description of the scattering behavior across a wide energy range, as illustrated in Fig.~\\ref{fig:results_all} (b).\nL000324\tThe prominent suppression of the scattering cross section is anchored precisely at the theoretically predicted \\(E_{\\text{sadd}}\\) and \\(E_{\\text{max}}\\), while the overall width of the interaction region is set by the natural dissipative scale of the system, \\(\\Gamma(\\bm{p}=\\bm{0})\\) (here, \\(\\approx 6\\Gamma_0\\), where \\(\\Gamma_0\\) is the single-atom decay rate). Beyond these sharp features, our results also reveal another generic property: the predominance of scattering into the dark-wave channel (\\(\\beta=0\\)). This originates from the high density of states associated with the relatively flat dark-wave bands, which enhances the \\(\\sigma_{\\alpha,0}\\) cross section over other channels. This preferential scattering into subradiant modes is therefore a general feature of atomic arrays supporting flat collective bands~\\cite{jaworowski2025laughlin}.\nL000325\t\nL000326\t\nL000327\t\nL000328\tExperimentally, two-photon cross sections can be extracted from the linear dependence of photon transmission or reflection on input intensity \\cite{Wang2025MultiExcitation}. The main experimental test is to measure this cross section as a function of energy near the critical points. Although broadening due to laser resolution, finite size~\\footnote{Finite-size effects impose a minimum energy resolution, scaling as \\(\\Delta E_{\\min} \\propto 1/N^2\\) for an \\(N \\times N\\) array.},\nL000329\tand disorder will smooth out sharp theoretical features, observing robust suppression at the critical energies would clearly validate our theory with current capabilities.\nL000330\t\nL000331\tWhile our analysis assumes a two-level nonlinearity and a square array, the core mechanism we identify is far more general.\nL000332\t The universal phenomena arise from the singular phase space near a band-structure critical point, making the details of the short-range interaction irrelevant.\nL000333\t We thus expect these universal  phenomena for a wide range of interactions and array geometries.\nL000334\t The decoupling of dark spin waves from photon channels at critical energies indicates two-excitation subradiant states, discussed further in \\cite{Wang2025MultiExcitation}.\nL000335\tThis detailed two-excitation scattering analysis underpins future studies of many-body dynamics in these driven-dissipative systems.\nL000336\t\nL000337\t\nL000338\t\nL000339\t\\emph{Acknowledgement.~}\nL000340\tWe thank Alec Douglas, Simon Hollerith and Sayed Ali Akbar Ghorashi for discussions. Y.W. and S.Y. acknowledge support from the NSF through CUA PFC (PHY-2317134), PHY-2207972, and the Q-SEnSE QLCI (OMA-2016244). O.R.-B. acknowledges support from Fundación Mauricio y Carlota Botton and from Fundació Bancaria “la Caixa” (LCF/BQ/AA18/11680093).  V. W. acknowledges support from the NSF through Grant No. PHYS-2409630 for early-stage investigations of the scattering formalism, and support from the U.S. Department of Energy, Office of Science, Office of Basic Energy Sciences Energy Frontier Research Centers program under Award Number DE-SC0025620 for the subsequent analysis of the dynamics near critical points.\nL000341\t\nL000342\t\nL000343\t\nL000344\t\\bibliographystyle{apsrev4-2}\nL000345\t\\bibliography{library_corrected}\nL000346\t\nL000347\t\nL000348\t\\end{document}\nL000349\t===== END FILE: Short_arxiv_submission.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

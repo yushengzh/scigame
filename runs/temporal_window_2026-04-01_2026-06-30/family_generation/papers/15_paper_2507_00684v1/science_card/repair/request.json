@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2507.00684v1\", \"citation\": \"David Luce, Correlation between Structural Order and Diffusion Length in Granular Flow, Physical Review Letters (2026), DOI:10.1103/7mcs-xyzs\", \"journal_doi\": \"10.1103/7mcs-xyzs\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: _main_V1.tex =====\nL000002\t\\documentclass[twocolumn,aps,prl,superscriptaddress,showpacs,byrevtex]{revtex4-2}\nL000003\t\\usepackage{epsf,graphicx,amssymb}\nL000004\t\\usepackage[usenames]{color}\nL000005\t\\usepackage{natbib}\nL000006\t\\usepackage{float,ulem}\nL000007\t\\usepackage{gensymb}\nL000008\t\\usepackage{amsmath,amssymb}\nL000009\t\\usepackage{color}\nL000010\t\\usepackage{empheq}\nL000011\t\\usepackage{url}\nL000012\t\nL000013\t\\begin{document}\nL000014\t\nL000015\t\\title{Structural Order Drives Diffusion in a Granular Packing}\nL000016\t\nL000017\t\\author{David Luce}\nL000018\t\\affiliation{LEMTA, Université de Lorraine, CNRS, 2, Avenue de la Forêt de Haye, Vandœuvre-lès-Nancy, 54504, France}\nL000019\t\\affiliation{GRASP, Institute of Physics B5a, Université de Liège, 4000 Liège, Belgium}\nL000020\t\\author{Adrien Gans}\nL000021\t\\affiliation{LEMTA, Université de Lorraine, CNRS, 2, Avenue de la Forêt de Haye, Vandœuvre-lès-Nancy, 54504, France}\nL000022\t\\author{Sébastien Kiesgen De Richter}\nL000023\t\\affiliation{LEMTA, Université de Lorraine, CNRS, 2, Avenue de la Forêt de Haye, Vandœuvre-lès-Nancy, 54504, France}\nL000024\t\\affiliation{Institut Universitaire de France (IUF)}\nL000025\t\\author{Nicolas Vandewalle}\nL000026\t\\affiliation{GRASP, Institute of Physics B5a, Université de Liège, 4000 Liège, Belgium}\nL000027\t\nL000028\t\nL000029\t\\begin{abstract}\nL000030\tWe investigate how structural ordering, i.e. crystallization, affects the flow of bidisperse granular materials in a quasi-two-dimensional silo. By systematically varying the mass fraction of two particle sizes, we finely tune the degree of local order. Using high-speed imaging and kinematic modeling, we show that crystallization significantly enhances the diffusion length $b$, a key parameter controlling the velocity profiles within the flowing medium. We reveal a strong correlation between $b$ and the hexatic order parameter $\\psi_6$, highlighting the role of local structural organization in governing macroscopic flow behavior. Furthermore, we demonstrate that pressure gradients within the silo promote the stabilization of orientational order even in the absence of crystallization, thus intrinsically increasing $b$ with height. These findings establish a direct link between microstructural order, pressure, and transport properties in granular silo flows.\nL000031\t\\end{abstract}\nL000032\t\nL000033\t\\maketitle\nL000034\t\nL000035\tGranular materials, composed of discrete macroscopic particles, display a wide range of collective behaviors that often defy intuition, owing to their athermal nature and dissipative interactions. Among these behaviors, structural ordering is a central aspect. When monodisperse spherical grains are densely packed, they tend to self-organize into highly ordered configurations, such as hcp and fcc lattices, which represent efficient packing arrangements \\cite{torquato2010jammed}. However, even a slight degree of size polydispersity can disrupt this tendency, preventing crystallization and promoting disordered or amorphous structures that lack long-range translational order \\cite{watanabe2008direct, kondic2012topology}. This effect is particularly pronounced in two-dimensional systems, where monodisperse disks spontaneously form hexagonal crystallites under confinement (see Fig.~\\ref{Fig:crystallization}(a)).\nL000036\t\nL000037\tWhile it is well established that stresses in granular media propagate along discrete contact networks, the influence of structural order on this transmission, particularly under flow conditions, remains a complex and actively debated topic \\cite{reis2006crystallization, watanabe2008direct, benyamine2014discharge, downs2021topographic, bai2023mesoscopic, carlevaro2024flow}. To suppress undesired ordering effects, especially in experimental investigations of flow, compaction, or jamming, bidisperse mixtures are commonly used. This strategy prompts several fundamental questions: which combinations of grain size ratios and mixing fractions most effectively hinder crystallization, and to what extent does the presence or absence of local structural order modify the mechanical response and dynamical behavior of granular systems?\nL000038\t\nL000039\t\\begin{figure}[h!]\nL000040\t\\includegraphics[width=0.49\\textwidth]{fig1_cristallisation_avec_annotations.png}\nL000041\t    \\caption{Four snapshots of the bidisperse granular media in a discharging 2D silo for different values of the fraction (a) $f=0$, (b) $f=0.05$, (c) $f=0.1$ and (d) $f=0.2$. Each particle is colored according to the hexatic order parameter modulus $|\\psi_6|$. (e) Sketch of the experimental quasi-2D silo with relevant parameters.}\nL000042\t    \\label{Fig:crystallization}\nL000043\t\\end{figure}\nL000044\t\nL000045\tThe quasi-two-dimensional geometry of the silo provides an ideal framework to investigate the interplay between particle ordering and granular flow. Over the past decades, granular discharge from silos has been extensively studied, leading to the development of several semi-empirical models that capture key flow properties such as the discharge rate \\cite{Hagen1852, beverloo1961flow, janda2012flow}, the internal velocity field \\cite{litwiniszyn1964application, mullins1974experimental, nedderman1979kinematic, medina1998velocity, choi2005velocity}, and the dynamics near the outlet \\cite{janda2012flow, benyamine2017discharge}. Despite this knowledge, the influence of structural ordering, particularly crystallization, within the bulk reservoir of the silo remains largely unexplored. This gap motivates a detailed investigation of how local particle arrangements affect the flow behavior in bidisperse systems.\nL000046\t\nL000047\tWe designed a quasi-two-dimensional flat-bottomed silo that constrains the grains to a single monolayer (see Fig.~\\ref{Fig:crystallization}(e)). The front and back walls are made of polycarbonate coated with a conductive layer to mitigate triboelectric charging. The cell dimensions are $H = 300$~mm (height), $L = 100$~mm (width), and $W = 1.25$~mm (depth), with a fixed outlet width of $18$~mm. The granular medium consists of a binary mixture of steel spheres with diameters $d_1 = 1.0$~mm and $d_2 = 1.2$~mm, and we define the average reference diameter as $d = 1.1$~mm. The mass fraction of small beads is denoted by $f$, representing the proportion of $1.0$~mm particles in the mixture. Once the aperture is opened, by lifting a retaining wire, grains begin to flow out, allowing us to study the discharge dynamics as a function of $f$. For each selected mass fraction, five independent discharge experiments were performed. The flow was recorded using a high-speed camera operating at 2000 frames per second. Each video sequence, captured with a resolution of $1024 \\times 1024$ pixels (corresponding to a physical area of approximately $91d \\times 91d$), focuses on the bottom region of the silo during the steady-state phase of the discharge. The Lagrangian quantities associated with each grain are projected onto an Eulerian grid composed of square cells of size $d \\times d$. The grid is constructed such that its bottom-central cell aligns with the center of the silo outlet. Within this framework, Eulerian fields for any measurable quantity can be obtained by averaging the corresponding Lagrangian values of all particles intersecting a given cell at position $(x, y)$.\nL000048\t\nL000049\t\nL000050\tFigure \\ref{Fig:crystallization}(a–d) presents snapshots of the granular packings within the silo for four different values of $f$, ranging from the monodisperse case ($f=0$) to a low fraction of small particles ($f=0.2$). Grains are color-coded according to their local structural environment, from crystalline regions (yellow) to amorphous ones (dark). To quantify the local order, we compute for each particle $k$ the hexatic order parameter based on the angular positions $\\theta_{k\\ell}$ of its $N_k$ nearest neighbors\nL000051\t\\begin{equation}\nL000052\t\\psi_{6k} = \\frac{1}{N_k} \\sum_{\\ell=1}^{N_k} \\exp\\left(i6\\theta_{k\\ell}\\right),\nL000053\t\\label{Eq:hexatic_parameter}\nL000054\t\\end{equation}\nL000055\twhere $|\\psi_{6k}|$ close to $1$ indicates a strong sixfold symmetry typical of hexagonal packing. The images clearly show that the large crystalline domains observed at $f=0$ are rapidly disrupted as $f$ increases, giving way to smaller clusters and disordered regions. This confirms that bidispersity suppresses long-range order and promotes amorphous configurations.\nL000056\t\nL000057\tA second structural measure confirms these observations. A Voronoi tessellation is applied to all grains, assigning to each grain $k$ a Voronoi cell of area $A_k$. We compute the Probability Distribution Function (PDF) of the dimensionless areas $A/d^2$ for various values of $f$, as shown in Figure~\\ref{Fig:pdf_voro}. For the monodisperse case ($f=0$), only large grains are present and the distribution is sharply peaked. As $f$ increases, a second peak emerges at smaller normalized areas, indicating the inclusion of smaller grains. The overall distribution broadens, reaching its widest spread near $f = 0.5$, before narrowing again for high $f$ values. At $f=1$, where only small particles are present, crystalline domains reappear, although the peak remains broader than in the $f=0$ case. This is due to the limited confinement in the silo's geometry, allowing some particle overlap and thus reducing positional order. The inset of Figure~\\ref{Fig:pdf_voro} shows the standard deviation $\\sigma$ of the PDFs, which reaches a maximum around $f=0.5$, consistent with the regime of minimal crystalline order.\nL000058\t\nL000059\t\\begin{figure}[h!]\nL000060\t    \\centering\nL000061\t    \\includegraphics[width=0.43\\textwidth]{fig2_pdf_voronoi.png}\nL000062\t    \\vskip -0.3cm\nL000063\t    \\caption{Probability Distribution Function (PDF) of Voronoi cell areas $A$ normalized by a typical grain area $d^2$. Different mixing fractions $f$ are shown exhibiting different patterns. The inset shows the standard deviation $\\sigma$ of each distribution as a function of $f$.}\nL000064\t    \\label{Fig:pdf_voro}\nL000065\t\\end{figure}\nL000066\t\nL000067\tThe above results are confirming the validity of most experimental protocols in which binary mixtures are used to avoid crystallization. The next relevant question is to measure the effect of this mixture on the global granular flow. In particular, we compute the average vertical velocity field $v_y(x, y)$ as a function of the mixing fraction $f$. Let us start by the outlet of the silo where the velocity profiles exhibit no significant dependence on $f$, in agreement with prior observations reported in \\cite{janda2012flow, carlevaro2024flow} (see Fig. \\ref{Fig:velocity_profiles}). The expected profile around the outlet is fitted over all data. This indicates that orientational correlations have little influence in this dilute region of the flow, where the granular medium is subject to a strong pressure drop \\cite{perge2012evolution}.\nL000068\t\nL000069\t\\begin{figure}[h!]\nL000070\t    \\centering\nL000071\t    \\includegraphics[width=0.43\\textwidth]{fig3_outlet_profiles.png}\nL000072\t    \\vskip -0.5cm\nL000073\t    \\caption{Normalized vertical velocity $v_y/v_{y0}$ profiles for all mixing fractions $f$. The black line corresponds to the fitting $\\left( 1 - (x/R)^2\\right)^{1/2}$ with $R$ the radius of the silo aperture. The inset presents the central velocity $v_{y0}$ normalized by the characteristic speed  $\\sqrt{gd}$, emphasizing no significant dependency of the mixing fractions $f$.}\nL000074\t    \\label{Fig:velocity_profiles}\nL000075\t\\end{figure}\nL000076\t\nL000077\t\\begin{figure*}[ht]\nL000078\t    \\centering\nL000079\t    \\includegraphics[width=1\\textwidth]{fig4_bulk_profiles.png}\nL000080\t    \\caption{(a) Time-average field of the normalized vertical velocity field $v_y / v_{y0}$ for $f=0.5$. Bulk velocity profiles for (b) $f \\in [0, 0.5]$ and (c) $f \\in [0.5, 1]$ along the horizontal dashed line at $y/d=75$ represented in green on (a). All solid curves corresponds to the fit of Eq.(\\ref{Eq:kinematic_model}) considering a plug flow component.}\nL000081\t    \\label{Fig:gaussian_profiles}\nL000082\t\\end{figure*}\nL000083\t\nL000084\tHowever, the effect of mixing granular species can be seen in the silo far from the outlet. A typical velocity field $v(x,y)$ is shown in Fig \\ref{Fig:gaussian_profiles}(a) where dead zones are in dark while fast moving parts are in yellow close to the outlet. A large part of the silo is moving and this is well described by the kinematic model introduced by Nedderman and Tüzün~\\cite{nedderman1979kinematic}, based on the earlier work of Litwiniszyn~\\cite{litwiniszyn1964application}. The model assumes that the horizontal velocity is proportional to the horizontal gradient of the vertical velocity, i.e. $v_x=\\partial_x v_y$. This leads to Gaussian-like-shaped vertical velocity profiles of the form\nL000085\t\\begin{equation}\nL000086\tv_y(x,y)\\,=\\,\\frac{Q}{\\sqrt{4 \\pi b y}} \\, \\exp \\left( \\frac{-x^2}{4 b y} \\right),\nL000087\t\\label{Eq:kinematic_model}\nL000088\t\\end{equation}\nL000089\twhere $Q$ is the time-averaged flow rate. The model introduces a single fitting parameter, $b$, which represents a characteristic diffusion length of the medium \\cite{choi2005velocity}. These velocity profiles are shown in Fig \\ref{Fig:gaussian_profiles}(b,c) for respectively low $f$ and high $f$ values. The profile is taken at the same height $y/d=75$ for comparison. For $f=0$, the velocity profile exhibits a uniform component, which corresponds to a crystalline block whose dislocation threshold is significantly higher than the shear stress present in this region. One concludes that velocity field $v(x,y)$ is altered by the onset of the crystallization phenomenon.\nL000090\t\nL000091\tRemoving the plug flow component, the Gaussian-like shape can still be fitted using the kinematic model, which allows the characteristic diffusion length of the medium $b$ to be extracted as a function of the height $y/d$ and the mixing fraction $f$. Figures \\ref{Fig:kinematic_model} (a) and (b) show resulting $b/d$ values as a function of the vertical position $y/d$. Distinguishing $f<0.5$ and $f>0.5$ allows to evidence that the diffusion length $b$ is minimal for $f\\approx 0.5$ while it increases significantly when ordering is present. The diffusion length $b$ systematically increases with height within the silo. This trend is consistent with the observations of Medina et al., who performed measurements in a monodisperse granular medium, under conditions where the aspect ratio between the silo gap and particle size corresponds to our case with $f=1$ \\cite{medina1998velocity}.\nL000092\t\nL000093\tIn this study, we further demonstrate that the increase in diffusion length becomes even more pronounced when crystallization occurs within the granular medium. Specifically, the diffusion length reaches a value of $b/d=4.5$ in the most crystalline case ($f<0.05$), which exceeds previously reported values for slightly polydisperse granular systems \\cite{mullins1974experimental, samadani1999size, medina1998velocity, chen2021measurement}.\nL000094\t\nL000095\t\\begin{figure}[h!]\nL000096\t    \\centering\nL000097\t    \\includegraphics[width=0.48\\textwidth]{fig5_diffusion_lenght.png}\nL000098\t    \\caption{Evolution of the normalized parameter $b/d$ in the silo for (a) $f \\in [0, 0.5]$ and (b) $f \\in [0.5, 1]$. Modulus of the local hexatic parameter order $\\left<|\\psi_6|\\right>_t$ as a function of height for (c) $f \\in [0, 0.5]$ and (d) $f \\in [0.5, 1]$.}\nL000099\t    \\label{Fig:kinematic_model}\nL000100\t\\end{figure}\nL000101\t\nL000102\t\\newpage\nL000103\t\nL000104\tThis enhanced diffusivity is strongly correlated with the cohesion induced by crystallization. The formation of crystalline blocks at the mesoscopic scale increases the number of mechanically stable configurations available to the grains, thereby reducing the prevalence of microscopically frustrated packings. As a consequence, the likelihood of localized plastic events occurring during flow decreases—a mechanism suggested to underlie the anomalous diffusion behavior observed in granular materials \\cite{zuriguel2019velocity}.\nL000105\t\nL000106\tTo explore this hypothesis, we compute the local time-averaged magnitude of the hexatic order parameter, $\\left<| \\psi_6|\\right>_t$, as an Eulerian field. Previous studies have established a link between dynamic heterogeneity and short-range orientational order \\cite{watanabe2008direct}. While instantaneous $|\\psi_6|$ values reflect the presence of hexatic structures at a given time, the time-averaged field $\\left< |\\psi_6|\\right>_t$ is inversely proportional to the frequency of plastic rearrangements at each location.\nL000107\t\nL000108\tOur results show that $\\left< |\\psi_6|\\right>_t$ varies only slightly along the horizontal axis $x$, but increases significantly with height, as depicted in Figure \\ref{Fig:kinematic_model}. In regions of high velocity, $\\left< |\\psi_6|\\right>_t$ ranges between $0.4$ and $0.55$, indicating substantial dislocation activity consistent with frequent plastic events. Conversely, higher in the silo, this parameter can reach values up to $0.75$ in the fully crystalline case ($f=0$), suggesting slower dynamics in these low-velocity regions where plastic events are suppressed by both elevated pressure \\cite{walker1966approximate} and the crystallinity-induced cohesion identified here. Velocity profiles at the outlet and in the bulk are largely similar, except when $\\left<| \\psi_6|\\right>_t$ exceeds the threshold of $0.6$. This critical threshold was previously identified in experimental studies of two-dimensional vibrated granular media \\cite{downs2021topographic}. Above this value, the velocity profiles develop broader tails, which are well captured by the diffusion length parameter $b$.\nL000109\t\nL000110\tA clear correlation thus emerges between the global diffusion length $b$ and the local time-averaged degree of order $\\left<| \\psi_6|\\right>_t$, as illustrated in Figure \\ref{Fig:correlation}. A high rate of dislocations, reflected by low $\\left< |\\psi_6|\\right>_t$ values, results in poor diffusion properties of the granular assembly, as momentum transfer is hindered by energy dissipation from plastic events. In contrast, a low dislocation rate—indicated by high $\\left< |\\psi_6|\\right>_t$ values—is associated with more efficient momentum propagation. Furthermore, this mechanism is reinforced by increasing confining pressure, potentially explaining the rise in the global diffusion parameter $b$ observed in previous studies \\cite{medina1998velocity}.\nL000111\t\nL000112\t\\begin{figure}[h!]\nL000113\t    \\centering\nL000114\t    \\includegraphics[width=0.37\\textwidth]{fig6_correlation.png}\nL000115\t    \\caption{Correlation between the local modulus of the hexatic parameter order $\\left<|\\psi_6|\\right>_t$ and the global caracteristic diffusion length $b$ ($r=0.942$) in the range $y/d \\in[10, 70]$. The black line corresponds to a line with slope $4.8$.}\nL000116\t    \\label{Fig:correlation}\nL000117\t\\end{figure}\nL000118\t\nL000119\tIn summary, we investigated how local structural ordering, i.e. crystallization, affects the flow dynamics of bidisperse granular materials in a quasi-2D silo. We demonstrated that the presence of crystalline domains enhances the local rigidity of the medium, thereby facilitating momentum transfer and leading to a measurable increase in the diffusion length $b$ within the kinematic model. A strong correlation was established between the hexatic order parameter and $b$, highlighting the pivotal role of microstructural organization in governing macroscopic flow behavior. Furthermore, we showed that even in the absence of significant crystallization, the pressure increase with height promotes the stabilization of local orientational order, which in turn causes a gradual increase in $b$. These findings point to pressure as a key factor mediating the interplay between structural order and transport properties in granular silo flows.\\\\\nL000120\t\nL000121\tThis work was carried out as part of [optionally specify the project or call], with the financial and scientific support of PIA project Lorraine Université d'Excellence (LUE), which significantly contributed to the achievement of this research (2025).\nL000122\t\nL000123\t\\bibliography{_biblio}\nL000124\t\nL000125\t\\end{document}\nL000126\t\nL000127\t\nL000128\t\nL000129\t<div id='footer'><table width='100\nL000130\t===== END FILE: _main_V1.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source packet is a single LaTeX manuscript (arXiv 2507.00684v1) describing an experimental study of bidisperse granular silo discharge. The selected quantitative cluster is the correlation between the time-averaged hexatic order parameter <|psi_6|>_t and the kinematic diffusion length b, with the reported linear fit b/d = 4.8 * <|psi_6|>_t (r=0.942) over y/d in [10,70]. The controls are the mass fraction f and height y/d; the readouts are b/d and <|psi_6|>_t. The source reports a single linear fit with slope 4.8 and correlation coefficient 0.942, but does not provide an intercept or uncertainty on the slope. The domain for f is reported as discrete values (0, 0.05, 0.1, 0.2, 0.5, 1) and for y/d as a continuous interval [10,70] for the correlation. The case is authoring-ready because there is at least one numeric control (f, y/d), one numeric readout (b/d), a quantitative mechanism (kinematic model and linear correlation), and an objective source-grounded response within an explicit domain.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"David Luce, Correlation between Structural Order and Diffusion Length in Granular Flow, Physical Review Letters (2026), DOI:10.1103/7mcs-xyzs\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/7mcs-xyzs\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2507.00684v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"Experimental study of bidisperse granular discharge from a quasi-2D silo, investigating how structural order (crystallization) affects the diffusion length b in the kinematic model. The paper reports a strong correlation between b and the time-averaged hexatic order parameter <|psi_6|>_t, with a linear fit slope 4.8 and correlation coefficient 0.942 over y/d in [10,70].\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"kinematic_model\\\",\\n      \\\"statement\\\": \\\"The vertical velocity profile in the silo is described by the kinematic model of Nedderman and Tüzün, v_y(x,y) = Q / sqrt(4*pi*b*y) * exp(-x^2/(4*b*y)), where b is a characteristic diffusion length and Q is the time-averaged flow rate.\\\",\\n      \\\"equations\\\": [\\n        \\\"v_y(x,y) = Q / sqrt(4*pi*b*y) * exp(-x^2/(4*b*y))\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"v_y\\\",\\n        \\\"x\\\",\\n        \\\"y\\\",\\n        \\\"Q\\\",\\n        \\\"b\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"kinematic_model_pi\\\",\\n          \\\"value\\\": 3.141592653589793,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Mathematical constant pi in the kinematic model equation.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 85,\\n              \\\"line_end\\\": 88,\\n              \\\"support\\\": \\\"Equation (Eq:kinematic_model) includes the factor 1/sqrt(4*pi*b*y).\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 84,\\n          \\\"line_end\\\": 89,\\n          \\\"support\\\": \\\"The kinematic model is introduced and the equation v_y = Q/sqrt(4*pi*b*y)*exp(-x^2/(4*b*y)) is given, with b as a single fitting parameter.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"hexatic_order_parameter\\\",\\n      \\\"statement\\\": \\\"The local hexatic order parameter for each particle k is defined as psi_6k = (1/N_k) * sum_{l=1}^{N_k} exp(i*6*theta_{kl}), where N_k is the number of nearest neighbors and theta_{kl} are angular positions. The time-averaged magnitude <|psi_6|>_t is used as an Eulerian field.\\\",\\n      \\\"equations\\\": [\\n        \\\"psi_6k = (1/N_k) * sum_{l=1}^{N_k} exp(i*6*theta_{kl})\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"psi_6k\\\",\\n        \\\"N_k\\\",\\n        \\\"theta_kl\\\"\\n      ],\\n      \\\"parameters\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 50,\\n          \\\"line_end\\\": 55,\\n          \\\"support\\\": \\\"Definition of psi_6k and its interpretation as a measure of sixfold symmetry.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 106,\\n          \\\"line_end\\\": 108,\\n          \\\"support\\\": \\\"The time-averaged field <|psi_6|>_t is computed and related to plastic rearrangements.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"b_psi6_correlation\\\",\\n      \\\"statement\\\": \\\"The diffusion length b is linearly correlated with the time-averaged hexatic order parameter <|psi_6|>_t, with a slope of 4.8 and correlation coefficient r=0.942 over the range y/d in [10,70].\\\",\\n      \\\"equations\\\": [\\n        \\\"b/d = 4.8 * <|psi_6|>_t\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"b\\\",\\n        \\\"psi_6\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"b_psi6_correlation_slope\\\",\\n          \\\"value\\\": 4.8,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Slope of the linear correlation between b/d and <|psi_6|>_t.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 115,\\n              \\\"line_end\\\": 115,\\n              \\\"support\\\": \\\"Caption states 'The black line corresponds to a line with slope 4.8.'\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Caption reports correlation r=0.942 and slope 4.8 for the line in the figure.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"silo_geometry\\\",\\n      \\\"statement\\\": \\\"Quasi-2D flat-bottomed silo with height H=300 mm, width L=100 mm, depth W=1.25 mm, and outlet width 18 mm.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 47,\\n          \\\"line_end\\\": 47,\\n          \\\"support\\\": \\\"Cell dimensions and outlet width are given.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"particle_sizes\\\",\\n      \\\"statement\\\": \\\"Binary mixture of steel spheres with diameters d1=1.0 mm and d2=1.2 mm, average reference diameter d=1.1 mm.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 47,\\n          \\\"line_end\\\": 47,\\n          \\\"support\\\": \\\"Particle diameters and average diameter are specified.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"imaging_setup\\\",\\n      \\\"statement\\\": \\\"High-speed camera at 2000 frames per second, resolution 1024x1024 pixels covering approximately 91d x 91d area, focusing on bottom region during steady-state discharge.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 47,\\n          \\\"line_end\\\": 47,\\n          \\\"support\\\": \\\"Recording details are provided.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"eulerian_grid\\\",\\n      \\\"statement\\\": \\\"Eulerian grid with square cells of size d x d, bottom-central cell aligned with silo outlet center.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 47,\\n          \\\"line_end\\\": 47,\\n          \\\"support\\\": \\\"Grid construction is described.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"plug_flow_removed\\\",\\n      \\\"statement\\\": \\\"For fitting the kinematic model, the plug flow component is removed from the velocity profiles.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 91,\\n          \\\"line_end\\\": 91,\\n          \\\"support\\\": \\\"Text states 'Removing the plug flow component, the Gaussian-like shape can still be fitted using the kinematic model.'\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"mass_fraction_f\\\",\\n      \\\"definition\\\": \\\"Mass fraction of small beads (diameter 1.0 mm) in the binary mixture.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [0, 0.05, 0.1, 0.2, 0.5, 1],\\n      \\\"domain_statement\\\": \\\"The paper reports experiments at f=0, 0.05, 0.1, 0.2, 0.5, and 1 (see snapshots and figures).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 41,\\n          \\\"line_end\\\": 41,\\n          \\\"support\\\": \\\"Snapshots for f=0, 0.05, 0.1, 0.2 are shown.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 57,\\n          \\\"line_end\\\": 57,\\n          \\\"support\\\": \\\"PDFs for various f, including f=0.5 and f=1, are discussed.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"height_y_over_d\\\",\\n      \\\"definition\\\": \\\"Vertical position in the silo normalized by the average particle diameter d.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 10,\\n      \\\"maximum\\\": 70,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The correlation between b and <|psi_6|>_t is reported in the range y/d in [10,70].\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Caption states 'in the range y/d in [10,70]'.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"diffusion_length_b_over_d\\\",\\n      \\\"definition\\\": \\\"Characteristic diffusion length b extracted from fitting the kinematic model to vertical velocity profiles, normalized by the average particle diameter d.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Fitted parameter from velocity profiles; values reported as a function of height and mixing fraction.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 91,\\n          \\\"line_end\\\": 91,\\n          \\\"support\\\": \\\"b is extracted by fitting the kinematic model to velocity profiles after removing plug flow.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 93,\\n          \\\"line_end\\\": 93,\\n          \\\"support\\\": \\\"A value of b/d=4.5 is reported for the most crystalline case.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"time_averaged_hexatic_order\\\",\\n      \\\"definition\\\": \\\"Local time-averaged magnitude of the hexatic order parameter <|psi_6|>_t, computed as an Eulerian field.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Time-averaged magnitude of the hexatic order parameter over the steady-state discharge.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 106,\\n          \\\"line_end\\\": 108,\\n          \\\"support\\\": \\\"The local time-averaged magnitude <|psi_6|>_t is computed as an Eulerian field.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"b_psi6_linear_correlation\\\",\\n      \\\"statement\\\": \\\"The diffusion length b/d is linearly correlated with the time-averaged hexatic order parameter <|psi_6|>_t with slope 4.8 and correlation coefficient r=0.942 over the range y/d in [10,70].\\\",\\n      \\\"quantitative_form\\\": \\\"b/d = 4.8 * <|psi_6|>_t\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"diffusion_length_b_over_d\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"param\\\": \\\"b_psi6_correlation_slope\\\"\\n            },\\n            {\\n              \\\"var\\\": \\\"time_averaged_hexatic_order\\\"\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"b_psi6_correlation\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"time_averaged_hexatic_order\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"time_averaged_hexatic_order\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 0.4,\\n          \\\"maximum\\\": 0.75,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The paper reports <|psi_6|>_t values ranging from 0.4 to 0.55 in high-velocity regions and up to 0.75 in the fully crystalline case (f=0).\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 108,\\n              \\\"line_end\\\": 108,\\n              \\\"support\\\": \\\"Text states <|psi_6|>_t ranges between 0.4 and 0.55 in high-velocity regions and can reach 0.75 in the fully crystalline case.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"diffusion_length_b_over_d\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"silo_geometry\\\",\\n        \\\"particle_sizes\\\",\\n        \\\"plug_flow_removed\\\"\\n      ],\\n      \\\"applicability\\\": \\\"The correlation is reported for the range y/d in [10,70] and for the mixing fractions studied (f in [0,1]). The linear fit is shown in Figure 6.\\\",\\n      \\\"statistical_basis\\\": \\\"Correlation coefficient r=0.942 reported; slope 4.8 from a line fit. No uncertainty on slope or intercept provided.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Caption reports correlation r=0.942 and slope 4.8 for the line in the figure.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"slope_uncertainty_unspecified\\\",\\n      \\\"statement\\\": \\\"The paper reports the slope of the correlation line as 4.8 and the correlation coefficient r=0.942, but does not specify the uncertainty on the slope or whether an intercept was included in the fit.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"b_psi6_linear_correlation\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"b_psi6_correlation\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"time_averaged_hexatic_order\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"diffusion_length_b_over_d\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Caption states slope 4.8 and r=0.942 without uncertainty.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"unknown identifier(s): time_averaged_hexatic_order\",\"path\":\"$.claims[0].control_names\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

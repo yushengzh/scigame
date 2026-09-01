@@ -1,0 +1,77 @@
+{
+  "core_versions": {
+    "oracle_adapter": "role_benchmark.llm_oracle.v1",
+    "oracle_prompt": "role_benchmark.oracle_prompt.v1",
+    "player_adapter": "role_benchmark.llm_player.v6",
+    "player_prompt": "role_benchmark.player_prompt.v6",
+    "runner": "role_benchmark.logged_runner.v6"
+  },
+  "created_at": "2026-08-24T18:02:23Z",
+  "design": {
+    "base_models": [
+      "deepseek-v4-flash",
+      "deepseek-v4-pro"
+    ],
+    "player_profiles": [
+      {
+        "model": "deepseek-v4-flash",
+        "profile_id": "flash_no_think",
+        "reasoning_effort": null,
+        "thinking": "disabled"
+      },
+      {
+        "model": "deepseek-v4-flash",
+        "profile_id": "flash_think_high",
+        "reasoning_effort": "high",
+        "thinking": "enabled"
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "profile_id": "pro_think_high",
+        "reasoning_effort": "high",
+        "thinking": "enabled"
+      }
+    ],
+    "profile_interpretation": "two base models plus one thinking-mode ablation; not three independent base models",
+    "repeat_policy": "provider-stochastic repeats; no client seed",
+    "repeats": 5,
+    "total_episodes": 60,
+    "tracks": [
+      "identification",
+      "discovery"
+    ],
+    "worlds": [
+      "historical",
+      "counterfactual"
+    ]
+  },
+  "execution": {
+    "workers": 4
+  },
+  "oracle": {
+    "mode": "llm_presentation_over_authoritative_world_model",
+    "profile": {
+      "model": "deepseek-v4-flash",
+      "profile_id": "oracle_flash_no_think",
+      "reasoning_effort": null,
+      "thinking": "disabled"
+    },
+    "temperature": 0.0
+  },
+  "player_generation": {
+    "max_actions": 16,
+    "max_output_tokens": 8192,
+    "max_repair_attempts": 1,
+    "note": "temperature/top_p are accepted but ignored by thinking mode",
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "provider": {
+    "api": "chat_completions",
+    "binding": "pendulum_matrix.deepseek_chat.v1",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "response_format": "json_object"
+  },
+  "schema": "role_benchmark.pendulum_matrix.v1"
+}

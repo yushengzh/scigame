@@ -1,0 +1,358 @@
+{
+  "assessment": "Independent comparison with the frozen TeX confirms the exponent law but not the current card's finite-time and model semantics. Lines 437-475 derive the RILW long-time result MSD(t) asymptotic to C(alpha)*t^gamma with gamma=2-2/alpha for alpha>3/2; thus alpha=2 gives gamma=1 and alpha=4 gives gamma=1.5. The stored ASTs are arithmetically correct: at r=1,2,10 they give (1,2,10) and (1,2.8284271247461903,31.622776601683793), exactly matching r and r^1.5. The source prefactor C(alpha) cancels only in the normalized leading-asymptotic ratio, equivalently lim_{t_ref->infinity} MSD(r*t_ref)/MSD(t_ref)=r^gamma for fixed r. The current card instead presents the raw finite-time ratio over the IRW simulation's final decade [10^7,10^8] as exact oracle truth; lines 497-508 say only that this decade estimates a fitted slope, not that every finite-time MSD ratio equals the asymptotic law. The fixed velocity condition also conflates two models: reflecting boundaries belong to the correlated IRW model (line 188), whereas the analytic RILW calculation draws IID velocities from f(v)=1/2 on (-1,1) (lines 250-257). Finally, alpha=2 versus alpha=4 is not represented by branch-specific fixed conditions. Revise the readout to the normalized leading-asymptotic prediction, treat [1,10] as an honest benchmark-chosen ratio subset rather than a finite empirical truth interval, use a model-consistent RILW condition (with IRW results only as validation evidence), and add the two private alpha conditions. The underlying paper remains viable.",
+  "decision": "card_revision_required",
+  "issues": [
+    {
+      "code": "readout.asymptotic_finite_time_conflation",
+      "detail": "Define M as the normalized leading-asymptotic prediction (or the fixed-r limit as t_ref tends to infinity), where C(alpha) cancels. Do not claim the raw IRW finite-time MSD ratio on [10^7,10^8] is exactly r^gamma; the final decade is only the numerical slope-fitting window.",
+      "line_ranges": [
+        {
+          "line_end": 475,
+          "line_start": 437
+        },
+        {
+          "line_end": 508,
+          "line_start": 497
+        }
+      ]
+    },
+    {
+      "code": "condition.rilw_irw_conflation",
+      "detail": "Replace the combined reflecting-boundary/uniform-velocity condition with a model-consistent condition for the analytic RILW truth: IID post-collision velocities with f(v)=1/2 on (-1,1). Reflecting boundaries describe the IRW validation model and should not be asserted as the same RILW condition.",
+      "line_ranges": [
+        {
+          "line_end": 188,
+          "line_start": 185
+        },
+        {
+          "line_end": 257,
+          "line_start": 250
+        }
+      ]
+    },
+    {
+      "code": "branch.private_condition_missing",
+      "detail": "Add source-anchored branch-specific fixed conditions alpha=2 and alpha=4 and cite each only from its corresponding claim. The current common conditions do not encode the private branch axis.",
+      "line_ranges": [
+        {
+          "line_end": 197,
+          "line_start": 193
+        },
+        {
+          "line_end": 475,
+          "line_start": 443
+        }
+      ]
+    }
+  ],
+  "paper_id": "paper_2503_15027v1",
+  "review_material": {
+    "assessment": "The source provides the asymptotic MSD scaling exponent gamma(alpha) for the RILW model, with alpha=2 giving gamma=1 and alpha=4 giving gamma=1.5. The final-decade fitting scope (t_ref=1e7, t_max=1e8) is supported by the simulation description and figure caption. The normalized MSD ratio M(r)=r^gamma is a derived quantity consistent with the power-law scaling. The extraction is complete and case_authoring_ready is true.",
+    "case_authoring_ready": true,
+    "claims": [
+      {
+        "anchors": [
+          {
+            "line_end": 449,
+            "line_start": 443,
+            "support": "For alpha>3/2, gamma=2-2/alpha; at alpha=2, gamma=1."
+          },
+          {
+            "line_end": 464,
+            "line_start": 464,
+            "support": "At alpha=2, normal diffusion is recovered."
+          }
+        ],
+        "applicability": "Valid for alpha=2 in the asymptotic long-time limit, within the final decade of observation time.",
+        "claim_id": "msd_scaling_alpha2",
+        "control_domains": [
+          {
+            "allowed_values": [],
+            "anchors": [
+              {
+                "line_end": 498,
+                "line_start": 497,
+                "support": "Final decade used for fitting; observation time t=10^8."
+              }
+            ],
+            "control_name": "r",
+            "domain_kind": "continuous_interval",
+            "domain_statement": "Final decade of observation time: t_ref=10^7 to t_max=10^8, so r in [1,10].",
+            "maximum": 10.0,
+            "minimum": 1.0
+          }
+        ],
+        "control_names": [
+          "r"
+        ],
+        "depends_on": [],
+        "fixed_condition_ids": [
+          "final_decade_scope",
+          "rate_parameters",
+          "velocity_bounds"
+        ],
+        "mechanism_ids": [
+          "msd_power_law"
+        ],
+        "oracle_outputs": {
+          "M": {
+            "args": [
+              {
+                "var": "r"
+              },
+              {
+                "param": "gamma_alpha2"
+              }
+            ],
+            "op": "power"
+          }
+        },
+        "quantitative_form": "M(r) = r^1",
+        "readout_names": [
+          "M"
+        ],
+        "statement": "For alpha=2, the asymptotic MSD scales as t^1, so the normalized MSD ratio M(r) = r^1.",
+        "statistical_basis": "Theoretical prediction from RILW model; numerical IRW simulations confirm the exponent.",
+        "uncertainty": "source_unspecified"
+      },
+      {
+        "anchors": [
+          {
+            "line_end": 449,
+            "line_start": 443,
+            "support": "For alpha>3/2, gamma=2-2/alpha; at alpha=4, gamma=1.5."
+          },
+          {
+            "line_end": 475,
+            "line_start": 475,
+            "support": "For alpha>2, superdiffusive regime with MSD ~ t^(2-2/alpha)."
+          }
+        ],
+        "applicability": "Valid for alpha=4 in the asymptotic long-time limit, within the final decade of observation time.",
+        "claim_id": "msd_scaling_alpha4",
+        "control_domains": [
+          {
+            "allowed_values": [],
+            "anchors": [
+              {
+                "line_end": 498,
+                "line_start": 497,
+                "support": "Final decade used for fitting; observation time t=10^8."
+              }
+            ],
+            "control_name": "r",
+            "domain_kind": "continuous_interval",
+            "domain_statement": "Final decade of observation time: t_ref=10^7 to t_max=10^8, so r in [1,10].",
+            "maximum": 10.0,
+            "minimum": 1.0
+          }
+        ],
+        "control_names": [
+          "r"
+        ],
+        "depends_on": [],
+        "fixed_condition_ids": [
+          "final_decade_scope",
+          "rate_parameters",
+          "velocity_bounds"
+        ],
+        "mechanism_ids": [
+          "msd_power_law"
+        ],
+        "oracle_outputs": {
+          "M": {
+            "args": [
+              {
+                "var": "r"
+              },
+              {
+                "param": "gamma_alpha4"
+              }
+            ],
+            "op": "power"
+          }
+        },
+        "quantitative_form": "M(r) = r^1.5",
+        "readout_names": [
+          "M"
+        ],
+        "statement": "For alpha=4, the asymptotic MSD scales as t^1.5, so the normalized MSD ratio M(r) = r^1.5.",
+        "statistical_basis": "Theoretical prediction from RILW model; numerical IRW simulations confirm the exponent.",
+        "uncertainty": "source_unspecified"
+      }
+    ],
+    "controls": [
+      {
+        "allowed_values": [
+          2.0,
+          4.0
+        ],
+        "anchors": [
+          {
+            "line_end": 197,
+            "line_start": 197,
+            "support": "Experimental setups typically use alpha = 2 or 4."
+          }
+        ],
+        "definition": "Exponent in the velocity-dependent fluorescence rate R(v) proportional to |v|^alpha.",
+        "domain_kind": "numeric_values",
+        "domain_statement": "The paper reports alpha=2 and alpha=4 as experimental values for velocity-selective coherent population trapping.",
+        "maximum": null,
+        "minimum": null,
+        "name": "alpha",
+        "unit": "dimensionless"
+      },
+      {
+        "allowed_values": [],
+        "anchors": [
+          {
+            "line_end": 498,
+            "line_start": 497,
+            "support": "Final decade of observation time used for fitting; observation time t=10^8."
+          },
+          {
+            "line_end": 508,
+            "line_start": 508,
+            "support": "Observation time set to t=10^8."
+          }
+        ],
+        "definition": "Normalized time ratio r = t / t_ref, where t_ref is the reference time in the final decade.",
+        "domain_kind": "continuous_interval",
+        "domain_statement": "With t_ref=10^7 and t_max=10^8, r ranges from 1 to 10.",
+        "maximum": 10.0,
+        "minimum": 1.0,
+        "name": "r",
+        "unit": "dimensionless"
+      }
+    ],
+    "fixed_conditions": [
+      {
+        "anchors": [
+          {
+            "line_end": 498,
+            "line_start": 497,
+            "support": "To determine the scaling exponent in numerical simulations, we used the final decade of the observation time for fitting."
+          },
+          {
+            "line_end": 508,
+            "line_start": 508,
+            "support": "In numerical simulations, the observation time is set to t = 10^8."
+          }
+        ],
+        "condition_id": "final_decade_scope",
+        "statement": "The scaling exponent is determined by fitting the final decade of the observation time, with observation time t=10^8 and reference time t_ref=10^7."
+      },
+      {
+        "anchors": [
+          {
+            "line_end": 197,
+            "line_start": 193,
+            "support": "R(v) = (1/tau0) |v/v_r|^alpha; for simplicity, we set v_r=1 and tau0=1."
+          }
+        ],
+        "condition_id": "rate_parameters",
+        "statement": "The fluorescence rate is R(v) = (1/tau0) |v/v_r|^alpha, with v_r=1 and tau0=1."
+      },
+      {
+        "anchors": [
+          {
+            "line_end": 188,
+            "line_start": 188,
+            "support": "Reflecting boundaries at |v|=v_max confine velocity within [-v_max, v_max]."
+          },
+          {
+            "line_end": 257,
+            "line_start": 257,
+            "support": "Set f(v)=1/2 for -1<v<1, implying velocity range [-1,1]."
+          }
+        ],
+        "condition_id": "velocity_bounds",
+        "statement": "Velocity is confined to [-1,1] with reflecting boundaries at |v|=v_max=1."
+      }
+    ],
+    "mechanisms": [
+      {
+        "anchors": [
+          {
+            "line_end": 449,
+            "line_start": 439,
+            "support": "Asymptotic MSD scales as t^gamma(alpha) with gamma(alpha) piecewise; for alpha>3/2, gamma=2-2/alpha."
+          }
+        ],
+        "equations": [
+          "gamma(alpha) = 2 - 2/alpha for alpha > 3/2",
+          "<x^2(t)> ~ C(alpha) t^gamma(alpha)"
+        ],
+        "mechanism_id": "msd_power_law",
+        "parameters": [
+          {
+            "anchors": [
+              {
+                "line_end": 449,
+                "line_start": 443,
+                "support": "Piecewise gamma(alpha): for alpha>3/2, gamma = 2 - 2/alpha; at alpha=2, gamma=1."
+              }
+            ],
+            "name": "gamma_alpha2",
+            "role": "MSD scaling exponent for alpha=2",
+            "uncertainty": "source_unspecified",
+            "unit": "dimensionless",
+            "value": 1.0
+          },
+          {
+            "anchors": [
+              {
+                "line_end": 449,
+                "line_start": 443,
+                "support": "For alpha>3/2, gamma = 2 - 2/alpha; at alpha=4, gamma=1.5."
+              }
+            ],
+            "name": "gamma_alpha4",
+            "role": "MSD scaling exponent for alpha=4",
+            "uncertainty": "source_unspecified",
+            "unit": "dimensionless",
+            "value": 1.5
+          }
+        ],
+        "statement": "The asymptotic MSD scales as a power law in time, <x^2(t)> ~ t^gamma(alpha), with exponent gamma(alpha) given piecewise. For alpha>3/2, gamma = 2 - 2/alpha.",
+        "variable_names": [
+          "gamma",
+          "alpha",
+          "t",
+          "MSD"
+        ]
+      }
+    ],
+    "paper_scope": "The paper analyzes anomalous diffusion in subrecoil-laser-cooled atoms using the rate-induced Levy walk (RILW) and inhomogeneous random walk (IRW) models, with a velocity-dependent fluorescence rate R(v) proportional to |v|^alpha. It derives the asymptotic MSD scaling exponent gamma(alpha) and validates it numerically. The selected cluster focuses on the normalized MSD scaling ratio M(r)=MSD(t)/MSD(t_ref)=r^gamma for alpha=2 and alpha=4, using the final-decade fitting scope.",
+    "readouts": [
+      {
+        "anchors": [
+          {
+            "line_end": 441,
+            "line_start": 439,
+            "support": "MSD scales as t^gamma(alpha) for t->infinity, implying MSD(t)/MSD(t_ref) = (t/t_ref)^gamma."
+          }
+        ],
+        "definition": "Normalized MSD scaling ratio M(r) = MSD(t) / MSD(t_ref) = r^gamma, where r = t/t_ref.",
+        "name": "M",
+        "resolution": null,
+        "statistic": "Asymptotic scaling ratio derived from the power-law MSD; not a finite-sample average.",
+        "uncertainty": "source_unspecified",
+        "unit": "dimensionless"
+      }
+    ],
+    "source": {
+      "arxiv_versioned_id": "2503.15027v1",
+      "citation": "Soma Shiraki, Tunable Anomalous Diffusion in Subrecoil-Laser-Cooled Atoms, Physical Review Letters (2026), DOI:10.1103/9pb2-v6zs",
+      "journal_doi": "10.1103/9pb2-v6zs"
+    },
+    "source_ambiguities": []
+  },
+  "reviewer": "Codex independent source reviewer /root/review_scaling_cards",
+  "selected_cluster": null,
+  "source": {
+    "arxiv_versioned_id": "2503.15027v1",
+    "citation": "Soma Shiraki, Tunable Anomalous Diffusion in Subrecoil-Laser-Cooled Atoms, Physical Review Letters (2026), DOI:10.1103/9pb2-v6zs",
+    "journal_doi": "10.1103/9pb2-v6zs"
+  }
+}

@@ -1,0 +1,713 @@
+{
+  "assessment": "The source packet is a physics paper (arXiv:2511.12574v3) presenting a symmetry-based formulation of nonlinear fluctuating hydrodynamics (NFH) in one dimension, with RG analysis and numerical simulations. The extraction focuses on the numerical simulation of the space-time correlation function S^alpha(x,t) for the heat and sound modes, which is the best quantitative cluster with two regimes (heat and sound) sharing the same controls (time t, sound velocity c_s) and readouts (correlation function, dynamical exponent z). The RG fixed point z=3/2 is a theoretical prediction, not a direct control-to-readout relation, so it is captured as a mechanism and claim with symbolic domain. The numerical fits provide quantitative relations: S^alpha(0,t)+C_alpha ~ A_alpha t^{-1/z} with z=3/2, and optimized exponents z=1.52 (heat) and z=1.51 (sound). The source reports fixed parameters (D0=Ds=lambda_i=1, c_s=0.1, L=8192) and robustness checks. The extraction encodes the central-value relations with named parameters, preserving the source's reported values and uncertainty conventions (source_unspecified for fit uncertainties).",
+  "case_authoring_ready": true,
+  "claims": [
+    {
+      "anchors": [
+        {
+          "line_end": 399,
+          "line_start": 395,
+          "support": "Examine temporal correlation S^α(0,t) to verify z=3/2; fit to A_α t^{-1/z} - C_α; data align with t^{-2/3}."
+        }
+      ],
+      "applicability": "Applies to the heat mode (α=0) in the main simulation with parameters D_0=D_s=λ_i=1, c_s=0.1, L=8192, in the time range 40 < t < 4000.",
+      "claim_id": "temporal_decay_heat",
+      "control_domains": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "Fit data in range 40 < t < 4000."
+            }
+          ],
+          "control_name": "time_t",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "Fit range 40 < t < 4000.",
+          "maximum": 4000.0,
+          "minimum": 40.0
+        }
+      ],
+      "control_names": [
+        "time_t"
+      ],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "main_simulation_parameters",
+        "simulation_units_and_discretization",
+        "observation_protocol"
+      ],
+      "mechanism_ids": [
+        "nfh_normal_mode_dynamics",
+        "modified_scaling_law"
+      ],
+      "oracle_outputs": {
+        "S_alpha_correlation": {
+          "args": [
+            {
+              "args": [
+                {
+                  "param": "A_heat_amplitude"
+                },
+                {
+                  "args": [
+                    {
+                      "var": "time_t"
+                    },
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "param": "one_constant"
+                            },
+                            {
+                              "param": "z_KPZ_exponent"
+                            }
+                          ],
+                          "op": "divide"
+                        }
+                      ],
+                      "op": "negate"
+                    }
+                  ],
+                  "op": "power"
+                }
+              ],
+              "op": "multiply"
+            },
+            {
+              "args": [
+                {
+                  "param": "C_heat_offset"
+                }
+              ],
+              "op": "negate"
+            }
+          ],
+          "op": "add"
+        }
+      },
+      "quantitative_form": "S^0(0,t) + C_0 = A_0 * t^{-1/z}, with z = 3/2",
+      "readout_names": [
+        "S_alpha_correlation"
+      ],
+      "statement": "For the heat mode (α=0), the temporal correlation S^0(0,t)+C_0 follows a power-law decay A_0 t^{-1/z} with z=3/2, i.e., t^{-2/3}, in the range 40 < t < 4000.",
+      "statistical_basis": "Fit of S^0(0,t)+C_0 to A_0 t^{-1/z} - C_0 with z, A_0, C_0 as fitting parameters; data averaged over 144 runs and 16 blocks.",
+      "uncertainty": "Fit parameter uncertainties not reported; error bars in Fig. emfig3 comparable to symbol size."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 399,
+          "line_start": 395,
+          "support": "Examine temporal correlation S^α(0,t) to verify z=3/2; fit to A_α t^{-1/z} - C_α; data align with t^{-2/3}."
+        }
+      ],
+      "applicability": "Applies to the sound mode (α=±) in the main simulation with parameters D_0=D_s=λ_i=1, c_s=0.1, L=8192, in the time range 40 < t < 4000.",
+      "claim_id": "temporal_decay_sound",
+      "control_domains": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "Fit data in range 40 < t < 4000."
+            }
+          ],
+          "control_name": "time_t",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "Fit range 40 < t < 4000.",
+          "maximum": 4000.0,
+          "minimum": 40.0
+        }
+      ],
+      "control_names": [
+        "time_t"
+      ],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "main_simulation_parameters",
+        "simulation_units_and_discretization",
+        "observation_protocol"
+      ],
+      "mechanism_ids": [
+        "nfh_normal_mode_dynamics",
+        "modified_scaling_law"
+      ],
+      "oracle_outputs": {
+        "S_alpha_correlation": {
+          "args": [
+            {
+              "args": [
+                {
+                  "param": "A_sound_amplitude"
+                },
+                {
+                  "args": [
+                    {
+                      "var": "time_t"
+                    },
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "param": "one_constant"
+                            },
+                            {
+                              "param": "z_KPZ_exponent"
+                            }
+                          ],
+                          "op": "divide"
+                        }
+                      ],
+                      "op": "negate"
+                    }
+                  ],
+                  "op": "power"
+                }
+              ],
+              "op": "multiply"
+            },
+            {
+              "args": [
+                {
+                  "param": "C_sound_offset"
+                }
+              ],
+              "op": "negate"
+            }
+          ],
+          "op": "add"
+        }
+      },
+      "quantitative_form": "S^±(0,t) + C_± = A_± * t^{-1/z}, with z = 3/2",
+      "readout_names": [
+        "S_alpha_correlation"
+      ],
+      "statement": "For the sound mode (α=±), the temporal correlation S^±(0,t)+C_± follows a power-law decay A_± t^{-1/z} with z=3/2, i.e., t^{-2/3}, in the range 40 < t < 4000.",
+      "statistical_basis": "Fit of S^±(0,t)+C_± to A_± t^{-1/z} - C_± with z, A_±, C_± as fitting parameters; data averaged over 144 runs and 16 blocks.",
+      "uncertainty": "Fit parameter uncertainties not reported; error bars in Fig. emfig3 comparable to symbol size."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 407,
+          "line_start": 406,
+          "support": "Data-collapse analysis yields optimized exponents z=1.52 (heat) and z=1.51 (sound)."
+        }
+      ],
+      "applicability": "Applies to the main simulation with parameters D_0=D_s=λ_i=1, c_s=0.1, L=8192.",
+      "claim_id": "optimized_exponents",
+      "control_domains": [],
+      "control_names": [],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "main_simulation_parameters",
+        "simulation_units_and_discretization",
+        "observation_protocol"
+      ],
+      "mechanism_ids": [
+        "nfh_normal_mode_dynamics",
+        "modified_scaling_law"
+      ],
+      "oracle_outputs": {
+        "dynamical_exponent_z": {
+          "param": "z_KPZ_exponent"
+        }
+      },
+      "quantitative_form": "z_heat = 1.52, z_sound = 1.51",
+      "readout_names": [
+        "dynamical_exponent_z"
+      ],
+      "statement": "Data-collapse analysis of S^α(x,t) yields optimized dynamical exponents z=1.52 for the heat mode and z=1.51 for the sound mode, in excellent agreement with the RG prediction z=3/2.",
+      "statistical_basis": "Neural-network regression fitting raw data S^α(x,t) to the modified scaling form, optimizing z, C_α, and network parameters simultaneously.",
+      "uncertainty": "Error bars not reported; in Fig. emfig3 error bars are comparable to symbol size."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 347,
+          "line_start": 342,
+          "support": "RG equations admit nontrivial fixed point with z=3/2 and anomalous scalings."
+        },
+        {
+          "line_end": 355,
+          "line_start": 355,
+          "support": "Requirement of scaling invariance leads to z=3/2."
+        }
+      ],
+      "applicability": "Theoretical RG result near the fixed point with c_s=0; applies to both sound and heat modes.",
+      "claim_id": "rg_fixed_point_z",
+      "control_domains": [],
+      "control_names": [],
+      "depends_on": [],
+      "fixed_condition_ids": [],
+      "mechanism_ids": [
+        "nfh_normal_mode_dynamics"
+      ],
+      "oracle_outputs": {
+        "dynamical_exponent_z": {
+          "param": "z_KPZ_exponent"
+        }
+      },
+      "quantitative_form": "z = 3/2",
+      "readout_names": [
+        "dynamical_exponent_z"
+      ],
+      "statement": "The RG analysis identifies a nontrivial fixed point with dynamical exponent z=3/2 for both sound and heat modes, with anomalous scalings D_0 ~ Λ^{-1/2}, D_s ~ Λ^{-1/2}, c_s ~ Λ^0, λ_i ~ Λ^0.",
+      "statistical_basis": "One-loop RG calculation; fixed point obtained as zeros of RG equations.",
+      "uncertainty": "Not applicable; theoretical prediction."
+    }
+  ],
+  "controls": [
+    {
+      "allowed_values": [],
+      "anchors": [
+        {
+          "line_end": 397,
+          "line_start": 397,
+          "support": "Optimal offset C_α determined by fitting data in the range 40 < t < 4000."
+        }
+      ],
+      "definition": "Time variable in the space-time correlation function S^α(x,t).",
+      "domain_kind": "continuous_interval",
+      "domain_statement": "The temporal fit of S^α(0,t)+C_α to A_α t^{-1/z} is performed in the range 40 < t < 4000.",
+      "maximum": 4000.0,
+      "minimum": 40.0,
+      "name": "time_t",
+      "unit": "dimensionless"
+    },
+    {
+      "allowed_values": [
+        0.0,
+        0.05,
+        0.1,
+        0.15
+      ],
+      "anchors": [
+        {
+          "line_end": 805,
+          "line_start": 805,
+          "support": "Tested c_s = 0.0, 0.05, 0.1, 0.15."
+        },
+        {
+          "line_end": 366,
+          "line_start": 366,
+          "support": "Main simulation c_s = 0.1."
+        }
+      ],
+      "definition": "Sound velocity in the NFH equations, which sets the comoving frame x+α c_s t.",
+      "domain_kind": "numeric_values",
+      "domain_statement": "Robustness tests used c_s = 0.0, 0.05, 0.1, 0.15; the main simulation used c_s = 0.1.",
+      "maximum": null,
+      "minimum": null,
+      "name": "sound_velocity_c_s",
+      "unit": "dimensionless"
+    }
+  ],
+  "fixed_conditions": [
+    {
+      "anchors": [
+        {
+          "line_end": 366,
+          "line_start": 366,
+          "support": "Figure 1 caption: parameters D_0 = D_s = λ_{1,2,3,4} = 1, c_s = 0.1, L=8192."
+        }
+      ],
+      "condition_id": "main_simulation_parameters",
+      "statement": "Numerical simulation of Eq. (EOM phi main) with D_0 = D_s = λ_1=λ_2=λ_3=λ_4 = 1, c_s = 0.1, and system size L = 8192."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 614,
+          "line_start": 613,
+          "support": "System of units: D_0=1.0, k_B T=1.0, λ_1=1.0; grid spacing a_uv=1.0, time step Δt=0.002."
+        }
+      ],
+      "condition_id": "simulation_units_and_discretization",
+      "statement": "Units: D_0 = 1.0, k_B T = 1.0, λ_1 = 1.0. Spatial grid spacing a_uv = 1.0, time step Δt = 0.002."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 626,
+          "line_start": 621,
+          "support": "Two-stage protocol: relaxation and production runs, saving profiles, 144 independent simulations."
+        }
+      ],
+      "condition_id": "observation_protocol",
+      "statement": "Relaxation run of 4.0×10^8 steps (8.0×10^5 time units), production run of 8.0×10^8 steps (1.6×10^6 time units), saving profiles every 1.0×10^4 steps, yielding 8.0×10^4 saved profiles per simulation, with 144 independent simulations."
+    }
+  ],
+  "mechanisms": [
+    {
+      "anchors": [
+        {
+          "line_end": 275,
+          "line_start": 270,
+          "support": "NFH equations in normal modes with noise correlation."
+        },
+        {
+          "line_end": 285,
+          "line_start": 279,
+          "support": "Constraints: D_+=D_-=D_s, G symmetries."
+        },
+        {
+          "line_end": 286,
+          "line_start": 286,
+          "support": "Parameterization of G by λ_1..λ_4."
+        }
+      ],
+      "equations": [
+        "(∂_t + α c_s ∂_x - D_α ∂_x^2) φ^α + Σ_{β,γ} G^α_{βγ} ∂_x(φ^β φ^γ) = ζ^α",
+        "⟨ζ^α(x,t)ζ^β(x',t')⟩ = -2D_α δ_{αβ} ∂_x^2 δ(t-t')δ(x-x')",
+        "D_+ = D_- = D_s"
+      ],
+      "mechanism_id": "nfh_normal_mode_dynamics",
+      "parameters": [
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: parameters D_0 = D_s = λ_{1,2,3,4} = 1, c_s = 0.1, L=8192."
+            },
+            {
+              "line_end": 761,
+              "line_start": 760,
+              "support": "Supplemental: D_s = D_h = 1.0, λ_1=λ_2=λ_3=λ_4=1.0."
+            }
+          ],
+          "name": "D_s_sound_diffusion",
+          "role": "Diffusion constant of sound modes in the numerical simulation.",
+          "uncertainty": "Not reported; fixed in simulation.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: D_0 = D_s = 1."
+            },
+            {
+              "line_end": 613,
+              "line_start": 613,
+              "support": "Supplemental: D_0 = 1.0."
+            }
+          ],
+          "name": "D_0_heat_diffusion",
+          "role": "Diffusion constant of heat mode in the numerical simulation.",
+          "uncertainty": "Not reported; fixed in simulation.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: λ_{1,2,3,4} = 1."
+            },
+            {
+              "line_end": 613,
+              "line_start": 613,
+              "support": "Supplemental: λ_1 = 1.0."
+            }
+          ],
+          "name": "lambda_1_nonlinear_coupling",
+          "role": "Nonlinear coupling λ_1 = G^+_{00} in the numerical simulation.",
+          "uncertainty": "Not reported; fixed in simulation.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: λ_{1,2,3,4} = 1."
+            }
+          ],
+          "name": "lambda_2_nonlinear_coupling",
+          "role": "Nonlinear coupling λ_2 = G^+_{+0} in the numerical simulation.",
+          "uncertainty": "Not reported; fixed in simulation.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: λ_{1,2,3,4} = 1."
+            }
+          ],
+          "name": "lambda_3_nonlinear_coupling",
+          "role": "Nonlinear coupling λ_3 = G^-_{--} in the numerical simulation.",
+          "uncertainty": "Not reported; fixed in simulation.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: λ_{1,2,3,4} = 1."
+            }
+          ],
+          "name": "lambda_4_nonlinear_coupling",
+          "role": "Nonlinear coupling λ_4 = G^+_{--} in the numerical simulation.",
+          "uncertainty": "Not reported; fixed in simulation.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: c_s = 0.1."
+            },
+            {
+              "line_end": 759,
+              "line_start": 759,
+              "support": "Supplemental: c_s = 0.1."
+            }
+          ],
+          "name": "c_s_sound_velocity_main",
+          "role": "Sound velocity in the main numerical simulation.",
+          "uncertainty": "Not reported; fixed in main simulation.",
+          "unit": "dimensionless",
+          "value": 0.1
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 366,
+              "line_start": 366,
+              "support": "Figure 1 caption: system size L=8192."
+            },
+            {
+              "line_end": 758,
+              "line_start": 758,
+              "support": "Supplemental: L = 8192."
+            }
+          ],
+          "name": "L_system_size_main",
+          "role": "System size in the main numerical simulation.",
+          "uncertainty": "Not reported; fixed in main simulation.",
+          "unit": "dimensionless",
+          "value": 8192.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 355,
+              "line_start": 355,
+              "support": "Requirement of scaling invariance leads to z=3/2, same as KPZ exponent."
+            },
+            {
+              "line_end": 407,
+              "line_start": 407,
+              "support": "Optimized exponents: z=1.52 for heat mode and z=1.51 for sound mode."
+            }
+          ],
+          "name": "z_KPZ_exponent",
+          "role": "Dynamical exponent at the KPZ fixed point.",
+          "uncertainty": "Theoretical value; numerical fits give z=1.52 (heat) and z=1.51 (sound) with unspecified error bars.",
+          "unit": "dimensionless",
+          "value": 1.5
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "Optimal offset C_α determined by fitting data to A_α t^{-1/z} - C_α."
+            }
+          ],
+          "name": "A_heat_amplitude",
+          "role": "Amplitude in the fit S^α(0,t)+C_α = A_α t^{-1/z} for the heat mode.",
+          "uncertainty": "Not reported; fitting parameter in the temporal fit.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "Optimal offset C_α determined by fitting data to A_α t^{-1/z} - C_α."
+            }
+          ],
+          "name": "A_sound_amplitude",
+          "role": "Amplitude in the fit S^α(0,t)+C_α = A_α t^{-1/z} for the sound mode.",
+          "uncertainty": "Not reported; fitting parameter in the temporal fit.",
+          "unit": "dimensionless",
+          "value": 1.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "Optimal offset C_α determined by fitting data to A_α t^{-1/z} - C_α."
+            }
+          ],
+          "name": "C_heat_offset",
+          "role": "Finite-size offset C_α in the modified scaling for the heat mode.",
+          "uncertainty": "Not reported; fitting parameter.",
+          "unit": "dimensionless",
+          "value": 0.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "Optimal offset C_α determined by fitting data to A_α t^{-1/z} - C_α."
+            }
+          ],
+          "name": "C_sound_offset",
+          "role": "Finite-size offset C_α in the modified scaling for the sound mode.",
+          "uncertainty": "Not reported; fitting parameter.",
+          "unit": "dimensionless",
+          "value": 0.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 397,
+              "line_start": 397,
+              "support": "The fit uses t^{-1/z}, where the exponent is 1/z."
+            }
+          ],
+          "name": "one_constant",
+          "role": "The number 1 used in the exponent expression.",
+          "uncertainty": "Exact constant.",
+          "unit": "dimensionless",
+          "value": 1.0
+        }
+      ],
+      "statement": "The symmetry-based NFH equations in normal modes: (∂_t + α c_s ∂_x - D_α ∂_x^2) φ^α + Σ_{β,γ} G^α_{βγ} ∂_x(φ^β φ^γ) = ζ^α, with noise correlation ⟨ζ^α(x,t)ζ^β(x',t')⟩ = -2D_α δ_{αβ} ∂_x^2 δ(t-t')δ(x-x'). The diffusion constants satisfy D_+ = D_- = D_s, and the nonlinear couplings G^α_{βγ} are parameterized by λ_1=G^+_{00}, λ_2=G^+_{+0}, λ_3=G^-_{--}, λ_4=G^+_{--}.",
+      "variable_names": [
+        "φ^α",
+        "c_s",
+        "D_α",
+        "D_s",
+        "D_0",
+        "G^α_{βγ}",
+        "λ_1",
+        "λ_2",
+        "λ_3",
+        "λ_4",
+        "ζ^α"
+      ]
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 388,
+          "line_start": 384,
+          "support": "Modified scaling form with offset C_α due to finite-size effects."
+        }
+      ],
+      "equations": [
+        "S^α(x,t) = t^{-1/z} f_α((x-α c_s t)/t^{1/z}) - C_α"
+      ],
+      "mechanism_id": "modified_scaling_law",
+      "parameters": [],
+      "statement": "The space-time correlation function S^α(x,t) obeys the modified scaling form S^α(x,t) = t^{-1/z} f_α((x-α c_s t)/t^{1/z}) - C_α, where C_α is a finite-size offset arising from the conservation law ∫dx S^α(x,t)=0.",
+      "variable_names": [
+        "S^α(x,t)",
+        "f_α",
+        "C_α",
+        "z",
+        "c_s"
+      ]
+    }
+  ],
+  "paper_scope": "The paper derives symmetry-based nonlinear fluctuating hydrodynamics (NFH) equations for one-dimensional many-particle systems, performs a dynamic renormalization-group analysis identifying a KPZ-type fixed point with dynamical exponent z=3/2 for both sound and heat modes, and numerically simulates the NFH equations to confirm the exponent and the universal KPZ (Prähofer–Spohn) scaling function for the space-time correlation function. The extraction focuses on the numerical simulation results for the space-time correlation function S^alpha(x,t) for the heat (alpha=0) and sound (alpha=±) modes, including the temporal decay and the dynamical exponent z.",
+  "readouts": [
+    {
+      "anchors": [
+        {
+          "line_end": 380,
+          "line_start": 379,
+          "support": "Compute space-time correlation function S^α(x,t) = ⟨φ^α(x,t)φ^α(0,0)⟩."
+        },
+        {
+          "line_end": 632,
+          "line_start": 630,
+          "support": "Definition of S^α_finite and ensemble average over origins and runs."
+        }
+      ],
+      "definition": "Space-time correlation function S^α(x,t) = ⟨φ^α(x,t)φ^α(0,0)⟩ for mode α (α=0 heat, α=± sound).",
+      "name": "S_alpha_correlation",
+      "resolution": null,
+      "statistic": "Ensemble average over spatial origins, temporal origins (block average over 16 blocks), and 144 independent simulation runs.",
+      "uncertainty": "Error bars not explicitly reported; in Fig. emfig3 error bars are comparable to symbol size.",
+      "unit": "dimensionless"
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 403,
+          "line_start": 401,
+          "support": "Fit local slope over intervals to extract z."
+        },
+        {
+          "line_end": 407,
+          "line_start": 406,
+          "support": "Data-collapse analysis yields optimized exponents z=1.52 (heat) and z=1.51 (sound)."
+        }
+      ],
+      "definition": "Dynamical exponent z extracted from the local slope of log-log plot of S^α(0,t)+C_α vs t, or from data-collapse analysis.",
+      "name": "dynamical_exponent_z",
+      "resolution": null,
+      "statistic": "Fitted from local slope over intervals (2+2^n)×10 ≤ t < (2+2^{n+1})×10, or via neural-network data collapse.",
+      "uncertainty": "Error bars not explicitly reported; in Fig. emfig3 error bars are comparable to symbol size.",
+      "unit": "dimensionless"
+    }
+  ],
+  "source": {
+    "arxiv_versioned_id": "2511.12574v3",
+    "citation": "Yuki Minami, Symmetry-Based Nonlinear Fluctuating Hydrodynamics in One Dimension, Physical Review Letters (2026), DOI:10.1103/2z9s-5d7w",
+    "journal_doi": "10.1103/2z9s-5d7w"
+  },
+  "source_ambiguities": [
+    {
+      "ambiguity_id": "fit_uncertainty_convention",
+      "anchors": [
+        {
+          "line_end": 407,
+          "line_start": 407,
+          "support": "Optimized exponents z=1.52 and z=1.51 reported without uncertainty."
+        },
+        {
+          "line_end": 717,
+          "line_start": 717,
+          "support": "Error bars are comparable to symbol size."
+        }
+      ],
+      "claim_ids": [
+        "optimized_exponents"
+      ],
+      "control_names": [],
+      "fixed_condition_ids": [],
+      "mechanism_ids": [],
+      "readout_names": [
+        "dynamical_exponent_z"
+      ],
+      "statement": "The paper reports optimized exponents z=1.52 and z=1.51 without specifying the uncertainty convention (e.g., standard error, confidence interval). The error bars in Fig. emfig3 are stated to be comparable to symbol size but no numerical values are given."
+    }
+  ]
+}

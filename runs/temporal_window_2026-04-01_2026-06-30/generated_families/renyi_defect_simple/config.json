@@ -1,0 +1,895 @@
+{
+  "generation": {
+    "max_output_tokens": 32768,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "provider": {
+    "api": "chat_completions",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "model": "deepseek-v4-flash",
+    "reasoning_effort": null,
+    "thinking": "disabled",
+    "timeout_s": 180.0
+  },
+  "runner": "temporal_warmup",
+  "schema": "role_benchmark.temporal_runner_config",
+  "science_card_focus": "Create a minimal exact normalized defect SRE card. Public control ONLY gamma in [0.5,2], a benchmark subset of theorem gamma>0. Common fixed N=4,k=2,r1=r2=1/2. Private branches symmetric (k) and antisymmetric [k], with distinct source-anchored conditions. One common mechanism must declare exactly parameters one=1, gamma_coefficient=0.125, branch_amplitude_symmetric=12, branch_amplitude_antisymmetric=8, all source-derived from lines101-116 and140-144. Both claims reference that mechanism and use identical AST multiply(branch_amplitude, add(one, multiply(gamma_coefficient, subtract(gamma,one)))), changing only amplitude leaf. Readout Y=S_gamma/log(ell/epsilon); never create log_factor=1 or any unused b/d2 coefficient parameters. No N/k controls, no ambiguity, no other mechanisms or claims.",
+  "science_card_review_guidance": {
+    "decision": "card_revision_required",
+    "issues": [
+      {
+        "code": "oracle.ast_coefficient_error",
+        "detail": "Both oracle ASTs use coefficient 12, making them six times the source-derived normalized formulas whose coefficient is (2b-d2)/6 = 2*k*(N-1) or 2*k*(N-k). Replace the AST coefficient with the derived value 2 and recheck it against quantitative_form.",
+        "line_ranges": [
+          {
+            "line_end": 116,
+            "line_start": 101
+          },
+          {
+            "line_end": 144,
+            "line_start": 140
+          }
+        ]
+      },
+      {
+        "code": "control.domain_not_source_valid",
+        "detail": "The current Cartesian continuous domains include gamma=0, noninteger representation ranks, and tuples with k>N-1. Define an honest finite benchmark subset wholly covered by the theorem, or fix N and enumerate valid integer k values; do not present the finite subset as a source empirical boundary.",
+        "line_ranges": [
+          {
+            "line_end": 116,
+            "line_start": 104
+          },
+          {
+            "line_end": 144,
+            "line_start": 122
+          }
+        ]
+      },
+      {
+        "code": "normalization.unfixed_factor_set_to_one",
+        "detail": "The source does not set log(ell/epsilon)=1. The normalized readout Y cancels this factor, so remove the unused numeric parameter rather than assigning it the value one.",
+        "line_ranges": [
+          {
+            "line_end": 144,
+            "line_start": 140
+          }
+        ]
+      },
+      {
+        "code": "branch.private_condition_missing",
+        "detail": "Add source-anchored branch-specific conditions for the symmetric and antisymmetric representations. The current common conditions do not encode the private branch partition required by a matched family.",
+        "line_ranges": [
+          {
+            "line_end": 110,
+            "line_start": 104
+          },
+          {
+            "line_end": 117,
+            "line_start": 111
+          }
+        ]
+      },
+      {
+        "code": "source_ambiguity.resolved_choice_misclassified",
+        "detail": "The card has already fixed r1=r2=1/2 and the source explicitly supports that specialization. Remove it from unresolved source_ambiguities while retaining the fixed condition and its locator.",
+        "line_ranges": [
+          {
+            "line_end": 144,
+            "line_start": 140
+          },
+          {
+            "line_end": 333,
+            "line_start": 333
+          }
+        ]
+      }
+    ],
+    "paper_id": "paper_2501_09498v1",
+    "previous_science_card": {
+      "assessment": "The source provides the exact defect supersymmetric Rényi entropy formula for 6d A_(N-1) 1/2-BPS Wilson surfaces with r1=r2=1/2, including explicit expressions for b and d2 in symmetric and antisymmetric representations. The selected cluster is fully supported by lines 101-116 and 140-144, with the r1=r2=1/2 specialization from line 333. The formula is linear in gamma=1/n and valid for gamma>0, N>=3, 2<=k<=N-1 as per the representation constraints. The extraction is complete and case_authoring_ready is true.",
+      "case_authoring_ready": true,
+      "claims": [
+        {
+          "anchors": [
+            {
+              "line_end": 110,
+              "line_start": 104,
+              "support": "For the symmetric representation (k), b_(k) and d2_(k) are given."
+            },
+            {
+              "line_end": 144,
+              "line_start": 140,
+              "support": "The main result S_gamma = (2b - d2)/6 [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon) is stated."
+            },
+            {
+              "line_end": 333,
+              "line_start": 333,
+              "support": "The specialization r1=r2=1/2 is stated."
+            }
+          ],
+          "applicability": "Valid for gamma > 0, N >= 3, 2 <= k <= N-1, for the symmetric representation (k) of A_(N-1).",
+          "claim_id": "sre_symmetric",
+          "control_domains": [
+            {
+              "allowed_values": [],
+              "anchors": [
+                {
+                  "line_end": 140,
+                  "line_start": 140,
+                  "support": "gamma := 1/n is defined."
+                }
+              ],
+              "control_name": "gamma",
+              "domain_kind": "continuous_interval",
+              "domain_statement": "gamma > 0, as the Rényi index n is positive and gamma = 1/n. The upper bound 100 is a conservative finite benchmark query subset inside the source theorem.",
+              "maximum": 100.0,
+              "minimum": 0.0
+            },
+            {
+              "allowed_values": [],
+              "anchors": [
+                {
+                  "line_end": 104,
+                  "line_start": 104,
+                  "support": "The representation is in A_(N-1) Lie algebra su(N)."
+                }
+              ],
+              "control_name": "N",
+              "domain_kind": "continuous_interval",
+              "domain_statement": "N >= 3, as the representation k must satisfy 2 <= k <= N-1, implying N >= 3. The upper bound 100 is a conservative finite benchmark query subset inside the source theorem.",
+              "maximum": 100.0,
+              "minimum": 3.0
+            },
+            {
+              "allowed_values": [],
+              "anchors": [
+                {
+                  "line_end": 104,
+                  "line_start": 104,
+                  "support": "The representation is in A_(N-1) Lie algebra su(N)."
+                }
+              ],
+              "control_name": "k",
+              "domain_kind": "continuous_interval",
+              "domain_statement": "2 <= k <= N-1, as the representation is non-trivial and not the full antisymmetric rank. The upper bound 99 is a conservative finite benchmark query subset inside the source theorem.",
+              "maximum": 99.0,
+              "minimum": 2.0
+            }
+          ],
+          "control_names": [
+            "gamma",
+            "N",
+            "k"
+          ],
+          "depends_on": [],
+          "fixed_condition_ids": [
+            "r1_r2_half",
+            "six_dimensional_2_0_theory",
+            "wilson_surface_half_bps"
+          ],
+          "mechanism_ids": [
+            "defect_sre_formula",
+            "b_d2_symmetric"
+          ],
+          "oracle_outputs": {
+            "Y": {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "param": "b_sym_Nk_coeff"
+                    },
+                    {
+                      "var": "k"
+                    }
+                  ],
+                  "op": "multiply"
+                },
+                {
+                  "args": [
+                    {
+                      "var": "N"
+                    },
+                    {
+                      "param": "one"
+                    }
+                  ],
+                  "op": "subtract"
+                },
+                {
+                  "args": [
+                    {
+                      "param": "one"
+                    },
+                    {
+                      "args": [
+                        {
+                          "param": "r1_r2_over_2"
+                        },
+                        {
+                          "args": [
+                            {
+                              "var": "gamma"
+                            },
+                            {
+                              "param": "one"
+                            }
+                          ],
+                          "op": "subtract"
+                        }
+                      ],
+                      "op": "multiply"
+                    }
+                  ],
+                  "op": "add"
+                }
+              ],
+              "op": "multiply"
+            }
+          },
+          "quantitative_form": "Y = 2*k*(N-1)*(1 + (gamma-1)/8)",
+          "readout_names": [
+            "Y"
+          ],
+          "statement": "For the symmetric representation (k) of A_(N-1) with r1=r2=1/2, the normalized defect supersymmetric Rényi entropy is Y = 2*k*(N-1)*(1 + (gamma-1)/8).",
+          "statistical_basis": "Exact formula, no statistical aggregation.",
+          "uncertainty": "source_unspecified"
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 111,
+              "support": "For the antisymmetric representation [k], b_[k] and d2_[k] are given."
+            },
+            {
+              "line_end": 144,
+              "line_start": 140,
+              "support": "The main result S_gamma = (2b - d2)/6 [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon) is stated."
+            },
+            {
+              "line_end": 333,
+              "line_start": 333,
+              "support": "The specialization r1=r2=1/2 is stated."
+            }
+          ],
+          "applicability": "Valid for gamma > 0, N >= 3, 2 <= k <= N-1, for the antisymmetric representation [k] of A_(N-1).",
+          "claim_id": "sre_antisymmetric",
+          "control_domains": [
+            {
+              "allowed_values": [],
+              "anchors": [
+                {
+                  "line_end": 140,
+                  "line_start": 140,
+                  "support": "gamma := 1/n is defined."
+                }
+              ],
+              "control_name": "gamma",
+              "domain_kind": "continuous_interval",
+              "domain_statement": "gamma > 0, as the Rényi index n is positive and gamma = 1/n. The upper bound 100 is a conservative finite benchmark query subset inside the source theorem.",
+              "maximum": 100.0,
+              "minimum": 0.0
+            },
+            {
+              "allowed_values": [],
+              "anchors": [
+                {
+                  "line_end": 104,
+                  "line_start": 104,
+                  "support": "The representation is in A_(N-1) Lie algebra su(N)."
+                }
+              ],
+              "control_name": "N",
+              "domain_kind": "continuous_interval",
+              "domain_statement": "N >= 3, as the representation k must satisfy 2 <= k <= N-1, implying N >= 3. The upper bound 100 is a conservative finite benchmark query subset inside the source theorem.",
+              "maximum": 100.0,
+              "minimum": 3.0
+            },
+            {
+              "allowed_values": [],
+              "anchors": [
+                {
+                  "line_end": 104,
+                  "line_start": 104,
+                  "support": "The representation is in A_(N-1) Lie algebra su(N)."
+                }
+              ],
+              "control_name": "k",
+              "domain_kind": "continuous_interval",
+              "domain_statement": "2 <= k <= N-1, as the representation is non-trivial and not the full antisymmetric rank. The upper bound 99 is a conservative finite benchmark query subset inside the source theorem.",
+              "maximum": 99.0,
+              "minimum": 2.0
+            }
+          ],
+          "control_names": [
+            "gamma",
+            "N",
+            "k"
+          ],
+          "depends_on": [],
+          "fixed_condition_ids": [
+            "r1_r2_half",
+            "six_dimensional_2_0_theory",
+            "wilson_surface_half_bps"
+          ],
+          "mechanism_ids": [
+            "defect_sre_formula",
+            "b_d2_antisymmetric"
+          ],
+          "oracle_outputs": {
+            "Y": {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "param": "b_anti_Nk_coeff"
+                    },
+                    {
+                      "var": "k"
+                    }
+                  ],
+                  "op": "multiply"
+                },
+                {
+                  "args": [
+                    {
+                      "var": "N"
+                    },
+                    {
+                      "var": "k"
+                    }
+                  ],
+                  "op": "subtract"
+                },
+                {
+                  "args": [
+                    {
+                      "param": "one"
+                    },
+                    {
+                      "args": [
+                        {
+                          "param": "r1_r2_over_2"
+                        },
+                        {
+                          "args": [
+                            {
+                              "var": "gamma"
+                            },
+                            {
+                              "param": "one"
+                            }
+                          ],
+                          "op": "subtract"
+                        }
+                      ],
+                      "op": "multiply"
+                    }
+                  ],
+                  "op": "add"
+                }
+              ],
+              "op": "multiply"
+            }
+          },
+          "quantitative_form": "Y = 2*k*(N-k)*(1 + (gamma-1)/8)",
+          "readout_names": [
+            "Y"
+          ],
+          "statement": "For the antisymmetric representation [k] of A_(N-1) with r1=r2=1/2, the normalized defect supersymmetric Rényi entropy is Y = 2*k*(N-k)*(1 + (gamma-1)/8).",
+          "statistical_basis": "Exact formula, no statistical aggregation.",
+          "uncertainty": "source_unspecified"
+        }
+      ],
+      "controls": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 140,
+              "line_start": 140,
+              "support": "gamma := 1/n is defined."
+            }
+          ],
+          "definition": "gamma = 1/n, where n is the Rényi index.",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "gamma > 0, as the Rényi index n is positive and gamma = 1/n. The upper bound 100 is a conservative finite benchmark query subset inside the source theorem.",
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "name": "gamma",
+          "unit": "dimensionless"
+        },
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 104,
+              "line_start": 104,
+              "support": "The representation is in A_(N-1) Lie algebra su(N)."
+            }
+          ],
+          "definition": "Rank of the gauge group A_(N-1) = SU(N).",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "N >= 3, as the representation k must satisfy 2 <= k <= N-1, implying N >= 3. The upper bound 100 is a conservative finite benchmark query subset inside the source theorem.",
+          "maximum": 100.0,
+          "minimum": 3.0,
+          "name": "N",
+          "unit": "dimensionless"
+        },
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 104,
+              "line_start": 104,
+              "support": "The representation is in A_(N-1) Lie algebra su(N)."
+            }
+          ],
+          "definition": "Highest weight label of the symmetric (k) or antisymmetric [k] representation.",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "2 <= k <= N-1, as the representation is non-trivial and not the full antisymmetric rank. The upper bound 99 is a conservative finite benchmark query subset inside the source theorem.",
+          "maximum": 99.0,
+          "minimum": 2.0,
+          "name": "k",
+          "unit": "dimensionless"
+        }
+      ],
+      "fixed_conditions": [
+        {
+          "anchors": [
+            {
+              "line_end": 333,
+              "line_start": 333,
+              "support": "The text states 'one can reproduce the defect SRE with r1=r2=1/2 precisely'."
+            }
+          ],
+          "condition_id": "r1_r2_half",
+          "statement": "The R-symmetry background parameters are set to r1 = r2 = 1/2."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 100,
+              "line_start": 100,
+              "support": "For 1/2-BPS Wilson surfaces in 6d A_(N-1) N=(2,0) SCFT, both T and S can be calculated holographically."
+            }
+          ],
+          "condition_id": "six_dimensional_2_0_theory",
+          "statement": "The theory is the 6d A_(N-1) (2,0) SCFT."
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 100,
+              "line_start": 100,
+              "support": "For 1/2-BPS Wilson surfaces in 6d A_(N-1) N=(2,0) SCFT..."
+            }
+          ],
+          "condition_id": "wilson_surface_half_bps",
+          "statement": "The defect is a 1/2-BPS Wilson surface."
+        }
+      ],
+      "mechanisms": [
+        {
+          "anchors": [
+            {
+              "line_end": 144,
+              "line_start": 140,
+              "support": "The main result is stated: S_gamma = (2b - d2)/6 [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon), with b and d2 given by eq-b-d2-R and r1+r2=1."
+            }
+          ],
+          "equations": [
+            "S_gamma = (2b - d2)/6 * [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon)"
+          ],
+          "mechanism_id": "defect_sre_formula",
+          "parameters": [
+            {
+              "anchors": [
+                {
+                  "line_end": 142,
+                  "line_start": 142,
+                  "support": "The formula S_gamma = (2b - d2)/6 [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon) includes the factor (2b - d2)/6."
+                }
+              ],
+              "name": "prefactor_2b_minus_d2_over_6",
+              "role": "coefficient multiplying the bracket in the SRE formula",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 0.16666666666666666
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 333,
+                  "line_start": 333,
+                  "support": "The text states 'plugging in sigma1=sigma2=(3+1/n)/2, omega1=1/n and omega_{2,3,4}=1, one can reproduce the defect SRE with r1=r2=1/2 precisely'."
+                }
+              ],
+              "name": "r1_r2_over_2",
+              "role": "coefficient of (gamma - 1) in the bracket, with r1=r2=1/2",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 0.125
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 142,
+                  "line_start": 142,
+                  "support": "The formula includes the factor log(ell/epsilon)."
+                }
+              ],
+              "name": "log_ell_over_epsilon",
+              "role": "logarithmic factor in the SRE formula, treated as a constant multiplier",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 1.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 142,
+                  "line_start": 142,
+                  "support": "The formula contains the constant 1 in the bracket [r1 r2/2 (gamma - 1) + 1]."
+                }
+              ],
+              "name": "one",
+              "role": "the constant 1 appearing in the bracket and in (N-1)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 1.0
+            }
+          ],
+          "statement": "The defect contribution to supersymmetric Rényi entropy for 1/2-BPS Wilson surfaces in 6d A_(N-1) (2,0) theories is a linear function of gamma=1/n, given by S_gamma = (2b - d2)/6 * [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon), where b and d2 are the defect Weyl anomaly coefficients.",
+          "variable_names": [
+            "S_gamma",
+            "b",
+            "d2",
+            "r1",
+            "r2",
+            "gamma",
+            "ell",
+            "epsilon"
+          ]
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 110,
+              "line_start": 104,
+              "support": "For the symmetric representation (k), eq-b-d2-Sk gives b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N and d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N."
+            }
+          ],
+          "equations": [
+            "b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N",
+            "d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N"
+          ],
+          "mechanism_id": "b_d2_symmetric",
+          "parameters": [
+            {
+              "anchors": [
+                {
+                  "line_end": 107,
+                  "line_start": 107,
+                  "support": "b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_sym_Nk_coeff",
+              "role": "coefficient of N k in b_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 107,
+                  "line_start": 107,
+                  "support": "b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_sym_k2_coeff",
+              "role": "coefficient of k^2 in b_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 3.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 107,
+                  "line_start": 107,
+                  "support": "b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_sym_k_coeff",
+              "role": "coefficient of k in b_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 107,
+                  "line_start": 107,
+                  "support": "b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_sym_k2_over_N_coeff",
+              "role": "coefficient of k^2/N in b_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -3.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 108,
+                  "line_start": 108,
+                  "support": "d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_sym_Nk_coeff",
+              "role": "coefficient of N k in d2_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 108,
+                  "line_start": 108,
+                  "support": "d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_sym_k2_coeff",
+              "role": "coefficient of k^2 in d2_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 6.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 108,
+                  "line_start": 108,
+                  "support": "d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_sym_k_coeff",
+              "role": "coefficient of k in d2_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 108,
+                  "line_start": 108,
+                  "support": "d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_sym_k2_over_N_coeff",
+              "role": "coefficient of k^2/N in d2_(k)",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -6.0
+            }
+          ],
+          "statement": "For the symmetric representation (k) of A_(N-1), the defect Weyl anomaly coefficients are b_(k) = 12 N k + 3 k^2 - 12 k - 3 k^2/N and d2_(k) = 12 N k + 6 k^2 - 12 k - 6 k^2/N.",
+          "variable_names": [
+            "b_(k)",
+            "d2_(k)",
+            "N",
+            "k"
+          ]
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 111,
+              "support": "For the antisymmetric representation [k], eq-b-d2-Ak gives b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N and d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N."
+            }
+          ],
+          "equations": [
+            "b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N",
+            "d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N"
+          ],
+          "mechanism_id": "b_d2_antisymmetric",
+          "parameters": [
+            {
+              "anchors": [
+                {
+                  "line_end": 114,
+                  "line_start": 114,
+                  "support": "b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_anti_Nk_coeff",
+              "role": "coefficient of N k in b_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 114,
+                  "line_start": 114,
+                  "support": "b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_anti_k2_coeff",
+              "role": "coefficient of k^2 in b_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 114,
+                  "line_start": 114,
+                  "support": "b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_anti_k_coeff",
+              "role": "coefficient of k in b_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 3.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 114,
+                  "line_start": 114,
+                  "support": "b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N"
+                }
+              ],
+              "name": "b_anti_k2_over_N_coeff",
+              "role": "coefficient of k^2/N in b_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -3.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 115,
+                  "line_start": 115,
+                  "support": "d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_anti_Nk_coeff",
+              "role": "coefficient of N k in d2_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 115,
+                  "line_start": 115,
+                  "support": "d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_anti_k2_coeff",
+              "role": "coefficient of k^2 in d2_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -12.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 115,
+                  "line_start": 115,
+                  "support": "d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_anti_k_coeff",
+              "role": "coefficient of k in d2_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": 6.0
+            },
+            {
+              "anchors": [
+                {
+                  "line_end": 115,
+                  "line_start": 115,
+                  "support": "d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N"
+                }
+              ],
+              "name": "d2_anti_k2_over_N_coeff",
+              "role": "coefficient of k^2/N in d2_[k]",
+              "uncertainty": "source_unspecified",
+              "unit": "dimensionless",
+              "value": -6.0
+            }
+          ],
+          "statement": "For the antisymmetric representation [k] of A_(N-1), the defect Weyl anomaly coefficients are b_[k] = 12 N k - 12 k^2 + 3 k - 3 k^2/N and d2_[k] = 12 N k - 12 k^2 + 6 k - 6 k^2/N.",
+          "variable_names": [
+            "b_[k]",
+            "d2_[k]",
+            "N",
+            "k"
+          ]
+        }
+      ],
+      "paper_scope": "The paper derives closed-form expressions for the contribution of surface defects to supersymmetric Rényi entropy and Casimir energy in 6d (2,0) theories, expressed in terms of defect Weyl anomaly coefficients b and d2. The main result is the defect SRE formula S_gamma = (2b - d2)/6 * [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon), with explicit b and d2 for symmetric and antisymmetric representations of A_(N-1). The paper also covers holographic large-N checks, localization results, and anomaly polynomial derivations.",
+      "readouts": [
+        {
+          "anchors": [
+            {
+              "line_end": 142,
+              "line_start": 142,
+              "support": "The formula S_gamma = (2b - d2)/6 [r1 r2/2 (gamma - 1) + 1] log(ell/epsilon) defines S_gamma; dividing by log(ell/epsilon) gives Y."
+            }
+          ],
+          "definition": "Normalized defect supersymmetric Rényi entropy, Y = S_gamma / log(ell/epsilon).",
+          "name": "Y",
+          "resolution": null,
+          "statistic": "Exact formula, no statistical aggregation.",
+          "uncertainty": "source_unspecified",
+          "unit": "dimensionless"
+        }
+      ],
+      "source": {
+        "arxiv_versioned_id": "2501.09498v1",
+        "citation": "Zi-Xiao Huang, From Weyl Anomaly to Universal Defect Casimir Energy and Rényi Entropy, Physical Review Letters (2026), DOI:10.1103/fz81-ysss",
+        "journal_doi": "10.1103/fz81-ysss"
+      },
+      "source_ambiguities": [
+        {
+          "ambiguity_id": "r1_r2_specialization",
+          "anchors": [
+            {
+              "line_end": 144,
+              "line_start": 140,
+              "support": "The main result is stated for general r1, r2 with r1+r2=1."
+            },
+            {
+              "line_end": 333,
+              "line_start": 333,
+              "support": "The reproduction uses r1=r2=1/2."
+            }
+          ],
+          "claim_ids": [
+            "sre_symmetric",
+            "sre_antisymmetric"
+          ],
+          "control_names": [
+            "gamma",
+            "N",
+            "k"
+          ],
+          "fixed_condition_ids": [
+            "r1_r2_half"
+          ],
+          "mechanism_ids": [
+            "defect_sre_formula"
+          ],
+          "readout_names": [
+            "Y"
+          ],
+          "statement": "The main formula is given for general r1, r2 with r1+r2=1, but the explicit reproduction in line 333 uses r1=r2=1/2. The extraction focuses on the r1=r2=1/2 case as per the routing hint."
+        }
+      ]
+    },
+    "source": {
+      "arxiv_versioned_id": "2501.09498v1",
+      "citation": "Zi-Xiao Huang, From Weyl Anomaly to Universal Defect Casimir Energy and Rényi Entropy, Physical Review Letters (2026), DOI:10.1103/fz81-ysss",
+      "journal_doi": "10.1103/fz81-ysss"
+    }
+  },
+  "target_accepted": 1
+}

@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2505.09538v1\", \"citation\": \"Aikya Banerjee, Intermittent Fluctuations Determine the Nature of Chaos in Turbulence, Physical Review Letters (2026), DOI:10.1103/1dj2-zw28\", \"journal_doi\": \"10.1103/1dj2-zw28\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: decorrelator140525.tex =====\nL000002\t\\documentclass[amsmath,amssymb,amsbsy,pre,twocolumn,tightenlines,superscriptaddress,floatfix]{revtex4-2}\nL000003\t\\usepackage{amsfonts}\nL000004\t\\usepackage{amsmath}\nL000005\t\\usepackage{amssymb}\nL000006\t\\usepackage{blindtext}\nL000007\t\\usepackage{lineno}\nL000008\t\\usepackage{cancel}\nL000009\t\\usepackage{bm}\nL000010\t\\usepackage[usenames, dvipsnames]{color}\nL000011\t\\usepackage{dcolumn}\nL000012\t\\usepackage{epic}\nL000013\t\\usepackage{epsfig}\nL000014\t\\usepackage{eucal}\nL000015\t\\usepackage{esdiff}\nL000016\t\\usepackage{graphicx}\nL000017\t\\usepackage[breaklinks,colorlinks = true,linkcolor = blue,urlcolor=blue,citecolor=red]{hyperref}\nL000018\t\nL000019\t\\begin{document}\nL000020\t\nL000021\t\nL000022\t\\title{Intermittent fluctuations determine the nature of chaos in  turbulence}\nL000023\t\\author{Aikya Banerjee}\nL000024\t\\email{aikyabanerjee2016@gmail.com}\nL000025\t\\affiliation{Department of Physical Sciences, Indian Institute of Science Education and Research Kolkata, Mohanpur 741246, India}\nL000026\t\\affiliation{International Centre for Theoretical Sciences, Tata Institute of Fundamental Research, Bengaluru 560089, India}\nL000027\t\\author{Ritwik Mukherjee}\nL000028\t\\email{ritwik.mukherjee@icts.res.in}\nL000029\t\\affiliation{International Centre for Theoretical Sciences, Tata Institute of Fundamental Research, Bengaluru 560089, India}\nL000030\t\\author{Sugan Durai Murugan}\nL000031\t\\email{vsdmfriend@gmail.com}\nL000032\t\\affiliation{Department of Mechanical Engineering, Johns Hopkins University, Baltimore, Maryland 21218, USA}\nL000033\t\\author{Subhro Bhattacharjee}\nL000034\t\\email{subhro@icts.res.in}\nL000035\t\\affiliation{International Centre for Theoretical Sciences, Tata Institute of Fundamental Research, Bengaluru 560089, India}\nL000036\t\\author{Samriddhi Sankar Ray}\nL000037\t\\email{samriddhisankarray@gmail.com}\nL000038\t\\affiliation{International Centre for Theoretical Sciences, Tata Institute of Fundamental Research, Bengaluru 560089, India}\nL000039\t\nL000040\t\t\\begin{abstract}\nL000041\tWe adapt recent ideas for many-body chaos in nonlinear, Hamiltonian fluids\nL000042\t\t[Murugan \\textit{et al.}, Phys. Rev. Lett. 127, 124501 (2021)] to\nL000043\t\trevisit the question of the Reynolds number Re dependence of the Lyapunov exponent $\\lambda\\propto{\\rm Re}^\\alpha$\nL000044\t\tin fully developed turbulence. The use of such decorrelators\nL000045\t\tallow us to investigate\nL000046\t\tthe interplay of the competing effects of viscous dissipation and nonlinearity. We obtain a precise value of $\\alpha = 0.59 \\pm 0.04$ and show that departure from the Kolmogorov\nL000047\t\t\tmean field result\nL000048\t\t$\\lambda \\propto \\sqrt{{\\rm Re}}$ is a consequence of the intermittent fluctuations in the velocity-gradient tensor. The robustness of our\nL000049\t\tresults are further confirmed in a local, dynamical systems model\nL000050\t\tfor turbulence.\nL000051\t\\end{abstract}\nL000052\t\nL000053\t\nL000054\t\\maketitle\nL000055\t\nL000056\tFully developed, incompressible turbulence is perhaps the most celebrated example of a chaotic\nL000057\tsystem. In contrast to other examples of classical, many-body\nL000058\tsystems showing chaotic behaviour, turbulent flows have the distinction of\nL000059\tbeing central across natural world.\nL000060\tUnsurprisingly, therefore,\nL000061\tphysicists working in problems ranging from astrophysics, atmospheric sciences,\nL000062\toceanography, and of course fluid dynamics have to factor in the underlying\nL000063\tchaotic nature of such flows~\\cite{Pandit-Pramana-Review}. This ubiquity is not surprising: After all the\nL000064\tunderlying Navier-Stokes equation, in all such systems, lead to solutions which\nL000065\tare turbulent in the limit of small viscosities commonly seen in most fluids~\\cite{Frisch_1995}.\nL000066\t\nL000067\tWhile mathematical and engineering tools remain indispensable, the ideas of\nL000068\tstatistical physics provide the basis for much of our understanding of\nL000069\tturbulence, especially in its most general form where the flow is homogeneous\nL000070\tand isotropic. In particular, chaos along with the other fingerprint of fully\nL000071\tdeveloped turbulence, namely intermittency, and their dependence \\textit{inter\nL000072\talia} the Reynolds number Re, forms a major challenge in a complete\nL000073\tunderstanding of turbulence.\nL000074\t\nL000075\tThe \\textit{degree} of chaos is usually quantified by the (largest) Lyapunov\nL000076\texponent $\\lambda$ of the flow. By using arguments tracing back to\nL000077\tKolmogorov's seminal work from 1941, Ruelle showed that\nL000078\t$\\lambda \\propto \\sqrt{{\\rm Re}}$~\\cite{Ruelle}. This result is a consequence of\nL000079\tassociating the (largest) Lyapunov exponent with the inverse of the smallest\nL000080\ttime-scale of the flow  $\\tau_\\eta \\propto 1/\\sqrt{{\\rm Re}}$, obtained most simply from\nL000081\tphenomenological arguments, and thence the $\\lambda$-scaling.\nL000082\tMore generally, assuming \\textit{a} H\\\"older exponent $h$ characterising the flow,\nL000083\tit is easy to show $\\lambda \\propto Re^{\\frac{1-h}{1+h}}$~\\cite{Vulpiani}; indeed taking the \\textit{monofractal},\nL000084\tKolmogorov limit~\\cite{K41} of a unique $h = 1/3$ recovers the Ruelle scaling.\nL000085\t\nL000086\tThe result $\\lambda \\propto \\sqrt{{\\rm Re}}$ implicitly assumes a unique small length and\nL000087\ttime-scale characteristic of a monofractal flow. However, the observational, experimental,\nL000088\tand numerical evidence against this is overwhelming. Indeed, a modern\nL000089\trationalisation of turbulence rests on the multifractal approach~\\cite{Benzi} developed by\nL000090\tFrisch and Parisi~\\cite{Frisch-Parisi}. Adapting this model, which allows for a spread of H\\\"older\nL000091\texponents $h$ in the flow, leads to the revised scaling obtained by Crisanti\nL000092\t\\textit{et al.} $\\lambda \\propto {\\rm Re}^\\alpha$, with $\\alpha \\approx 0.459$~\\cite{Vulpiani}.\nL000093\t\nL000094\tThis scaling exponent $\\alpha \\lesssim 0.5$ has been challenged in recent years\nL000095\twith data from different experiments and direct numerical simulations. For\nL000096\texample, Berera and Ho ~\\cite{BereraPRL} have recently reported $\\alpha =\nL000097\t0.53$. This lack of consensus between the theoretical estimate and measurements\nL000098\t--- as well as the lack of agreement between different\nL000099\tsimulations~\\cite{Yamada1987,Vulpiani,BereraPRL,Siddhartha,Boffetta_2017,Mohan_higher,Vassilicos_2023}\nL000100\t--- suggests that the origins of chaos in turbulence is far from settled.\nL000101\t\nL000102\tBut is there a way to address the microscopic origin of $\\alpha$ from the\nL000103\tNavier-Stokes equation itself and connect it to the intermittent aspect of\nL000104\tfully developed turbulence?  And what role does the non-locality (in length\nL000105\tscale) of interactions --- a defining feature of the Navier-Stokes equation ---\nL000106\tplay?\nL000107\t\nL000108\tIn this paper we show that this is indeed possible through recently\nL000109\tconstructed ideas of \\textit{decorrelators}~\\cite{Lightcone} --- largely\nL000110\tlimited to Hamiltonian~\\cite{Subhro_PRB,Subhro_PRL,GTEuler} systems in the\nL000111\tcontext ergodicity, thermalisation and chaos --- and adapt them for\nL000112\tdriven-dissipative, non-equilibrium systems such as turbulence. Consequently,\nL000113\tby using a suitable mix of theory and numerical simulations, we uncover the\nL000114\tcompeting effects of the viscous and nonlinear terms to show \\textit{exactly}\nL000115\tthe chaos and the scaling $\\lambda \\sim {\\rm Re}^\\alpha$ emerges along with\nL000116\twhat determining the value of $\\alpha = 0.59 \\pm 0.04$ and why this\nL000117\tis so. We also confirm the robustness of this result by using a dynamical\nL000118\tsystems approach to turbulence with the additional advantage of exploiting its\nL000119\tnearest and next-nearest neighbour interactions to investigate short-time\nL000120\teffects of locality which are absent in the Navier-Stokes equation.\nL000121\t\nL000122\t\nL000123\tWe begin with the three-dimensional, incompressible, unit-density Navier-Stokes equation, driven by an external\nL000124\tforce to a non-equilibrium statistically steady state.\nL000125\tThe force ${\\bf f}$ varies to ensure a constant energy injection~\\cite{Pope_forcing} $\\mathcal{I}\nL000126\t= \\langle {\\bf f}\\cdot {\\bf u} \\rangle \\equiv \\overline{\\langle \\varepsilon\nL000127\t\\rangle}$, where the mean energy dissipation rate $\\overline{\\langle \\varepsilon\nL000128\t\\rangle}$ is the time $\\overline{\\cdot \\cdot \\cdot}$ and space $\\langle \\cdot\nL000129\t\\cdot \\cdot \\rangle$ average of the spatio-temporally fluctuating dissipation\nL000130\t$\\varepsilon ({\\bf x},t)$ characteristic of such non-equilibrium steady states of fully developed\nL000131\tturbulence with a statistically steady velocity field ${\\bf u}_{\\rm\nL000132\tsteady}$. This follows from the familiar, instantaneous (spatially-averaged)\nL000133\tkinetic energy $E$ balance: $\\frac{dE}{dt} = -\\langle \\varepsilon \\rangle +\nL000134\t\\mathcal{I}$ with a mean kinetic energy $E_0 = \\overline {E}$.\nL000135\t\nL000136\tWe now construct two, \\textit{nearly} identical,  velocity fields ${\\bf u_0}^{\\rm A}\nL000137\t\\equiv {\\bf u}_{\\rm steady}$ and ${\\bf u_0}^{\\rm B} = {\\bf u_0}^{\\rm A} +\nL000138\t\\delta {\\bf u_0}$, where the form of $\\delta {\\bf u_0}$ ensures that system B\nL000139\tremains incompressible.  We choose the amplitude of perturbation $\\epsilon_0$\nL000140\tsufficiently small (see Appendix~\\ref{App_DNS}) and localise it in space at ${\\bf x}_0$; the precise choice\nL000141\tof ${\\bf x}_0$ is irrelevant and can be chosen to be the center of our domain.\nL000142\t\nL000143\tWe choose these fields ---  ${\\bf u_0}^{\\rm A}$ and  ${\\bf u_0}^{\\rm B}$ --- as\nL000144\tinitial conditions $t = 0$ for the Navier-Stokes equation, evolve them independently in time, and\nL000145\tcalculate the velocity difference $\\delta {\\bf u} ({\\bf x},t) \\equiv  {\\bf\nL000146\tu}^{\\rm B}({\\bf x},t) - {\\bf u}^{\\rm A}({\\bf x},t)$ for $t > 0$. From such\nL000147\tvelocity differences, we are able to construct the decorrelator $\\phi({\\bf\nL000148\tx},t) \\equiv \\frac{1}{2} |\\delta {\\bf u} ({\\bf x},t)|^2 $~\\cite{GTEuler,mukherjee2023intermittency}.\nL000149\tIt is easy to show, starting from the Navier-Stokes equation written separately for systems A and\nL000150\tB, that the decorrelator follows an evolution (written in component form and\nL000151\tsum over repeated indices assumed)\nL000152\t\\begin{equation}\nL000153\t\t\\frac{\\partial \\phi(\\mathbf{x},t)}{\\partial t} = \\partial_i W_i - \\delta u_i S_{ij} \\delta u_j +\nL000154\t\t\\nu \\delta u_i \\nabla^2\\delta u_i\nL000155\t\t\\label{eq:phi}\nL000156\t\\end{equation}\nL000157\twith the strain-rate tensor\nL000158\t$S_{ij} = \\frac{1}{2}(\\partial_i u^A_j + \\partial_j \\delta u^A_i)$,\nL000159\t$W_i = u^B_i \\phi + \\delta u_i \\partial_{jk}\\int \\mathrm{d}^3 \\mathbf{x'}\nL000160\tG(\\mathbf{x},\\mathbf{x'})[u^A_j\\delta u_k + u^A_k \\delta u_j + \\delta u_j \\delta u_k]'$,\nL000161\twhere $G(\\mathbf{x}, \\mathbf{x'})$ is the Green's function obtained from the Poisson equation for pressure, and $\\nu$ the coefficient of\nL000162\tkinematic viscosity (see Appendix~\\ref{Phi_derivation}).\nL000163\t\nL000164\tA further simplification exploits the statistical isotropy and\nL000165\thomogeneity of fully developed turbulence to construct, over the volume\nL000166\t$\\mathcal{V}$, the spatially integrated decorrelator $\\Phi (t) \\equiv\nL000167\t\\frac{1}{\\mathcal{V}}\\int \\mathrm{d}{\\bf x} \\phi ({\\bf x},t) = \\langle \\phi\nL000168\t\\rangle$. This leads to a simple cancellation of the divergence term in\nL000169\tEq.~\\eqref{eq:phi} and a resulting evolution equation for the integrated decorrelator:\nL000170\t\nL000171\t\\begin{equation}\nL000172\t\t\\dot{\\Phi} = \\frac{d\\Phi}{dt} = \\beta_S + \\beta_\\eta,\nL000173\t\t \\label{eq:Phi}\nL000174\t\\end{equation}\nL000175\twhere $\\beta_S = -\\langle \\delta {\\bf u}\\cdot \\mathbf{S} \\cdot \\delta {\\bf u}\\rangle$ and $\\beta_\\eta = \\nu \\langle \\delta {\\bf u} \\cdot \\nabla^2 \\delta {\\bf u}\\rangle$ as\nL000176\tthe contributions from the strain and dissipative terms, respectively.\nL000177\tThere is one additional remark to make.  In the derivations of Eqs.~\\eqref{eq:phi}-\\eqref{eq:Phi} we have neglected\nL000178\tthe forcing terms on systems A and B. This is perfectly valid at short times but in the long time $t \\to \\infty$ limit\nL000179\tit plays a critical role as we shall see below.\nL000180\t\nL000181\tAt short times we conjecture an exponential growth of the decorrelator:\nL000182\t$\\dot{\\Phi}/\\Phi \\equiv \\lambda$.\nL000183\tWe confirm this numerically by integrating Eq.~\\eqref{eq:Phi} with an initial perturbation\nL000184\tfield $\\delta {\\bf u}$ and measurements of the strain-rate tensor $\\mathbf{S}$ drawn from direct numerical\nL000185\tsimulations (DNSs) of the Navier-Stokes equation (Appendix~\\ref{App_DNS})\nL000186\t\nL000187\tIn Fig.~\\ref{fig:Phi-theory} we show a representative plot of $\\dot{\\Phi}/\\Phi$\nL000188\tvs time for ${\\rm Re} = 178.5$ displaying a clear plateau $\\lambda$\nL000189\tdemarcated by a pair of vertical dashed lines. While this is not very surprising,\nL000190\tgiven that turbulence is chaotic, it is far from obvious how to trace its origins in\nL000191\tthe structure of Eq.~\\eqref{eq:Phi} and in particular how the competing effects of\nL000192\tthe strain and viscous terms conspire to give such exponential-\nL000193\tgrowth phases.\nL000194\tIn Fig.~\\ref{fig:Phi-theory} we plot $\\beta_S$ and $\\beta_\\eta$ (compensated by $\\Phi$) and find strong\nL000195\tevidence of their short-time exponential growth --- the plateau between the\nL000196\tvertical dashed lines --- corresponding to Lyapunov exponents $\\lambda_S$ and\nL000197\t$\\lambda_\\eta$, respectively. Furthermore, the dissipative effect of the\nL000198\tviscous term $\\lambda_\\eta \\sim \\mathcal{O}(1/\\tau_\\eta) < 0$ is compensated by the\nL000199\teffect of the strain term $\\lambda_S > |\\lambda_\\eta|$, leading to an overall positive\nL000200\tLyapunov exponent $\\lambda = \\lambda_S + \\lambda_\\eta$.\nL000201\t\nL000202\t\\begin{figure}\nL000203\t\\includegraphics[width = 1.00\\linewidth]{Phi-theory}\nL000204\t\t\\caption{Representative plots of the normalised spatially averaged decorrelator $\\dot{\\Phi}/\\Phi$,\nL000205\t\t $\\beta_S/\\Phi$\nL000206\t\tand $\\beta_\\eta/\\Phi$ vs time for $Re = 178.5$. The pair of vertical dashed lines\nL000207\t\tindicate the short-time exponential-growth phase.\nL000208\t\t(Inset) Probability density\nL000209\t\tfunction of the ${\\hat{n}_i}^2$ direction cosines of ${\\bf u}$ (at short times) showing\nL000210\t\ta preferential growth of the difference field along the\nL000211\t\tcompressional $i = 3$ direction.}\nL000212\t\t\\label{fig:Phi-theory}\nL000213\t\\end{figure}\nL000214\t\nL000215\tHow do we understand the origins of $\\lambda_S$ which leads to a compensation\nL000216\tof the negative $\\lambda_\\eta$ and hence a positive $\\lambda$? In particular,\nL000217\thow does the strain field $S$ ensure the exponential amplification of $\\delta\nL000218\t{\\bf u}$ at short times and thence $\\Phi \\sim e^{\\lambda t}$? The answer lies\nL000219\tin decomposing the strain term in the eigenbasis of the strain tensor $\nL000220\t\\delta {\\bf u}\\cdot \\mathbf{S} \\cdot \\delta {\\bf u} = \\sum_{i = 1}^{i=3}\nL000221\t\\hat{n}_i^2\\gamma_i |\\delta {\\bf u}|^2$, with ${\\hat{n}_i}$\nL000222\tdirection cosines of ${\\bf u}$ (along the eigendirections) and ${\\gamma_i}$ the\nL000223\teigenvalues. The relative distributions for the extensional ($i = 1$;\nL000224\t$\\gamma_1 > 0$), intermediate  ($i = 2$; $\\gamma_2 \\approx 0$) and\nL000225\tcompressional directions ($i = 3$; $\\gamma_3 < 0$), seen in the inset of\nL000226\tFig.~\\ref{fig:Phi-theory}, underlines a bias for the compressional direction.\nL000227\tThus, clearly the dominant contribution in this expansion \\textit{must}\nL000228\tcome from the statistics of the  compressional eigenvalue.\nL000229\t\nL000230\tAt such short times, a careful analysis of $\\beta_S$ shows (see Appendix~\\ref{Phi_derivation}) that\nL000231\t$\\beta_S \\sim \\langle \\gamma_3 \\rangle + \\gamma_3^{\\rm std}$. And hence, the Reynolds number\nL000232\tdependence of $\\lambda_S$ must be dominated by the competing effects of the mean $\\langle \\gamma_3 \\rangle$\nL000233\teigenvalue and their intermittency-induced fluctuations $\\gamma_3^{\\rm std}$.\nL000234\t\nL000235\tIn the long time limit, $\\beta_S \\to 0$, all eigenvalues are sampled\nL000236\tequally (see Appendix~\\ref{Phi_derivation}, Fig.~\\ref{3fig}(c)) leading to  $\\langle \\delta {\\bf u}\\cdot \\mathbf{S}\nL000237\t\\cdot \\delta {\\bf u}\\rangle \\propto \\sum_{i = 1}^{i=3} \\gamma_i = 0$ because of\nL000238\tincompressibility. We see from Fig.~\\ref{fig:Phi-theory} that this is indeed\nL000239\tthe case as the compensated $\\beta_S$ term rapidly falls to 0 for $t \\gtrsim 25$.\nL000240\t\nL000241\tDoes the viscous term $\\beta_\\eta$ also go to zero similarly at late times\nL000242\tleading to $\\dot{\\Phi} = 0$?\nL000243\tAt such late times it is easy to show that (see Appendix~\\ref{Phi_derivation})\nL000244\t$\\beta_\\eta \\to -2\\overline{\\langle \\varepsilon\\rangle}$. Indeed, in\nL000245\tFig.~\\ref{fig:Phi-theory} we do see a clear saturation of the normalised\nL000246\tviscous term to a value consistent with $-2\\overline{\\langle \\varepsilon\\rangle}\nL000247\t\\approx 1.6$ (corresponding to the simulations from which the rate of strain\nL000248\tmatrix is drawn).\nL000249\t\nL000250\tA trivial consequence of this is that within the framework of\nL000251\tEq.~\\eqref{eq:Phi} $\\dot{\\Phi} = -2\\overline{\\langle \\varepsilon\\rangle}$ (clearly\nL000252\tseen in Fig.~\\ref{fig:Phi-theory}) and suggesting that the decorrelator never\nL000253\tsaturates. However this is a contradiction: By definition, the decorrelator is\nL000254\tdefined as the spatial average of the velocity difference of systems A and B,\nL000255\tand hence at long times $\\Phi \\to 2E_0$ since the cross-correlator $\\langle\nL000256\t{\\bf u}_{\\rm A} \\cdot  {\\bf u}_{\\rm B}\\rangle$ vanishes as the fields\nL000257\tdecorrelate as $t \\to \\infty$.\nL000258\t\nL000259\tThis contradiction is resolved by recalling that the derivation of\nL000260\tEq.~\\eqref{eq:Phi} neglects the effective energy injection. While at short\nL000261\ttimes, this is zero, at long times this contribution is no longer irrelevant.\nL000262\tIn fact we can show (see Appendix~\\ref{Phi_derivation}) that $\\langle \\delta {\\bf f}\\cdot \\delta\nL000263\t{\\bf u} \\rangle = 2\\overline{\\langle \\varepsilon\\rangle}$ as $t\\to \\infty$ and thus\nL000264\tcompensates the viscous contribution $-2\\overline{\\langle \\varepsilon\\rangle}$ (see Appendix~\\ref{Phi_derivation}, Fig.~\\ref{3fig}(a))\nL000265\tleading to $\\dot{\\Phi} = 0$.\nL000266\t\nL000267\t\\begin{figure}\nL000268\t\\includegraphics[width = 1.00\\linewidth]{Phivstcubeinset.png}\nL000269\t\t\\caption{Semilog plots of $\\Phi$ vs $t$ from DNSs for different Re showing an exponential regime followed by\nL000270\t\tsaturation at a value $2E_0$ (dashed horizontal line).\nL000271\t\tThe insets show two snapshots at (left) $t = 0$  and (right) $t = 12.5$ of the square of the difference field\nL000272\t\t$|\\delta {\\bf u}|^2$ for Re = 178.5. (See Ref.~\\cite{movie} for the full evolution of $|\\delta {\\bf u}|^2$.)}\nL000273\t\t\\label{fig:DNS}\nL000274\t\\end{figure}\nL000275\t\nL000276\tHow consistent are these ideas in actual measurements of the decorrelator in DNSs of the\nL000277\tNavier-Stokes equation? We check for this by solving the incompressible Navier-Stokes equation\nL000278\ton a 2$\\pi$ triply-periodic domain by using a pseudospectral method with a large-scale constant energy $\\mathcal{I} = \\overline{\\langle \\varepsilon\\rangle}$~\\cite{Pope_forcing}\nL000279\tinjection scheme to drive the flow and maintain it in non equilibrium statistically steady state with a\nL000280\tmean energy $E_0$; see Appendix~\\ref{App_DNS}\nL000281\tfor a detailed summary of the numerical scheme and the parameters used.\nL000282\tBy using the same protocol described earlier, we calculate the decorrelator $\\Phi$ for several\nL000283\tdifferent values of the\nL000284\tReynolds number ${\\rm Re}$. In\nL000285\tFig.~\\ref{fig:DNS} we show representative snapshots\nL000286\tat $t = 0$ (left inset) and $t = 12.5$ (right inset), corresponding to the initial and\nL000287\texponential-growth phases, respectively. (Ref.~\\cite{movie} shows the full evolution of $|\\delta {\\bf u}|^2$.)\nL000288\t\nL000289\tThese difference fields allow us to construct the spatially averaged\nL000290\tdecorrelator $\\Phi$ which we plot, on a semilog scale,  in the main panel of\nL000291\tFig.~\\ref{fig:DNS} as a function of time. We see a convincing exponential regime\nL000292\tfrom which we can extract the Lyapunov exponent $\\lambda^{\\rm DNS}$, followed by a saturation at a value approximately\nL000293\tequal to $2E_0$, indicated by the dashed horizontal line, as our theory suggests. (We have confirmed from our data that the\nL000294\tonset of the saturation of the decorrelators (see Figs.~\\ref{fig:Phi-theory} and~\\ref{fig:DNS}) is of the order of the\nL000295\tinverse of the Lyapunov exponent.)\nL000296\t\nL000297\tIt is important to observe that even at very short times, before the exponential growth phase,\nL000298\tour results from the Navier-Stokes equation summarised in Fig.~\\ref{fig:DNS} do not suggest an initial\nL000299\tpower-law growth which has been seen in many local models of chaotic systems\\cite{Luca_shell, Ditlevsen-book}. Could this --- as well as the\nL000300\tsomewhat self-similar evolution of the difference field (see Fig.~\\ref{fig:DNS}, insets) --- be a consequence\nL000301\tof the essential non-local nature of the equation?\nL000302\t\nL000303\t\\begin{figure}[b!]\nL000304\t\\includegraphics[width = 1.00\\linewidth]{Phi_shell}\nL000305\t\\caption{Semilog plot of the shell model decorrelator $\\Phi^{\\rm GOY}$ vs $t$ for different Re showing an exponential growth.\nL000306\t\t(Inset) Loglog plot of the shell-specific decorrelator $\\phi_n$ for different shells (the arrow indicates the\nL000307\t\tdirection $n = 1$ to $n = 16$ shells) at \\textit{very} early times shows a power-law growth.}\nL000308\t\t\\label{fig:shell-decorr}\nL000309\t\\end{figure}\nL000310\t\nL000311\tTo test this as well as the robustness of our conclusions of an exponentially growing decorrelator,\nL000312\twe use a simpler, phenomenological (cascade) model for turbulence, inspired from dynamical systems,\nL000313\tnamely the Gledzer-Ohkitani-Yamada (GOY) shell model~\\cite{GOY-Gledzer, GOY-Okhitani, Ditlevsen-book}.\nL000314\tIn such shell models (Appendix~\\ref{App_DNS}), the velocities $u_n$, associated with a scalar, exponentially\nL000315\tgrowing, wave-number $k_n = k_0 2^n$, are treated as complex, dynamical\nL000316\tvariables, with the shells numbers being integers $1 \\le n \\le N$ (see Appendix~\\ref{App_DNS} for further details).\nL000317\t\nL000318\t\\begin{figure}\nL000319\t\\includegraphics[width = 1.00\\linewidth]{LambdaVsRe}\nL000320\t\t\\caption{A loglog plot of $\\lambda$, $\\lambda^{\\rm DNS}$, $\\gamma_3^{\\rm std}$\nL000321\t\tand $-\\langle \\gamma_3 \\rangle$, obtained from various DNSs versus the Reynolds number Re (DNS) (bottom X axis),\nL000322\t\tas well as the Lyapunov exponent obtain from the shell model $\\lambda^{\\rm GOY}$ (rescaled by a constant factor\nL000323\t\tto overlap with the DNS data since the Reynolds number ranges are different) with the\nL000324\t\tcorresponding shell model Reynolds numbers Re(GOY) (top X axis).\nL000325\t\t(Inset) A loglog plot of the probability density function $\\mathcal{P}$ for\nL000326\t\t$\\lambda_\\eta$ showing a power-law $|\\lambda_\\eta|^{-4}$ tail.}\nL000327\t\t\\label{fig:lambda}\nL000328\t\\end{figure}\nL000329\t\nL000330\tIn the statistically steady state (Appendix~\\ref{App_DNS}), let the velocity \\textit{field} be denoted as $u_n^{\\rm A}$. We\nL000331\tnow construct a second field $u_n^{\\rm B} = u_n^{\\rm A} \\forall n \\neq n_p$ and\nL000332\t$u_{n_p}^{\\rm B} = (1 + \\epsilon_0) u_{n_p}^{\\rm A}$. Our choice of $n_p = 16$ ensures\nL000333\tthat the tiny perturbation (with $\\epsilon_0 = 10^{-3}$) are always added at wavenumbers just before\nL000334\tthe onset of the dissipation scales for all the Reynolds number being considered. (We have checked that our results\nL000335\tare robust to the specific choice of $n_p$ or variations in $\\epsilon_0$.)\nL000336\t\nL000337\tWe now use the nearly-identical fields $u_n^{\\rm A}$ and $u_n^{\\rm B}$ as\nL000338\tinitial conditions and evolve the GOY shell model independently for systems A and B\nL000339\tand hence construct the shell model decorrelator $\\phi_n (t) \\equiv \\langle |u_n^{\\rm A} - u_n^{\\rm B}|^2 / 2\\rangle$\nL000340\tThe $\\langle \\cdot \\rangle$ denote an ensemble averaging over independent realisations of the initial field\nL000341\t$u_n^{\\rm A}$. While it is straightforward to write the evolution equation for $\\phi_n$ (Appendix~\\ref{App_shell}), we\nL000342\tfind this is neither revealing nor analytically\nL000343\ttractable. Instead, we choose to work with the numerically constructed $\\phi_n$ and assess its behaviour from\nL000344\tour simulations.\nL000345\t\nL000346\tGiven the local nature of interactions in the shell model\\cite{Luca_shell}, it is reasonable to\nL000347\texpect that decorrelators such as $\\phi_n$ may well have a self-similar short\nL000348\ttime growth followed by an eventual exponential rise with a saturation as $t\nL000349\t\\to \\infty$. In the inset of Fig.~\\ref{fig:shell-decorr} we show a loglog\nL000350\tplot of the temporal evolution of $\\phi_n$ for a small initial time window $0\nL000351\t\\le t \\lesssim 0.5$ with a clear power-law range for $n < n_p$. This power-law eventually ($t \\gtrsim 0.1$) gives way\nL000352\tto the\nL000353\texponential-growth phase of\nL000354\tdecorrelators. The\nL000355\tLyapunov exponent characterising such shell-by-shell decorrelators $\\phi_n$ are\nL000356\tof course $n$-dependent. Hence we find it useful to construct the $n$-independent Lyapunov exponent $\\lambda^{\\rm GOY}$\nL000357\tvia the integrated decorrelator $\\Phi^{\\rm GOY} = \\sum_1^N \\phi_n$.\nL000358\tIn the main panel of Fig.~\\ref{fig:shell-decorr} we show a semilog plot of the\nL000359\ttemporal evolution of $\\Phi^{\\rm GOY}$ for different values of Re\nL000360\tshowing, yet again, a clear exponential growth, with a shell model Lyapunov exponent\nL000361\t$\\lambda^{\\rm GOY}$, followed by a saturation to\nL000362\tvalues roughly corresponding to $2E_0$, with $E_0$ the statistically\nL000363\tsteady state energy in our shell model.\nL000364\t\nL000365\tWe can now summarise all of these ideas in answering the\nL000366\tquestion of how consistent are the various (largest) Lyapunov exponent ---\nL000367\t$\\lambda$, $\\lambda^{\\rm DNS}$, and $\\lambda^{\\rm GOY}$ --- with each other given the\nL000368\tdifferent ways and indeed the different models from which they are derived?\nL000369\tIn Fig.~\\ref{fig:lambda} we show a composite plot of $\\lambda$, $\\lambda^{\\rm\nL000370\tDNS}$ and $\\lambda^{\\rm GOY}$ versus the\nL000371\tReynolds number Re. For measurements from the DNSs and the GOY shell model\nL000372\tsimulations, we estimate the Lyapunov exponents from a linear fit in the\nL000373\texponential-growth\nL000374\tphase of the decorrelators (as shown in Figs.~\\ref{fig:DNS} and\nL000375\t\\ref{fig:shell-decorr}); the errors on such fits yield the errorbars on\nL000376\t$\\lambda^{\\rm DNS}$ and $\\lambda^{\\rm GOY}$. We find our errorbars smaller than\nL000377\tthe symbols sizes in Fig.~\\ref{fig:lambda}. The errorbars for the exponent\nL000378\t$\\gamma_3$ are extracted likewise and are of the same order as those on\nL000379\t$\\lambda^{\\rm DNS}$ and $\\lambda^{\\rm GOY}$.  The exponent $\\lambda$ is\nL000380\tobtained differently. We use plots of $\\dot{\\Phi}/\\Phi$, such as the one shown\nL000381\tin Fig.~\\ref{fig:Phi-theory}, to extract $\\lambda$ and its errorbar as the mean\nL000382\tand standard deviation of the plateau, respectively.\nL000383\t\nL000384\tWe find remarkable consistency (within error bars) between the different\nL000385\tmeasurements of the Lyapunov exponents and indeed across the different models,\nL000386\tas well as the range of Reynolds number between the DNSs (bottom axis) and\nL000387\tshell models (top axis), that we use. All the Lypanov exponents seem to follow\nL000388\ta universal scaling: $\\lambda^{\\rm DNS}$ = $\\lambda^{\\rm GOY}$ = $\\lambda$\nL000389\t$\\sim {\\rm Re}^{\\alpha}$, with $\\alpha = 0.59 \\pm 0.04$. Remarkably, combining the\nL000390\tshell model and DNS data we show in Fig.~\\ref{fig:lambda} that our reported scaling\nL000391\tholds for nearly 7 decades in Reynolds number.\nL000392\t\nL000393\tThe theory developed earlier suggests a connection between the Lyapunov exponent and the statistics of\nL000394\t$\\gamma_3$ with $\\lambda_S \\sim \\langle \\gamma_3 \\rangle + \\gamma_3^{\\rm std}$ (Appendix~\\ref{Phi_derivation}).\nL000395\tThe departure of the measured Lyapunov exponents (Fig.~\\ref{fig:lambda}) from a Kolmogorov-like mean field result $\\lambda \\sim \\langle \\gamma_3 \\rangle  \\sim \\sqrt{{\\rm Re}}$, is a clear indication that the\nL000396\tdeviation must stem from intermittent fluctuations and the dominant scaling in the statistics of $\\gamma_3$ is\nL000397\tdue to $\\gamma_3^{\\rm std} \\sim {\\rm Re}^\\alpha$. In Fig.~\\ref{fig:lambda} we show a plot of $\\gamma_3^{\\rm std}$ from our DNSs and find a near perfect agreement with the Lyapunov exponent confirming, nearly 7 decades in Reynolds number, the\nL000398\trobustness of this theory: $\\lambda = \\lambda^{\\rm DNS} = \\gamma_3^{\\rm std} \\sim {\\rm Re}^{0.59}$. Furthermore,\nL000399\twe confirm that the mean eigenvalue -$\\langle \\gamma_3 \\rangle \\sim \\sqrt{{\\rm Re}}$ (Fig.~\\ref{fig:lambda}) consistent with the simpler scaling analysis, not accounting\nL000400\tfor fluctuations, and at odds with the measured Lyapunov exponent.\nL000401\t\nL000402\tIn this work we have shown how recent ideas of decorrelators~\\cite{Subhro_PRL, Subhro_PRB,Lightcone,Shenker2014, GTEuler}\nL000403\tprovide a microscopic way to understand the origins of chaos in fully developed turbulence.\nL000404\tRemarkably, these ideas are just as robust for simpler, cascade models of turbulence where\nL000405\tlocality~\\cite{Luca_shell} ensures an\nL000406\tinitial scale-invariant growth of the decorrelator.\nL000407\tWe find signatures of these fluctuations in one further aspect of the strain\nL000408\tand viscous terms in Eq.~\\eqref{eq:Phi} which connects with the idea of\nL000409\tintermittency. The theory developed by us involve the\nL000410\t\\textit{mean} exponents: $\\lambda_S$ and $\\lambda_\\eta$ (and hence $\\lambda$)\nL000411\tare obtained from the spatial integrals over the corresponding terms.\nL000412\tHowever, it is possible to measure the \\textit{local} exponents\nL000413\t$\\lambda_S ({\\bf x}) \\equiv  \\frac{\\delta {\\bf u}\\cdot \\mathbf{S} \\cdot \\delta {\\bf\nL000414\tu}}{|\\delta {\\bf u}|^2/2}$ and $\\lambda_\\eta ({\\bf x}) \\equiv \\frac{\\nu \\delta {\\bf u}\nL000415\t\\cdot \\nabla^2 \\delta {\\bf u}}{|\\delta {\\bf u}|^2/2}$ in the exponential-growth\nL000416\tphase\nL000417\tand thence their probability distribution functions $\\mathcal{P}$.  These\nL000418\tdistribution are found to have\nL000419\texponential (for $\\lambda_S ({\\bf x})$) or power-law (for $\\lambda_\\eta ({\\bf x})$; see inset of\nL000420\tFig.~\\ref{fig:lambda}) tails strongly suggestive of intermittency and its connections with the question of\nL000421\tchaos in turbulence.\nL000422\tWe do not explore these ideas, and in particular\nL000423\tthe origins of the power-law tails, any further in this work as well as its implications for Lagrangian chaos~\\cite{Jeremie_Boffetta_Lagrangian_tracers,Ray2018}, but leave it for a more detailed\nL000424\tstudy of the statistics of $\\beta_S$ and $\\beta_\\eta$ in the future.\nL000425\t\nL000426\t\\begin{acknowledgements}\nL000427\t        We acknowledge Anupam Kundu, Siddhartha Mukherjee, Sthitadhi Roy, Sibaram Ruidas and Akash Sarkar for discussions on related issues.\nL000428\t\tA.B. acknowledges the Long Term Visiting Students' Program (LTSVP) of the\nL000429\t\tICTS-TIFR which enabled this collaboration.\nL000430\t\tSB acknowledges funding from the Swarna Jayanti fellowship of SERB-DST (India) Grant\nL000431\t\tNo. SB/SJF/2021-22/12 and DST, Government of India (Nano mission),\nL000432\t\tunder Project No. DST/NM/TUE/QM-10/2019 (C)/7.\nL000433\t\tS.S.R. acknowledges SERB-DST (India) projects\nL000434\t\tSTR/2021/000023 and CRG/2021/002766 for financial support.\nL000435\t\tThis research was supported in part by the International Centre for Theoretical Sciences (ICTS) for the programs -\nL000436\t\tField Theory and Turbulence ( (code:ICTS/ftt2023/12),\nL000437\t\tIndo-French workshop on Classical and quantum dynamics in out of equilibrium systems  (code: ICTS/ifwcqm2024/12) and\nL000438\t        10th Indian Statistical Physics Community Meeting (code: ICTS/10thISPCM2025/04).\nL000439\t\tThe simulations were performed on the ICTS clusters Mario, Tetris, and Contra.\nL000440\t\tThe authors\nL000441\t\tacknowledge the support of the DAE, Government of India,\nL000442\t\tunder projects nos. 12-R\\&D-TFR-5.10-1100 and RTI4001.\nL000443\t\\end{acknowledgements}\nL000444\t\nL000445\t\nL000446\t\nL000447\t\\bibliographystyle{apsrev4-2}\nL000448\t\\bibliography{decorrelator140525}\nL000449\t\\appendix\nL000450\t\\onecolumngrid\nL000451\t\nL000452\t\\section{Direct Numerical Simulations}\nL000453\t\\label{App_DNS}\nL000454\t\nL000455\t\\renewcommand{\\theequation}{A-\\arabic{equation}}\nL000456\t\\setcounter{equation}{0}\nL000457\t\nL000458\t\\subsection{The Navier-Stokes Equation}\nL000459\t\nL000460\tWe perform direct numerical simulations (DNSs), by using a pseudospectral method, of the three-dimensional (3D),\nL000461\tincompressible, unit density Navier Stokes equation, with the pressure field $P$\nL000462\t\\begin{equation}\nL000463\t\t\\frac{\\partial {\\bf u}}{\\partial t} + {\\bf u}\\cdot\\nabla {\\bf u} = \\nu \\nabla^2 {\\bf u} - \\nabla P + {\\bf f}.\nL000464\t\\label{eq:NS}\nL000465\t\\end{equation}\nL000466\ton a periodic box of size $L = 2\\pi$ with $N^3$ collocation points. We choose $N = 256$ and $N = 512$ (to check for numerical\nL000467\tconvergence) and vary the coefficient viscosity $10^{-3}\\le \\nu \\le 32\\times10^{-3}$ to obtain Reynolds numbers $ 50 \\le {\\rm Re} \\le 1400 $.\nL000468\tWe use a second-order\nL000469\tAdams-Bashforth for time-marching with a time step $\\delta t = 5  \\times 10^{-4} $ (for $N = 256$) and\nL000470\t$\\delta t = 4\\times 10^{-4} \\ $ (for $N = 512$).\nL000471\t\nL000472\tWe initialise the flow with a random initial condition such that the\nL000473\tinitial energy spectrum spectrum $E(k) = A_0 k^2 \\exp(-k^2 / 2k_0^2)$ with $A_0\nL000474\t= k_0 = 1$. The system is driven to a non-equilibrium steady state (NESS)\nL000475\tthrough a large-scale forcing with a constant energy injection at large scales\nL000476\tcorresponding to wavenumber $1 \\le k_{\\rm force}\\le 2$.\nL000477\t\nL000478\tThis statistically steady velocity field ${\\bf u}$ is taken as the initial field for system A: ${\\bf u_0}^{\\rm A}\nL000479\t\\equiv {\\bf u}$ and further define the initial condition for system B via ${\\bf u_0}^{\\rm B} = {\\bf u_0}^{\\rm A} +\nL000480\t\\delta {\\bf u_0}$. We use a Gaussian perturbation\nL000481\t$\\delta {\\bf u}_0 ({\\bf x}) = \\epsilon_0 \\exp{(-(x - x_0)^2 / 2\\sigma_0^2)}{\\bf \\hat{x}}$ with $\\epsilon_0 = 10^{-5}$, $\\sigma_0=4{\\rm d}x $ and $x_0 = ({\\pi, \\pi, \\pi})$ at the center of the domain and which also satisfies the incompressibility constraint.\nL000482\t\nL000483\tThe nearly identical fields  ${\\bf u_0}^{\\rm A}$ and  ${\\bf u_0}^{\\rm B}$ are then used as initial conditions for the Navier-Stokes\nL000484\tequation and evolved as before.\nL000485\tThe decorrelator is calculated from the evolution of such twin simulations as\nL000486\t$\\phi({\\bf x},t) = |{\\bf u}^{\\rm B} - {\\bf u}^{\\rm A}|^2/2$ and thence $\\Phi(t) = \\int d{\\bf x} \\phi({\\bf x},t) / \\mathcal{V}$.\nL000487\tThe decorrelators are then used to estimate the Lyapunov exponents (obtained by fitting the initial exponential growth phase)\nL000488\tand its dependence on the Reynolds number.\nL000489\t\nL000490\t\\subsection{The Gledzer-Ohkitani-Yamada (GOY) Model}\nL000491\tThe Gledzer-Ohkitani-Yamada or the GOY shell model\nL000492\t\\begin{eqnarray}\nL000493\t\t\\frac{d}{dt} u_n &=& \\iota k_n [u_{n+2}u_{n+1} - \\frac{1}{4}u_{n+1}u_{n-1}\nL000494\t\t- \\frac{1}{8} u_{n-1}u_{n-2}]^* \\nonumber \\\\ &-& \\nu k_n^2 u_n + f\nL000495\t\t\\label{eq:GOY}\nL000496\t\\end{eqnarray}\nL000497\tis one of several cascade models which mimic Navier-Stokes turbulence and are designed to achieve\nL000498\tvery high Reynolds number.\nL000499\tIn such models, the velocities $u_n$ (with boundary conditions $u_{-1} =\nL000500\tu_{0} = u_{N+1} = u_{N+2} = 0$)  associated with a scalar, exponentially\nL000501\tgrowing, wave-number $k_n = k_0 2^n$, are complex, dynamical\nL000502\tvariables. The shell numbers range from $1 \\le n \\le N$; in our simulations we\nL000503\tchoose $N = 22$ and the coefficient of viscosity varies as $2\\times 10^{-7} \\le\nL000504\t\\nu \\le 64 \\times 10^{-7}$ yielding Reynolds numbers in the range $ 8.7 \\times 10^6\nL000505\t \\le {\\rm Re}\nL000506\t\\le 2.6 \\times 10^8$; the shell model,\nL000507\tReynolds number is simply defined as ${\\rm Re} = |u_{\\rm rms}|/k_0\\nu$.\nL000508\tThe equation is integrated numerically by using a second-order Runge-Kutta scheme with a time step $\\delta t = 2 \\times 10^{-5}$\nL000509\tThe constant amplitude forcing $f = 0.1$, applied on the $n = 2$  shell and drives the system to a statistically steady\nL000510\tstate~\\cite{Ray2008}.\nL000511\t\nL000512\tAs with the strategy for the Navier-Stokes equation, we first obtain a non-equilibrium statistically steady\nL000513\tstate with  an energy spectrum $E(k_n) \\equiv |u_n|^2/k_n \\sim k_n^{-5/3}$ over an inertial range\nL000514\tof shells whose extent is determined by Re. We use this steady state velocity field to define the initial\nL000515\tfield for system A --- $u_{n,0}^{\\rm A}$ and construct the initial condition for system B via\nL000516\t$u^B_{n,0} = (1 + \\epsilon_0)\nL000517\t\\delta_{n,n_p} u_{n,0}^A$. In all our simulations we have used $\\epsilon_0 =\nL000518\t0.001$ and $n_p = 16$.  Numerically it has been seen that the shell wise\nL000519\tdecorrelators first show an power-law rise later followed by the\nL000520\texponential-{growth}\nL000521\tregime. The initial power law largely depends on the\nL000522\tdistance from the perturbed shell. Therefore, we add the perturbation in a fixed\nL000523\tshell $n_p = 16$ for all values of ${\\rm Re}$.\nL000524\t\nL000525\t\nL000526\t\nL000527\t\nL000528\t\nL000529\t\\section{Derivation of the decorrelator from the Navier-Stokes equation and its limits} \\label{Phi_derivation}\nL000530\t\\renewcommand{\\theequation}{B-\\arabic{equation}}\nL000531\t\\setcounter{equation}{0}\nL000532\t\\subsection{Evolution equation for $\\phi({\\bf r},t)$ and $\\Phi$}\nL000533\tIn this section we provide the derivation of the equation of motion of the decorrelator for the Navier-Stokes equation and\nL000534\tin particular estimate the long and short time limits of $\\beta_S$ and $\\beta_\\eta$.\nL000535\t\nL000536\tWe begin by recalling that the pressure term in the Navier-Stokes equation can be rewritten as a Poisson equation\nL000537\t\\begin{equation}\nL000538\t\\nabla^2 P = - {\\partial_j u_i}{\\partial_i u_j}\nL000539\t\\end{equation}\nL000540\tby exploiting the incompressibility constraint. This Poisson equation underlines the non-local nature of turbulence.\nL000541\t\nL000542\tIt is useful, in what follows, to have a Green's function representation\nL000543\t\\begin{equation}\nL000544\t\tP({\\bf x}) = -\\int {\\rm d}{\\bf x} G({\\bf x},{\\bf x}^\\prime)\nL000545\t\t\\left [{\\partial_j u_i}{\\partial_i u_j}\\right ]^\\prime\nL000546\t\\end{equation}\nL000547\t\twhere the $\\prime$ denotes the quantity evaluated at ${\\bf x}^\\prime$.\nL000548\t\nL000549\tThis allows us to construct the\nL000550\tevolution equation of the solenoidal\nL000551\tvelocity perturbation $\\delta {\\bf u} = {\\bf u}^{\\rm B} - {\\bf u}^{\\rm A}$ in component form\nL000552\t\\begin{equation}\nL000553\t\\frac{\\partial \\delta u_i}{\\partial t} = - \\delta u_j \\partial_j u_i^{\\rm A} - u_j^{\\rm B} \\partial_j \\delta u_i\nL000554\t-  \\partial_i \\left(\\int {\\rm d}{\\bf x}\nL000555\tG({\\bf x},{\\bf x'}) [\\partial^2_{jk} (u_j^{\\rm A}\\delta u_k +\\delta u_j u_k^{\\rm A} + \\delta u_j\\delta u_k)]'\\right) + \\nu \\nabla^2 \\delta u_i + \\delta u_i \\delta f_{i}\nL000556\t\\label{delu}\nL000557\t\\end{equation}\nL000558\tand hence, via a dot product of  $\\delta {\\bf u}$ with Eq.~\\eqref{delu}, the equation for\nL000559\tthe decorrelator $\\phi ({\\bf r},t)$:\nL000560\t\\begin{equation}\nL000561\t\\frac{\\partial \\phi}{\\partial t} = - \\delta u_i S_{ij} \\delta u_j\nL000562\t-  \\partial_i W_i + \\nu \\delta u _i\\nabla^2 \\delta u_i + \\delta u_i \\delta f_{i}.\nL000563\t\\label{phi_resolved}\nL000564\t\\end{equation}\nL000565\tHere, $S_{ij} = \\frac{1}{2}  (\\partial_j u_i^{\\rm A} + \\partial_i u_j^{\\rm A})$ is the strain-rate tensor\nL000566\tand $W_i = u_i^{\\rm B} \\phi + \\delta u_i\\int {\\rm d}{\\bf x}\nL000567\tG({\\bf x},{\\bf x'}) [\\partial^2_{jk} (u_j^{\\rm A}\\delta u_k +\\delta u_j u_k^{\\rm A} + \\delta u_j\\delta u_k)]'$.\nL000568\t\nL000569\tA spatial integration with $\\Phi = \\int d{\\bf x} \\phi$ now leads to the cancellation of the divergence term and hence\nL000570\t\\begin{equation}\nL000571\t\\frac{d\\Phi}{dt} = - \\langle \\delta u_i S_{ij} \\delta u_j\\rangle +\\nu \\langle \\delta u_i \\nabla^2 \\delta u_i \\rangle + \\langle \\delta u_i \\delta f_i\\rangle \\equiv \\beta_S + \\beta_\\eta + \\langle \\delta u_i \\delta f_i\\rangle\nL000572\t\\end{equation}\nL000573\tthe evolution equation for our spatially integrated decorrelator as discussed in the main text of the manuscript.\nL000574\t\nL000575\t\nL000576\t\nL000577\t\nL000578\t\nL000579\t\nL000580\t\\subsection{Short and long-time asymptotics of $\\beta_S$}\nL000581\tAt early times, $\\langle \\delta u_i \\delta f_i\\rangle = 0$ (since the forcing terms are nearly identical), the pre saturation exponential growth of the decorrelator with the Lyapunov exponent $\\lambda = \\lambda^{\\rm DNS} \\sim \\lambda_S$\nL000582\tis controlled by the short time asymptotics of $\\beta_S$. Hence, in what follows, we drop the contribution from\nL000583\t$\\beta_\\eta$, to simplify notation.\nL000584\t\nL000585\tWe now expand  $\\delta u_i S_{ij} \\delta u_j$ in the eigenbasis of the strain-rate tensor, with eigenvalues\nL000586\t$\\gamma_i$ and direction cosines $\\cos\\theta_i$, to obtain\nL000587\t\\begin{equation}\nL000588\t\t\\frac{\\partial}{\\partial t} \\phi = - \\phi({\\bf x},t)\\, \\Gamma({\\bf x},t)\nL000589\t\t\\label{eq:beta_S}\nL000590\t\\end{equation}\nL000591\twith\nL000592\t$\\Gamma({\\bf x},t) \\equiv \\left(\\sum_{i=1}^{3} \\gamma_i({\\bf x}, t) \\cos^2\\theta_i({\\bf x}, t)\\right)\nL000593\t\\approx \\gamma_3({\\bf x}, t) \\cos^2\\theta_3({\\bf x}, t)$ dominated by the compressional eigendirection\nL000594\tas discussed in the main text.\nL000595\t\nL000596\tWe choose an integrating factor  $e^{\\Theta({\\bf x}, t)}$, such that\nL000597\t$\\partial_t \\Theta({\\bf x}, t) = \\Gamma({\\bf x}, t)$, to obtain the form of the spatially-resolved decorrator\nL000598\tat time $t$\nL000599\t\\begin{equation}\nL000600\t\\phi({\\bf x}, t) = \\phi({\\bf x}, 0) e^{\\Theta({\\bf x}, 0) -\\Theta({\\bf x}, t)}\nL000601\t\t\\label{eq:IF}\nL000602\t\\end{equation}\nL000603\t\nL000604\tWe are now able to spatially integrate Eq.~\\eqref{eq:IF} and, keeping in mind that the initially localised perturbation\nL000605\t$\\phi({\\bf x}, 0)$ is independent of $e^{\\Theta({\\bf x}, 0) -\\Theta({\\bf x}, t)}$, we obtain\nL000606\t\\begin{equation}\nL000607\t\\Phi(t) = \\Phi(0) \\langle e^{\\Theta({\\bf x}, 0) -\\Theta({\\bf x}, t)} \\rangle\nL000608\t\t\\label{eq:IF-int}\nL000609\t\\end{equation}\nL000610\twhere the angular brackets $\\langle \\cdot \\cdot \\rangle \\equiv \\int d{\\bf x} (\\cdot \\cdot)$.\nL000611\t\nL000612\tSince we are interested in the short-time asymptotics of $\\beta_S$, it is possible to Taylor expand\nL000613\tthe exponential and, keeping in mind the mapping of $\\Theta$ to $\\Gamma$, we obtain\nL000614\t\\begin{equation}\nL000615\t\\Phi(t) \\lesssim \\Phi(0) \\exp \\left[ \\sum_{p = 1}^\\infty \\frac{(-1)^p}{p!} \\langle \\Delta \\Theta({\\bf x}, t)^p\\rangle \\right]\nL000616\t\t\\label{eq:exp}\nL000617\t\\end{equation}\nL000618\twhere $\\Delta \\Theta({\\bf x}, t) = \\Theta({\\bf x}, t) - \\Theta({\\bf x}, 0)$.\nL000619\tConsidering terms up to $\\mathcal{O}(\\Delta \\Theta^2)$, to account for corrections stemming from intermittent\nL000620\tfluctuations~\\cite{BereraPRL},\nL000621\t\\begin{equation}\nL000622\t\\Phi(t) \\lesssim \\Phi(0) \\exp \\left [- \\langle \\Delta \\Theta \\rangle + \\frac{1}{2}\\langle \\Delta \\Theta^2\\rangle \\right ]\nL000623\t\t\\label{eq:2ndorder}\nL000624\t\\end{equation}\nL000625\t\nL000626\tNow all that remains is the evaluation of $\\langle \\Delta \\Theta \\rangle$ and $\\langle \\Delta \\Theta^2\\rangle$.\nL000627\t\nL000628\tFrom the choice of $\\Theta$ it is easy to see (by interchanging time and space integrals\nL000629\t$\\langle \\cdot \\cdot \\rangle \\equiv \\int d{\\bf x} (\\cdot \\cdot)$ suitably) that $\\langle \\Delta \\Theta \\rangle \\propto \\langle \\gamma_3 \\rangle \\sim  \\sqrt{{\\rm Re}}$ (see Fig. 4 of the main text). The determination of $\\langle \\Delta \\Theta^2\\rangle$\nL000630\trequires a further Ansatz of an approximate delta-correlation in time, at least over time-scales of the order\nL000631\tassociated with strain-rate,\nL000632\tto yield  $\\langle \\Delta \\Theta^2\\rangle \\propto \\gamma_3^{\\rm std} \\sim {\\rm Re}^{0.59}$ (see Fig. 4\nL000633\tof the main text as well as Fig.~\\ref{3fig}(c) which shows that indeed the distribution of\nL000634\t$\\gamma_3$ changes with Re) which, in the large Reynolds number limit dominates over the  $\\sqrt{{\\rm Re}}$ of the mean exponent.\nL000635\tHence $\\lambda = \\lambda^{\\rm DNS} \\sim \\lambda_S \\sim {\\rm Re}^\\alpha$ with $\\alpha = 0.59 \\pm 0.04$.\nL000636\t\nL000637\t\nL000638\tThis then completes the proof of how the intermittency induced fluctuations determines the Lyapunov exponent\nL000639\tfor fully-developed turbulence.\nL000640\t\nL000641\t\nL000642\tAt long times, beyond the exponential-growth phase when the systems have\nL000643\tstarted to completely decorrelate the forcing term can not be neglected.  Thus\nL000644\tas $t \\to \\infty$, we estimate   $\\langle \\delta u_i \\delta f_i \\rangle =\nL000645\t\\langle u^B_i f^B_i \\rangle + \\langle u^A_i f^A_i \\rangle - \\langle (u^B_i\nL000646\tf^A_i + u^A_i f^B_i) \\rangle \\to 2\\overline{\\langle \\varepsilon\\rangle}$. As we\nL000647\tshall see below, this exactly compensates the contribution of the viscous term\nL000648\t$\\beta_\\eta$ at long times.\nL000649\t\nL000650\t\nL000651\t\nL000652\t\nL000653\t\nL000654\t\\subsection{Short and long-time asymptotics of $\\beta_\\eta$}\nL000655\t\nL000656\tThe viscous term can be expanded as\nL000657\t\\begin{eqnarray}\nL000658\t\\beta_\\eta &=& \\nu\\langle \\delta u_i \\nabla^2 \\delta u_i \\rangle = - \\nu\\langle \\partial_j \\delta u_i \\partial_j \\delta u_i\\rangle \\nonumber\\\\\nL000659\t&=& -\\nu \\langle(\\partial_i u_j^B \\partial_i u^B_j + \\partial_i u_j^A \\partial_i u^A_j - 2\\partial_i u_j^B \\partial_i u^A_j) \\rangle \\nonumber\\\\\nL000660\t&=& - 4\\nu \\operatorname{Tr}(S^2) + 2 \\nu \\langle \\partial_i u_j^{\\rm A} \\partial_i u_j^{\\rm B}\\rangle = 2\\langle \\varepsilon\\rangle + 2 \\nu \\langle \\partial_i u_j^{\\rm A} \\partial_i u_j^{\\rm B}\\rangle.\nL000661\t\\end{eqnarray}\nL000662\t\nL000663\tWe find at short times, in the exponential-growth phase,\nL000664\tthis terms scales as $\\beta_\\eta =  \\mathcal{O}(1/\\tau_\\eta)$,\nL000665\twhere $\\tau_\\eta = \\sqrt{\\frac{\\nu}{\\overline{\\langle\nL000666\t\\varepsilon\\rangle} }}$ corresponds to the smallest Kolmogorov time scales.\nL000667\tHowever, at long times $t \\to \\infty$, systems A and B decorrelate leading to\nL000668\t$\\langle \\partial_i u_j^{\\rm A} \\partial_i u_j^{\\rm B}\\rangle \\to 0$ and hence\nL000669\t$\\beta_\\eta \\sim -2\\langle\\varepsilon\\rangle$ (see Fig.~\\ref{3fig}(a) as well as the main text).\nL000670\tThis is easily understandable because, on average, dissipation is balanced by the energy injection derived above.\nL000671\t\nL000672\t\\begin{figure}\nL000673\t \\includegraphics[width = 0.45\\linewidth]{match_eta}\nL000674\t \\includegraphics[width = 0.45\\textwidth]{alpha_long_3}\\\\\nL000675\t \\includegraphics[width = 0.45\\linewidth]{plot_gamma_3_1.png}\nL000676\t \\includegraphics[width = 0.44\\linewidth]{shell_spread.png}\nL000677\t\t\\caption{(a) Plots of $\\beta_\\eta$, at late times,\nL000678\t\tfor different Reynolds numbers, showing a saturation to $-2 \\overline{\\langle \\varepsilon \\rangle}$ (black dotted, horizontal\nL000679\t\tline). (b) A plot of the probability distribution of components of $\\delta {\\bf u}$ (for ${\\rm Re} = 358.2$), for the Navier-Stokes equation,\nL000680\t\talong the three eigen vectors of\nL000681\t\tthe strain rate tensor at late times once the decorrelator saturates.\nL000682\t\t(c) The distribution of the compressional eigenvalues for different values of ${\\rm Re}$. Both the peak and the spread of the distribution scales with ${\\rm Re}$.\nL000683\t\t(d) The evolution of $\\phi_n$ vs $k_n$, for the GOY shell model, on a loglog scale at different times; the late\nL000684\t\ttime shows an asymptotic scaling corresponding to $k_n^{-2/3}$ indicated by the dashed line.}\nL000685\t \\label{3fig}\nL000686\t\\end{figure}\nL000687\t\nL000688\t\nL000689\t\nL000690\t\nL000691\t\nL000692\t\nL000693\t\nL000694\t\nL000695\t\nL000696\t\\section{Decorrelator in the shell model for turbulence} \\label{App_shell}\nL000697\t\\renewcommand{\\theequation}{C-\\arabic{equation}}\nL000698\t\\setcounter{equation}{0}\nL000699\tIt is possible to construct an evolution equation for the decorrelator in our shell model but, as we shall see, its structure is\nL000700\tless transparent than what we have seen for the Navier-Stokes equation.\nL000701\t\nL000702\tBy subtracting the GOY model equations for systems A and B we obtain\nL000703\tthe evolution of the shell-by-shell  velocity difference $\\delta u_n = u_n^{\\rm B} - u_n^{\\rm A}$:\nL000704\t\\begin{eqnarray}\nL000705\t    \\frac{d}{dt} \\delta u_n\nL000706\t    &=& \\iota k_n [(\\delta u_{n+2}u^{\\rm A}_{n+1} + \\delta u_{n+2}u^{\\rm A}_{n+1} + \\delta u_{n+2}\\delta u_{n+1}) - \\frac{\\epsilon}{\\lambda}(\\delta u_{n+1}u^{\\rm A}_{n-1} + \\delta u_{n+1}u^{\\rm A}_{n-1} + \\delta u_{n+1}\\delta u_{n-1})  \\nonumber \\\\\nL000707\t    &+& \\frac{(\\epsilon - 1)}{\\lambda^2} (\\delta u_{n-2}u^{\\rm A}_{n-1} + \\delta u_{n-2}u^{\\rm A}_{n-1} + \\delta u_{n-2}\\delta u_{n-1})]^* - \\nu k_n^2 \\delta u_n.\nL000708\t\\label{shell_diff}\nL000709\t\\end{eqnarray}\nL000710\tFrom this by suitably multiplying with the complex conjugate field $\\delta u^*$, the decorrlator obeys\nL000711\t\nL000712\t\\begin{eqnarray}\nL000713\t\\frac{d}{dt} \\phi_n &=& \\frac{\\iota k_n}{2} [(\\delta u_{n+2}u^{\\rm A}_{n+1}\\delta u_{n} + \\delta u_{n+2}u^{\\rm A}_{n+1}\\delta u_{n} + \\delta u_{n+2}\\delta u_{n+1}\\delta u_{n}) - \\frac{\\epsilon}{\\lambda}(\\delta u_{n+1}\\delta u_{n}u^{\\rm A}_{n-1} + \\delta u_{n+1}\\delta u_{n}u^{\\rm A}_{n-1} \\nonumber\\\\\nL000714\t&+& \\delta u_{n+1}\\delta u_{n}\\delta u_{n-1}) + \\frac{(\\epsilon - 1)}{\\lambda^2} (\\delta u_{n-2}u^{\\rm A}_{n-1}\\delta u_{n} + \\delta u_{n-2}u^{\\rm A}_{n-1}\\delta u_{n} + \\delta u_{n-2}\\delta u_{n-1}\\delta u_{n})]^* + c.c. - 2\\nu k_n^2 \\phi_n.\nL000715\t\\label{shell_phi}\nL000716\t\\end{eqnarray}\nL000717\tA summation over all shells leads to simplifications in the evolution of the GOY model decorrelator $\\Phi^{\\rm GOY}$\nL000718\t\\begin{eqnarray}\nL000719\t\t\\frac{d}{dt}\\Phi^{\\rm GOY} &=& \\frac{\\iota}{2} \\sum k_n [\\epsilon\\delta u_{n} u^{\\rm A}_{n+1}\\delta u _{n+2} + (1-\\epsilon)\\delta u_{n} \\delta u_{n+1}u^{\\rm A} _{n+2} - u^{\\rm A}_{n} \\delta u_{n+1}\\delta u _{n+2}]^* + c.c - 2\\nu \\sum_n k_n^2 \\phi_n\nL000720\t\\end{eqnarray}\nL000721\t\nL000722\tFurther progress is only possible through a numerical solution of the\nL000723\tdecorrelator equation as we report in the main text of the manuscript. The\nL000724\tshell-wise decorrelator at very short times show a power-law growth with a\nL000725\twavenumber-dependent scaling exponent.  In particular at long times when the\nL000726\tdecorrelator saturates, we find, unsurprisingly, $|\\delta u_n|^2 \\sim |u_n|^2\nL000727\t\\sim k_n^{-2/3}$ as shown in Fig.~\\ref{3fig}(d).\nL000728\t\nL000729\t\nL000730\t\nL000731\t\nL000732\t\\end{document}\nL000733\t===== END FILE: decorrelator140525.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides a quantitative relation between the Lyapunov exponent and Reynolds number in turbulence, with a fitted exponent alpha = 0.59 ± 0.04, supported by DNS and shell model data. The selected cluster is the scaling lambda ~ Re^alpha, with controls Re (DNS and GOY ranges) and readouts lambda, lambda_DNS, lambda_GOY, gamma3_std, and -<gamma3>. The source reports two regimes: DNS (Re 50-1400) and GOY shell model (Re 8.7e6-2.6e8), which can be treated as separate claims sharing the same mechanism. The extraction is case_authoring_ready because there is at least one numeric control (Re), numeric readouts (lambda etc.), a quantitative mechanism (lambda ~ Re^alpha), and an explicit domain.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Aikya Banerjee, Intermittent Fluctuations Determine the Nature of Chaos in Turbulence, Physical Review Letters (2026), DOI:10.1103/1dj2-zw28\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/1dj2-zw28\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2505.09538v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper studies the Reynolds number dependence of the largest Lyapunov exponent in fully developed turbulence, using decorrelators from the Navier-Stokes equation and the GOY shell model. It derives a scaling lambda ~ Re^alpha with alpha = 0.59 ± 0.04, and connects this to intermittent fluctuations in the compressional eigenvalue of the strain-rate tensor.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"lyapunov_scaling\\\",\\n      \\\"statement\\\": \\\"The Lyapunov exponent lambda scales as a power law with Reynolds number: lambda ~ Re^alpha, with alpha = 0.59 ± 0.04. This scaling is universal across DNS and GOY shell model, and is dominated by the standard deviation of the compressional eigenvalue gamma_3^std ~ Re^alpha, while the mean -<gamma_3> ~ sqrt(Re).\\\",\\n      \\\"equations\\\": [\\n        \\\"lambda = lambda_DNS = lambda_GOY ~ Re^alpha, alpha = 0.59 ± 0.04\\\",\\n        \\\"lambda_S ~ <gamma_3> + gamma_3^std\\\",\\n        \\\"gamma_3^std ~ Re^alpha\\\",\\n        \\\"-<gamma_3> ~ sqrt(Re)\\\"\\n      ],\\n      \\\"variable_names\\\": [\\\"lambda\\\", \\\"lambda_DNS\\\", \\\"lambda_GOY\\\", \\\"Re\\\", \\\"alpha\\\", \\\"gamma_3\\\", \\\"gamma_3^std\\\", \\\"<gamma_3>\\\", \\\"lambda_S\\\"],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"alpha_lyapunov\\\",\\n          \\\"value\\\": 0.59,\\n          \\\"uncertainty\\\": \\\"± 0.04 (convention source_unspecified)\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"power-law exponent in lambda ~ Re^alpha\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 46, \\\"line_end\\\": 47, \\\"support\\\": \\\"Abstract states alpha = 0.59 ± 0.04.\\\"},\\n            {\\\"line_start\\\": 388, \\\"line_end\\\": 391, \\\"support\\\": \\\"Universal scaling lambda_DNS = lambda_GOY = lambda ~ Re^alpha with alpha = 0.59 ± 0.04, holding for nearly 7 decades in Re.\\\"},\\n            {\\\"line_start\\\": 635, \\\"line_end\\\": 635, \\\"support\\\": \\\"lambda = lambda_DNS ~ lambda_S ~ Re^alpha with alpha = 0.59 ± 0.04.\\\"}\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"gamma3_std_exponent\\\",\\n          \\\"value\\\": 0.59,\\n          \\\"uncertainty\\\": \\\"± 0.04 (convention source_unspecified)\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"power-law exponent in gamma_3^std ~ Re^alpha\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 397, \\\"line_end\\\": 398, \\\"support\\\": \\\"gamma_3^std ~ Re^alpha and lambda = lambda_DNS = gamma_3^std ~ Re^0.59.\\\"},\\n            {\\\"line_start\\\": 632, \\\"line_end\\\": 634, \\\"support\\\": \\\"<Delta Theta^2> proportional to gamma_3^std ~ Re^0.59.\\\"}\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mean_gamma3_exponent\\\",\\n          \\\"value\\\": 0.5,\\n          \\\"uncertainty\\\": \\\"None reported\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"power-law exponent in -<gamma_3> ~ sqrt(Re)\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 399, \\\"line_end\\\": 400, \\\"support\\\": \\\"Mean eigenvalue -<gamma_3> ~ sqrt(Re).\\\"},\\n            {\\\"line_start\\\": 629, \\\"line_end\\\": 629, \\\"support\\\": \\\"<Delta Theta> proportional to <gamma_3> ~ sqrt(Re).\\\"}\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 46, \\\"line_end\\\": 48, \\\"support\\\": \\\"Abstract: alpha = 0.59 ± 0.04 and departure from Kolmogorov mean field lambda ~ sqrt(Re).\\\"},\\n        {\\\"line_start\\\": 388, \\\"line_end\\\": 391, \\\"support\\\": \\\"Universal scaling lambda_DNS = lambda_GOY = lambda ~ Re^alpha with alpha = 0.59 ± 0.04, nearly 7 decades.\\\"},\\n        {\\\"line_start\\\": 393, \\\"line_end\\\": 400, \\\"support\\\": \\\"Theory connects lambda_S ~ <gamma_3> + gamma_3^std; gamma_3^std ~ Re^alpha and -<gamma_3> ~ sqrt(Re).\\\"},\\n        {\\\"line_start\\\": 635, \\\"line_end\\\": 635, \\\"support\\\": \\\"lambda = lambda_DNS ~ lambda_S ~ Re^alpha with alpha = 0.59 ± 0.04.\\\"}\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"dns_setup\\\",\\n      \\\"statement\\\": \\\"DNS of 3D incompressible Navier-Stokes on a 2π triply-periodic box with N=256 or 512 collocation points, pseudospectral method, second-order Adams-Bashforth time stepping, constant energy injection at wavenumbers 1 ≤ k_force ≤ 2, initial perturbation Gaussian with epsilon_0 = 1e-5, sigma_0 = 4 dx, localized at center.\\\",\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 460, \\\"line_end\\\": 470, \\\"support\\\": \\\"DNS details: periodic box L=2π, N=256/512, viscosity range, time steps.\\\"},\\n        {\\\"line_start\\\": 472, \\\"line_end\\\": 481, \\\"support\\\": \\\"Initial spectrum, forcing, and Gaussian perturbation parameters.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"goy_setup\\\",\\n      \\\"statement\\\": \\\"GOY shell model with N=22 shells, k_n = k_0 2^n, k_0 = 1, constant forcing f = 0.1 on shell n=2, second-order Runge-Kutta with time step 2e-5, perturbation epsilon_0 = 0.001 on shell n_p = 16.\\\",\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 499, \\\"line_end\\\": 510, \\\"support\\\": \\\"GOY model parameters: N=22, viscosity range, Re definition, time step, forcing.\\\"},\\n        {\\\"line_start\\\": 515, \\\"line_end\\\": 523, \\\"support\\\": \\\"Perturbation epsilon_0 = 0.001 and n_p = 16.\\\"}\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"Re_DNS\\\",\\n      \\\"definition\\\": \\\"Reynolds number in the DNS simulations, varied by changing kinematic viscosity.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 50,\\n      \\\"maximum\\\": 1400,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400 obtained by varying viscosity 1e-3 ≤ ν ≤ 32e-3.\\\",\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 467, \\\"line_end\\\": 467, \\\"support\\\": \\\"Vary viscosity to obtain Reynolds numbers 50 ≤ Re ≤ 1400.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"Re_GOY\\\",\\n      \\\"definition\\\": \\\"Reynolds number in the GOY shell model, defined as Re = |u_rms|/(k_0 ν).\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 8700000,\\n      \\\"maximum\\\": 260000000,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"Reynolds numbers in range 8.7e6 ≤ Re ≤ 2.6e8, with viscosity varying 2e-7 ≤ ν ≤ 64e-7.\\\",\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 503, \\\"line_end\\\": 507, \\\"support\\\": \\\"Viscosity range yields Re range 8.7e6 to 2.6e8; Re defined as |u_rms|/k_0 ν.\\\"}\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"lambda_DNS\\\",\\n      \\\"definition\\\": \\\"Largest Lyapunov exponent extracted from the exponential growth phase of the spatially averaged decorrelator Φ(t) in DNS.\\\",\\n      \\\"unit\\\": \\\"1/time (arbitrary units)\\\",\\n      \\\"statistic\\\": \\\"Linear fit to the exponential growth phase of Φ(t); errorbars from fit errors.\\\",\\n      \\\"uncertainty\\\": \\\"Errorbars smaller than symbol sizes; convention not specified.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 289, \\\"line_end\\\": 295, \\\"support\\\": \\\"Φ from DNS shows exponential regime from which λ_DNS is extracted.\\\"},\\n        {\\\"line_start\\\": 371, \\\"line_end\\\": 376, \\\"support\\\": \\\"Lyapunov exponents estimated from linear fit in exponential-growth phase; errors from fits.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"lambda_GOY\\\",\\n      \\\"definition\\\": \\\"Lyapunov exponent from the integrated GOY shell model decorrelator Φ^GOY = sum_n φ_n, extracted from exponential growth phase.\\\",\\n      \\\"unit\\\": \\\"1/time (arbitrary units)\\\",\\n      \\\"statistic\\\": \\\"Linear fit to exponential growth phase of Φ^GOY; errorbars from fit errors.\\\",\\n      \\\"uncertainty\\\": \\\"Errorbars smaller than symbol sizes; convention not specified.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 356, \\\"line_end\\\": 361, \\\"support\\\": \\\"λ^GOY from integrated decorrelator Φ^GOY showing exponential growth.\\\"},\\n        {\\\"line_start\\\": 371, \\\"line_end\\\": 376, \\\"support\\\": \\\"Lyapunov exponents estimated from linear fit; errors from fits.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"gamma3_std\\\",\\n      \\\"definition\\\": \\\"Standard deviation of the compressional eigenvalue γ_3 of the strain-rate tensor, measured from DNS.\\\",\\n      \\\"unit\\\": \\\"1/time (arbitrary units)\\\",\\n      \\\"statistic\\\": \\\"Standard deviation of γ_3 distribution; errorbars extracted similarly to λ_DNS.\\\",\\n      \\\"uncertainty\\\": \\\"Errorbars of same order as λ_DNS; convention not specified.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 377, \\\"line_end\\\": 379, \\\"support\\\": \\\"Errorbars for γ_3 extracted likewise and of same order as λ_DNS.\\\"},\\n        {\\\"line_start\\\": 397, \\\"line_end\\\": 398, \\\"support\\\": \\\"Plot of γ_3^std from DNS shows near perfect agreement with Lyapunov exponent.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"mean_gamma3_abs\\\",\\n      \\\"definition\\\": \\\"Absolute value of the mean compressional eigenvalue -<γ_3> of the strain-rate tensor, measured from DNS.\\\",\\n      \\\"unit\\\": \\\"1/time (arbitrary units)\\\",\\n      \\\"statistic\\\": \\\"Mean of γ_3 distribution; errorbars not explicitly reported.\\\",\\n      \\\"uncertainty\\\": \\\"Not reported.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 399, \\\"line_end\\\": 400, \\\"support\\\": \\\"Mean eigenvalue -<γ_3> ~ sqrt(Re) shown in Fig. 4.\\\"}\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"lambda_DNS_scaling\\\",\\n      \\\"statement\\\": \\\"The Lyapunov exponent from DNS scales as λ_DNS ~ Re^α with α = 0.59 ± 0.04, consistent with the universal scaling.\\\",\\n      \\\"quantitative_form\\\": \\\"λ_DNS = C_DNS * Re^0.59\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"lambda_DNS\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\\"param\\\": \\\"prefactor_DNS\\\"},\\n            {\\\"op\\\": \\\"power\\\", \\\"args\\\": [{\\\"var\\\": \\\"Re_DNS\\\"}, {\\\"param\\\": \\\"alpha_lyapunov\\\"}]}\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"lyapunov_scaling\\\"],\\n      \\\"control_names\\\": [\\\"Re_DNS\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"Re_DNS\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 50,\\n          \\\"maximum\\\": 1400,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400 from DNS.\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 467, \\\"line_end\\\": 467, \\\"support\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400.\\\"}\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"lambda_DNS\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"dns_setup\\\"],\\n      \\\"applicability\\\": \\\"Valid for DNS of 3D incompressible turbulence in the Reynolds number range 50 to 1400.\\\",\\n      \\\"statistical_basis\\\": \\\"Lyapunov exponent estimated from linear fit to exponential growth phase of decorrelator; errorbars from fit errors.\\\",\\n      \\\"uncertainty\\\": \\\"Exponent uncertainty ±0.04 (convention source_unspecified); errorbars on λ_DNS smaller than symbol sizes.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 388, \\\"line_end\\\": 391, \\\"support\\\": \\\"Universal scaling λ_DNS = λ_GOY = λ ~ Re^α with α = 0.59 ± 0.04.\\\"},\\n        {\\\"line_start\\\": 635, \\\"line_end\\\": 635, \\\"support\\\": \\\"λ = λ_DNS ~ λ_S ~ Re^α with α = 0.59 ± 0.04.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"lambda_GOY_scaling\\\",\\n      \\\"statement\\\": \\\"The Lyapunov exponent from the GOY shell model scales as λ_GOY ~ Re^α with α = 0.59 ± 0.04, consistent with DNS.\\\",\\n      \\\"quantitative_form\\\": \\\"λ_GOY = C_GOY * Re^0.59\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"lambda_GOY\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\\"param\\\": \\\"prefactor_GOY\\\"},\\n            {\\\"op\\\": \\\"power\\\", \\\"args\\\": [{\\\"var\\\": \\\"Re_GOY\\\"}, {\\\"param\\\": \\\"alpha_lyapunov\\\"}]}\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"lyapunov_scaling\\\"],\\n      \\\"control_names\\\": [\\\"Re_GOY\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"Re_GOY\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 8700000,\\n          \\\"maximum\\\": 260000000,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"Reynolds numbers 8.7e6 ≤ Re ≤ 2.6e8 from GOY shell model.\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 503, \\\"line_end\\\": 507, \\\"support\\\": \\\"Reynolds numbers in range 8.7e6 to 2.6e8.\\\"}\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"lambda_GOY\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"goy_setup\\\"],\\n      \\\"applicability\\\": \\\"Valid for GOY shell model in the Reynolds number range 8.7e6 to 2.6e8.\\\",\\n      \\\"statistical_basis\\\": \\\"Lyapunov exponent estimated from linear fit to exponential growth phase of integrated decorrelator; errorbars from fit errors.\\\",\\n      \\\"uncertainty\\\": \\\"Exponent uncertainty ±0.04 (convention source_unspecified); errorbars on λ_GOY smaller than symbol sizes.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 388, \\\"line_end\\\": 391, \\\"support\\\": \\\"Universal scaling λ_DNS = λ_GOY = λ ~ Re^α with α = 0.59 ± 0.04.\\\"},\\n        {\\\"line_start\\\": 635, \\\"line_end\\\": 635, \\\"support\\\": \\\"λ = λ_DNS ~ λ_S ~ Re^α with α = 0.59 ± 0.04.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"gamma3_std_scaling\\\",\\n      \\\"statement\\\": \\\"The standard deviation of the compressional eigenvalue γ_3^std scales as Re^α with α = 0.59 ± 0.04, matching the Lyapunov exponent.\\\",\\n      \\\"quantitative_form\\\": \\\"γ_3^std = C_gamma * Re^0.59\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"gamma3_std\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\\"param\\\": \\\"prefactor_gamma3_std\\\"},\\n            {\\\"op\\\": \\\"power\\\", \\\"args\\\": [{\\\"var\\\": \\\"Re_DNS\\\"}, {\\\"param\\\": \\\"gamma3_std_exponent\\\"}]}\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"lyapunov_scaling\\\"],\\n      \\\"control_names\\\": [\\\"Re_DNS\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"Re_DNS\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 50,\\n          \\\"maximum\\\": 1400,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400 from DNS.\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 467, \\\"line_end\\\": 467, \\\"support\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400.\\\"}\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"gamma3_std\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"dns_setup\\\"],\\n      \\\"applicability\\\": \\\"Valid for DNS in the Reynolds number range 50 to 1400.\\\",\\n      \\\"statistical_basis\\\": \\\"Standard deviation of γ_3 distribution; errorbars extracted similarly to λ_DNS.\\\",\\n      \\\"uncertainty\\\": \\\"Exponent uncertainty ±0.04 (convention source_unspecified); errorbars on γ_3^std of same order as λ_DNS.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 397, \\\"line_end\\\": 398, \\\"support\\\": \\\"γ_3^std ~ Re^α and λ = λ_DNS = γ_3^std ~ Re^0.59.\\\"},\\n        {\\\"line_start\\\": 632, \\\"line_end\\\": 634, \\\"support\\\": \\\"<Delta Theta^2> proportional to γ_3^std ~ Re^0.59.\\\"}\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"mean_gamma3_scaling\\\",\\n      \\\"statement\\\": \\\"The absolute value of the mean compressional eigenvalue -<γ_3> scales as sqrt(Re), consistent with Kolmogorov mean field.\\\",\\n      \\\"quantitative_form\\\": \\\"-<γ_3> = C_mean * Re^0.5\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"mean_gamma3_abs\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\\"param\\\": \\\"prefactor_mean_gamma3\\\"},\\n            {\\\"op\\\": \\\"power\\\", \\\"args\\\": [{\\\"var\\\": \\\"Re_DNS\\\"}, {\\\"param\\\": \\\"mean_gamma3_exponent\\\"}]}\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"lyapunov_scaling\\\"],\\n      \\\"control_names\\\": [\\\"Re_DNS\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"Re_DNS\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 50,\\n          \\\"maximum\\\": 1400,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400 from DNS.\\\",\\n          \\\"anchors\\\": [\\n            {\\\"line_start\\\": 467, \\\"line_end\\\": 467, \\\"support\\\": \\\"Reynolds numbers 50 ≤ Re ≤ 1400.\\\"}\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"mean_gamma3_abs\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"dns_setup\\\"],\\n      \\\"applicability\\\": \\\"Valid for DNS in the Reynolds number range 50 to 1400.\\\",\\n      \\\"statistical_basis\\\": \\\"Mean of γ_3 distribution; errorbars not explicitly reported.\\\",\\n      \\\"uncertainty\\\": \\\"Not reported.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 399, \\\"line_end\\\": 400, \\\"support\\\": \\\"Mean eigenvalue -<γ_3> ~ sqrt(Re).\\\"},\\n        {\\\"line_start\\\": 629, \\\"line_end\\\": 629, \\\"support\\\": \\\"<Delta Theta> proportional to <γ_3> ~ sqrt(Re).\\\"}\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"prefactor_not_reported\\\",\\n      \\\"statement\\\": \\\"The prefactors (C_DNS, C_GOY, C_gamma, C_mean) in the scaling relations are not reported in the source; only the exponents are given. The oracle_outputs use placeholder parameters for these prefactors, but their values are not anchored.\\\",\\n      \\\"claim_ids\\\": [\\\"lambda_DNS_scaling\\\", \\\"lambda_GOY_scaling\\\", \\\"gamma3_std_scaling\\\", \\\"mean_gamma3_scaling\\\"],\\n      \\\"mechanism_ids\\\": [\\\"lyapunov_scaling\\\"],\\n      \\\"control_names\\\": [\\\"Re_DNS\\\", \\\"Re_GOY\\\"],\\n      \\\"readout_names\\\": [\\\"lambda_DNS\\\", \\\"lambda_GOY\\\", \\\"gamma3_std\\\", \\\"mean_gamma3_abs\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"dns_setup\\\", \\\"goy_setup\\\"],\\n      \\\"anchors\\\": [\\n        {\\\"line_start\\\": 388, \\\"line_end\\\": 391, \\\"support\\\": \\\"Only scaling exponent reported, no prefactor.\\\"},\\n        {\\\"line_start\\\": 397, \\\"line_end\\\": 400, \\\"support\\\": \\\"Only scaling exponents reported, no prefactors.\\\"}\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"parameters.outputs.lambda_DNS.args[0].param is not an allowed parameter\",\"path\":\"$.claims[0].oracle_outputs\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

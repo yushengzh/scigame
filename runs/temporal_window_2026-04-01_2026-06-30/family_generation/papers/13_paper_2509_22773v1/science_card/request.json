@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2509.22773v1\", \"citation\": \"Julia Wei, Universality of Shallow Global Quenches in Critical Spin Chains, Physical Review Letters (2026), DOI:10.1103/dgx2-mwrk\", \"journal_doi\": \"10.1103/dgx2-mwrk\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main.tex =====\nL000002\t\\documentclass[prl,twocolumn, aps,amssymb,longbibliography,showpacs,superscriptaddress,nofootinbib,floatfix]{revtex4-1}\nL000003\t\nL000004\t\\usepackage{graphicx}\nL000005\t\\usepackage{float}\nL000006\t\\usepackage{dcolumn}\nL000007\t\\usepackage{siunitx}\nL000008\t\\usepackage{float}\nL000009\t\\usepackage{hyperref}\nL000010\t\\usepackage{mathtools}\nL000011\t\\usepackage{svg}\nL000012\t\\usepackage[english]{babel}\nL000013\t\\usepackage{physics}\nL000014\t\nL000015\t\\normalsize\nL000016\t\\usepackage{booktabs,makecell,tabularx}\nL000017\t\\usepackage{color}\nL000018\t\\usepackage{comment}\nL000019\t\\usepackage{dsfont}\nL000020\t\\usepackage[export]{adjustbox}\nL000021\t\\usepackage{multirow}\nL000022\t\\usepackage[normalem]{ulem}\nL000023\t\\setcounter{secnumdepth}{3}\nL000024\t\nL000025\t\nL000026\t\nL000027\t\nL000028\t\nL000029\t\nL000030\t\\newcommand{\\expct}[1]{\\langle #1 \\rangle}\nL000031\t\nL000032\t\\begin{document}\nL000033\t\nL000034\t\nL000035\t\\title{Universality of Shallow Global Quenches in Critical Spin Chains}\nL000036\t\\author{Julia Wei}\nL000037\t\\thanks{These authors contributed equally to this work.}\nL000038\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}\nL000039\t\nL000040\t\\author{Méabh Allen}\nL000041\t\\thanks{These authors contributed equally to this work.}\nL000042\t\\affiliation{Department of Physics, University of California, Berkeley, California 94720 USA}\nL000043\t\nL000044\t\\author{Jack Kemp}\nL000045\t\\thanks{These authors contributed equally to this work.}\nL000046\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}\nL000047\t\\affiliation{TCM Group, University of Cambridge, JJ Thomson Avenue, Cambridge, CB3 0US UK}\nL000048\t\nL000049\t\\author{Chenbing Wang}\nL000050\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}\nL000051\t\nL000052\t\\author{Zixia Wei}\nL000053\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}\nL000054\t\nL000055\t\\author{Joel E. Moore}\nL000056\t\\affiliation{Department of Physics, University of California, Berkeley, California 94720 USA}\nL000057\t\\affiliation{Materials Science Division, Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA}\nL000058\t\nL000059\t\\author{Norman Y. Yao}\nL000060\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}\nL000061\t\nL000062\t\nL000063\t\nL000064\t\\begin{abstract}\nL000065\tMeasuring universal data in the strongly correlated regime of quantum critical points remains a fundamental objective for quantum simulators. In foundational work, Calabrese and Cardy demonstrated how this data governs the dynamics of certain global quenches to 1+1-dimensional conformal field theories.\nL000066\t\nL000067\tWhile the quasiparticle picture they introduce has been widely successful in both theory and experiment, their seminal prediction that the critical exponents are simply encoded in the relaxation rates of local observables is more challenging to investigate experimentally; in particular,  the specific initial state required for their analysis is generated via imaginary time evolution.\nL000068\t\nL000069\tIn this work, we examine the critical quench dynamics of local observables from two types of readily-accessible initial conditions: ground states and finite-temperature ensembles.\nL000070\t\nL000071\tWe identify universal scaling collapses and scaling functions in both cases, utilizing a combination of conformal perturbation theory and tensor network numerics.\nL000072\t\nL000073\tFor the finite-temperature quenches, we determine a regime in which the conformal field theory results are recovered, thereby allowing universal quantum critical data to be extracted from realistic quenches.\nL000074\t\nL000075\t\\end{abstract}\nL000076\t\nL000077\t\\maketitle\nL000078\t\nL000079\tThe advent of analog quantum simulators has enabled the precision investigation of\nL000080\tunitary quantum many-body dynamics.\nL000081\t\nL000082\tThis has revealed a rich landscape of emergent behavior, from anomalously slow thermalization~\\cite{smith:2016, bernien:2017, bluvstein:2021, adler:2024, wang:2025, jin:2025} to anomalously fast spin transport~\\cite{jepsen:2020, joshi:2022, wei:2022b, rosenberg:2024a}.\nL000083\t\nL000084\tA natural regime for the exploration of such correlated phenomena is the vicinity of quantum phase transitions, where  universality dictates that systems with dramatically disparate microscopic details nevertheless exhibit the same macroscopic physics.\nL000085\t\nL000086\tTo probe this physics, two dynamical strategies are often used: sweeping through criticality to exploit the quantum Kibble-Zurek mechanism \\cite{zurek2005dynamics,keesling2019quantum,dupont2022quantum, andersen:2025} or direct preparation of the quantum critical ground state \\cite{dborin:2022,anand:2023, haghshenas:2024, fang2024probing}.\nL000087\t\nL000088\t\nL000089\tOne might naturally wonder if a more straightforward strategy exists.\nL000090\t\nL000091\tIn particular, can one simply perform quench dynamics under the critical Hamiltonian in order to extract universal properties of the critical point?\nL000092\t\nL000093\tIn addition to being especially well-suited for near-term quantum simulators, the use of such critical quenches at \\emph{high energies} has recently led to the discovery of novel dynamical phase transitions~\\cite{heyl:2013, heyl:2014, heyl:2015, heyl:2016, zunkovic:2016, karrasch:2017, titum:2019, titum:2020, halimeh:2020,  rossini:2020, dag:2023, dag:2023a, robertson:2023, bandyopadhyay:2023}.\nL000094\t\nL000095\t\\begin{figure}\nL000096\t\\centering\nL000097\t\\includegraphics[width=0.5\\textwidth]{figure1_no_lightcone.pdf}\nL000098\t\\caption{(a) Schematic depiction of the initial state $\\ket{\\psi_0}$ considered by Calabrese and Cardy~\\cite{calabrese2016quantum} for a quantum critical quench, generated by deforming a conformally invariant boundary state, $\\ket{\\psi_0^*}$, via imaginary time evolution for time $\\tau_0$.\nL000099\t\nL000100\t(b) Two alternative initial conditions:  a ground state (purple) and a finite-temperature ensemble (red), produced by  perturbing the Hamiltonian away from the quantum critical point, $g_c$.\nL000101\t\nL000102\tThe orange region depicts the quantum critical fan, where quantum fluctuations  dominate the system's behavior at finite temperatures.\nL000103\t\nL000104\t(c) Starting from these three different initial conditions, the critical quench dynamics of a local observable, $\\langle \\Phi(t) \\rangle$, are shown.\nL000105\t\nL000106\tAll three initial states exhibit universal dynamics in the shallow quench limit, albeit with different scaling forms.\nL000107\t\nL000108\tThe universal regime is bounded by early-time dynamics set by the lattice spacing, $a$, and quasiparticle velocity, $v$; and late-time dynamics arising from differences between the CFT and the lattice model~\\cite{SM}.\nL000109\t\nL000110\t}\nL000111\t\nL000112\t\\label{fig:schematic}\nL000113\t\\end{figure}\nL000114\t\nL000115\tThe broad question of whether critical quenches at \\emph{low energies} can, instead, extract the universal properties of the ground-state phase transition, was explored in a set of seminal papers by Calabrese and Cardy (Fig.~\\ref{fig:schematic})~\\cite{calabrese2005evolution,calabrese2006time,Calabrese_Cardy_2007,calabrese2016quantum,cardy2016furtherresults}. In addition to introducing an intuitive and widely applicable~\\cite{kim:2013, bonnes:2014, cotler:2016, alba:2018, bastianello:2018, bertini:2018, cevolani:2018, vonkeyserlingk:2018a, najafi:2018, bertini:2019, cao:2019, calabrese:2020, klobas:2021, schneider:2021, rottoli:2025}  quasiparticle picture since confirmed in experiments~\\cite{cheneau:2012, jurcevic:2014, kaufman:2016, kormos:2017, vovrosh:2021}, this work gave a prescription to obtain much more information about the critical theory than appears in the quantum Kibble-Zurek process.\nL000116\t\nL000117\tThe prescription is based on quenching from a specific initial state [Fig.~\\ref{fig:schematic}(a)], obtained by evolving a conformally invariant boundary state in imaginary time, which is amenable to the powerful machinery of boundary conformal field theory (CFT) in 1+1D (see Appendix~A).\nL000118\t\nL000119\tIn this context, Calabrese and Cardy showed that, under a critical quench, primary fields exhibit a simple exponential decay. Moreover, the ratio of relaxation times for any two such primary fields is \\emph{universal} and given by the ratio of their scaling dimensions. Unfortunately, the specific initial state considered is not practical to realize in experiment, as it requires imaginary time evolution to prepare~\\cite{nimag}.\nL000120\t\nL000121\tWe are thus led to ask the following: are there experimentally accessible classes of initial states for which critical quench dynamics can extract the same critical information as in the full Calabrese-Cardy prescription?  And if not, are selected critical properties still manifest in those quenches?\nL000122\t\nL000123\t\nL000124\t\\begin{table}[t]\nL000125\t    \\begin{tabular}{lccc}\nL000126\t    \\toprule\nL000127\t     Initial State & Scaling & U. Ratio & Exp.  \\\\\nL000128\t    \\midrule\nL000129\t    $|\\psi_0\\rangle \\propto e^{-\\tau_0 H_{\\textrm{c}}}|\\psi_0^*\\rangle$ &$\\tau_0$& \\checkmark & \\checkmark \\\\\nL000130\t    $|\\psi_{\\textrm{GS}}\\rangle \\propto \\lim\\limits_{\\tau \\to \\infty} e^{-\\tau( H_{\\textrm{c}}+g H_\\Psi)} |\\psi_0^*\\rangle$ & $g^{-\\nu}$& $\\cross$ & $\\cross$ \\\\\nL000131\t    \\multirow{2}{*}{ $\\rho_{\\beta, g_\\Psi} \\propto e^{-\\beta(H_\\mathrm{c} + g_\\Psi H_\\Psi)}$ } & $\\beta$& $\\checkmark$ & \\makecell[c]{$x_\\Psi =1$: $\\checkmark$ \\\\$x_\\Psi \\neq 1$: $\\cross$ }\nL000132\t    \\\\\nL000133\t    \\bottomrule\nL000134\t    \\end{tabular}\nL000135\t\\caption{\\label{tab:forms}\nL000136\t\nL000137\tSummarizes three key properties of the critical quench dynamics starting from  different initial states: (i) the scaling collapse parameter, (ii) whether the ratio of decay times of primary fields is universal ratio~\\cite{calabrese2016quantum}, and (iii) whether the decay is generically given by a simple exponential.\nL000138\t\nL000139\tWe consider only relevant perturbations.\nL000140\t\nL000141\t}\nL000142\t\\label{table:initial_states}\nL000143\t\\end{table}\nL000144\t\nL000145\tIn this Letter, we resolve this question for two of the most physically relevant types of initial conditions (Table~\\ref{table:initial_states}): ground states and finite-temperature ensembles [Fig.~\\ref{fig:schematic}(b)].\nL000146\t\nL000147\tUsing a combination of  conformal perturbation theory, free fermion analytics and large-scale tensor network numerics~\\cite{hauschild:2024,barthelOptimizedLieTrotter2020,SCHOLLWOCK201196,karraschReducingNumericalEffort2013}, we explore the relaxation of local observables after instantaneous, ``shallow\" global quenches to criticality, where the low-energy limit is taken before the late-time [Fig.~\\ref{fig:schematic}(c)].\nL000148\t\nL000149\tTo ensure generality, we perform an extensive investigation of three distinct models (Table~\\ref{table:models}): (i) the transverse-field Ising model (TFIM), (ii) the three-state Potts model, and (iii) the axial next-nearest-neighbor Ising (ANNNI) model.\nL000150\t\nL000151\t\nL000152\tOur main results are as follows. We begin by computing critical quench dynamics for both classes of initial conditions across all three models.\nL000153\t\nL000154\tOne might naively expect, via renormalization group arguments, that both of these initial conditions should exhibit scaling dynamics similar to that observed for the boundary-CFT initial condition~\\cite{nintegr}.\nL000155\t\nL000156\tAlthough we do observe a scaling collapse for the relaxation of the primary fields in both cases, we instead uncover a distinct scaling form for the critical quench dynamics.\nL000157\t\nL000158\tFor the ground-state initial condition, we find that the dynamics collapse  under rescaling by the energy gap.\nL000159\t\nL000160\tHowever, the ratio of relaxation times is no longer given by the ratio of scaling dimensions (Table~\\ref{table:initial_states}).\nL000161\t\nL000162\t\nL000163\tFor the finite-temperature initial condition, conformal perturbation theory allows us to explicitly determine the scaling function.\nL000164\t\nL000165\tInspection then reveals that the ratio of relaxation times matches the boundary-CFT expectation at late times (Table~\\ref{table:initial_states}).\nL000166\t\nL000167\tHowever, at early times, the extraction of universal quantities from the ratio of relaxation times is complicated by the presence of additional terms in the scaling function.\nL000168\t\nL000169\tInterestingly, these additional terms drop out in the specific case of integer scaling dimension, where one recovers the simple exponential decay predicted by the boundary-CFT analysis.\nL000170\t\nL000171\tFinally, we describe a pair of experimental, critical quench protocols aimed at observing the  different predicted scaling behaviors (Fig.~\\ref{fig:schematic}).\nL000172\t\nL000173\t \\begin{table}[t]\nL000174\t    \\begin{tabular}{lllll}\nL000175\t    \\toprule\nL000176\t     & $\\nu$ & $\\Phi$& $x_{\\Phi}$ & Lattice Operator \\\\\nL000177\t    \\midrule\nL000178\t    \\multirow{2}{*}{Ising}\nL000179\t\nL000180\t    &\\multirow{2}{*}{1}& $\\sigma_\\text{I}$ & 1/8 & $Z_i$ \\\\\nL000181\t    && $\\epsilon_\\text{I}$ & 1 & $Z_i Z_{i+1} - X_i$ \\\\\nL000182\t    \\midrule\nL000183\t    \\multirow{4}{*}{Potts } & \\multirow{4}{*}{5/6\\,}& $\\sigma_\\text{P}$ & 2/15 \\, & $s_i$\\\\\nL000184\t    && $\\epsilon_\\text{P}$ & 4/5 & $(s_is_{i+1}^\\dagger - \\tau_i) + \\mathrm{h.c.}$ \\\\\nL000185\t    && $\\psi \\bar \\psi \\,$ & 4/3 & \\makecell[l]{ $s_i^\\dagger(2 - 3 \\omega^2 \\tau_i - 3\\omega \\tau_i^2)$\\\\ - $2(s_{i-1}s_i + s_i s_{i+1})$ }\\\\\nL000186\t    \\bottomrule\nL000187\t    \\end{tabular}\nL000188\t\\caption{\\label{tab:primary} Critical exponent $\\nu$, primary fields $\\Phi$, and scaling dimensions $x_{\\Phi}$ for the 1+1D Ising and Potts conformal field theories. In the three-state Potts model, $\\omega \\equiv e^{2\\pi i/3}$.\nL000189\t\nL000190\tNote that both the TFI and ANNNI models are governed by the Ising critical point.\nL000191\t\nL000192\tThe final column depicts the lattice-to-CFT dictionaries for the critical TFI, ANNNI, and Potts models~\\cite{zou2020conformal, mong2014parafermionic,SM}.}\nL000193\t\\label{table:models}\nL000194\t\\end{table}\nL000195\t\nL000196\t\\textit{Shallow quenches to CFTs}---Let us start with the setting.\nL000197\t\nL000198\tConsider a system prepared in an initial state which is close to an equilibrium state of a quantum critical Hamiltonian, $H_\\textrm{c}$.\nL000199\t\nL000200\tHere, we study the quench dynamics at the quantum critical points of three paradigmatic spin chains.\nL000201\t\nL000202\tFirst, we consider the transverse-field Ising model,\nL000203\t\nL000204\t\\begin{equation}\nL000205\tH_{\\mathrm{TFI}} = -J\\sum_i Z_i Z_{i+1} + (1-g)X_i,\nL000206\t\\label{eqn:tfi}\nL000207\t\\end{equation}\nL000208\t\nL000209\twhere $Z_i$, $X_i$ are Pauli matrices.\nL000210\t\nL000211\tThe TFIM is a non-interacting model, which allows us to take advantage of a wealth of exact results~\\cite{barouch1970statistical, li:2009, degrandi:2010,Calabrese_Essler_Fagotti_2011, calabrese2012quantum, calabrese2012quantum2, delfino:2014, Essler_Fagotti_2016,delfino:2017,das:2017, hodsagi:2018,Granet_Fagotti_Essler_2020, granet:2022}.\nL000212\t\nL000213\tNext, we consider the three-state Potts model, an interacting integrable spin chain,\nL000214\t\\begin{equation}\nL000215\tH_{\\mathrm{Potts}} = -J\\sum_i s_i^\\dagger s_{i+1} + (1-g)\\tau_i + \\mathrm{h.c.},\nL000216\t\\end{equation} where $s_i$ and $\\tau_i$ are the $\\mathbb{Z}_3$ clock and shift operators, respectively~\\cite{SM}.\nL000217\t\nL000218\tFinally, we consider the self-dual ANNNI  model, a non-integrable spin chain obtained by adding integrability-breaking terms to the TFIM~\\cite{surace},\nL000219\t\nL000220\t\\begin{equation}\nL000221\tH_{\\mathrm{ANNNI}} = H_{\\mathrm{TFI}} -J \\gamma\\sum_i X_iX_{i+1} + Z_i Z_{i+2}.\nL000222\t\\end{equation}\nL000223\t\nL000224\tAt $g = 0$ and low energies, the TFI, Potts, and ANNNI (for $-0.3 < \\gamma < 250$~\\cite{rahmani2015mzm,milsted2015annni,milsted2017extraction}) models are each characterized by an emergent 1+1D conformal field theory.\nL000225\t\nL000226\tIn order to study the critical quench dynamics of the primary fields, $\\Phi$, with scaling dimensions, $x_\\Phi$, we measure the corresponding local lattice operators, as shown in Table~\\ref{table:models}.\nL000227\t\nL000228\t\\begin{figure*}\nL000229\t\\centering\nL000230\t\\includegraphics[width=1.0\\textwidth]{figure2_with_inset_v2.pdf}\nL000231\t\\caption{Scaling collapse of the critical primary-field dynamics of (a) TFI (system size $L = 500$), (b) Potts ($L = 500$, bond dimension $\\chi = 512$), and (c) ANNNI ($L = 2000$, $\\gamma = 0.24$, $\\chi = 384$) open spin chains.\nL000232\t\nL000233\tThe initial state for the shallow quench is a ground state in the ordered phase (perturbed away from the critical point).\nL000234\t\nL000235\tThe analytical scaling limits are shown in\nL000236\tdotted gray lines for the TFIM.\nL000237\t\nL000238\tFor $\\epsilon_\\mathrm{I}(t)$ in the TFIM, an additional dynamical regime is observable: at fixed $g$, coherent oscillations $\\sim (Jt)^{-3/2}\\cos(8J t + \\pi/4)$ dominate when the long-time limit is taken before the low-energy limit, a free-fermion lattice effect~\\cite{calabrese2006time,barouch1970statistical}.\nL000239\t\nL000240\tGenerically, this limit will be governed by non-universal physics~\\cite{Essler_Fagotti_2016,SM}.\nL000241\t\nL000242\tWhen the primary fields are non-Hermitian (e.g.~$\\sigma_\\mathrm{P}$ in the Potts model), the real part  is plotted.\nL000243\t\nL000244\tInsets: Depict primary-field dynamics before rescaling.\nL000245\t\nL000246\t}\nL000247\t\\label{fig:groundstate}\nL000248\t\\end{figure*}\nL000249\t\nL000250\t\\textit{Ground state critical quenches}---\nL000251\tFor each of the three models, we consider critical quenches starting from a nearby ground state on the ordered side of the transition ($0<g\\ll 1$) (Fig.~\\ref{fig:groundstate}).\nL000252\t\nL000253\tIn each case, the $\\sigma$ primary field exhibits exponential decay with a relaxation time that depends on the distance, $g$, from the critical point (insets, Fig.~\\ref{fig:groundstate}).\nL000254\t\nL000255\tAfter an initial transient, the $\\epsilon$ primary field also seems to exhibit exponential decay with oscillations arising at late times (insets, Fig.~\\ref{fig:groundstate}).\nL000256\t\nL000257\t This is suggestive of the behavior from the boundary-CFT prediction, which one might naively expect to hold, on the basis that at large length- and time-scales the dynamics should be insensitive to the details of short-range correlations. However, a careful analysis immediately reveals that the ratio of decay times for any two primary fields does not match the ratio of scaling dimensions (for any of the three models)~\\cite{SM}.\nL000258\t\nL000259\t\nL000260\tA hint of the underlying issue is provided by the analytic tractability of the TFIM.\nL000261\t\nL000262\tTo uncover the behavior of the underlying critical point, we take the scaling limit, $g \\rightarrow 0$ \\cite{calabrese2012quantum}, \\emph{before} the late-time limit.\nL000263\t\nL000264\tThis yields the intermediate-time, exponentially decaying behavior seen in the inset of Fig. \\ref{fig:groundstate}(a).\nL000265\t\nL000266\tIndeed, one finds that the exact forms of $\\langle\\sigma_\\mathrm{I}(t)\\rangle$~\\cite{calabrese2012quantum} and $\\langle \\epsilon_\\mathrm{I}(t) \\rangle$~\\cite{barouch1970statistical, SM} are given by:\nL000267\t\nL000268\t\\begin{equation}\nL000269\t  \\langle\\sigma_\\mathrm{I}(t)\\rangle  \\simeq (2g)^{1/8}e^{-J g t}, \\hspace{2mm}\nL000270\t    \\langle \\epsilon_\\mathrm{I}(t)\\rangle \\simeq \\sqrt{\\frac{g}{2\\pi}}e^{-4Jgt}\\frac{1}{\\sqrt{Jt} }.\nL000271\t     \\label{eqn:gs_quench_epsilon}\nL000272\t\\end{equation}\nL000273\t\nL000274\tOne immediately notes two distinctions from the boundary-CFT case: (i) the decay of the $\\epsilon_\\mathrm{I}$ primary field is not a simple exponential, and (ii) even asymptotically, the ratio of relaxation times is $1/4$ as opposed to $x_\\sigma / x_\\epsilon  = 1/8$ (Table~\\ref{table:models}).\nL000275\t\nL000276\t\nL000277\tTwo remarks are in order.\nL000278\t\nL000279\tFirst, the analytic results above explicitly demonstrate that the boundary-CFT predictions do not hold in the TFIM when starting the critical quench from a ground-state initial condition.\nL000280\t\nL000281\tMore generally, for all three models,  deviations from the boundary-CFT prediction can be understood as a consequence of the emergent integrability of the underlying CFTs~\\cite{calabrese2012quantum2, calabrese2016quantum}.\nL000282\t\nL000283\tCrucially, this integrability naturally implies a sensitivity to the starting state of the critical quench, since the subsequent relaxation dynamics will be constrained by additional local conserved quantities beyond the energy.\nL000284\t\nL000285\tIndeed, for an arbitrary initial state, the system will relax to a generalized Gibbs ensemble (GGE) distinct from the critical Gibbs ensemble associated with the boundary-CFT initial condition~\\cite{cardy2016furtherresults, surace:2020, robertson:2022}.\nL000286\t\nL000287\t\\begin{figure*}[t]\nL000288\t\\centering\nL000289\t\\includegraphics[width=1.\\textwidth]{figure3_with_insets.pdf}\nL000290\t\\caption{Scaling collapse of the critical primary-field dynamics after a transverse [longitudinal] field quench from a thermal ensemble with perturbation sizes $g_\\epsilon=5.62\\times 10^{-3}$ and $g_\\sigma = 1.78\\times 10^{-3}$, respectively.\nL000291\t\nL000292\t(a)[(d)] Depicts the TFIM ($\\chi=384$), (b)[(e)] the Potts model ($\\chi=384$), and (c)[(f)] the ANNNI model ($\\chi=256$).\nL000293\t\nL000294\tFor (d-f), the rescaling factor $p_{\\Phi}$ corresponds to $p_\\sigma = 2 - 2x_{\\sigma}$, and $p_\\epsilon = 4 - 2x_\\sigma - x_\\epsilon$.\nL000295\t\nL000296\tAll models have length $L=400$.\nL000297\t\nL000298\t The dotted gray lines represent the comparison to conformal perturbation theory, which matches the analytical scaling limit seen in panel (a) for the TFIM~\\cite{SM}.\nL000299\t\nL000300\tIn the TFIM, the non-universal oscillations observed at late times for fixed $\\beta$ are analogous to those seen in ground state quenches for fixed $g$ [Fig. \\ref{fig:groundstate}(a)]~\\cite{SM}.\nL000301\t\nL000302\tInsets: Depict primary-field dynamics before rescaling.\nL000303\t\nL000304\t\\label{fig:finitetemp}}\nL000305\t\\end{figure*}\nL000306\t\nL000307\t\nL000308\tSecond, although the universal ratio of relaxation times is lost, one might hope that the dynamics of local observables nevertheless collapse onto an observable-dependent scaling function.\nL000309\t\nL000310\tA natural guess for the functional form of such a nonequilibrium scaling ansatz is as follows:\nL000311\t\\begin{equation}\nL000312\t \\langle \\psi_{\\mathrm{GS}}|\\Phi(t) |\\psi_{\\mathrm{GS}}\\rangle \\simeq  \\mathcal{A}^{\\Phi}_{\\mathrm{GS}}g^{x_\\Phi \\nu} \\mathcal{F}_{\\Phi}^{\\mathrm{GS}}(|\\Delta|t).\nL000313\t \\label{eqn:scaling_gs}\nL000314\t\\end{equation}\nL000315\t\nL000316\tThe dependence on $g$ is based upon the scaling hypotheses for spinless energy and magnetization-like operators\nL000317\t~\\cite{ginsparg1988applied}, while the dynamic scaling function, $\\mathcal{F}_{\\Phi}^{\\mathrm{GS}}$, depends on the only relevant energy scale in the protocol, namely, the gap of the initial state, $|\\Delta| \\sim J|g|^{\\nu}$~\\cite{sachdevQuantumPhaseTransitions2011}. $A_{\\mathrm{GS}}^{\\Phi}$ is a constant that may vanish depending on the symmetries of the ground state and $\\Phi$.\nL000318\t\nL000319\tAs depicted in Fig.~\\ref{fig:groundstate}, rescaling according to the ansatz in Eqn.~\\ref{eqn:scaling_gs} yields a collapse of the data across all models and all primary fields~\\cite{SM}.\nL000320\t\nL000321\t\nL000322\t\\textit{Finite-temperature critical quenches}---The fact that the critical quench dynamics depend sensitively on the initial state suggests that a more careful choice is required in order to observe the universal ratios of decay times.\nL000323\t\nL000324\tA particularly natural setting is to consider shallow quenches from finite-temperature initial conditions perturbed slightly away from the critical Gibbs ensemble:\nL000325\t\\begin{equation}\nL000326\t    \\rho_{\\beta, g} \\propto e^{-\\beta(H_\\mathrm{c} + g H')},\nL000327\t    \\label{eq:initialgibbs}\nL000328\t\\end{equation}\nL000329\twith $ g \\ll 1 / (\\beta J)$.\nL000330\t\nL000331\tAlthough one can consider an arbitrary perturbation, for simplicity, we will focus on perturbations, $H' =  H_\\Psi$, where $H_\\Psi$ is a sum of lattice operators corresponding to the primary field $\\Psi$\\cite{nOPE}.\nL000332\t\nL000333\tSpecifically, we will consider two cases: (i) an $\\epsilon$ field perturbation with $H_\\epsilon = -J \\sum_i X_i$ for the TFI/ANNNI models and $H_\\epsilon = -J \\sum_i ( \\tau_i + \\tau_{i}^\\dagger$) for the Potts model;  and (ii) a $\\sigma$ field perturbation with $H_\\sigma = -J \\sum_i Z_i$ for the TFI/ANNNI models and $H_\\sigma = -J \\sum_i (s_i + s_{i}^\\dagger)$ for the Potts model~\\cite{nsigmaquench}.\nL000334\t\nL000335\t\nL000336\tLet us begin by considering the critical quench dynamics of a finite-temperature ensemble, $\\rho_{\\beta,g_\\epsilon}$, perturbed by the $\\epsilon$ field.\nL000337\t\nL000338\tWorking with a series of low temperatures in the scaling limit, $\\beta J  \\gg 1$, we find that the relaxation dynamics of the $ \\epsilon$ field seem to exhibit an exponential decay in all three models [insets, Fig. \\ref{fig:finitetemp}(a-c)].\nL000339\t\nL000340\tNot only is this similar to the boundary-CFT prediction, but for the TFI/ANNNI models, the exponent itself matches that of the boundary-CFT quench which thermalizes to a Gibbs ensemble at the same temperature~\\cite{ntau0}.\nL000341\tUnfortunately, one cannot test the ratio of decay times since the $\\sigma$ field is identically zero by symmetry.\nL000342\t\nL000343\t\nL000344\tTurning to the critical quench dynamics of the finite-temperature ensemble, $\\rho_{\\beta,g_\\sigma}$, perturbed by the $\\sigma$ field [insets, Fig. \\ref{fig:finitetemp}(d-f)],  one immediately observes two distinctions from the boundary-CFT prediction: first,  the relaxation dynamics of the $\\sigma$ field is not exponential, and second, the relaxation dynamics of the $\\epsilon$ field are significantly slower than expected for a quench thermalizing to the same temperature.\nL000345\t\nL000346\tThis raises the following question: Despite the initial ensembles, $\\{ \\rho_{\\beta,g_\\epsilon}$, $\\rho_{\\beta,g_\\sigma} \\}$, both being \\emph{perturbatively} close to the critical Gibbs state, why are the dynamics so qualitatively distinct?\nL000347\t\nL000348\tAnd indeed, how and why does the functional form of the relaxation depend on both the nature of the perturbation and the observable?\nL000349\t\nL000350\t\nL000351\tTo shed light on this discrepancy, we turn to conformal perturbation theory for analytical insight into the scaling forms of the relaxation dynamics after a finite-temperature critical quench~\\cite{Zamolodchikov_1991,Mussardo_2010}.\nL000352\t\nL000353\tIn this framework, we treat the deviation from the critical Gibbs state as a perturbation to the underlying CFT and obtain the dynamics of the primary fields via a perturbative expansion over correlation functions (see Appendix~B)~\\cite{SM}.\nL000354\t\nL000355\t\nL000356\tFor a perturbing field $\\Psi$ and an observable $\\Phi$, the leading order, $\\mathcal{O}(g)$, critical quench dynamics are given by:\nL000357\t\\begin{equation}\nL000358\t\\begin{aligned}\nL000359\t    \\langle\\Phi (t )\\rangle_{1}&\\sim g \\delta_{x_\\Psi x_\\Phi} \\beta^{2-2x_\\Phi}\\left(A_{x_\\Phi} + B_{x_\\Phi}t/\\beta \\right)e^{-2\\pi x_\\Phi t/\\beta},\nL000360\t    \\label{eqn:g^1}\nL000361\t\\end{aligned}\nL000362\t\\end{equation}\nL000363\t\nL000364\twith $A_{x_\\Phi}\\sim  1 + \\frac{\\sin(\\pi x_\\Phi)\\left[x_\\Phi^{-1}-\\gamma_E -\\pi \\csc(\\pi x_\\Phi) -\\psi^{\\prime}(1-x_\\Phi)\\right]}{\\pi}$ and $B_{x_\\Phi} \\sim 2\\sin(\\pi x_\\Phi )$ universal constants~\\cite{ndga,ndims}.\nL000365\t\nL000366\t\nL000367\tWe note that when $\\Psi$ and $\\Phi$ have different scaling dimensions, the dynamics are zero via symmetry.\nL000368\t\nL000369\tThis necessitates going to second order, $\\mathcal{O}(g^2)$, to obtain the leading behavior when $x_\\Psi \\neq x_\\Phi$:\nL000370\t\nL000371\t\\begin{align}\nL000372\t    &\\langle\\Phi (t )\\rangle_{2} \\sim g^2 C_{\\Phi\\Psi\\Psi} \\beta^{4-2x_\\Psi-x_\\Phi}\\Big[D_{x_{\\Phi},x_\\Psi} e^{-4\\pi  x_\\Psi t/\\beta}  +\\label{eqn:g^2} \\\\\nL000373\t    & \\quad \\big( E_{x_{\\Phi},x_\\Psi} +  F_{x_{\\Phi},x_\\Psi}t/\\beta+G_{x_{\\Phi},x_\\Psi}t^2/\\beta^2 \\big)e^{-2\\pi  x_{\\Phi} t/\\beta}\\Big]\\nonumber,\nL000374\t\\end{align}\nL000375\twhere $C_{\\Phi\\Psi\\Psi} $ is the three-point structure constant of the CFT, and $D_{x_{\\Phi},x_\\Psi} ,E_{x_{\\Phi},x_\\Psi} ,F_{x_{\\Phi},x_\\Psi} $, and $G_{x_{\\Phi},x_\\Psi} $ are universal constants.\nL000376\t\nL000377\t\nL000378\tRemarkably, the scaling form predicted by the conformal perturbation theory immediately yields a nearly perfect collapse of the numerical data across all models, perturbations, and observables (Fig.~\\ref{fig:finitetemp}).\nL000379\t\nL000380\tCrucially, this implies that one can use the analytics to understand the origin of the observed discrepancies from the boundary-CFT predictions.\nL000381\t\nL000382\tFor example, the linear in $t$ term in $\\langle\\Phi (t)\\rangle_1$ is precisely the reason why the relaxation dynamics of the $\\sigma$ field are not observed to be exponential in the insets of Figs.~\\ref{fig:finitetemp}(d-f).\nL000383\t\nL000384\tMoreover, from the functional form of $\\langle\\Phi (t)\\rangle_2$, one sees that, when $x_\\Psi \\neq x_\\Phi$,\nL000385\tthe asymptotic relaxation dynamics depends on the smaller of $2 x_\\Phi$ versus $x_\\Psi$; this explains our previously observed slower decay timescale for the $\\epsilon$ field [insets, Fig.~\\ref{fig:finitetemp}(d-f)].\nL000386\t\nL000387\t\nL000388\tA few remarks are in order.\nL000389\t\nL000390\tFirst, we note that in the scaling limit, the relaxation timescale for our finite-temperature ensemble (Eqn.~\\ref{eqn:g^1})\nL000391\tmatches the boundary-CFT initial condition (Eqn.~\\ref{eqn:cardydecay}). This means that, in principle, at late times, one should be able to  recover the universal ratio of relaxation times by taking a finite-temperature ensemble perturbed by two primary fields and\nL000392\tmeasuring the critical quench dynamics of the same fields.\nL000393\t\nL000394\tSecond, in the specific case where the scaling dimension of the (relevant) observable is an integer, $x_\\Phi = 1$, we find\nL000395\tthat $B\\left(x_\\Phi\\right) \\sim \\sin \\left(\\pi x_\\Phi \\right) = 0$, implying that the linear in $t$ term drops out of the dynamics (Eqn.~\\ref{eqn:g^1}).\nL000396\t\nL000397\tFinally, our conformal perturbation theory enables us to gain physical insight into the critical quench dynamics.\nL000398\t\nL000399\tFor example, the two terms in $ \\langle\\Phi (t)\\rangle_1$ arise from the horizon effect of a perturbation to the CFT.\nL000400\t\nL000401\tIn particular, the initial thermal ensemble emits quasiparticles which are correlated over distances set by their velocity; the build-up of correlations inside this light-cone leads to the linear in $t$ term in Eqn.~\\ref{eqn:g^1}, distinct from the contribution due to spatially-decaying correlations.\nL000402\t\nL000403\t\\emph{Outlook}---Our results suggest two possible experimental protocols utilizing quantum quenches to probe universal scaling.\nL000404\t\nL000405\tFirst, adiabatically preparing ground states near the critical point at different perturbations strengths, $g$, and then quenching is sufficient to measure the critical exponent $\\nu$, analogous to a Kibble-Zurek sweep.\nL000406\t\nL000407\tSecond, and more powerfully, if one performs an initial quench in an integrability-broken model, the reduced density matrix of a subsystem should ``thermalize\" to an effective Gibbs ensemble~\\cite{Deutsch_1991,Srednicki_1994,Rigol_Dunjko_Olshanii_2008}.\nL000408\t\nL000409\tCrucially, using this ``thermalized'' initial condition for the critical quench enables one to take advantage of our finite-temperature results~\\cite{nltc}.\nL000410\t\nL000411\t\nL000412\tOn the theoretical front, our work opens the door to two intriguing directions.\nL000413\t\nL000414\tFirst, in 1+1D, it would be interesting to test whether our framework generalizes to other CFTs currently out of reach of classical simulation, as well as those with continuously-varying critical exponents such as the easy-plane XXZ spin chain~\\cite{bonnes:2014}.\nL000415\t\nL000416\tSecond, a natural extension of our work is to higher dimensions, where significantly fewer exact results are available on the nature of physical conformal field theories.  Since interacting conformal field theories are no longer integrable in higher dimensions, we expect the phenomenology to be qualitatively distinct.\nL000417\t\nL000418\t\nL000419\t\\textit{Acknowledgements} We gratefully acknowledge the insights of and discussions with P. Calabrese, J. Cardy, P. Zoller, M. P. Zaletel, C. Kokail, T. Zache, S. Sachdev, M. Bintz, and S. Anand.\nL000420\t\nL000421\tThis work was supported in part by the Air Force Office of Scientific Research via the MURI program (FA9550-21-1-0069) and by the NSF QLCI program through Grant No. OMA-2016245.\nL000422\t\nL000423\tJ.W. acknowledges support from the Department of Energy Computational Science Graduate Fellowship under award number DE-SC0022158.\nL000424\t\nL000425\tZ.W. is supported by the Society of Fellows at Harvard University.\nL000426\t\nL000427\tJ.K. acknowledges support from EPSRC Grant No. EP/V062654/1.\nL000428\t\nL000429\tN.Y.Y. acknowledges support from a Simons Investigator award.\nL000430\t\nL000431\t\nL000432\t\\nocite{*}\nL000433\t\\bibliography{sources}\nL000434\t\nL000435\t\nL000436\t\nL000437\t\nL000438\t\nL000439\t\nL000440\t\nL000441\t\nL000442\t\nL000443\t\nL000444\t\\onecolumngrid\nL000445\t\\section*{End Matter}\nL000446\t\\twocolumngrid\nL000447\t\nL000448\t\\appendix\nL000449\t\\renewcommand{\\theequation}{A\\arabic{equation}}\nL000450\t\\setcounter{equation}{0}\nL000451\t\nL000452\t\nL000453\t\\begin{figure*}\nL000454\t\\centering\nL000455\t\\includegraphics[width=1.0\\textwidth]{figure_endmatt_with_insets.pdf}\nL000456\t\\caption{Quench dynamics starting in the boundary-CFT initial state for (a) the TFI ($L=200$), (b) Potts ($L=200$), and (c) ANNNI ($L=400$) spin chains. The $x$-axis is rescaled by the initial state's extrapolation length, $\\tau_0$. TEBD simulations at bond dimension $\\chi = 512$ are shown. The dynamics of different primary fields are fitted to an exponential decay curve using a sliding window of $Jt = 1$, in order to extract field-dependent decay constants. The ratios of these decay constants are shown in the lower plots, where the horizontal dotted lines indicate universal ratios of the fields' scaling dimensions. The time-scale of the lower plot is truncated as the ratio diverges from boundary-CFT expectations, illustrating the onset of the nonuniversal regime. \\label{fig:cc}}\nL000457\t\\end{figure*}\nL000458\t\nL000459\t\\emph{Appendix A: Boundary CFT Quenches}---\\label{app:bcft}In this appendix, we present supporting numerical data for the quench dynamics starting in a boundary-CFT initial state, for all three lattice models considered in the main text.\nL000460\t\nL000461\tIn particular, Calabrese and Cardy determined the quench dynamics for a conformal field theory starting from a special initial state, $|\\psi_0\\rangle$~\\cite{calabrese2005evolution,calabrese2016quantum}:\nL000462\t\nL000463\t\\begin{equation}\nL000464\t|\\psi_0\\rangle \\propto e^{-\\tau_0 H_{\\textrm{CFT}}}|\\psi_0^* \\rangle,\nL000465\t\\label{eqn:cardystate}\nL000466\t\\end{equation}\nL000467\twhere $|\\psi_0^*\\rangle$ is a conformally invariant boundary state, and the extrapolation length, $\\tau_0$, determines the correlation length in the initial state. For both the Ising and Potts universality classes, these conformally invariant boundary states have been calculated exactly. For example,  for the TFIM, they correspond to the two (symmetry-broken) ferromagnetic product states, or the $|{+}X\\rangle$ (symmetric) paramagnetic state.\nL000468\t\nL000469\tAfter real-time evolution under the critical Hamiltonian, Calabrese and Cardy showed that this initial state thermalizes locally to a Gibbs ensemble at temperature $\\beta = 4 \\tau_0$. Furthermore, for $t \\gg \\tau_0$, the primary fields decay exponentially:\nL000470\t\nL000471\t\\begin{align}\nL000472\t\\langle \\psi_0| \\Phi(t) |\\psi_0\\rangle &\\simeq A_b^{\\Phi}\\left(\\frac{\\pi}{2 \\tau_0}\\right)^{x_\\Phi} e^{-x_\\Phi \\pi t / 2 \\tau_0}\nL000473\t\\label{eqn:cardydecay}\nL000474\t\\end{align}\nL000475\twhere $A_b^{\\Phi}$ is a constant depending on the boundary conditions, $b$. This may vanish: for instance, if we quench from $|{+}X\\rangle$, $A_X^\\sigma$ is zero due to the $\\mathbb{Z}_2$ symmetry.\nL000476\t\nL000477\t\nL000478\tCrucially, because $\\tau_0$ only depends on the initial state, the ratio of the decay times of two primary fields is universal: it is simply the ratio of their scaling dimensions. We confirm this prediction carries over to shallow quenches on the lattice by simulating open spin chains for the TFI, Potts, and ANNNI models. For all three models, we choose a symmetry-broken product state (corresponding to $\\sigma > 0$) and simulate imaginary-time evolution for various $\\tau_0$ values. We observe scaling collapse in good agreement with the asymptotic expectations. The scaling collapse improves once $J\\tau_0 > 1$, so that the initial correlation length is much larger than the lattice spacing and the continuum limit may be applied. Up to $t \\propto$ $2\\tau_0 - 4\\tau_0$ for the models, there is quantitatively good agreement with the expected ratios, shown in the lower plots of Fig.~\\ref{fig:cc}. At longer times, there are deviations from the CFT prediction, particularly $\\langle \\psi \\bar \\psi(t)\\rangle$ in the Potts chain. This indicates a crossover into the nonuniversal regime and the breakdown of the low-energy effective CFT.\nL000479\t\nL000480\t\nL000481\t\\renewcommand{\\theequation}{B\\arabic{equation}}\nL000482\t\\setcounter{equation}{0}\nL000483\t\\emph{Appendix B: Finite-Temperature Conformal Perturbation Theory}---\\label{app:FT_CFT}In this appendix, we present details of  some essential aspects of the analytical technique~\\cite{Zamolodchikov_1991,Mussardo_2010, Berenstein_Miller_2014} used for calculating the relaxation dynamics of primary fields after a finite-temperature critical quench, and qualitatively sketch how the quasiparticle light-cone picture manifests~\\cite{calabrese2005evolution}.\nL000484\tCorrections to the dynamics of a local observable, $\\langle\\Phi(t)\\rangle$, after a quench from the finite-temperature Gibbs ensemble of\nL000485\t\\begin{align}\nL000486\t    H = H_{\\mathrm{CFT}} + \\tilde{g}  \\int dr \\Psi\\left( r \\right)\nL000487\t\\end{align}\nL000488\tcan be calculated perturbatively by integrating over $n$-point finite-temperature correlation functions:\nL000489\t\nL000490\t\\begin{equation}\nL000491\t\\begin{aligned}\nL000492\t    &\\left\\langle \\Phi\\left(t\\right)\\right\\rangle\nL000493\t    =  \\tilde{g} \\int_\\beta  d r d\\tau  \\left\\langle \\Psi(r,\\tau) \\Phi\\left(t\\right)\\right\\rangle \\quad\\quad\\\\\nL000494\t    &\\quad+\nL000495\t    \\frac{1}{2}\\tilde{g}^2\\int_\\beta  d r d\\tau d r' d\\tau' \\left\\langle \\Psi(r,\\tau)\\Psi(r',\\tau') \\Phi\\left(t\\right)\\right\\rangle + \\ldots,\nL000496\t\nL000497\t\nL000498\t    \\label{eq:perteexpn}\nL000499\t\\end{aligned}\nL000500\t\\end{equation}\nL000501\twhere the notation $\\int_\\beta$ indicates that the integrals are evaluated over infinite real space, $r$, and periodic imaginary time, $\\tau$, with circumference give by the inverse temperature, $\\beta$ The correlators, $\\langle \\ldots \\rangle$, can be evaluated using the operator product expansion~\\cite{Di_Francesco_Mathieu_Sénéchal_1997}; for simplicity, both $\\Phi$ and $\\Psi$ are (real components of) primary fields. Even the first-order correction to the dynamics illustrates the light-cone picture. Here, the integrand is the two-point finite-temperature correlation function, which is given by (for $2\\pi t\\gg  \\beta$)\nL000502\t\\begin{equation}\nL000503\t    \\left\\langle \\Psi(0,t)\\Phi\\left( r,\\tau\\right)\\right\\rangle\nL000504\t    \\simeq \\frac{\\delta_{x_\\Psi x_\\Phi}}{\\beta^{2 x_\\Phi}\\left( \\cosh\\frac{2\\pi r}{v\\beta}-e^{\\frac{2\\pi}{\\beta}(t-i\\tau)}\\right)^{x_\\Phi}},\nL000505\t    \\label{eq:twopointcorrs}\nL000506\t\\end{equation}\nL000507\twhere $v$ is the propagation speed of the quasiparticles in the CFT~\\cite{ cardy2016furtherresults}.\nL000508\tWe see from Eqn.~\\ref{eq:twopointcorrs}, that for large spatial separations, $|r|\\gg vt$, the spatial decay term, $\\cosh\\frac{2\\pi r}{v\\beta} \\sim \\frac{1}{2} e^{2\\pi |r|/\\beta}$, dominates, meaning that the two-point correlation function decays exponentially with distance $r$. On the other hand, for small spatial separations, $|r|\\ll vt$, the exponential term $e^{2\\pi(t-i\\tau)/\\beta}$ dominates, meaning that the two-point correlation function is constant over distance $r$. These distinct regimes of $r$, which are causally separated by the ``horizon\" of the light-cone, $|r| = vt$, leads to two qualitatively different contributions to the first-order corrections of the relaxation dynamics, as in Eqn. \\ref{eqn:g^1}. The horizon effect due to the causal structure of the CFT naturally extends to understanding second-\nL000509\tand higher-order corrections $\\mathcal{O}(g^n)$, where the interplay of $n$\nL000510\tlight-cones leads to more complex scaling forms~\\cite{SM}.\nL000511\t\nL000512\t\nL000513\t\\onecolumngrid\nL000514\t\\clearpage\nL000515\t\nL000516\t\\widetext\nL000517\t\nL000518\t\\setcounter{equation}{0}\nL000519\t\\setcounter{figure}{0}\nL000520\t\nL000521\t\\setcounter{table}{0}\nL000522\t\\setcounter{page}{1}\nL000523\t\\makeatletter\nL000524\t\\renewcommand{\\theequation}{S\\arabic{equation}}\nL000525\t\\renewcommand{\\thefigure}{S\\arabic{figure}}\nL000526\t\\renewcommand{\\bibnumfmt}[1]{[S#1]}\nL000527\t\\renewcommand{\\citenumfont}[1]{S#1}\nL000528\t\\renewcommand{\\theHfigure}{Supplement.\\thefigure}\nL000529\t\nL000530\t\nL000531\t\nL000532\t\nL000533\t\nL000534\t\nL000535\t\nL000536\t\\begin{center}\nL000537\t\\textbf{\\large Supplementary Information: \\\\ Universality of Shallow Global Quenches in Critical Spin Chains}\nL000538\t\nL000539\t\\vspace{10pt}\nL000540\t\\thispagestyle{plain}\nL000541\tJulia Wei,\\textsuperscript{1,*}, Méabh Allen,\\textsuperscript{2,*} Jack Kemp\\textsuperscript{1,3,*}, Chenbing Wang,\\textsuperscript{1} Zixia Wei,\\textsuperscript{1} Joel E. Moore,\\textsuperscript{2,4} and Norman Y. Yao\\textsuperscript{1}\nL000542\t\nL000543\t\\textsuperscript{1}\\textit{\\small Department of Physics, Harvard University, Cambridge, MA 02138 USA} \\\\\nL000544\t\\textsuperscript{2}\\textit{\\small Department of Physics, University of California, Berkeley, California 94720 USA} \\\\\nL000545\t\\textsuperscript{3}\\textit{\\small TCM Group, University of Cambridge, JJ Thomson Avenue, Cambridge, CB3 0US UK} \\\\\nL000546\t\\textsuperscript{4}\\textit{\\small Materials Science Division, Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA} \\\\\nL000547\t\nL000548\t\\end{center}\nL000549\t\nL000550\t\nL000551\t\\section{Operators in the three-state Potts model}\nL000552\tIn the three-state Potts model, the $\\mathbb{Z}_3$ clock and shift operators are defined as\nL000553\t\\begin{align}\nL000554\t    s_i &= \\begin{pmatrix}\nL000555\t                    1 & 0 & 0\\\\\nL000556\t                    0 & \\omega & 0\\\\\nL000557\t                    0 & 0 & \\omega^2\nL000558\t                    \\end{pmatrix} \\ \\rm{ and} \\\\\nL000559\t    \\tau_i &=  \\begin{pmatrix}\nL000560\t                    0 & 0 & 1\\\\\nL000561\t                    1 & 0 & 0\\\\\nL000562\t                    0 & 1 & 0\nL000563\t                \\end{pmatrix},\nL000564\t\\end{align}\nL000565\t\nL000566\twhere $\\omega = e^{\\frac{2\\pi i}{3}}$~\\cite{S_mong2014parafermionic}.\nL000567\t\nL000568\t\\section{Simulation parameters and convergence}\nL000569\t\nL000570\tAll matrix product state (MPS) simulations were performed using the \\texttt{tenpy} library~\\cite{S_hauschild:2024}. We use the time-evolving block decimation algorithm (TEBD) with a fourth-order Trotter decomposition, where the time step is fixed to $\\delta t = 0.1$~\\cite{S_barthelOptimizedLieTrotter2020}. TFI and Potts are both nearest-neighbor models, so we can immediately apply TEBD; for the ANNNI model, we first group pairs of nearest-neighbor sites together. Measurements are performed on the central sites.\nL000571\t\nL000572\t\nL000573\tFor ground state quenches, we first use the density matrix renormalization group (DMRG) method to find near-critical ground states of the Potts and ANNNI models~\\cite{S_SCHOLLWOCK201196}. Since spontaneous symmetry breaking does not occur at finite system sizes~\\cite{S_sachdevQuantumPhaseTransitions2011}, we run DMRG in the presence of a small symmetry-breaking field, $H_\\sigma$, with field strength $g_\\sigma$. This ensures that the spin field has a non-zero value at $t=0$, but the separation of scales $g \\gg g_\\sigma$ allows us to neglect $g_\\sigma$ in the scaling collapse of the quench dynamics. For system size $L < 1000$ (Potts model), we fix $g_\\sigma = 10^{-4}$, while for $L \\geq 1000$ (ANNNI model), we fix $g_\\sigma = 10^{-5}$.\nL000574\t\nL000575\t\nL000576\tFor finite-temperature quenches, we first use the purification method to find near-critical Gibbs ensembles. For real-time dynamics, we again use the purification method and apply the backward time-evolution disentangler, which can reduce the bond dimension~\\cite{S_karraschReducingNumericalEffort2013}.\nL000577\t\nL000578\t\nL000579\tWe use the same procedure to assess convergence in the quench dynamics for boundary-CFT, ground state, and finite-temperature initial conditions. First, we choose a maximum simulation time, $Jt_{\\max}$. To test convergence, we fix the scaling parameter ($\\tau_0$, $g^{-\\nu}$, or $\\beta$, respectively) and sweep across three values of $L$ and $\\chi$, summarized in Table~\\ref{table:convergence_params} below. Fixing $\\chi$ ($L$) to its maximum value, we compare observable values between the second-largest and largest $L$ ($\\chi$) simulations, resulting in a convergence time, $t_{\\rm conv}^{(L)}$ ($t_{\\rm conv}^{(\\chi)}$), where all observable dynamics agree up to a relative error of $5\\%$. We identify the maximum convergence time, $t_{\\rm conv}\\equiv \\min(t_{\\rm conv}^{(L)},t_{\\rm conv}^{(\\chi)})$, which corresponds to the timescales shown in the main text.\nL000580\t\nL000581\t\\begin{table}\nL000582\t    \\begin{tabular}{ccccc}\nL000583\t    \\toprule\nL000584\t     Initial State & Model & $L$ & $\\chi$ & $t_{\\max}$  \\\\\nL000585\t    \\midrule\nL000586\t     \\multirow{3}{*}{ Boundary-CFT state} & TFIM & $\\{50, 100, 200\\}$ & \\multirow{3}{*}{$\\{128, 256, 512\\}$} & \\multirow{3}{*}{$20$}\\\\\nL000587\t     & Potts & $\\{50, 100, 200\\}$ &   & \\\\\nL000588\t    & ANNNI & $\\{100, 200, 400\\}$ &  & \\\\\nL000589\t    \\midrule\nL000590\t    \\multirow{2}{*}{ Ground state}\nL000591\t     & Potts & $\\{250, 375, 500\\}$ & \\{128, 256, 512\\} & $20$\\\\\nL000592\t    & ANNNI & $\\{1000, 1500, 2000\\}$ & \\{128, 256, 384\\} & $20$\\\\\nL000593\t    \\midrule\nL000594\t     \\multirow{3}{*}{ Finite-temperature ensemble} & TFIM & \\multirow{3}{*}{$\\{100, 200, 400\\}$} & \\{128, 256, 384\\} & $12$\\\\\nL000595\t     & Potts &  & \\{128, 256, 384\\} & $6$\\\\\nL000596\t    & ANNNI & & \\{128, 192, 256\\} & $10$\\\\\nL000597\t    \\bottomrule\nL000598\t    \\end{tabular}\nL000599\t\\caption{Parameters used to assess the convergence of MPS quench simulations.}\nL000600\t\\label{table:convergence_params}\nL000601\t\\end{table}\nL000602\t\nL000603\t\\section{Details about fitting procedures}\nL000604\t\nL000605\t\\subsection{Ground state quench: Extracting decay ratios}\nL000606\t\nL000607\t\\begin{figure*}\nL000608\t\\centering\nL000609\t\\includegraphics[width=1.0\\textwidth]{suppgs_ratio.pdf}\nL000610\t\\caption{The ratio of decay constants in quenches starting from the symmetry-broken ground state in (a) the TFI ($L=500$), (b) Potts ($L=500$, $\\chi = 512$), and (c) ANNNI ($L=2000$, $\\chi=384$) models. A sliding window of $Jt=1$ is used to fit the dynamics of different primary fields to an exponential decay curve. The horizontal dotted lines indicate universal ratios of the fields' scaling dimensions. In (b), the time-scale is truncated for clarity $x_\\sigma/x_{\\psi\\bar\\psi}$ as the fitted ratio diverges from the boundary-CFT expectation of $x_\\sigma/x_{\\psi\\bar\\psi} = 1/10$.\nL000611\t}\nL000612\t\\label{fig:gsratio}\nL000613\t\\end{figure*}\nL000614\t\nL000615\tWe may fit quench dynamics to an exponential decay curve and examine the ratios of the decay constants, shown in Fig.~\\ref{fig:gsratio}. Unlike the boundary-CFT initial condition, we do not observe a plateau in the decay constant that is consistent with the universal ratios in any of the three models.\nL000616\t\nL000617\t\\subsection{Boundary-CFT quench: Varying the fitting window}\nL000618\t\nL000619\t\\begin{figure*}\nL000620\t\\centering\nL000621\t\\includegraphics[width=1.0\\textwidth]{suppbcft.pdf}\nL000622\t\\caption{The ratio of decay constants in quenches starting from the boundary-CFT state in (a) the TFI ($L=200$), (b) Potts ($L=200$), and (c) ANNNI ($L=400$) models at bond dimension $\\chi=512$. The horizontal dotted lines indicate universal ratios of the fields' scaling dimensions. For each value of $J\\tau_0$, ratios from three fitting windows are shown: $Jt = 0.5$ (dashed lines), $Jt = 1$ (solid lines), and $Jt = 2$ (dash-dotted lines).\nL000623\t}\nL000624\t\\label{fig:bcftwindowfit}\nL000625\t\\end{figure*}\nL000626\t\nL000627\tWe vary the size of the fitting window in Fig.~\\ref{fig:bcftwindowfit} for the boundary-CFT quench dynamics. First, we observe that for all windows, the ratio corresponding to the initial time interval is far from the universal result, indicating an early, nonuniversal time-scale set by the lattice spacing (not shown in the main text). We also observe that the approaches toward and away from the universal ratios have a slight qualitative variation depending on the size of the fitting window. For all three windows, we can identify a plateau consistent with the universal ratios.\nL000628\t\nL000629\t\nL000630\t\\section{Additional data for three-state Potts model quenches}\nL000631\t\nL000632\t\\begin{figure*}\nL000633\t\\centering\nL000634\t\\includegraphics[width=1.0\\textwidth]{suppbdag.pdf}\nL000635\t\\caption{The scaling collapse of the dynamics of the parafermion bilinear field, $\\psi \\bar \\psi$, after global quenches in the three-state Potts model, starting from (a) the boundary-CFT state ($L = 400$, $\\chi=512$), (b) ground state ($L = 500$, $\\chi = 512$), and (c) finite-temperature ensemble with a $\\sigma$ perturbation ($L = 400$, $\\chi = 384$, $g_\\sigma = 1.78\\times 10^{-3}$). Insets: The unscaled data.\nL000636\t}\nL000637\t\\label{fig:psibarpsi}\nL000638\t\\end{figure*}\nL000639\t\nL000640\tIn Fig.~\\ref{fig:psibarpsi}, we show scaling collapses of the parafermion bilinear field, $ \\psi \\bar \\psi$, after global quenches in the three-state Potts model, starting from the three initial conditions. (For completeness, we show the unscaled dynamics for quenches from the boundary-CFT state in App. A.)\nL000641\t\nL000642\t\nL000643\tIn the ground state quench, we again observe collapse that is consistent with critical exponent $\\nu = 5/6$. After normalizing by the initial amplitude of $\\langle \\psi \\bar \\psi\\rangle$ in the finite-temperature quench, we see a scaling collapse when the time axis is rescaled by $\\beta$. However, in contrast to the other examples for the finite-temperature initial condition, we note that this case is not explained by the conformal perturbation theory framework for primary fields, because the three-point structure constant is zero. We hypothesize that the dynamics can still be understood via the overlap between descendant fields in the OPE of the lattice operators, and leave the analytical form for future work.\nL000644\t\nL000645\t\nL000646\t\\section{Analytics}\nL000647\t\nL000648\t\\subsection{Free fermion scaling limit}\nL000649\tIn this section we discuss the origin of the analytical results for quenches to critical points for the transverse-field Ising model quoted in the main text, $H_{\\mathrm{TFI}} = -J\\sum_i Z_i Z_{i+1} + (1-g)X_i$. In particular, we will focus on deriving results for the $\\epsilon$ field through the scaling limit of the lattice observable $Z_i Z_{i+1} - X_i$; the scaling limit of the $Z_i$ has already been calculated in \\cite{S_Calabrese_Essler_Fagotti_2011}. Notice that for a transverse-field Ising model with periodic boundary conditions, this simply corresponds to computing the transverse field dynamics, because \\begin{align*}\nL000650\t\\expct{Z_i Z_{i+1}(t) - X_i(t)}=&\\expct{\\left(Z_i Z_{i+1}(t) + X_i(t)\\right)-2X_i(t)}\\\\\nL000651\t    =&\\expct{\\text{Const}-2X_i(t)}\\\\\nL000652\t    =&\\expct{2X_i(\\infty)-2X_i(t)}.\nL000653\t\nL000654\t\\end{align*} The last line follows via the invariance of the critical point under Kramers-Wannier duality, which implies $Z_i Z_{i+1}(t) - X_i(t)$ must vanish as $t \\to \\infty$. For a quench to the critical point from a model prepared at equilibrium temperature $\\beta$ and initial transverse-field perturbation $g$, such transverse-field dynamics have already been calculated by Barouch and McCoy~\\cite{S_barouch1970statistical}\nL000655\t\\begin{equation}\nL000656\t\\expct{Z_i Z_{i+1}(t) - X_i(t)}=\\frac{2}{\\pi } \\int_0^{\\pi } \\frac{g \\cos ^2 \\left(\\frac{k}{2}\\right) \\cos  \\left(4 J t \\sqrt{2-2 \\cos  k} \\right) \\tanh\\left(\\beta J \\sqrt{g^2+2(1+g)(1-\\cos k)} \\right)}{\\sqrt{g^2+2(1+g)(1-\\cos k)}} dk\nL000657\t\\label{eqn:mccoyfull}\nL000658\t\\end{equation}\nL000659\tThey took the asymptotic late-time limit, $t\\to \\infty$, of this expression and found oscillatory behavior at leading order:\nL000660\t\\begin{equation}\nL000661\t\\expct{Z_i Z_{i+1}(t) - X_i(t)} \\sim -\\frac{g}{8  |2-g| \\sqrt{\\pi } }(Jt)^{-3/2} \\tanh\\left(\\beta J |2-g|\\right) \\cos \\left(8 J t+\\frac{\\pi }{4}\\right),\nL000662\t\\label{eq:oscillation}\nL000663\t\\end{equation}\nL000664\tas can be observed in Fig.~3 of the main text.\nL000665\t\nL000666\t\nL000667\tOur goal is to instead calculate the scaling limit of Eqn. ~\\ref{eqn:mccoyfull} in order to compare with the CFT results. This amounts to taking the limit $g\\to 0$ before taking the late-time limit $t \\to \\infty$. Keeping only terms to first order in $g$ in Eqn.~\\ref{eqn:mccoyfull}  and making the change of variables  $p=\\frac{\\pi \\sqrt{1-\\cos k}}{\\sqrt{2}}$, we find\nL000668\t\\begin{equation}\nL000669\t    \\expct{Z_i Z_{i+1}(t) - X_i(t)} \\sim \\frac{2}{\\pi } g \\int_0^{\\pi } \\frac{ \\sqrt{\\pi ^2-p^2} \\cos \\left(\\frac{ 8 J  t }{\\pi } p \\right) \\tanh \\left( \\frac{2\\beta J}{\\pi} p \\right) }{\\pi \\sqrt{p^2+\\left(\nL000670\t    \\frac{\\pi g}{2}\\right)^2}} dp\nL000671\t\\end{equation}\nL000672\t\nL000673\t\nL000674\tAt late times, the cosine term in the integrand will oscillate rapidly, so we may use the method of stationary phase about $p=0$ to simplify the integrand and extend the upper limit:\nL000675\t\\begin{equation}\nL000676\t    \\expct{Z_i Z_{i+1}(t) - X_i(t)} \\sim \\frac{2}{\\pi } g \\int_0^{\\infty } \\frac{ \\cos \\left(\\frac{ 8 J  t }{\\pi }p\\right) \\tanh \\left( \\frac{2 \\beta J}{\\pi} p \\right) }{ \\sqrt{p^2+\\left(\nL000677\t    \\frac{\\pi g}{2}\\right)^2}} dp.\nL000678\t    \\label{eq:statphase}\nL000679\t\\end{equation}\nL000680\tAs this integral is now in the form of a Fourier transform, it may be easily evaluated. There are two possible cases, depending on the temperature.\nL000681\t\nL000682\t\\paragraph{Ground state quench} For the ground state quench, $\\beta \\to \\infty$, we utilize\nL000683\t\\begin{equation}\nL000684\t    \\int_0^{\\infty } \\frac{1}{\\sqrt{p^2+\\alpha^2}} \\cos (\\omega p) dp=K_0\\left(\\alpha \\omega\\right),\nL000685\t\\end{equation}\nL000686\twhere $K_n(x)$ is the modified Bessel function of the second kind. The leading order term in the series expansion of $K_0(x)$ as $x\\to \\infty$ is $\\sqrt{\\frac{\\pi }{2}}e^{-x}  \\sqrt{\\frac{1}{x}}$. Finally, we obtain\nL000687\t\\begin{equation} \\label{eq:asymptote1}\nL000688\t    \\expct{\\epsilon_\\text{I}(t)} \\sim \\expct{Z_i Z_{i+1}(t) - X_i(t)}\\sim{\\sqrt[]{\\frac{g}{2\\pi}}}e^{-4 gJt}{\\sqrt[]{\\frac{1}{Jt}}},\nL000689\t\\end{equation}\nL000690\tas quoted in the main text. We note that this result may also be obtained by exploiting the horizon effect to equate the one-point function squared of $X_i(t)$, decaying as a function of time, with the two-point function in equilibrium, decaying as a function of space. For ground state quenches, the generalized Gibbs ensemble equilibrium two-point function has already been calculated~\\cite{S_Calabrese_Essler_Fagotti_2011}.\nL000691\t\nL000692\t\nL000693\t\\paragraph{Finite temperature}\nL000694\tFor finite $\\beta$, we may simplify the integrand in Eqn.~\\ref{eq:statphase} by neglecting the term in the denominator proportional to $g^2$, as unlike for the ground state case the integral converges without this term. Then we may evaluate the integral using the Fourier transform\nL000695\t\\begin{equation}\nL000696\t\\int_0^{\\infty} \\frac{\\cos(\\omega p)\\tanh(\\gamma p)}{p}dp = - \\log \\tanh\\frac{\\pi \\omega}{4\\gamma}.\nL000697\t\\end{equation}\nL000698\tThe leading term of the series expansion of $- \\log \\tanh x$ as $x \\to \\infty$ is $2 e^{-2x}$, so finally we recover the exponential decay \\begin{equation}\nL000699\t \\expct{\\epsilon_\\text{I}(t)}\\sim\\expct{Z_i Z_{i+1}(t) - X_i(t)} \\sim \\frac{4 g}{\\pi}e^{-2\\pi t/\\beta},\nL000700\t \\label{eq:asymptote2}\nL000701\t\\end{equation}\nL000702\tconsistent with the boundary-CFT expression under the identification $\\beta = 4\\tau_0$.\nL000703\t\nL000704\t\\subsection{Lattice-to-field mapping}\nL000705\tIt is useful to take a closer look at the mapping between the critical lattice Hamiltonians and perturbations, which are implemented in numerical simulation, and the underlying continuum CFT Hamiltonians and field perturbations, from which a conformal perturbative analysis yields scaling forms.\nL000706\t\nL000707\t\nL000708\tA primary field $\\Phi$ scales under a conformal transformation by its scaling dimension~\\cite{S_Di_Francesco_Mathieu_Sénéchal_1997}, which is denoted by $\\Delta_\\Phi$ throughout the supplemental material~\\footnote{This notation for the scaling dimension deviates from the main text's convention, $x_\\Phi$, in order to avoid confusion with the conformal space-time co-ordinates $\\mathbf{x}$.}, and defined by the power-law decay of their two-point correlation functions,\nL000709\t\\begin{align}\nL000710\t    \\langle \\Phi(\\mathbf{x}_1)\\Psi(\\mathbf{x}_2) \\rangle = \\delta_{\\Delta_\\Phi,\\Delta_\\Psi}\\left|\\mathbf{x}_1-\\mathbf{x}_2\\right|^{-2\\Delta_\\Psi},\nL000711\t\nL000712\t\\end{align}\nL000713\tfollowing customary normalization conventions. The Hamiltonian has units of inverse length $[H] = [J] = -1$. Local lattice operators $O_i$, which are dimensionless, can be written as a linear combination of fields in the CFT~\\cite{S_milsted2017extraction},\nL000714\t\\begin{align}\nL000715\t    O_i = \\sum_\\varphi c_{\\varphi} a^{\\Delta_\\varphi}\\varphi,\nL000716\t\\end{align}\nL000717\twhere $a$ is the lattice spacing and $c_{\\varphi} $ are dimensionless constants. In the continuum limit, a sum over local lattice operators becomes an integral over fields: $\\sum_i \\to \\frac{1}{a}\\int dr$. Since any field in the CFT is either a primary field or a descendant thereof~\\cite{S_Di_Francesco_Mathieu_Sénéchal_1997}, we consider then, for simplicity, the case where the lattice operator maps to just a primary field, $O_i = c_\\Psi a^{\\Delta_\\Psi}\\Psi_i  $. We have\nL000718\t\\begin{align}\nL000719\t    H = H_{\\mathrm{c}} + g J  \\sum_i O_i \\to H_{\\mathrm{CFT}} + \\tilde{g}  \\int dr \\Psi\\left( r \\right) \\implies \\tilde{g} = g c_\\Psi J a^{\\Delta_\\Psi-1}.\nL000720\t\\end{align}\nL000721\tImmediately we note that the CFT perturbation strength, $\\tilde{g}$, is proportional to the dimensionless lattice perturbation strength, $g$, and, unless the primary field $\\Phi$ is a marginal operator (i.e. $\\Delta_\\Psi = 2$), it must have dimensions, $[\\tilde{g}] =  \\Delta_\\Psi-2$.\nL000722\t\nL000723\t\nL000724\tThe lattice-to-field mapping and corresponding constants $c_\\Psi$ for the TFIM are discussed at length in the literature, see, e.g., \\cite{S_sachdevQuantumPhaseTransitions2011,Calabrese_Essler_Fagotti_2011,milsted2017extraction}, and references therein. However, since we do not generically know $c_\\Psi$ for arbitrary lattice operators, we do not focus on explicit calculation of the pre-factor in each term of the perturbative expansion in the main text, but instead on the scaling forms with respect to temperature and time, as well as the \\emph{ratio} of the different terms for $\\mathcal{O}(g)$. We set $a = 1$ from here on out unless explicitly stated.\nL000725\t\nL000726\t\\subsection{Conformal perturbation theory asymptotics}\nL000727\t\\begin{figure}[tbp!]\nL000728\t    \\centering\nL000729\t    \\includegraphics[width=0.9\\linewidth]{suppgeoms.pdf}\nL000730\t    \\caption{(a) The Euclidean geometry running over all real space $r$ and imaginary time $\\tau$, providing no natural infrared (IR) regulator. (b) Considering the CFT at finite temperature is equivalent to putting the Euclidean geometry on a cylinder, where the circumference is in the imaginary time direction $\\tau$ and is given by the inverse temperature $\\beta \\sim T^{-1}$. The finite imaginary time provides an IR regulator. In both geometries, the introduction of a cutoff $\\tilde{g}$ allows for the regularization of ultraviolet (UV) divergences; if the calculation is convergent one should be able to safely take $\\Lambda \\to 0$. }\nL000731\t    \\label{fig:geometryboth}\nL000732\t\\end{figure}\nL000733\tWe are interested in the relaxation behavior of local observables following a shallow global quench to the critical point in $1+1$D, starting from a nearby thermal ensemble. Having discussed the lattice-to-field mapping above, we proceed in the language of CFT. In the conformal perturbative framework~\\cite{S_Zamolodchikov_1991,Mussardo_2010}, the quench, characterized by some relevant scalar operator $\\Psi$ with $\\Delta_\\Psi <2$, is modeled as a small deformation of the CFT action $S_{\\mathrm{CFT}}$,\nL000734\t\\begin{align}\nL000735\t    S = \\int d^2\\mathbf{x} \\mathcal{L}(\\mathbf{x}) = S_{\\mathrm{CFT}} - \\tilde{g}\\int d^2\\mathbf{x} \\Psi(\\mathbf{x}),\nL000736\t\\end{align}\nL000737\twhere $\\mathbf{x}= (r,\\tau)$ are the conformal space-time co-ordinates, and $ \\mathcal{L}$ is the Lagrangian density of the system. Since the system is at finite temperature, the Euclidean geometry of the CFT is a cylinder of circumference $\\beta$ in imaginary time $\\tau$, and infinite in real space $r$ (Fig. \\ref{fig:geometryboth}). This geometry naturally introduces an infrared (IR) regulator, and is conformally equivalent to flat space~\\cite{S_Berenstein_Miller_2014}. Then:\nL000738\t\\begin{align}\nL000739\tS=  S_{\\text{CFT}}- \\tilde{g} \\int_{0}^{\\beta}d\\tau \\int_{-\\infty}^{\\infty} dr\\Psi(r,\\tau).\nL000740\t\\end{align}\nL000741\tNote that the procedure may require the introduction of an ultraviolet (UV) cutoff in imaginary time, $\\Lambda$, to regularize any divergences [see Fig. \\ref{fig:geometryboth}(b)]\\footnote{$\\Lambda $ should be distinguished from $a$, which is the UV cutoff corresponding to the lattice spacing}; UV divergences can be dealt with via standard renormalization methods and $\\Lambda$ can  be taken to zero after the computation~\\cite{S_Mussardo_2010}.\nL000742\t\nL000743\tThe partition function takes the form:\nL000744\t\\begin{align}\nL000745\t    Z_{\\tilde{g}}=\\left\\langle\\exp \\left(\\tilde{g} \\int d^2 \\mathbf{x} \\Psi(\\mathbf{x})\\right)\\right\\rangle_0=\\left\\langle\\sum_{n=0}^{\\infty} \\frac{1}{n!}\\left(\\tilde{g} \\int d^2 \\mathbf{x} \\Psi(\\mathbf{x})\\right)^n\\right\\rangle_0= 1 +\\mathcal{O}(\\tilde{g}^2),\nL000746\t    \\label{eq:partitionfunction}\nL000747\t\\end{align}\nL000748\twhere $\\langle \\ldots\\rangle_0 $ denotes correlation functions of the undeformed finite-temperature CFT. Corrections to local operators can then be determined via a perturbative expansion over $n$-point finite-temperature correlators,\nL000749\t\\begin{equation}\nL000750\t\\begin{aligned}\nL000751\t    \\left\\langle O\\left(\\mathbf{x}\\right)\\right\\rangle_{\\tilde{g}} & = \\frac{1}{Z_{\\tilde{g}}} \\left\\langle O(\\mathbf{x}) \\exp \\left(\\tilde{g} \\int d^2 \\mathbf{x}' \\Psi(\\mathbf{x}')\\right)\\right\\rangle_0\\\\\nL000752\t    &= \\frac{1}{Z_{\\tilde{g}}}\\sum_{n=1}^{\\infty} \\frac{1}{n!}\\tilde{g}^n \\int  d^2 \\mathbf{x}_1 \\ldots d^2 \\mathbf{x}_n\\left\\langle \\Psi(\\mathbf{x}_1)\\ldots \\Psi(\\mathbf{x}_n)O\\left(\\mathbf{x}\\right)\\right\\rangle_0 \\\\\nL000753\t    &=  \\tilde{g} \\int  d^2 \\mathbf{x}_1 \\left\\langle \\Psi(\\mathbf{x}_1) O\\left(\\mathbf{x}\\right)\\right\\rangle_0 +\nL000754\t    \\frac{1}{2}\\tilde{g}^2\\int d^2 \\mathbf{x}_1 d^2 \\mathbf{x}_2\\left\\langle \\Psi(\\mathbf{x}_1)\\Psi(\\mathbf{x}_2) O\\left(\\mathbf{x}\\right)\\right\\rangle_0 +\\mathcal{O}\\left(\\tilde{g}^3\\right)\\\\\nL000755\t    & =\\left\\langle O\\left(\\mathbf{x}\\right)\\right\\rangle_{1}+ \\left\\langle O\\left(\\mathbf{x}\\right)\\right\\rangle_{2} +\\mathcal{O}\\left(\\tilde{g}^3\\right),\nL000756\t    \\label{eq:perteexpn}\nL000757\t\\end{aligned}\nL000758\t\\end{equation}\nL000759\twhere the correlators can be obtained from the operator product expansions (OPE) of the observable $O$ with the quench perturbation $\\Psi$, again in the undeformed finite-temperature CFT~\\cite{S_Di_Francesco_Mathieu_Sénéchal_1997}. Since the one-point functions of primary fields evaluated in the undeformed CFT are zero, corrections from the renormalized partition function in Eqn.~\\ref{eq:partitionfunction} do not manifest until $\\mathcal{O}(\\tilde{g}^3)$ (when we consider a Taylor expansion in $\\tilde{g}$). Note, from Section V B, that $[\\tilde{g}] = \\Delta_O-2$, and the units of each term in Eqn.~\\ref{eq:perteexpn} are $[O(\\mathbf{x})] = -\\Delta_O$. Assuming translation invariance, expectation values of deformed one-point functions are position-independent and higher-point functions depend only on the separation between fields. The decay of local observables is then obtained via analytic continuation to real time.\nL000760\t\nL000761\t\nL000762\tFor simplicity, we consider only the dynamics of quench fields and observables which are (the real components of) primary fields.\nL000763\t\\subsubsection{First-order perturbation theory}\nL000764\tAt leading order, the expectation value of the observable $\\Phi(\\mathbf{x})$ at space-time coordinate $\\mathbf{x} = (0,\\tau) \\equiv \\tau$, under a quench characterized by $\\Psi$, takes the form\nL000765\t\\begin{align}\nL000766\t    \\langle \\Phi(\\tau)\\rangle_1&= \\tilde{g} \\int d^2 \\mathbf{x'} \\left\\langle \\Psi(\\mathbf{x'})\\Phi\\left( \\tau\\right)\\right\\rangle_0 \\label{eqn:integralsetup},\nL000767\t\\end{align}\nL000768\twhere the integrand is the two-point finite-temperature correlation function which is non-zero only if $\\Psi = \\Phi$ by symmetry constraints, and describes pairs of left- and right-moving quasiparticles~\\cite{S_Di_Francesco_Mathieu_Sénéchal_1997},\nL000769\t\\begin{align}\nL000770\t    \\left\\langle \\Psi(\\mathbf{x'})\\Phi\\left( \\mathbf{x}\\right)\\right\\rangle_0  &= \\delta_{\\Delta_\\Psi \\Delta_\\Phi} \\left(\\frac{\\pi^2}{\\beta^2}\\right)^{\\Delta_\\Phi}\\frac{1}{\\left\\{\\sin \\left[\\frac{\\pi}{\\beta}(\\tau' -\\tau)+\\frac{i \\pi }{v\\beta} (r'-r)\\right] \\sin \\left[\\frac{\\pi}{\\beta}(\\tau' -\\tau)-\\frac{i \\pi }{v\\beta} (r'-r)\\right]\\right\\}^{\\Delta_\\Phi}}\\\\\nL000771\t    &= \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2\\pi^2}{\\beta^2}\\right)^{\\Delta_\\Phi}\\frac{1}{\\left\\{ \\cosh\\left[\\frac{2\\pi}{v\\beta}(r-r')\\right]-\\cos\\left[\\frac{2\\pi}{\\beta}(\\tau-\\tau')\\right]\\right\\}^{\\Delta_\\Phi}} \\\\\nL000772\t    &=  \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2\\pi^2}{\\beta^2}\\right)^{\\Delta_\\Phi} w\\left(\\mathbf{x'},\\mathbf{x}\\right)^{-\\Delta_\\Phi}\nL000773\t    \\label{eqn:fintempcorrelator},\nL000774\t\\end{align}\nL000775\twhere $\\delta_{ij}$ denotes the Kronecker delta function, $v = \\partial \\epsilon_k/\\partial k\\vert_{k\\ll 1}$ is a speed determined by the linear dispersion of the CFT, and where we have re-expressed the correlator in terms of the variable $w(\\mathbf{x'},\\mathbf{x})$.\nL000776\t\nL000777\t\nL000778\tTo proceed with the calculation, we firstly make use of analytic continuation to real time, $\\tau\\rightarrow -it$~\\footnote{We point out that an equivalent formulation up until the Wick rotation was obtained by Ref.~\\cite{S_Berenstein_Miller_2014}, but the following calculation is distinct.}. Secondly, in light of Ref.~\\cite{S_calabrese2006time}'s result that local observables exhibit exponential decay for ``large\" times $t\\gg \\tau_0$, we note that our primary region of interest is analogously $2\\pi t\\gg\\beta$ (though we discuss the ``short\" time regime $2\\pi t\\ll\\beta$ later). Then, after analytic continuation, and at late times,  the cosine of $w(\\mathbf{x},\\tau\\to-it)\\equiv w(\\mathbf{x},t)$ becomes exponentially suppressed,\nL000779\t\\begin{align}\nL000780\t   w(\\mathbf{x'},t) = \\cosh\\left[\\frac{2\\pi r'}{v\\beta}\\right] -\\cos \\left[\\frac{2\\pi}{\\beta}(i t +\\tau')\\right] \\xrightarrow{2\\pi t\\gg\\beta}  \\cosh\\left(\\frac{2\\pi r'}{v\\beta}\\right)-\\frac{1}{2}e^{2\\pi (t-i\\tau')/\\beta},\nL000781\t   \\label{eq:w}\nL000782\t\\end{align}\nL000783\tso that the first-order correction to the local observable at late times after a quench takes the form,\nL000784\t\\begin{equation}\nL000785\t\\begin{aligned}\nL000786\t\\langle \\Phi(t)\\rangle_{1} & \\simeq \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi^2}{\\beta^2}\\right)^{\\Delta_\\Phi}  \\int_{-\\infty}^\\infty  d r' \\int_0^\\beta d\\tau' \\frac{1}{\\left\\{\\cosh \\left[\\frac{2 \\pi r' }{ v \\beta}\\right]-\\frac{1}{2}\\exp \\left[\\frac{2 \\pi } {\\beta}\\left(t-i \\tau'\\right)\\right]\\right\\}^{\\Delta_\\Phi}},\nL000787\t\\end{aligned}\nL000788\t\\end{equation}\nL000789\twhich is even over real space. We now make the observation that the first term in Eqn.~\\ref{eq:w} dominates when $|r'|\\gg v t$, and the second term dominates when $|r'| \\ll v t$. That is, we can split the real-space integral into two regions which are separated by a ``horizon\" $|r'| = vt$ [see Fig. \\ref{fig:lightcone}(a)],\nL000790\t\nL000791\t\\begin{equation}\nL000792\t\\begin{aligned}\nL000793\t\\int_{0}^{\\infty} d r' &= \\int_{0}^{vt} d r'+ \\int_{vt}^{\\infty} d r' \\implies \\langle \\Phi(t)\\rangle = \\langle \\Phi(t)\\rangle_{ \\text{LC}}+\\langle \\Phi(t)\\rangle_{ \\text{\\sout{LC}}}\nL000794\t\\end{aligned}\nL000795\t\\end{equation}\nL000796\tPhysically, this reflects the light-cone (LC) structure of a relativistic CFT: the perturbing field acts as a source of quasiparticles which propagate through space-time at speed $v$~\\cite{S_calabrese2005evolution,cardy2016furtherresults}. The form of the correlator $w(\\mathbf{x}',t)$ can be approximated accordingly.\nL000797\tOutside the light cone, where $|r^{\\prime}|\\gg vt $, the correlations decay exponentially with distance, $\\cosh\\left(\\frac{2 \\pi r' }{ v \\beta}\\right) \\sim \\frac{1}{2}\\exp \\left(\\frac{2 \\pi r' }{ v \\beta}\\right)$, and the \\emph{spatial decay} term in Eqn. \\ref{eq:w} dominates:\nL000798\t\\begin{equation}\nL000799\t    w(\\mathbf{x^{\\prime}},t)^{-\\Delta_\\Phi}\\xrightarrow{|r^{\\prime}|\\gg vt}\nL000800\t    2^{\\Delta_\\Phi}e^{-\\frac{2\\pi r'   }{v\\beta}\\Delta_\\Phi} \\left[1 -\\left(e^{\\frac{2\\pi}{\\beta} (t-i\\tau') -\\frac{2\\pi r'}{v\\beta}}-e^{-\\frac{4\\pi r'}{v\\beta}} \\right)\\right]^{-\\Delta_\\Phi}.\nL000801\t\\label{eq:LCapproxlarger}\nL000802\t\\end{equation}\nL000803\tThe spatial decay term, $\\exp({-2\\pi\\Delta_\\Phi r'/ v\\beta})$, is explicitly taken out of the parentheses as the leading contribution. The binomial $(1+y)^{-\\Delta_\\Phi}$ in Eqn.~\\ref{eq:LCapproxlarger} can then be expressed as an algebraic expansion of the sub-leading terms $y$ over an infinite series,\nL000804\t\\begin{equation}\nL000805\t    \\left[1 -\\left(e^{\\frac{2\\pi}{\\beta} (t-i\\tau') -\\frac{2\\pi r'}{v\\beta}}-e^{-\\frac{4\\pi r'}{v\\beta}} \\right)\\right]^{-\\Delta_\\Phi}=\nL000806\t    1 +\\sum_{k=1}^{\\infty}{\\Delta_\\Phi+k -1\\choose k}\\left(e^{\\frac{2\\pi}{\\beta} (t-i\\tau') -\\frac{2\\pi r'}{v\\beta}}-e^{-\\frac{4\\pi r'}{v\\beta}} \\right)^k.\nL000807\t    \\label{eq:binomialexp}\nL000808\t\\end{equation}\nL000809\tThe leading contribution to the behavior of the primary field from outside the light cone comes from the spatial decay term:\nL000810\t\\begin{align}\nL000811\t\\langle \\Phi(t)\\rangle_{ 1_\\text{\\sout{LC},pure decay}}\nL000812\t&\\simeq 2 \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi}  \\int_{vt}^\\infty  d r' \\int_\\Lambda^{\\beta-\\Lambda} d\\tau' e^{- 2 \\pi r'\\Delta_\\Phi/ v \\beta}\\bigg|_{\\Lambda\\to 0}\\nonumber\\\\\nL000813\t&\\simeq  \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi}   \\frac{v\\beta^2}{\\pi \\Delta_\\Phi}e^{-2\\pi t \\Delta_\\Phi/\\beta}.\nL000814\t\\label{eq:decay1}\nL000815\t\\end{align}\nL000816\t\nL000817\tThe $\\tau'$-dependent terms in the binomial expansion around $e^{- 2 \\pi r'\\Delta_\\Phi/ v \\beta}$ in Eqn.~\\ref{eq:LCapproxlarger} vanish, since only positive integer powers of $e^{- 2 \\pi i\\tau'/\\beta}$ appear (see Eqn.~\\ref{eq:binomialexp}) and therefore cancel out over the closed imaginary time loop. The first $\\tau'$-independent correction term in the binomial expansion is integrated to obtain a sub-leading term of order $\\mathcal{O}(e^{-2\\pi(2+\\Delta_\\Phi)t/\\beta})$.\nL000818\t\nL000819\t\nL000820\tOn the other hand, inside the light cone where $|r^{\\prime}|\\ll vt$, the correlations can be expanded around the dominant time decay term that is \\emph{spatially constant}:\nL000821\t\\begin{equation}\nL000822\t    w(\\mathbf{x^{\\prime}},t)^{-\\Delta_\\Phi}\\xrightarrow{|r^{\\prime}|\\ll vt}\nL000823\t    2^{\\Delta_\\Phi}\\left(-1\\right)^{-\\Delta_\\Phi}e^{-\\frac{2\\pi}{\\beta}(t-i\\tau^{\\prime})\\Delta_\\Phi}\\left[ 1-2\\cosh\\left(\\frac{2\\pi r'}{v\\beta}\\right)e^{-\\frac{2\\pi}{\\beta}(t-i\\tau^{\\prime})}\\right]^{-\\Delta_\\Phi} ,\nL000824\t\\label{eq:LCapproxsmallr}\nL000825\t\\end{equation}\nL000826\twhere, again, the correction terms can be calculated via a binomial expansion. We see that this spatially constant integrand leads to exponentially damped operator growth (a linear-times-exponential-in-t behavior) which we denote``peak decay\", in contrast to ``pure (exponential) decay\":\nL000827\t\\begin{align}\nL000828\t\\langle \\Phi(t)\\rangle_{1_ \\text{LC,peak decay}}&\\simeq 2 \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi}  \\int_{0}^{vt}  d r' \\int_\\Lambda^{\\beta-\\Lambda} d\\tau' \\left(-1\\right)^{-\\Delta_\\Phi} e^{-2 \\pi \\left(t-i \\tau'\\right)\\Delta_\\Phi/  \\beta}\\bigg|_{\\Lambda\\to 0}\\nonumber\\\\\nL000829\t&\\simeq  \\tilde{g}\\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi}  \\frac{v\\beta}{\\pi \\Delta_\\Phi} 2t\\sin (\\pi \\Delta_\\Phi)e^{-2\\pi t\\Delta_\\Phi /\\beta}.\nL000830\t\\label{eq:cumulativeterm}\nL000831\t\\end{align}\nL000832\tHere, introducing the cutoff $\\Lambda$ is crucial for regularizing the branch cut singularities that exist for non-integer scaling dimensions $\\Delta_\\Phi \\neq 1$, since the integrand is a multi-valued function in such cases. In this case, the contribution of the binomial expansion around $e^{- 2 \\pi (t-i\\tau')\\Delta_\\Phi/ \\beta}$ due to subleading spatially decaying corrections does not vanish around the imaginary time contour, also due to the branch cut for $\\Delta_\\Phi \\neq 1$. We have\nL000833\t\\begin{align}\nL000834\t\\langle \\Phi(t)\\rangle_{1_ \\text{LC,pure decay}}&\\simeq 2\\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi} \\sum_{k=1}^{\\infty}{\\Delta_\\Phi\\choose k} \\frac{2^{k}}{k!} (-1)^{-\\Delta_\\Phi}  \\int_\\Lambda d r^{\\prime}d \\tau^{\\prime}  \\cosh^k\\left(\\frac{2\\pi r'}{v\\beta}\\right) e^{-2\\pi (\\Delta_\\Phi+k) (t-i \\tau^{\\prime})/ \\beta }\\bigg|_{\\Lambda\\to0}\\nonumber\\\\\nL000835\t&\\simeq \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi}\\frac{ \\sin(\\pi \\Delta_\\Phi) }{ 2\\pi^2 } v\\beta^2 e^{-2\\pi \\Delta_\\Phi t/\\beta } \\sum_{k=1}^{\\infty}{\\Delta_\\Phi\\choose k} \\frac{1 }{(\\Delta_\\Phi+k) k!}\\frac{\\Gamma\\left(-{1\\over2} + \\frac{1+k}{2}\\right)}{\\Gamma\\left(-{1\\over2} + \\frac{3+k}{2}\\right)}\\nonumber \\\\\nL000836\t&\\simeq \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\left(\\frac{2 \\pi}{\\beta}\\right)^{2\\Delta_\\Phi}\\frac{v\\beta^2}{\\pi\\Delta_\\Phi }  \\frac{\\sin (\\pi \\Delta_\\Phi)}{\\pi }\\left[  \\frac{1}{\\Delta_\\Phi} - \\gamma_E -\\pi \\csc(\\pi \\Delta_\\Phi) -\\frac{\\Gamma^{\\prime}(1-\\Delta_\\Phi)}{\\Gamma(1-\\Delta_\\Phi)}\\right]e^{-2\\pi \\Delta_\\Phi t/\\beta },\nL000837\t\\label{eq:decay2}\nL000838\t\\end{align}\nL000839\twith corrections again of order $\\mathcal{O}(e^{-2\\pi(2+\\Delta_\\Phi)t/\\beta})$.\nL000840\t\nL000841\t\nL000842\tWe see that spatial correlations grow within the light cone where space-time points are causally connected. Constant correlations accumulate over the light cone and lead to exponentially damped operator growth, or ``peak decay\" (Eqn. \\ref{eq:cumulativeterm}), while spatially decaying correlations lead to purely exponential decay in time (Eqns. \\ref{eq:decay1} and \\ref{eq:decay2}),\nL000843\t\\begin{equation}\nL000844\t\\begin{aligned}\nL000845\t\\langle \\Phi(t)\\rangle_{ 1_\\text{peak decay}} \\sim  \\frac{t}{\\beta} e^{-2\\pi \\Delta_\\Phi t/\\beta },\\quad \\quad\nL000846\t\\langle \\Phi(t)\\rangle_{ 1_\\text{pure decay}}\\sim  e^{-2\\pi t \\Delta_\\Phi/\\beta}\nL000847\t\\end{aligned}\nL000848\t\\end{equation}\nL000849\tAltogether, we have two distinct regimes of behavior,\nL000850\t\\begin{align}\nL000851\t\\langle \\Phi(t)\\rangle_1\nL000852\t &\\simeq \\tilde{g} \\delta_{\\Delta_\\Psi \\Delta_\\Phi}\\beta^{2-2\\Delta_\\Phi}\nL000853\t \\left(A_{\\Delta_\\Phi} + B_{\\Delta_\\Phi}\\frac{t}{\\beta}\\right)e^{-2\\pi t \\Delta_\\Phi/\\beta}\\label{eqn:(A+Bt)}\\\\\nL000854\t B_{\\Delta_\\Phi}&\\simeq   v (2\\pi)^{2\\Delta_\\Phi}\\frac{2\\sin(\\pi \\Delta_\\Phi )}{ \\pi \\Delta_\\Phi}\\nonumber\\\\\nL000855\t \\frac{A_{\\Delta_\\Phi}}{B_{\\Delta_\\Phi} }&\\simeq\\frac{1}{2 \\sin(\\pi\\Delta_\\Phi)}\\left\\{1 + \\frac{\\sin(\\pi\\Delta_\\Phi)}{\\pi}\\left[\\frac{1}{\\Delta_\\Phi}-\\gamma_E -\\pi \\csc(\\pi \\Delta_\\Phi) -\\frac{\\Gamma^{\\prime}(1-\\Delta_\\Phi)}{\\Gamma(1-\\Delta_\\Phi)}\\right]\\right\\},\nL000856\t\\label{eqn:scalingorderg}\nL000857\t\\end{align}\nL000858\twith corrections of order $\\mathcal{O}(e^{-2\\pi(2+\\Delta_\\Phi)t/\\beta})$.\nL000859\t\nL000860\tA few remarks are in order. Firstly, both contributions coming from within the light cone are proportional to $\\sin (\\pi \\Delta_\\Phi) $. Then, since $\\sin (\\pi \\Delta_\\Phi) =0$ for integer-valued scaling dimensions, there are no contributions from within the light cone, and the decay is purely exponential. This explains the relaxation dynamics of $\\epsilon_\\text{I}$ under a finite-temperature $\\epsilon_\\text{I}$ quench in the main text. Further, since $\\sin (\\pi \\Delta_\\Phi) < 0 $ for $1< \\Delta_\\Phi <2$, the contributions from either side of the horizon have opposite sign: the two competing decay terms will eventually cancel out and the one-point function will cross the $t$-axis before becoming negative, though the amplitude still eventually decays to zero. Finally, we see that a term $\\sim( t/\\beta) e^{-2\\pi \\Delta_\\Phi t/\\beta}$  arises for $\\Delta_\\Phi \\neq 1$. It follows from the causal structure of CFTs: the initial thermal ensemble acts as a source of left- and right-moving pairs of quasiparticles, which are correlated and entangled over lengths $\\sim \\mathcal{O}\\left( vt \\right)$. At time $t$, the perturbation of the initial state is felt only from regions within $|r'| < vt$. In this region, the integrand has a term that is spatially constant, leading to a contribution $\\sim t/\\beta$.\nL000861\t\nL000862\t\\begin{figure}\nL000863\t  \\centering\nL000864\t  \\includegraphics[width=.9\\linewidth]{suppLC.pdf}\nL000865\t  \\caption{The horizon effect of the forward-spreading light cone(s) of a perturbation in CFT to (a) first order and (b) second order. The initial thermal ensemble acts as a source of quasiparticles which propagate at velocity $v$. Spatially decaying correlations lead to exponential decay of observables with time both inside (yellow) and outside (gray) the (intersecting) light cone(s). Constant spatial correlations can build up within the (intersecting) light cone(s) where space-time points are causally connected, leading to maximal exponentially-damped polynomial growth terms of the form $t^n e^{-2\\pi t \\Delta_\\Phi /\\beta}$, for $n$ intersecting light cones. These regimes lead to two qualitatively different scaling forms in the perturbation theory as in Eqns.~\\ref{eqn:(A+Bt)} and \\ref{eqn:scalingorderg2}. In the first-order correction, both contributions from within the light cone are zero for integer scaling dimension, leading to the purely exponential decay of $\\epsilon_\\text{I}$ under an $\\epsilon_\\text{I}$ quench.}\nL000866\t  \\label{fig:lightcone}\nL000867\t\\end{figure}\nL000868\t\\subsubsection{Second-order perturbation theory}\nL000869\tWhen the scaling dimensions of the observable and the quench primary fields are not the same, the first order dynamics, $\\mathcal{O}(\\tilde{g})$, are zero. In that case, we must consider the corrections to second order, for a primary field $\\Phi$ under a different primary field $\\Psi$ quench:\nL000870\t\\begin{equation}\nL000871\t\\begin{aligned}\nL000872\t\\left\\langle \\Phi \\left( t\\right)\\right\\rangle_{2} &=  \\frac{1}{2}\\tilde{g}^2 \\int d^2 \\mathbf{x'} d^2 \\mathbf{x''} \\left\\langle \\Psi(\\mathbf{x'})\\Psi(\\mathbf{x''}) \\Phi\\left( t\\right)\\right\\rangle_0   \\\\\nL000873\t&= \\frac{1}{2}\\tilde{g}^2 \\frac{C_{\\Psi\\Psi\\Phi}}{\\beta^{\\Delta_\\Phi+2\\Delta_\\Psi}} \\int d^2 \\mathbf{x'} d^2 \\mathbf{x''}\\frac{w\\left(\\mathbf{x'},\\mathbf{x''}\\right)^{\\frac{1}{2}\\Delta_\\Phi-\\Delta_\\Psi}}{w\\left(\\mathbf{x'},t\\right)^{\\frac{1}{2}\\Delta_\\Phi}w\\left(\\mathbf{x''},t\\right) ^{\\frac{1}{2}\\Delta_\\Phi}}\nL000874\t\\label{eq:secondordersetup}\nL000875\t\\end{aligned}\nL000876\t\\end{equation}\nL000877\twhere $C_{\\Psi\\Psi\\Phi}$ is the three-point structure factor of the CFT. Again, we are interested in the $2\\pi t\\gg \\beta$ regime.\nL000878\t\nL000879\t\nL000880\tThere are now two intersecting light cones with respect to  $r'$ and  $r''$, see Fig.~\\ref{fig:lightcone}(b). Qualitatively speaking, the regions outside both light cones lead to two distinct rates of exponential relaxation, characterized by the scaling dimensions of twice the quench field $\\sim  e^{-4\\pi t \\Delta_\\Psi/\\beta} $, and the observable $\\sim e^{-2\\pi t \\Delta_\\Phi/\\beta}$. Within the two intersecting light cones, in addition to this purely exponential decay, the accumulation of constant spatial correlations result in damped $t$ or $t^2$ terms, with the damping associated only with the scaling dimension of the observable $\\sim e^{-2\\pi t \\Delta_\\Phi/\\beta}$.\nL000881\t\nL000882\tWhile the calculation is more involved for intersecting light cones, the procedure follows that of the first-order perturbation. We are primarily focused on the general scaling ansatz with real time $t$ and temperature $\\beta^{-1}$; to that end, we focus on the functional form of the polynomial and exponential behavior with real time, and omit explicit calculation of constants.\nL000883\t\nL000884\t\nL000885\tWe split the spatial integrals up along the horizons $|r^{\\prime(\\prime)}| = v t$ (without loss of generality taking $r'>0$ and considering $r'' \\in (-\\infty,\\infty)$) and consider the following overlapping regions: (i) outside both light cones, (ii) inside one light cone, and (iii) inside both light cones. We make use of the light-cone approximations for $w(\\mathbf{x^{\\prime}},t)$ from Eqn.~\\ref{eq:LCapproxlarger} and Eqn.~\\ref{eq:LCapproxsmallr}, but ignore the contribution of the subleading terms in the binomial expansion, since we assume these will not change the overall functional form (as we saw in the first-order calculation), and only add corrections of order $\\mathcal{O}\\left(e^{-4\\pi (1+\\Delta_\\Psi)t/\\beta},e^{-2\\pi (2+\\Delta_\\Phi)t/\\beta}\\right)$.\nL000886\t\nL000887\tFurthermore, it is useful to consider the approximations for $w(\\mathbf{x'},\\mathbf{x''})$ when the \\emph{quench fields} are spatially ``close\" or ``far\" apart, meaning:\nL000888\t\\begin{align}\nL000889\t    w(\\mathbf{x'},\\mathbf{x''})=\\cosh \\left[\\frac{2\\pi}{v\\beta}(r'-r'')\\right] -\\cos\\left[\\frac{2\\pi}{\\beta}(\\tau^{\\prime}-\\tau^{\\prime\\prime})\\right]\\to\\begin{cases}\nL000890\t        \\frac{1}{2}e^{\\frac{2\\pi}{v\\beta}|r'-r''|} \\quad &\\text{ for }\\quad |r'-r''|\\gg \\frac{\\beta}{2\\pi}\\\\\nL000891\t        1 -\\cos\\left[\\frac{2\\pi}{\\beta}(\\tau^{\\prime}-\\tau^{\\prime\\prime})\\right]\\quad &\\text{ for }\\quad |r'-r''|\\ll \\frac{\\beta}{2\\pi}\nL000892\t    \\end{cases}\nL000893\t\\end{align}\nL000894\tOutside both or one of the light cones, the contributions are from the following spatial integrals:\nL000895\t\\begin{align}\nL000896\t    I_{\\text{0LC}}&\\sim \\int_{vt}^{\\infty} dr' \\left(\\int_{-\\infty}^{-vt} dr''  +\\int_{vt}^{r'} dr''+ \\int_{r'}^{\\infty} dr''\\right)\\label{eq:0LC}\\\\\nL000897\t    I_{\\text{1LC}}&\\sim \\int_{vt}^{\\infty} dr' \\int_{-vt}^{vt}dr''+\\int_{0}^{vt} dr' \\left(\\int_{-\\infty}^{-vt} dr''  +\\int_{vt}^{\\infty} dr'' \\right)\nL000898\t\\end{align}\nL000899\t\nL000900\tFor instance, the explicit calculation of the quadruple integral in Eqn.~\\ref{eq:secondordersetup}, for the first region in Eqn.~\\ref{eq:0LC}, is:\nL000901\t\\begin{equation}\nL000902\t\\begin{aligned}\nL000903\t\nL000904\t    &\\tilde{g}^2 \\frac{C_{\\Psi\\Psi\\Phi}}{\\beta^{\\Delta_\\Phi+2\\Delta_\\Psi}}2^{\\frac{1}{2}\\Delta_{\\Phi}+\\Delta_{\\Psi}-1} \\int  d\\tau' d\\tau'' \\int_{vt}^{\\infty} dr' \\int_{-\\infty}^{-vt} dr'' \\frac{\\left(e^{\\frac{2\\pi}{v\\beta}|r'-r''|}\\right)^{\\frac{1}{2}\\Delta_{\\Phi}-\\Delta_{\\Psi}}}{\\left(e^{\\frac{2\\pi}{v\\beta}|r'|}\\right)^{\\frac{1}{2}\\Delta_{\\Phi}}\\left(e^{\\frac{2\\pi}{v\\beta} |r''|}\\right)^{\\frac{1}{2}\\Delta_{\\Phi}}}\\\\\nL000905\t    \\simeq &\\tilde{g}^2 C_{\\Psi\\Psi\\Phi} \\beta^{4- \\Delta_\\Phi-2\\Delta_\\Psi}\\left(\\frac{v }{2\\pi\\Delta_{\\Psi}}\\right)^2 2^{\\frac{1}{2}\\Delta_{\\Phi}+\\Delta_{\\Psi}-1} e^{-4\\pi \\Delta_{\\Psi}t/\\beta }.\nL000906\t\\end{aligned}\nL000907\t\\end{equation}\nL000908\tThe correlations outside both or one of the light-cones lead to a scaling form comprising \\emph{two} purely exponential decays,\nL000909\t\\begin{align}\nL000910\t    \\left\\langle \\Phi \\left( t\\right)\\right\\rangle_{2_\\text{\\sout{2LC}}} \\simeq \\tilde{g}^2 C_{\\Psi\\Psi\\Phi} \\beta^{4-\\Delta_\\Phi-2\\Delta_\\Psi} \\left(D_{{\\Delta_\\Phi,\\Delta_\\Psi}_\\text{\\sout{2LC}}}e^{-4\\pi \\Delta_{\\Psi} t/\\beta}+E_{{\\Delta_\\Phi,\\Delta_\\Psi}_\\text{\\sout{2LC}}}e^{-2\\pi \\Delta_{\\Phi} t/\\beta}\\right),\nL000911\t\\end{align}\nL000912\twhere the decay exponents are that of twice the quench field, $2\\Delta_\\Psi$, and the observable field, $\\Delta_\\Phi$.\nL000913\t\nL000914\t\nL000915\tEven though one would naively think that spatial correlations would accumulate inside even just one of the light cones, because of the more complex form of the three-point correlator --- i.e., due to the term $\\cosh(2\\pi/v\\beta(r'-r''))$ in $w(\\mathbf{x'},\\mathbf{x''})$ --- the three-point spatial correlations are not constant inside only one light cone. This is because the quench fields must be (approximately) far apart for one field to be inside its light cone and another to be outside; $w(\\mathbf{x'},\\mathbf{x''})$ still spatially decays and the integral is not constant over either spatial coordinate. Indeed, causality does not necessitate constant correlations but rather facilitates them; a further condition is the proximity of fields. We already saw this in the first-order correction, where there were still purely exponential contributions inside the (single) light cone.\nL000916\t\nL000917\t\nL000918\tTo meet this condition for two intersecting light cones, one needs to be inside \\emph{both} light cones to see (damped) operator growth (i.e. linear or quadratic ``peaked decay\"):\nL000919\t\\begin{align}\nL000920\t    I_{\\text{2LC}}&\\sim \\int_{0}^{vt} dr' \\left(\\int_{-vt}^{r'} dr'' +\\int_{r'}^{vt} dr'' \\right) +\\int_{0}^{vt} dr' \\int_{0}^{vt} dr''\\\\\nL000921\t\\left\\langle \\Phi \\left( t\\right)\\right\\rangle_{2_\\text{2LC}} &\\simeq \\tilde{g}^2 C_{\\Psi\\Psi\\Phi} \\beta^{4-\\Delta_\\Phi-2\\Delta_\\Psi} \\Bigg[D_{{\\Delta_\\Phi,\\Delta_\\Psi}_\\text{2LC}}e^{-4\\pi  \\Delta_\\Psi t/\\beta} +\\Bigg(E_{{\\Delta_\\Phi,\\Delta_\\Psi}_\\text{2LC}} + F_{\\Delta_\\Phi,\\Delta_\\Psi} \\frac{t}{\\beta} + G_{\\Delta_\\Phi,\\Delta_\\Psi}\\frac{t^2}{\\beta^2}\\Bigg)e^{-2\\pi  \\Delta_\\Phi t/\\beta}\\Bigg].\nL000922\t\\end{align}\nL000923\tIn this case, there are relaxation terms associated with the observable field $\\sim e^{-2\\pi t \\Delta_\\Phi/\\beta}$, for which the correlations are constant across one or both spatial integrals. This leads to exponentially damped linear and quadratic operator growth $\\sim t, t^2$. The damping term associated with the quench operator $\\sim e^{-4\\pi t \\Delta_\\Psi/\\beta}$ only arises when the integrand is some exponential function of \\emph{both} space directions, and so is purely exponential in time.\nL000924\t\nL000925\tGenerically, the scaling form at second order in $\\tilde{g}$ is\nL000926\t\\begin{equation}\nL000927\t    \\langle\\Phi (t)\\rangle_2 \\simeq \\tilde{g}^2 C_{\\Psi\\Psi\\Phi} \\beta^{4-\\Delta_\\Phi-2\\Delta_\\Psi} \\Bigg[D_{\\Delta_\\Phi,\\Delta_\\Psi} e^{-4\\pi  \\Delta_\\Psi t/\\beta}+ \\Bigg(E_{\\Delta_\\Phi,\\Delta_\\Psi} + F_{\\Delta_\\Phi,\\Delta_\\Psi} \\frac{t}{\\beta} + G_{\\Delta_\\Phi,\\Delta_\\Psi}\\frac{t^2}{\\beta^2}\\Bigg)e^{-2\\pi  \\Delta_\\Phi t/\\beta}\\Bigg],\nL000928\t    \\label{eqn:scalingorderg2}\nL000929\t\\end{equation}\nL000930\t\nL000931\t\nL000932\twith corrections of order $\\mathcal{O}\\left(e^{-4\\pi (1+\\Delta_\\Psi)t/\\beta},e^{-2\\pi (2+\\Delta_\\Phi)t/\\beta}\\right)$. Then, so long as $\\Delta_\\Psi < \\Delta_\\Phi/2$, the second order correction is dominated by a purely exponential term set by the scaling dimension of the quench operator --- this is the case for the relaxation dynamics of $\\epsilon_\\text{I}$ after a finite-temperature $\\sigma_\\text{I} $ quench.\nL000933\t\nL000934\t\nL000935\tThe picture of $n$-intersecting light cones naturally extends to arbitrary order $\\mathcal{O}(\\tilde{g}^n)$, with each order contributing up to $\\sim \\tilde{g}^n (t/\\beta)^n e^{-2\\pi t\\Delta_\\Phi/\\beta}$ in the scaling function.\nL000936\t\nL000937\t\\subsubsection{Ground state conformal perturbation theory and the finite temperature $2\\pi t \\ll \\beta $ regime}\nL000938\tThus far, we have only considered the finite-temperature quench perturbatively in the --- we discuss now why this is so.  If we instead consider a quench to the critical point from a ``nearby\" ground state, the equivalent action is now on the infinite Euclidean plane rather than the cylinder [see Fig.~\\ref{fig:geometryboth}(a)]. The relaxation dynamics of the primary field $\\Phi$ that constitutes the quench perturbation are now calculated to first order from the integral of the two-point correlation function of the primary field on the plane. This takes the form:\nL000939\t\\begin{equation}\nL000940\t\\langle \\Phi(\\tau)\\rangle_{\\tilde{g}}  = \\tilde{g} \\int d^2 \\mathbf{x}' \\left[ \\frac{1}{(\\tau-\\tau' )^2+ r^{\\prime 2}}\\right]^{ \\Delta_\\Phi} +\\mathcal{O}(\\tilde{g}^2),\nL000941\t\\label{eq:zerotempcorrs}\nL000942\t\\end{equation}\nL000943\twhere imaginary time may still be regularized by a UV cutoff $\\tilde{g}$: $\\int d\\tau \\sim \\int_{-\\infty}^{-\\Lambda} + \\int_{\\Lambda}^{\\infty}$. Considering, for example, $\\epsilon$ in the TFIM, we obtain, after rotation back to Minkowski space:\nL000944\t\\begin{equation}\nL000945\t    \\langle \\epsilon_\\text{I}(t)\\rangle  \\simeq \\tilde{g}  \\lim_{\\tau'\\to\\infty}  \\log \\frac{\\tau'}{ t}.\nL000946\t\\end{equation}\nL000947\tWe see that, while the UV divergences can be dealt with via standard renormalization methods, the lack of a natural IR cutoff $\\mu $ leads to divergences at zero temperature which are of a different type: they cannot be absorbed in the redefinition of the local quantities and so give rise to non-analytic expressions in the coupling constants~\\cite{S_Mussardo_2010}.\nL000948\t\nL000949\t\nL000950\tIndeed, since the vacuum state of the deformed theory is not adiabatically related to the vacuum states of the conformal theory, the ``nearby\" ground state is not so nearby after all. The introduction of a natural IR regulator therefore plays a crucial role in adiabatically connecting the two theories, whether that's by introducing a boundary to the CFT to obtain a slab geometry~\\cite{S_calabrese2006time, Calabrese_Cardy_2007, cardy2016furtherresults}, such that $\\mu \\sim \\tau_0$, or by putting the CFT on a cylinder, such that $\\mu \\sim \\beta$.\nL000951\t\nL000952\t\nL000953\tMoreover, let us consider the relaxation of $\\Phi$ under its own quench at finite temperature (see Eqn.~\\ref{eqn:integralsetup}), but this time in the $2\\pi t \\ll \\beta$ regime. For $\\epsilon$ in the TFIM, we obtain\nL000954\t\\begin{equation}\nL000955\t    \\langle \\epsilon_\\text{I}(t)\\rangle \\simeq \\tilde{g}   \\log \\frac{\\beta}{\\pi t},\nL000956\t\\end{equation}\nL000957\tanalogous to Eqn.~\\ref{eq:zerotempcorrs}. As $\\beta \\to \\infty$, the quench depth correspondingly must vanish, $\\tilde{g} \\sim g \\to 0$, in order for the integral to converge; such ground state quenches cannot be treated via a conformal perturbative analysis, as the quench cannot be ``shallow\" enough.\nL000958\t\nL000959\t\nL000960\tRegardless, while the one-point functions should always be universal in the case of the boundary-CFT quench, it's only in the late time region, $t \\gg \\tau_0$, that the exponential decay functional form appears generically for all primary fields such that we can extract a universal ratio of scaling dimensions in the ratio of their relaxation rates. It is natural to extend this notion to the finite temperature quench: observables will not ``relax\" until they ``notice\" the finite cutoff $\\mu$ of the geometry they live on. Even at finite $\\beta$ with sufficiently shallow quenches, the $2\\pi t\\ll \\beta$ regime does not appear to generically give an exponential or an exponential-times-polynomial decay from which we can extract a universal ratio of scaling dimensions.\nL000961\t\nL000962\t\\section{Lattice crossover: emergent conformal symmetry and non-linear dispersion}\nL000963\tWhen quenching to the critical point of a quantum spin chain, local observables generally exhibit scaling behavior that reflects both universal critical behavior (at least in the scaling limit) as well as non-universal lattice effects. The low-lying degrees of freedom are described by a continuum field theory with emergent conformal symmetry, and therefore have linear dispersion,\nL000964\t\\begin{align}\nL000965\t    \\epsilon_{k\\ll 1} \\sim v k \\implies\nL000966\t    v_g\\left(k\\ll 1 \\right) = \\frac{\\partial}{\\partial k} \\epsilon_k\\bigg|_{k\\ll 1} \\sim v .\nL000967\t\\end{align}\nL000968\tThese modes travel at the same group velocity $v_g \\sim v$ and give rise to ballistic, coherent transport and a sharp light-cone effect.\nL000969\t\nL000970\tThis light-cone picture relies on Lorentz invariance; however, most 1+1D critical spin chains are not microscopically relativistic, but rather exhibit an emergent Lorentz symmetry only at low energies near criticality. High-energy modes in the lattice may break this emergent symmetry, having some nonlinear dispersion $\\epsilon_{k\\sim 1} \\sim v k + \\delta \\epsilon(k) $.\nL000971\tHigh-energy quasiparticles still move ballistically (since the system is integrable) but with momentum-dependent velocities which decrease away from the linear regime. These modes are dispersive: the wave packet will spread out and lose shape over time due to these components traveling at different speeds.\nL000972\t\nL000973\t\nL000974\tMany different modes can contribute to observable behavior, depending on the model, the nature of the initial state, and the observable itself. In particular, in the case of a global quench, the initial state is highly excited in terms of the post-quench Hamiltonian — it populates many $k$-modes, not just low-energy ones. Then the post-quench operator wavefront will be initially dominated by a coherent light-cone picture with $v_{g,\\text{max}}\\sim v$, while high-energy modes can lead to oscillatory, dispersive dephasing and velocity spread at long times. Consequently, there may exist a regime in which the universal critical contributions decay faster than the non-universal oscillations, leading to a crossover at a time $t^*$ beyond which the dispersive effects become dominant.\nL000975\tA general scaling ansatz is\nL000976\t\\begin{equation}\nL000977\t    \\langle  O(t) \\rangle \\sim \\langle  O(t) \\rangle_{\\text{univ}} + \\langle  O(t) \\rangle_{\\text{latt}}\nL000978\t\\end{equation}\nL000979\twhere the regime $ a/v \\ll t \\ll t^*$ is governed by universal scaling, and the lattice crossover time $t^*$ occurs when this universal contribution has decayed to the same magnitude as the underlying lattice effects --- see Fig.~\\ref{fig:gsgenericcrossover},\nL000980\t\\begin{equation}\nL000981\t    \\langle  O(t^{*}) \\rangle_{\\text{univ}} \\sim \\langle  O(t^{*}) \\rangle_{\\text{latt}}.\nL000982\t    \\label{eq:crossovertime1}\nL000983\t\\end{equation}\nL000984\t\nL000985\t\nL000986\tDetermining $t^*$ requires knowledge of universal scaling as well as dispersive corrections from the underlying lattice dynamics. A quench between integrable Hamiltonians presents the challenge of translating between eigenbases of the two integrable theories, which can have complicated structures described by the Bethe Ansatz. This is a difficult undertaking analytically, with no general formalism currently known~\\cite{S_Essler_Fagotti_2016}. Even in the non-interacting (TFIM) case, this proves to be an ambitious undertaking both analytically~\\cite{S_Calabrese_Essler_Fagotti_2011,calabrese2012quantum, Granet_Fagotti_Essler_2020} and numerically, as shown in this work. Extensions to interacting integrable models are an area of current research.\nL000987\t\nL000988\t\nL000989\tThe extent of this work is namely to propose universal scaling ansätze for ground state and finite-temperature critical quenches in these quantum spin chains, and leave parametric determination of crossover times from universal to lattice-dominated behavior to future work. That said, since the behavior of the transverse magnetization has already been obtained~\\cite{S_barouch1970statistical}, we can at least calculate these crossover times in that case.\nL000990\t\\begin{figure}\nL000991\t    \\centering\nL000992\t    \\includegraphics[width=0.4\\linewidth]{supplattice.pdf}\nL000993\t    \\caption{Schematic of the crossover time (black dot) between universal scaling behavior and dispersive lattice effects. The former is governed by the low-energy modes of the model which have emergent conformal symmetry, while the latter are determined by the full energy spectrum of the underlying lattice model, including high-energy modes, which eventually break the conformal invariance.}\nL000994\t    \\label{fig:gsgenericcrossover}\nL000995\t\\end{figure}\nL000996\tFor the ground state quench, we can equate the scaling limit in Eqn.~\\ref{eq:asymptote1} to the power-law lattice tail without the oscillation in Eqn.~\\ref{eq:oscillation} with $\\beta \\to \\infty$, to obtain the crossover time $Jg t^*$ which scales polynomially in $g$,\nL000997\t\\begin{equation}\nL000998\t    Jg t^* \\sim -\\frac{1}{4}W_{-1}\\left(-\\frac{g^{3/2}}{|2-g| \\sqrt{2}}\\right)\nL000999\t\\sim a g^{-p},\nL001000\t\\end{equation}\nL001001\twhere $W_{-1}$ is the product log function, $a \\approx 1.37$, and $ p \\approx 0.14$. Similarly, equating the scaling limit in Eqn.~\\ref{eq:asymptote2} with the power-law tail in Eqn.~\\ref{eq:oscillation}, we obtain the crossover time $t^*/\\beta $ for the finite-temperature critical TFI quench which scales logarithmically with $\\beta J $,\nL001002\t\\begin{equation}\nL001003\t\nL001004\t    \\frac{t^*}{\\beta} \\sim -\\frac{3  }{4 \\pi }W_{-1}\\left\\{-\\frac{1}{6\\beta J} \\left[\\frac{\\pi^{2}  \\tanh (|2-g| \\beta J)}{|2-g|\\sqrt{2}}\\right]^{2/3}\\right\\}\\sim a' \\log (b'\\beta J),\nL001005\t\\end{equation}\nL001006\twith $a' \\approx 0.26$, and $ b' \\approx 9.88$.\nL001007\t\nL001008\tOne may observe that operators $O$ which are more relevant than $\\epsilon_\\text{I}$ --- that is, more governed by low-lying modes and less sensitive to high-energy corrections --- may have a later lattice crossover,\nL001009\t\\begin{align}\nL001010\t    \\Delta_O < 1 \\implies t^*_O > \\beta \\log \\beta,\nL001011\t\\end{align}\nL001012\twhile, conversely, there may exist less relevant operators such that $t^*_{O}\\leq \\beta/2\\pi $, for which lattice effects obfuscate the asymptotic universal relaxation regime entirely.\nL001013\t\nL001014\t\\section{Integrability breaking, thermalization, and the dual quench protocol}\nL001015\tTo demonstrate the broader applicability of our results, we show that strict Bethe-Ansatz solubility on the lattice is not a requirement for observing the dynamical scaling forms we derive. We support this claim by considering critical quenches in the ANNNI model, which includes (weak) integrability-breaking perturbations. Crucially, although the model is not fully integrable, it remains governed by the underlying integrable Ising CFT for the regime of $\\gamma$ and $t$ considered. More generally, we expect integrability-breaking terms to eventually induce a crossover to diffusive dynamics, thereby limiting the window in which universal scaling behavior appears. This ``thermalization\" time $t_{\\text{therm}}$ should take the form:\nL001016\t\\begin{equation}\nL001017\t    t_{\\text{therm}} \\sim \\Delta E^{-a} \\gamma^{-2l},\nL001018\t    \\label{eqn:thermtime}\nL001019\t\\end{equation}\nL001020\twhere $\\Delta E = E - E_0(g)$ is the energy density injected into the system by the quench, and $a,l$ are positive integers --- see Ref.~\\cite{S_Mori_Ikeda_Kaminishi_Ueda_2018} and references therein. Though Fermi's Golden Rule arguments would yield $l = 1$, Ref.~\\cite{S_Surace_Motrunich_2023} identifies the self-dual ANNNI as a special case where $l = 2$. The universal regime on the lattice is generally a limited window either way; whether thermalization of the subsystem occurs before or after the crossover to dispersive lattice corrections merely determines which phenomenon constitutes the greatest limiting factor. Then, since $t_{\\text{therm}}$ implicitly depends on the integrability-breaking strength, $\\gamma$ could be chosen such that thermalization effects were not observed on the timescales we considered. Indeed, our scaling results would still hold even for models that thermalize in a more typical fashion (when $l = 1$).\nL001021\t\nL001022\t\\begin{figure}\nL001023\t    \\centering\nL001024\t    \\includegraphics[width=0.4\\linewidth]{suppdoublequench.pdf}\nL001025\t    \\caption{The proposed ``dual quench\" protocol for implementing effective finite-temperature critical quenches on a quantum simulator. First, one quenches from a ground state with off-critical tuning $g_0$, which is close to the critical point, to an ensemble at $g_1$, even closer to the critical point. This injects the state with some small amount of energy density $\\Delta E=E- E_0(g)$, which, when the Hamiltonian has integrability-breaking terms, should locally ``thermalize\", becoming an effective finite temperature ensemble $ \\beta^{-1} \\sim E- E_0(g)$ for the subsystem after some thermalization time $t_{\\text{therm}}$. Finally, the thermalized subsystem ensemble can be used as the initial condition for the finite-temperature quench; the decay of local observables after this second quench should then follow the scaling laws derived from the finite-temperature conformal perturbation theory as in Eqns. \\ref{eqn:scalingorderg} and \\ref{eqn:scalingorderg2}, for some regime of $\\gamma$,\nL001026\t$t$.}\nL001027\t    \\label{fig:dualquench}\nL001028\t\\end{figure}\nL001029\tOn the other hand, the fact that integrability-breaking lattice terms induce thermalization actually facilitate the simulation of critical quenches from effective ``finite temperature\" initial states in isolated quantum simulators. Such a ``dual quench\" protocol is outlined in Fig.~\\ref{fig:dualquench}.\nL001030\t\nL001031\t\nL001032\t\nL001033\t\nL001034\t\nL001035\t\nL001036\t\nL001037\t\nL001038\t\nL001039\t\\begin{thebibliography}{25}\nL001040\t\\makeatletter\nL001041\t\\providecommand \\@ifxundefined [1]{\nL001042\t \\@ifx{#1\\undefined}\nL001043\t}\nL001044\t\\providecommand \\@ifnum [1]{\nL001045\t \\ifnum #1\\expandafter \\@firstoftwo\nL001046\t \\else \\expandafter \\@secondoftwo\nL001047\t \\fi\nL001048\t}\nL001049\t\\providecommand \\@ifx [1]{\nL001050\t \\ifx #1\\expandafter \\@firstoftwo\nL001051\t \\else \\expandafter \\@secondoftwo\nL001052\t \\fi\nL001053\t}\nL001054\t\\providecommand \\natexlab [1]{#1}\nL001055\t\\providecommand \\enquote  [1]{``#1''}\nL001056\t\\providecommand \\bibnamefont  [1]{#1}\nL001057\t\\providecommand \\bibfnamefont [1]{#1}\nL001058\t\\providecommand \\citenamefont [1]{#1}\nL001059\t\\providecommand \\href@noop [0]{\\@secondoftwo}\nL001060\t\\providecommand \\href [0]{\\begingroup \\@sanitize@url \\@href}\nL001061\t\\providecommand \\@href[1]{\\@@startlink{#1}\\@@href}\nL001062\t\\providecommand \\@@href[1]{\\endgroup#1\\@@endlink}\nL001063\t\\providecommand \\@sanitize@url [0]{\\catcode `\\\\12\\catcode `\\$12\\catcode `\\&12\\catcode `\\#12\\catcode `\\^12\\catcode `\\_12\\catcode `\\%12\\relax}\nL001064\t\\providecommand \\@@startlink[1]{}\nL001065\t\\providecommand \\@@endlink[0]{}\nL001066\t\\providecommand \\url  [0]{\\begingroup\\@sanitize@url \\@url }\nL001067\t\\providecommand \\@url [1]{\\endgroup\\@href {#1}{\\urlprefix }}\nL001068\t\\providecommand \\urlprefix  [0]{URL }\nL001069\t\\providecommand \\Eprint [0]{\\href }\nL001070\t\\providecommand \\doibase [0]{http://dx.doi.org/}\nL001071\t\\providecommand \\selectlanguage [0]{\\@gobble}\nL001072\t\\providecommand \\bibinfo  [0]{\\@secondoftwo}\nL001073\t\\providecommand \\bibfield  [0]{\\@secondoftwo}\nL001074\t\\providecommand \\translation [1]{[#1]}\nL001075\t\\providecommand \\BibitemOpen [0]{}\nL001076\t\\providecommand \\bibitemStop [0]{}\nL001077\t\\providecommand \\bibitemNoStop [0]{.\\EOS\\space}\nL001078\t\\providecommand \\EOS [0]{\\spacefactor3000\\relax}\nL001079\t\\providecommand \\BibitemShut  [1]{\\csname bibitem#1\\endcsname}\nL001080\t\\let\\auto@bib@innerbib\\@empty\nL001081\t\nL001082\t\\bibitem [{\\citenamefont {Mong}\\ \\emph {et~al.}(2014)\\citenamefont {Mong}, \\citenamefont {Clarke}, \\citenamefont {Alicea}, \\citenamefont {Lindner},\\ and\\ \\citenamefont {Fendley}}]{S_mong2014parafermionic}\nL001083\t  \\BibitemOpen\nL001084\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {R.~S.~K.}\\ \\bibnamefont {Mong}}, \\bibinfo {author} {\\bibfnamefont {D.~J.}\\ \\bibnamefont {Clarke}}, \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Alicea}}, \\bibinfo {author} {\\bibfnamefont {N.~H.}\\ \\bibnamefont {Lindner}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Fendley}},\\ }\\href {\\doibase 10.1088/1751-8113/47/45/452001} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Physics A: Mathematical and Theoretical}\\ }\\textbf {\\bibinfo {volume} {47}},\\ \\bibinfo {pages} {452001} (\\bibinfo {year} {2014})}\\BibitemShut {NoStop}\nL001085\t\\bibitem [{\\citenamefont {Hauschild}\\ \\emph {et~al.}(2024)\\citenamefont {Hauschild}, \\citenamefont {Unfried}, \\citenamefont {Anand}, \\citenamefont {Andrews}, \\citenamefont {Bintz}, \\citenamefont {Borla}, \\citenamefont {Divic}, \\citenamefont {Drescher}, \\citenamefont {Geiger}, \\citenamefont {Hefel}, \\citenamefont {H{\\'e}mery}, \\citenamefont {Kadow}, \\citenamefont {Kemp}, \\citenamefont {Kirchner}, \\citenamefont {Liu}, \\citenamefont {Moller}, \\citenamefont {Parker}, \\citenamefont {Rader}, \\citenamefont {Romen}, \\citenamefont {Scalet}, \\citenamefont {Schoonderwoerd}, \\citenamefont {Schulz}, \\citenamefont {Soejima}, \\citenamefont {Thoma}, \\citenamefont {Wu}, \\citenamefont {Zechmann}, \\citenamefont {Zweng}, \\citenamefont {Mong}, \\citenamefont {Zaletel},\\ and\\ \\citenamefont {Pollmann}}]{S_hauschild:2024}\nL001086\t  \\BibitemOpen\nL001087\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Hauschild}}, \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Unfried}}, \\bibinfo {author} {\\bibfnamefont {S.}~\\bibnamefont {Anand}}, \\bibinfo {author} {\\bibfnamefont {B.}~\\bibnamefont {Andrews}}, \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Bintz}}, \\bibinfo {author} {\\bibfnamefont {U.}~\\bibnamefont {Borla}}, \\bibinfo {author} {\\bibfnamefont {S.}~\\bibnamefont {Divic}}, \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Drescher}}, \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Geiger}}, \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Hefel}}, \\bibinfo {author} {\\bibfnamefont {K.}~\\bibnamefont {H{\\'e}mery}}, \\bibinfo {author} {\\bibfnamefont {W.}~\\bibnamefont {Kadow}}, \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Kemp}}, \\bibinfo {author} {\\bibfnamefont {N.}~\\bibnamefont {Kirchner}}, \\bibinfo {author} {\\bibfnamefont {V.~S.}\\ \\bibnamefont {Liu}}, \\bibinfo {author} {\\bibfnamefont {G.}~\\bibnamefont {Moller}},\nL001088\t  \\bibinfo {author} {\\bibfnamefont {D.}~\\bibnamefont {Parker}}, \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Rader}}, \\bibinfo {author} {\\bibfnamefont {A.}~\\bibnamefont {Romen}}, \\bibinfo {author} {\\bibfnamefont {S.}~\\bibnamefont {Scalet}}, \\bibinfo {author} {\\bibfnamefont {L.}~\\bibnamefont {Schoonderwoerd}}, \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Schulz}}, \\bibinfo {author} {\\bibfnamefont {T.}~\\bibnamefont {Soejima}}, \\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Thoma}}, \\bibinfo {author} {\\bibfnamefont {Y.}~\\bibnamefont {Wu}}, \\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Zechmann}}, \\bibinfo {author} {\\bibfnamefont {L.}~\\bibnamefont {Zweng}}, \\bibinfo {author} {\\bibfnamefont {R.}~\\bibnamefont {Mong}}, \\bibinfo {author} {\\bibfnamefont {M.~P.}\\ \\bibnamefont {Zaletel}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {F.}~\\bibnamefont {Pollmann}},\\ }\\href {\\doibase 10.21468/SciPostPhysCodeb.41} {\\bibfield  {journal} {\\bibinfo  {journal} {SciPost Physics Codebases}\\ ,\\ \\bibinfo {pages}\nL001089\t  {041}} (\\bibinfo {year} {2024})}\\BibitemShut {NoStop}\nL001090\t\\bibitem [{\\citenamefont {Barthel}\\ and\\ \\citenamefont {Zhang}(2020)}]{S_barthelOptimizedLieTrotter2020}\nL001091\t  \\BibitemOpen\nL001092\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {T.}~\\bibnamefont {Barthel}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {Y.}~\\bibnamefont {Zhang}},\\ }\\href {\\doibase 10.1016/j.aop.2020.168165} {\\bibfield  {journal} {\\bibinfo  {journal} {Annals of Physics}\\ }\\textbf {\\bibinfo {volume} {418}},\\ \\bibinfo {pages} {168165} (\\bibinfo {year} {2020})}\\BibitemShut {NoStop}\nL001093\t\\bibitem [{\\citenamefont {Schollw{\\\"o}ck}(2011)}]{S_SCHOLLWOCK201196}\nL001094\t  \\BibitemOpen\nL001095\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {U.}~\\bibnamefont {Schollw{\\\"o}ck}},\\ }\\href {\\doibase 10.1016/j.aop.2010.09.012} {\\bibfield  {journal} {\\bibinfo  {journal} {Annals of Physics}\\ }\\textbf {\\bibinfo {volume} {326}},\\ \\bibinfo {pages} {96} (\\bibinfo {year} {2011})}\\BibitemShut {NoStop}\nL001096\t\\bibitem [{\\citenamefont {Sachdev}(2011)}]{S_sachdevQuantumPhaseTransitions2011}\nL001097\t  \\BibitemOpen\nL001098\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {S.}~\\bibnamefont {Sachdev}},\\ }\\href {\\doibase 10.1017/CBO9780511973765} {\\emph {\\bibinfo {title} {Quantum {{Phase Transitions}}}}},\\ \\bibinfo {edition} {2nd}\\ ed.\\ (\\bibinfo  {publisher} {Cambridge University Press},\\ \\bibinfo {address} {Cambridge},\\ \\bibinfo {year} {2011})\\BibitemShut {NoStop}\nL001099\t\\bibitem [{\\citenamefont {Karrasch}\\ \\emph {et~al.}(2013)\\citenamefont {Karrasch}, \\citenamefont {Bardarson},\\ and\\ \\citenamefont {Moore}}]{S_karraschReducingNumericalEffort2013}\nL001100\t  \\BibitemOpen\nL001101\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {C.}~\\bibnamefont {Karrasch}}, \\bibinfo {author} {\\bibfnamefont {J.~H.}\\ \\bibnamefont {Bardarson}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {J.~E.}\\ \\bibnamefont {Moore}},\\ }\\href {\\doibase 10.1088/1367-2630/15/8/083031} {\\bibfield  {journal} {\\bibinfo  {journal} {New Journal of Physics}\\ }\\textbf {\\bibinfo {volume} {15}},\\ \\bibinfo {pages} {083031} (\\bibinfo {year} {2013})}\\BibitemShut {NoStop}\nL001102\t\\bibitem [{\\citenamefont {Calabrese}\\ \\emph {et~al.}(2011)\\citenamefont {Calabrese}, \\citenamefont {Essler},\\ and\\ \\citenamefont {Fagotti}}]{S_Calabrese_Essler_Fagotti_2011}\nL001103\t  \\BibitemOpen\nL001104\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Calabrese}}, \\bibinfo {author} {\\bibfnamefont {F.~H.~L.}\\ \\bibnamefont {Essler}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Fagotti}},\\ }\\href {\\doibase 10.1103/PhysRevLett.106.227203} {\\bibfield  {journal} {\\bibinfo  {journal} {Physical Review Letters}\\ }\\textbf {\\bibinfo {volume} {106}},\\ \\bibinfo {pages} {227203} (\\bibinfo {year} {2011})}\\BibitemShut {NoStop}\nL001105\t\\bibitem [{\\citenamefont {Barouch}\\ \\emph {et~al.}(1970)\\citenamefont {Barouch}, \\citenamefont {McCoy},\\ and\\ \\citenamefont {Dresden}}]{S_barouch1970statistical}\nL001106\t  \\BibitemOpen\nL001107\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {E.}~\\bibnamefont {Barouch}}, \\bibinfo {author} {\\bibfnamefont {B.~M.}\\ \\bibnamefont {McCoy}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Dresden}},\\ }\\href {\\doibase 10.1103/PhysRevA.2.1075} {\\bibfield  {journal} {\\bibinfo  {journal} {Phys. Rev. A}\\ }\\textbf {\\bibinfo {volume} {2}},\\ \\bibinfo {pages} {1075} (\\bibinfo {year} {1970})}\\BibitemShut {NoStop}\nL001108\t\\bibitem [{\\citenamefont {Di~Francesco}\\ \\emph {et~al.}(1997)\\citenamefont {Di~Francesco}, \\citenamefont {Mathieu},\\ and\\ \\citenamefont {Sénéchal}}]{S_Di_Francesco_Mathieu_Sénéchal_1997}\nL001109\t  \\BibitemOpen\nL001110\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Di~Francesco}}, \\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Mathieu}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {D.}~\\bibnamefont {Sénéchal}},\\ }\\href {\\doibase 10.1007/978-1-4612-2256-9} {\\emph {\\bibinfo {title} {Conformal Field Theory}}},\\ Graduate Texts in Contemporary Physics\\ (\\bibinfo  {publisher} {Springer},\\ \\bibinfo {address} {New York, NY},\\ \\bibinfo {year} {1997})\\BibitemShut {NoStop}\nL001111\t\\bibitem [{Note1()}]{Note1}\nL001112\t  \\BibitemOpen\nL001113\t  \\bibinfo {note} {This notation for the scaling dimension deviates from the main text's convention, $x_\\Phi $, in order to avoid confusion with the conformal space-time co-ordinates $\\protect \\mathbf {x}$.}\\BibitemShut {Stop}\nL001114\t\\bibitem [{\\citenamefont {Milsted}\\ and\\ \\citenamefont {Vidal}(2017)}]{S_milsted2017extraction}\nL001115\t  \\BibitemOpen\nL001116\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {A.}~\\bibnamefont {Milsted}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {G.}~\\bibnamefont {Vidal}},\\ }\\href {\\doibase 10.1103/PhysRevB.96.245105} {\\bibfield  {journal} {\\bibinfo  {journal} {Phys. Rev. B}\\ }\\textbf {\\bibinfo {volume} {96}},\\ \\bibinfo {pages} {245105} (\\bibinfo {year} {2017})}\\BibitemShut {NoStop}\nL001117\t\\bibitem [{\\citenamefont {Zamolodchikov}(1991)}]{S_Zamolodchikov_1991}\nL001118\t  \\BibitemOpen\nL001119\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {A.~B.}\\ \\bibnamefont {Zamolodchikov}},\\ }\\href {\\doibase 10.1016/0550-3213(91)90207-E} {\\bibfield  {journal} {\\bibinfo  {journal} {Nuclear Physics B}\\ }\\textbf {\\bibinfo {volume} {348}},\\ \\bibinfo {pages} {619–641} (\\bibinfo {year} {1991})}\\BibitemShut {NoStop}\nL001120\t\\bibitem [{\\citenamefont {Mussardo}(2020)}]{S_Mussardo_2010}\nL001121\t  \\BibitemOpen\nL001122\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {G.}~\\bibnamefont {Mussardo}},\\ }\\href@noop {} {\\emph {\\bibinfo {title} {Statistical {{Field Theory}}: {{An Introduction}} to {{Exactly Solved Models}} in {{Statistical Physics}}}}},\\ \\bibinfo {edition} {2nd}\\ ed.,\\ Oxford {{Graduate Texts}}\\ (\\bibinfo  {publisher} {Oxford University Press},\\ \\bibinfo {address} {Oxford, New York},\\ \\bibinfo {year} {2020})\\BibitemShut {NoStop}\nL001123\t\\bibitem [{\\citenamefont {Berenstein}\\ and\\ \\citenamefont {Miller}(2014)}]{S_Berenstein_Miller_2014}\nL001124\t  \\BibitemOpen\nL001125\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {D.}~\\bibnamefont {Berenstein}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {A.}~\\bibnamefont {Miller}},\\ }\\href {\\doibase 10.1103/PhysRevD.90.086011} {\\bibfield  {journal} {\\bibinfo  {journal} {Physical Review D}\\ }\\textbf {\\bibinfo {volume} {90}},\\ \\bibinfo {pages} {086011} (\\bibinfo {year} {2014})}\\BibitemShut {NoStop}\nL001126\t\\bibitem [{Note2()}]{S_Note2}\nL001127\t  \\BibitemOpen\nL001128\t  \\bibinfo {note} {$\\Lambda $ should be distinguished from $a$, which is the UV cutoff corresponding to the lattice spacing}\\BibitemShut {NoStop}\nL001129\t\\bibitem [{Note3()}]{S_Note3}\nL001130\t  \\BibitemOpen\nL001131\t  \\bibinfo {note} {We point out that an equivalent formulation up until the Wick rotation was obtained by Ref.~\\cite {Berenstein_Miller_2014}, but the following calculation is distinct.}\\BibitemShut {Stop}\nL001132\t\\bibitem [{\\citenamefont {Calabrese}\\ and\\ \\citenamefont {Cardy}(2006)}]{S_calabrese2006time}\nL001133\t  \\BibitemOpen\nL001134\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Calabrese}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Cardy}},\\ }\\href {\\doibase 10.1103/PhysRevLett.96.136801} {\\bibfield  {journal} {\\bibinfo  {journal} {Physical Review Letters}\\ }\\textbf {\\bibinfo {volume} {96}},\\ \\bibinfo {pages} {136801} (\\bibinfo {year} {2006})}\\BibitemShut {NoStop}\nL001135\t\\bibitem [{\\citenamefont {Calabrese}\\ and\\ \\citenamefont {Cardy}(2005)}]{S_calabrese2005evolution}\nL001136\t  \\BibitemOpen\nL001137\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Calabrese}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Cardy}},\\ }\\href {\\doibase 10.1088/1742-5468/2005/04/P04010} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\\ }\\textbf {\\bibinfo {volume} {2005}},\\ \\bibinfo {pages} {P04010} (\\bibinfo {year} {2005})}\\BibitemShut {NoStop}\nL001138\t\\bibitem [{\\citenamefont {Cardy}(2016)}]{S_cardy2016furtherresults}\nL001139\t  \\BibitemOpen\nL001140\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Cardy}},\\ }\\href {\\doibase 10.1088/1742-5468/2016/02/023103} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\\ }\\textbf {\\bibinfo {volume} {2016}},\\ \\bibinfo {pages} {023103} (\\bibinfo {year} {2016})}\\BibitemShut {NoStop}\nL001141\t\\bibitem [{\\citenamefont {Calabrese}\\ and\\ \\citenamefont {Cardy}(2007)}]{S_Calabrese_Cardy_2007}\nL001142\t  \\BibitemOpen\nL001143\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Calabrese}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {J.}~\\bibnamefont {Cardy}},\\ }\\href {\\doibase 10.1088/1742-5468/2007/06/P06008} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\\ }\\textbf {\\bibinfo {volume} {2007}},\\ \\bibinfo {pages} {P06008–P06008} (\\bibinfo {year} {2007})}\\BibitemShut {NoStop}\nL001144\t\\bibitem [{\\citenamefont {Essler}\\ and\\ \\citenamefont {Fagotti}(2016)}]{S_Essler_Fagotti_2016}\nL001145\t  \\BibitemOpen\nL001146\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {F.~H.~L.}\\ \\bibnamefont {Essler}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Fagotti}},\\ }\\href {\\doibase 10.1088/1742-5468/2016/06/064002} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\\ }\\textbf {\\bibinfo {volume} {2016}},\\ \\bibinfo {pages} {064002} (\\bibinfo {year} {2016})}\\BibitemShut {NoStop}\nL001147\t\\bibitem [{\\citenamefont {Calabrese}\\ \\emph {et~al.}(2012)\\citenamefont {Calabrese}, \\citenamefont {Essler},\\ and\\ \\citenamefont {Fagotti}}]{S_calabrese2012quantum}\nL001148\t  \\BibitemOpen\nL001149\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {P.}~\\bibnamefont {Calabrese}}, \\bibinfo {author} {\\bibfnamefont {F.~H.~L.}\\ \\bibnamefont {Essler}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Fagotti}},\\ }\\href {\\doibase 10.1088/1742-5468/2012/07/P07016} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\\ }\\textbf {\\bibinfo {volume} {2012}},\\ \\bibinfo {pages} {P07016} (\\bibinfo {year} {2012})}\\BibitemShut {NoStop}\nL001150\t\\bibitem [{\\citenamefont {Granet}\\ \\emph {et~al.}(2020)\\citenamefont {Granet}, \\citenamefont {Fagotti},\\ and\\ \\citenamefont {Essler}}]{S_Granet_Fagotti_Essler_2020}\nL001151\t  \\BibitemOpen\nL001152\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {E.}~\\bibnamefont {Granet}}, \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Fagotti}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {F.~H.~L.}\\ \\bibnamefont {Essler}},\\ }\\href {\\doibase 10.21468/SciPostPhys.9.3.033} {\\bibfield  {journal} {\\bibinfo  {journal} {SciPost Physics}\\ }\\textbf {\\bibinfo {volume} {9}},\\ \\bibinfo {pages} {033} (\\bibinfo {year} {2020})}\\BibitemShut {NoStop}\nL001153\t\\bibitem [{\\citenamefont {Mori}\\ \\emph {et~al.}(2018)\\citenamefont {Mori}, \\citenamefont {Ikeda}, \\citenamefont {Kaminishi},\\ and\\ \\citenamefont {Ueda}}]{S_Mori_Ikeda_Kaminishi_Ueda_2018}\nL001154\t  \\BibitemOpen\nL001155\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {T.}~\\bibnamefont {Mori}}, \\bibinfo {author} {\\bibfnamefont {T.~N.}\\ \\bibnamefont {Ikeda}}, \\bibinfo {author} {\\bibfnamefont {E.}~\\bibnamefont {Kaminishi}}, \\ and\\ \\bibinfo {author} {\\bibfnamefont {M.}~\\bibnamefont {Ueda}},\\ }\\href {\\doibase 10.1088/1361-6455/aabcdf} {\\bibfield  {journal} {\\bibinfo  {journal} {Journal of Physics B: Atomic, Molecular and Optical Physics}\\ }\\textbf {\\bibinfo {volume} {51}},\\ \\bibinfo {pages} {112001} (\\bibinfo {year} {2018})}\\BibitemShut {NoStop}\nL001156\t\\bibitem [{\\citenamefont {Surace}\\ and\\ \\citenamefont {Motrunich}(2023)}]{S_Surace_Motrunich_2023}\nL001157\t  \\BibitemOpen\nL001158\t  \\bibfield  {author} {\\bibinfo {author} {\\bibfnamefont {F.~M.}\\ \\bibnamefont {Surace}}\\ and\\ \\bibinfo {author} {\\bibfnamefont {O.}~\\bibnamefont {Motrunich}},\\ }\\href {\\doibase 10.1103/PhysRevResearch.5.043019} {\\bibfield  {journal} {\\bibinfo  {journal} {Physical Review Research}\\ }\\textbf {\\bibinfo {volume} {5}},\\ \\bibinfo {pages} {043019} (\\bibinfo {year} {2023})}\\BibitemShut {NoStop}\nL001159\t\\end{thebibliography}\nL001160\t\\end{document}\nL001161\t===== END FILE: main.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

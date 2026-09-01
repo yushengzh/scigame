@@ -1,0 +1,290 @@
+===== BEGIN FILE: PaperMain.tex =====
+\documentclass[prl,a4paper,twocolumn,superscriptaddress,floatfix]{revtex4-1}%,twocolumn
+%\documentclass[]{revtex4-1}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,graphicx,graphics,rotating}
+\usepackage[american]{babel}
+% \usepackage[utf8]{inputenc}
+\usepackage{dcolumn}% Align table columns on decimal point 
+\usepackage{bm}% bold math 
+\usepackage{hyperref,color,soul,mathbbol}%%% soul: package that includes \st command to "strikethrough" words
+
+\usepackage{mciteplus}
+
+%******************************************************************************
+%% MY SET OF COMMANDS
+\newcommand{\old}[1]{{\color{red}\st{#1}}} %%% needs soul and color pakcages
+\newcommand{\new}[1]{{\color{blue}#1}}
+\newcommand{\KR}[1]{{\color{blue}KR: #1}}
+\newcommand{\ket}[1]{| #1\rangle}
+\newcommand{\bra}[1]{\langle #1}  
+\newcommand{\fig}[1]{FIG.~\ref{#1}}
+\newcommand{\equa}[1]{Eq.~(\ref{#1})} 
+\newcommand{\equ}[1]{(\ref{#1})}
+\newcommand{\ktimes}{\rangle\! \langle}
+\newcommand{\op}[2]{|#1\ktimes #2|}
+\newcommand{\ud}{\mathrm{d}}
+\newcommand{\ic}{\mathrm{i}}
+\newcommand{\re}{\mathrm{ Re }\;}
+\newcommand{\im}{\mathrm{ Im }\;}
+\newcommand{\tr}{\mathrm{ tr }\;}
+\newcommand{\cC}{\mathbb{C}}
+\newcommand{\zZ}{\mathbb{Z}}
+\newcommand{\Ai}{\mathrm{ Ai}}
+\newcommand{\Bi}{\mathrm{ Bi}}
+\newcommand{\sgn}{\mathrm{sgn}} 
+\newcommand{\argch}{\mathrm{argch}} 
+\newcommand{\one}{\mathbb{I}}
+\newcommand{\D}[1]{\displaystyle}
+
+% To add the titles in the references
+%\nocite{TitlesOn}
+
+
+\begin{document} 
+\title{Universal correlations in
+% mesoscopic
+chaotic many-body quantum states: \\ Fock-space formulation of Berry's random wave model}
+
+%%
+\author{Florian Schoeppl}
+\affiliation{Institut f\"ur Theoretische Physik, Universit\"at Regensburg, 93040 Regensburg, Germany}
+\author{R\'emy~Dubertrand}
+\affiliation{Department of Mathematics, Physics and Electrical Engineering, Northumbria University, NE1 8ST Newcastle upon Tyne, United Kingdom}
+\affiliation{Institut f\"ur Theoretische Physik, Universit\"at Regensburg, 93040 Regensburg, Germany}
+\author{Juan-Diego~Urbina}
+\affiliation{Institut f\"ur Theoretische Physik, Universit\"at Regensburg, 93040 Regensburg, Germany}
+\author{Klaus~Richter}
+\affiliation{Institut f\"ur Theoretische Physik, Universit\"at Regensburg, 93040 Regensburg, Germany}
+
+
+\date{\today}% 
+%%%
+\begin{abstract}
+The apparent randomness of chaotic eigenstates in interacting quantum systems hides subtle correlations
+dynamically imposed by their finite energy per particle. These correlations are revealed when Berry’s
+approach for chaotic eigenfunctions in single-particle systems is lifted into many-body space. We achieve
+this by a many-body semiclassical analysis, appropriate for the mesoscopic regime of a large but finite
+number of particles. We thereby identify as signatures of chaotic many-body eigenstates the universality of
+both their cross-correlations and the Gaussian distribution of expansion coefficients. Combined, these two
+features imprint characteristic features to the morphology of eigenstates that we check against extensive
+quantum simulations. The universality of eigenstate correlations for fixed energy density is hence a further
+signature of many-body quantum chaos that, while consistent with the eigenstate thermalization
+hypothesis, lies beyond random matrix theory.\\
+\\
+\noindent DOI: \hyperlink{https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.134.010404}{\color{blue}{10.1103/PhysRevLett.134.010404}}
+\end{abstract}
+
+\maketitle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Quantum systems of particles with classically chaotic
+limits display universality in the statistical properties of
+both their spectral fluctuations and the (spatial) correlations
+of their eigenstates. This is one of the celebrated and
+powerful results of semiclassical analysis, namely the study
+of quantum mechanical properties in the asymptotic limit $\hbar \to 0$ pioneered by Van Vleck, Gutzwiller, and Berry,
+among many others \cite{Gut1,*Gut2,Berr1,BB1970,*BB1972,*BB1974,Gutb}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}[ttt]
+    %\vspace{-0.97cm}
+    
+    \includegraphics[width=0.95\linewidth]{Fig_3210_5_5_4_6_5_154.png}
+        %\includegraphics[width=0.49\linewidth]{fig1right.png}
+   \caption{
+   {\bf Eigenstate correlations in a Bose-Hubbard chain beyond Random Matrix Theory--}
+   Cross correlations $R_{{\bf n},{\bf m}}(E)=\overline{\langle {\bf n} |\psi\rangle \langle \psi |{\bf m} \rangle}_{E}$ between expansion coefficients  (w.r.t  Fock basis states $|\mathbf n\rangle$ and $|\mathbf m\rangle$) of many-body eigenstates $|\psi^{(j)}\rangle$ of a chaotic Bose-Hubbard chain, Eq.~(\ref{eq:BH}).
+   %
+   In the lower triangle results are shown for the normalized correlator $R_{{\bf n},{\bf m}}(E)/\sqrt{R_{{\bf n},{\bf n}}(E)R_{{\bf m},{\bf m}}(E)}$, obtained by averaging numerically calculated eigenstates with energies $E^{(j)}$ over a microcanonical energy window  $E^{(j)} \in [E-\eta/2,E+\eta/2]$,
+   Eq.~(\ref{eq:Rnm}). They show clear mesoscopic correlations beyond random matrix theory {\em i.e.} $R^{{\rm RMT}}_{{\bf n},{\bf m}}\sim \delta_{{\bf n},{\bf m}}$, signaling quantum interference, well described by the corresponding semiclassical correlator $R^{{\rm sc}}_{{\bf n},{\bf m}}$, Eq.~(\ref{eq:Rsc}), shown in the upper triangle. For visualization, the representative states $|\mathbf n\rangle$ and $|\mathbf m\rangle$  for $L\!=\!5$ sites and $N\!=\!25$ particles
+  are obtained from a reference  "seed" $|5,6,4,5,5\rangle$ by changes in local occupations up to $\pm 3$; see text and \cite{suppmat} for other seed states.
+   }
+	\label{fig:Corr}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In the case of the single-particle (SP) “spectral statistics” ~\footnote{
+Following standard terminology we use ''single particle'' instead of the more precise ''first-quantized'' nomenclature for systems where the classical limit corresponds to particle-like (instead of field-like) degrees of freedom}, this universality was embodied and linked to classical chaos in the Bohigas-Giannoni-Schmit conjecture \cite{BGS} and later confirmed by means of semiclassical theory~\cite{Berr3,Klaus1,Haak1,*Haak2}. For many-body (MB) systems the analysis of energy spectra using random matrix theory (RMT) had started in nuclear physics \cite{RevModPhys.53.385} and was later followed in condensed matter, (see~\cite{montambaux_quantum_1993}), mesoscopic physics \cite{RevModPhys.69.731} and many other domains; see the review~\cite{GUHR1998189} for an exhaustive bibliography for this early period. The study of spectral correlations has later been extended to MB systems with chaotic mean-field limit~\cite{MBQC1,Kollath_2010,PhysRevE.81.036206,Richter22}, and to systems without a semiclassical regime, see Refs. \cite{10.1143/PTPS.139.191,Rig1,PhysRevE.102.062144,PhysRevLett.121.264101,PhysRevB.91.081103,Kos2018} for a review.
+
+For SP “eigenstate statistics” and confirmed by the
+seminal numerical study \cite{mcdonaldSpectrumEigenfunctionsHamiltonian1979,mcdonaldWaveChaosStadium1988}, 
+Berry's semiclassical analysis of chaotic eigenfunctions \cite{Berr4} in $d$-dimensions leads to an amplitude-amplitude correlator between positions ${\bf r}$ and ${\bf r'}$ given by the celebrated Bessel function $J_{d/2-1}(x)/x^{d/2-1}$. It displays characteristic coherent oscillations as a function of the spatial distance $x=k(E,\bar{{\bf r}})|{\bf r}-{\bf r'}|$ fixed through the local wavenumber $k^{2}(E,\bar{\bf r})=2m(E-V(\bar{\bf r}))/\hbar^{2}$ at the energy $E$ and mean position $\bar{{\bf r}}=({\bf r}+{\bf r'})/2$. Berry's result is universal in the sense of having the exact same dependence on the external potential $V({\bf r})$ for any chaotic system, an universality that moreover lies beyond  RMT for any finite energy $E < \infty$ . Once Berry's correlator fixes an amplitude distribution universally given in Gaussian form for chaotic  systems, the resulting SP Random Wave Model (RWM) \cite{Berr4,Sied1,JDUre} turns into a powerful approach to describe the spatial morphology of eigenfunctions in mesoscopic chaotic systems \cite{RWM3,Urbina06,RWM2}. Its validity is supported by a huge amount of numerical \cite{PhysRevA.37.3067,RWMBe3,bogomolny2002percolation} and experimental \cite{HJ1,HJ2,HJ3} results. Moreover, due to its appealing form based on Gaussian random fields, it allows for the explicit analytical computation of even delicate topological features \cite{RWMBe3,RWMBe4,Dennis1,Dennis2} including nodal structure \cite{bogomolny2002percolation,jainNodalPortraitsQuantum2017}.
+
+In the MB context, the description of chaotic eigenstates has a long story dating back to the 70's where 
+% central-limit-type of arguments were used to their
+they were characterized through statistical measures such as the entropy \cite{lubkinEntropyNsystemIts1978,pageAverageEntropySubsystem1993,senAverageEntropyQuantum1996}. In a further refinement, % introduced and extended in \cite{ETH1,ETH2,ETH3,ETH4}, 
+the Eigenstate Thermalization Hypothesis (ETH) 
+\cite{ETH1,ETH2,ETH3,ETH4}, 
+and related concepts \cite{jainQuantumChaosRandom1997} have provided tools to relate equilibrium properties to chaotic dynamics \cite{ETH2,ALONSO1996812,Gaspard1997}. Within the resurgence of MB quantum chaos during the last two decades, MB eigenstates at the universal level have been mainly described within  pure RMT approaches where they are assumed to behave as random vectors, only weakly correlated through their orthonormality \cite{Rig1}.
+
+However, as indicated
+% shown 
+in Figs.~\ref{fig:Corr} and~\ref{fig:cuts}, there exist distinct eigenstate correlations in the Fock space of chaotic (here bosonic) MB systems that are obviously not captured by RMT. Such correlations prevail, even in the ergodic phase, for systems with large but finite particle numbers, the regime where state-of-art cold-atom based quantum simulators operate~\cite{doi:10.1126/science.aal3837,Aidelsburger_2018,RevModPhys.80.885}. The swift progress of quantum state tomography \cite{Lanyon2017} appropriate for this \emph{mesoscopic} regime, demands an understanding of these correlations and their possible universality beyond RMT.
+
+Hence, in this Letter, we provide a generalization of the RWM and the extension of Berry's ansatz into the mesoscopic regime of chaotic MB systems. We will lift its key ingredients into the Fock space of quantum fields, namely, the presence of microscopic correlations predicted by semiclassics that lie beyond RMT, as seen in
+Figs.~\ref{fig:Corr} and \ref{fig:cuts}, and through the conjectured multivariate Gaussian distribution of expansion coefficients (Fig.~\ref{fig:CorrInt}).   
+
+To this end we need to extend quantum chaos techniques that successfully described SP systems \cite{Gutb,Haake06}, into the asymptotic regime of large but finite particle number $N\gg 1$. 
+This is one of the quest of MB quantum chaos, a field that has swiftly moved at the frontier of several fundamental questions, ranging from equilibration in statistical physics~\cite{MBQC1,Rig1,MBQC3,Kos2018} to gravity \cite{JT1,JT2}. Discrete bosonic fields such as the Bose-Hubbard chains considered here possess indeed a classical limit for $N\rightarrow \infty$, amenable to a mean-field description. Then 
+$1/N \ll 1$ plays the role of an effective Planck's constant and semiclassical techniques for chaotic SP systems have been generalized to MB (Fock) space, see \cite{Richter22} for a recent review.  
+In this way genuine MB interference effects, ranging from MB coherent backscattering \cite{CBS} and MB spin echo \cite{MBSE}, via MB spectra from periodic mean field solutions \cite{TF_Thomas,TF_Remy} to
+out-of-time-order-correlators \cite{Josef,QB} have been understood in semiclassical terms. This semiclassical approach fully accounts for MB quantum interference \cite{PhysRevA.97.061606}, beyond the (incoherent) truncated Wigner approximation, see e.g.~\cite{PhysRevA.68.053604,pappalardi2020quantum}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+To introduce the statistical measures to describe eigenstate fluctuations,
+consider a  MB system defined by a Hamiltonian $\hat{H}$ with  eigenfunctions $\hat{H}|\psi^{(j)}\rangle=E^{(j)}|\psi^{(j)}\rangle$ and eigenvalues $E^{(0)}\le E^{(1)} \le \ldots$ \footnote{
+If necessary, systematic degeneracies due to symmetries are excluded by focusing on the  eigenfunctions within a given symmetry-related subspace with fixed values of the corresponding quantum numbers}. Consider now a spectral region of width $\eta$ around an energy $E$, implemented through a window function $W_{\eta}(x)$ centered at $x=0$, and a functional $F(|\psi\rangle)$ associating a complex number to an arbitrary state $|\psi\rangle$. We then define
+\begin{equation}
+\label{eq:Fexact}
+\overline{F(|\psi\rangle)}_{E}=\sum_{j=0}^{\infty}\frac{W_{\eta}(E^{(j)}\!-\!E)}{\rho_{\eta}(E)} F(|\psi^{(j)}\rangle)\, 
+\end{equation}
+% $\overline{F(|\psi\rangle)}_{E}$
+as the average of the fluctuating numbers $F(|\psi^{j}\rangle)$ over the spectral window. Normalization $\bar{1}_{E}=1$ gives then
+\begin{equation}
+ \rho_{\eta}(E)={\rm Tr~}W_{\eta}(E-\hat{H}) \sim {\rm e}^{N}
+\end{equation}
+ as the mean ({\em i.e.}~coarse-grained) level density \footnote{We assume $\eta$ to be large compared to the local mean level spacing which implies a large number of eigenstates inside the spectral window.}. 
+
+In bosonic MB systems, the Hilbert space is spanned by the (Fock) common eigenstates $|{\bf n}\rangle$ of the occupation number operators $\hat{n}_{\alpha}=\hat{b}_{\alpha}^{\dagger}\hat{b}_{\alpha}$ ($\alpha = 1, \ldots, L)$ where $n_\alpha$ counts the number of particles and $\hat{b}_{\alpha}$ ($\hat{b}_{\alpha}^{\dagger}$) annihilates (creates) a particle in the $\alpha$-th single-particle state. The choice $F(|\psi\rangle)=\langle {\bf n}|\psi\rangle \langle \psi|{\bf m}\rangle$ in Eq.~(\ref{eq:Fexact}) defines then the two-point cross-correlation of expansion coefficients $\langle {\bf n}|\psi^{(j)}\rangle$ and $\langle {\bf m}|\psi^{(j)}\rangle$ over the spectral window:
+\begin{eqnarray}
+\label{eq:Rnm}
+\overline{\langle {\bf n}|\psi\rangle \langle \psi|{\bf m}\rangle}_{E}&=&\sum_{j=0}^{\infty}\frac{W_{\eta}(E^{(j)}\!-\!E)}{\rho_{\eta}(E)}\langle {\bf n}|\psi^{(j)}\rangle \langle \psi^{(j)}|{\bf m}\rangle \nonumber \\ &\equiv&R_{{\bf n},{\bf m}}(E) \; .
+\end{eqnarray}
+This in turn naturally defines the covariance matrix
+\begin{equation}
+\label{eq:CovR}
+    R_{{\bf n},{\bf m}}(E)=\langle {\bf n}| \hat{R}(E)|{\bf m}\rangle,
+\end{equation}
+in terms of the basis-independent covariance operator
+\begin{equation}
+  \hat{R}(E)=\overline{|\psi\rangle\langle \psi |}_{E}=\frac{W_{\eta}(E-\hat{H})}{{\rm Tr~}W_{\eta}(E-\hat{H})} \; , 
+  \label{eq:R}
+\end{equation}
+{\it i.e.}~the density operator corresponding to the microcanonical window $W_{\eta}(x)$. Such intrincate mesoscopic fluctuations of the covariance matrix were numerically observed in Ref.~\cite{nakerst2021eigenstate}, and one of our goals here is to provide a theoretical understanding of their structure. 
+
+We implement the MB generalization of Berry's construction in three stages: First, it is assumed that the quantum MB system possesses a well defined chaotic classical (mean-field) limit and a semiclassical regime. Second, we employ for
+$\overline{F(|\psi\rangle)}_{E}$
+a Gaussian distribution, 
+\begin{equation}
+\label{eq:Gauss}
+\overline{F(|\psi\rangle)}_{E}\!\simeq\!
+\overline{F(|\psi\rangle)}_{E}^{\rm G}\!=\!
+\frac{1}{\mathcal{N}(\hat{R})}\int_{{\cal H}}\!\!F(|\psi\rangle){\rm e}^{-\langle \psi |\hat{R}(E)^{-1}|\psi\rangle}\ud|\psi\rangle\ ,
+\end{equation}
+valid in chaotic systems~\cite{Sied1,JDUre,Heller_2007}, where $\mathcal{N}(\hat{R})$ fixes $\overline{1}_{E}^{\rm G}=1$. At a third stage, we use a semiclassical approximation for the correlation matrix $\hat{R}(E)$ instead of its exact and usually untractable microscopic expression \footnote{Knowledge of $\hat{R}(E)$ provides all information required for the calculation of the microcanonical (mc) expectation value of any MB observable $\hat{O}$, as $\langle \hat{O} \rangle^{(\rm mc)}_{E}={\rm Tr}\left[\hat{R}(E)\hat{O}\right]$. Its exact determination is therefore a formidable task in general}, where both universal and system-specific aspects enter.
+
+To be definite, we now implement these steps and construct the MB RWM for systems described by Bose-Hubbard-type Hamiltonians
+\begin{equation}
+\hat{H}=\!\sum_{\alpha=1}^{L} \!\!
+\left[\!-t(\hat{b}^{\dagger}_{\alpha}\hat{b}_{\alpha+1}\!+\!\hat{b}^{\dagger}_{\alpha+1}\hat{b}_{\alpha})\!+\!\epsilon_{\alpha}\hat{n}_{\alpha}\!+\!U\hat{n}_{\alpha} (\hat{n}_{\alpha}\!-\!1) \right]
+\label{eq:BH}
+\end{equation}
+where the on-site energies $\epsilon_\alpha$ are chosen in a way to break any discrete symmetry, and periodic boundary conditions are assumed. This model describes a wide range of physical systems, see e.g. \cite{PhysRevB.40.546,krutitsky2016ultracold,bloch2008many} and references therein. It has a classical limit that corresponds to large occupations $n_{\alpha} \gg 1$ with a classical Hamiltonian $H_{\rm cl}({\boldsymbol \rho},{\boldsymbol \theta})$ obtained from $\hat{H}$ by the replacements $\hat{b}_\alpha \to \sqrt{\rho_\alpha}{\rm e}^{-i\theta_\alpha},\hat{b}_\alpha^{\dagger} \to \sqrt{\rho_\alpha}{\rm e}^{i\theta_\alpha}$ \cite{TF_Thomas,TF_Remy}. 
+The classical phase space, endowed with the canonical variables $({\boldsymbol \rho},{\boldsymbol \theta})$,  was numerically found~\cite{TF_Remy,Steve} to be  integrable in the limiting regimes $t/UN\to 0, \infty$, while chaotic dynamics sets in for $t/UN\sim 1$.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}
+	\includegraphics[width=0.95\linewidth]{Fig2_Cut3210_5_5_4_6_5_154.png}
+	%\includegraphics[width=0.9\linewidth]{fig2.eps}
+   \caption{\textbf{Individual normalized correlators --}  The same as in Fig.~\ref{fig:Corr} but for a selection of three horizontal cuts at $|\mathbf n\rangle$ with ${\mathbf n}=6,4,4,6,5$ (bottom), ${\mathbf n}=5,7,4,4,5$ (middle), and ${\mathbf n}=6,6,4,5,4$ (top).
+   Along the horizontal axis we mark a representative set of states $|\mathbf m\rangle$ with changes up to $\pm 3$ in their occupation numbers relative to the respective $|\mathbf n\rangle$.
+   Black and red symbols mark numerically exact normalized correlators and the prediction (\ref{eq:Rsc}) of the MB semiclassical theory, respectively (lines serve as guides to the eye). The gaps correspond to the diagonal ${\bf n}={\bf m}$, where the normalized correlator is unity by construction.}
+\label{fig:cuts}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+To proceed with the MB semiclassical approximation we consider the Wigner transform  of $\hat{R}(E)$, Eq.~(\ref{eq:R}), \footnote{We do not address the issue of defining the Wigner transform on discrete spaces, as it is irrelevant in the semiclassical regime considered here.}
+\begin{equation}
+\label{eq:Wigner}
+    {\cal W}_{E}({\boldsymbol \rho},{\boldsymbol \theta})=\sum_{{\bf m} < {\boldsymbol \rho}} R_{{\boldsymbol \rho}+{\bf m},{\boldsymbol \rho}-{\bf m}}(E) \, {\rm e}^{i{\boldsymbol \theta}\cdot {\bf m}} \,  ,
+\end{equation}
+where the notation ${\bf m} < {\boldsymbol \rho}$ means $m_{\alpha}<\rho_{\alpha}$ for all $\alpha$. We invoke now the Fock space version of the eigenstate condensation hypothesis of Voros and Berry~\cite{voros1976semi,berry1977semi} in the form ${\cal W}_{E}\simeq {\cal W}_{E}^{{\rm cl}}$, with classical phase space distribution
+\begin{equation}
+\label{eq:RW}
+{\cal W}_{E}^{{\rm cl}}({\boldsymbol \rho},{\boldsymbol \theta})=\frac{1}{\rho_{\eta}^{{\rm cl}}(E)}W_{\eta}\left(E\!-\!H_{\rm cl}({\boldsymbol \rho},{\boldsymbol \theta})\right) \, .
+\end{equation}
+
+The level density $
+\rho_{\eta}^{{\rm cl}}(E)=\int W_{\eta}\left(E\!-\!H_{\rm cl}({\boldsymbol \rho},{\boldsymbol \theta})\right) d{\boldsymbol \rho}d{\boldsymbol \theta}$ is
+ defined by the volume of the classical energy shell of width $\eta$. Inverting relation~(\ref{eq:Wigner}) to obtain the corresponding semiclassical form of the covariance matrix $R^{\rm sc}$ is in general a formidable task, but thanks to the local character of $\hat{H}$ we get as our main result (see \footnote{See Supplemental Material at [url], which further includes \cite{Fischer_2013} for additional information about the derivation of the Eq.(\ref{eq:Rsc}) and \cite{beugeling2018statistical} for an in depth discussion about statistical properties of eigenstate amplitudes in complex quantum systems.} for details)
+\begin{widetext}
+\begin{equation}
+\label{eq:Rsc}
+\hspace{-0.3cm}R^{{\rm sc}}_{{\bf n},{\bf m}}(E)=\frac{1}{\rho_{\eta}^{{\rm cl}}(E)}\sum_{Q\in\zZ}  \int_{-\infty}^\infty\frac{\ud \tau}{2\pi} \tilde{W}(\tau)\exp{\{\ic \tau [E\!-\! U \sum_{\alpha} I_\alpha(I_\alpha\!-\!1) \!-\! \sum_{\alpha} \varepsilon_\alpha I_\alpha]}\} \prod_{\alpha=1}^L
+  e^{\ic \frac{\pi}{2}(\delta_{\alpha}+ Q)} J_{\delta_{\alpha}+ Q}(2t\tau\sqrt{I_\alpha I_{\alpha+1}}) \, .
+\end{equation}
+\end{widetext}
+Here $\tilde{W}(\tau)$ is the Fourier transform of $W_{\eta}(E)$,
+$J_{l}(x)$ the $l$th Bessel function, ${\bf I}= ({\bf n}+{\bf m})/2$ with $I_{L+1}=I_{1}$, and $\delta_\alpha = \sum_{\beta=1}^\alpha (n_\beta - m_\beta)$.
+    
+Together with Eq.~(\ref{eq:Gauss}) the  expression~(\ref{eq:Rsc}) allows us to compute the average of \textit{any} functional $F$ in Eq.~(\ref{eq:Fexact}) within our MB RWM. It is therefore important to compare this central analytical prediction with corresponding numerical results for the Bose Hubbard model, Eq.~(\ref{eq:BH}). For definiteness we choose $L=5,N=25$ and $UN=2t$, where the classical dynamics is predominantly chaotic. In Figs.~\ref{fig:Corr} and~\ref{fig:cuts} we compare the normalized correlators $R_{{\bf n},{\bf m}}(E)/\sqrt{R_{{\bf n},{\bf n}}(E)R_{{\bf m},{\bf m}}(E)}$ obtained by exact diagonalization and averaged over a spectral window comprising $\sim 10^{3}$ MB states, with the MB semiclassical approximation (\ref{eq:Rsc}). In Fig.~(\ref{fig:cuts}) we show the correlations between reference Fock states  $|\mathbf n\rangle =|6,6,4,5,4\rangle, |5,7,4,4,5\rangle,|6,4,4,6,5\rangle$ and representative states $|\mathbf m\rangle$ indicated along the horizontal axis. In all three cases we find remarkable agreement between the semiclassical prediction (red symbols) and the numerical results (black symbols). Instead of fixing a single reference basis state $|\mathbf n\rangle$,  the color matrix in Fig. \ref{fig:Corr} represents cross correlations among all Fock basis states around $|5,6,4,5,5\rangle$. The upper right and lower left triangle shows the semiclassical and the numerical results, respectively. The apparent symmetry, quantitatively confirmed by the cuts shown in Fig.~(\ref{fig:cuts}), again reflects the excellent agreement, see also \cite{suppmat} for further comparisons. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}[bbb]
+	\includegraphics[width=0.95\linewidth]{Fig3_FPT3210_5_5_4_6_5_154.png}
+	
+	%\vspace{0.25cm}
+    %\includegraphics[width=0.95\linewidth]{fig3bottom.eps}
+   \caption{{\bf Intensity correlators --} Numerical check of the conjectured multivariate Gaussian distribution, Eq.~(\ref{eq:Gauss}), for the expansion coefficients of chaotic many-body eigenstates. Black symbols and lines: Numerically computed normalized  intensity-intensity correlator $Y_{{\mathbf n},{\mathbf m}}(E)/(R_{{\mathbf m},{\mathbf m}}(E) R_{{\mathbf n},{\mathbf n}}(E))$, defined in Eq.~(\ref{def:y_mn}) with spectral average, Eq.~(\ref{eq:Fexact}).
+   Dashed blue curves: $Y_{{\mathbf n},{\mathbf m}}^{G}(E)/(R_{{\mathbf n},{\mathbf n}}(E)R_{{\mathbf m},{\mathbf m}}(E))$ with Gaussian assumption $Y_{{\mathbf n},{\mathbf m}}^{G}(E)=2|R_{{\mathbf n},{\mathbf m}}(E)|^{2}$, Eq.~(\ref{def:yg_mn}). Top and bottom panels show cross correlators between a set of Fock states $|{\bf m}\rangle$, marked along the horizontal axis, and reference states $|{\mathbf n}\rangle=|6,6,4,5,4\rangle$ and $|5,7,4,4,5\rangle$, respectively. The prediction based on the full MB random wave model with semiclassical approximation $R_{{\mathbf n},{\mathbf m}}(E)\simeq R^{\rm sc}_{{\mathbf n},{\mathbf m}}(E)$ (Eq.~(\ref{eq:Rsc}), red curve) is closely following the numerical data based on the Gaussian approximation (blue asterisks). The gaps mark  cases ${\bf n}={\bf m}$ where it coincides with $Y^{\rm RMT}_{{\mathbf n},{\mathbf m}}/R^{{\rm RMT}}_{{\bf n},{\bf n}}R^{{\rm RMT}}_{{\bf m},{\bf m}}\!=\!2\delta_{{\mathbf n},{\mathbf m}}$.}
+\label{fig:CorrInt}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+After this exhaustive check of the semiclassical approximation for the covariance matrix we focus on the second essential aspect of the MB RWM, namely the underlying Gaussian assumption for the joint distribution of eigenstate amplitudes, encoded in Eq.~(\ref{eq:Gauss}). This assumption has far reaching consequences well beyond the well-known Gaussian distribution of expansion coefficients along {\it a single fixed} $|{\mathbf n}\rangle$ reported in \cite{atas2017quantum,nakerst2021eigenstate} and numerically confirmed \cite{suppmat} for chaotic Bose-Hubbard models. In fact, Eq.~(\ref{eq:Gauss}) describes the {\it joint} probability distribution of {\it the whole set} of coefficients $\langle {\mathbf n}|\psi^{(j)}\rangle$ for {\it all} $|{\bf n}\rangle$. A prominent statistical measure, sensitive to both the microscopic correlations and the multivariate Gaussian nature of the  expansion coefficients, is the Fock space version of the two-point intensity correlator~\cite{MIRLIN2000},
+\begin{equation}
+Y_{{\mathbf n},{\mathbf m}}(E)=\overline{|\langle {\mathbf n}|\psi\rangle|^{2}|\langle {\mathbf m}|\psi\rangle|^{2}}_{E}-\overline{|\langle {\mathbf n}|\psi\rangle|^{2}}_{E} \overline{|\langle {\mathbf m}|\psi\rangle|^{2}}_{E}  \, .
+\label{def:y_mn}
+\end{equation}
+Using the properties of multivariate Gaussian distributions in Eq.~(\ref{eq:Gauss}), we easily get \cite{suppmat}
+\begin{equation}
+Y_{{\mathbf n},{\mathbf m}}^{G}(E)=2|R_{{\mathbf n},{\mathbf m}}(E)|^{2} \label{def:yg_mn}
+\end{equation}
+for the case of real expansion coefficients considered here. In Fig.~\ref{fig:CorrInt} we check this prediction by performing  numerical simulations independently for both 
+$Y_{{\mathbf n},{\mathbf m}}(E)$ (black curves) and $|R_{{\mathbf n},{\mathbf m}}(E)|^2$ (dashed blue) for two representative seed states \footnote{Similar results are obtained for any seed state under the conditions discussed below}. We see that mesoscopic MB eigenstates behave as realizations of a {\it correlated} multivariate Gaussian distribution, up to deviations expected for such higher-order correlators due to stronger finite-size effects.
+
+Combining the Gaussian conjecture with the semiclassical approximation $R_{{\mathbf n},{\mathbf m}}(E)\simeq R^{\rm sc}_{{\mathbf n},{\mathbf m}}(E)$ yields moreover closed analytical results for
+$Y_{{\mathbf n},{\mathbf m}}^{G}(E)$, 
+Eq.~(\ref{def:yg_mn}). In Fig.~(\ref{fig:CorrInt}) they are 
+indicated as red asterisks again coinciding well with numerical Gaussian theory (blue).
+This close agreement gives full support of the proposed MB version of the RWM. The semiclassical covariance matrix captures the \emph{microscopic} correlations of typical eigenstates responsible for the structure of any correlation function. Thus, the semiclassical correlator unveils MB information well beyond RMT that predicts energy-independent flat profiles as $Y^{\rm RMT}_{{\mathbf n},{\mathbf m}}/R^{{\rm RMT}}_{{\bf n},{\bf n}}R^{{\rm RMT}}_{{\bf m},{\bf m}}\!=\!2\delta_{{\mathbf n},{\mathbf m}}$.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We briefly comment now on some important instances where our analysis touches previous results and concepts.
+
+{\it On the notion of universality.} As mentioned before, the universality of Berry's RWM stems from the universal functional dependence of the two-point amplitude correlator on the external potential as long as, i) it generates strongly chaotic dynamics (nonzero Lyapunov exponent) and, ii) the kinetic term is quadratic in the momentum. In the same venue, as long as the hopping term of $\hat{H}$ is nearest-neighbor only, our results will hold for \textit{any} interaction term $H^{\rm int}(\hat{\mathbf n})$ that is diagonal in the Fock basis and generates chaotic mean-field dynamics, the only change being the substitution 
+\begin{equation}
+U\sum_{\alpha}I_{\alpha}(I_{\alpha}-1) \to H^{\rm int}({\bf I})
+\end{equation}
+in the semiclasical cross-correlator, Eq.~(\ref{eq:Rsc}).
+
+{\it Relation with ETH and Behemoths.} The predictions of the MB RWM  are consistent with the ETH, as expectation values $\langle \hat{O} \rangle ={\rm Tr~}[\hat{O}\hat{R}]$ of MB observables $\hat{O}$ take the ETH form in leading order through Eq.~(\ref{eq:RW}). Our results extend the usual ergodic arguments for diagonal matrix elements into a theory for cross-correlations of expansion coefficients, and this is achieved by means of the same object, namely the microcanonical covariance matrix. Despite their common roots, in general the RWM and the ETH address different objects, {\em i.e.}, Fock-space correlations and expectation values. There exists however a type of non-local MB observables, the so-called Behemoths introduced in \cite{Haque2019} like $\hat{\Omega}_{{\bf n},{\bf m}}=|{\bf n}\rangle \langle{\bf m}|+|{\bf m}\rangle \langle{\bf n}|$, whose microcanonical expectation values are {\it exactly} given by $R_{{\mathbf n},{\mathbf m}}(E)$. Our analysis implies that Behemoths display universal structure at fixed energy, beyond the fidelity to RMT in the infinite temperature limit reported in \cite{Haque2019}.
+
+{\it Regime of validity.} Within the semiclasical regime $N\gg 1$, and assuming that the mean-field dynamics are chaotic, the key steps in Eqs.~(\ref{eq:Wigner}) and~(\ref{eq:RW}) treat the interacting term of the Hamiltonian as a constant background evaluated at the mean occupations ${\bf I}= ({\bf n}+{\bf m})/2$. This means the kinetic (hopping) contribution to the energy $E$ must be sufficiently large and, vice versa, 
+that the interaction term of the classical Hamiltonian fulfills, for some constant $c$,
+\begin{equation}
+ \left|E-H^{\rm int}({\boldsymbol I})\right|>c.
+\end{equation}
+ This is confirmed by an extensive check of the validity of the MB RWM predictions across the whole Fock space~\cite{suppmat}. 
+
+{\it Conclusions}. We have lifted Berry's random wave model from configuration space into the Fock space of interacting systems by constructing an accurate semiclassical theory describing the statistical backbone of chaotic states in mesoscopic MB systems. This MB random state model relies on the identification of chaotic eigenstates as correlated Gaussian fields arising from massive, genuine MB interference. Its central building block is a covariance matrix constructed by means of MB semiclassics techniques where the large-$N$ mean-field regime plays the role of a classical limit. 
+The predictions of the MB random state model for both the multivariate and correlated features of chaotic MB eigenstates
+show quantitative agreement with numerical results from 
+extensive simulations for Bose-Hubbard systems. 
+In this way a pillar of the field of single-particle quantum chaos, the universality of spatial fluctuations of chaotic eigenstates, is also established in the realm of many-body quantum chaos.
+
+{\em Acknowledgements --} We thank Arnd B\"acker, Eugene Bogomolny,  Silvia Pappalardi and Mark Srednicki for valuable discussions. We acknowledge financial support from the Deutsche Forschungsgemeinschaft (German Research Foundation) through Ri681/14-1, and through Ri681/15-1 within the Reinhart-Koselleck Programme.
+
+\bibliographystyle{apsrevM} %{apsrev4-1}
+\bibliography{refRW}
+\end{document}
+===== END FILE: PaperMain.tex =====

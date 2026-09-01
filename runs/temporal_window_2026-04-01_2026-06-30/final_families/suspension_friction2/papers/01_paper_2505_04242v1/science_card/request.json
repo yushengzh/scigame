@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2505.04242v1\", \"citation\": \"Sudarshan Konidena, Tangential Forces Govern the Viscous-Inertial Transition in Dense Frictional Suspensions, Physical Review Letters (2026), DOI:10.1103/66pp-4rdj\", \"journal_doi\": \"10.1103/66pp-4rdj\"}\n\nSource-grounded routing hint from pre-screening:\nPreserve the fully verified family exactly: public St in [0.01,300], normalized readout r, private mu_f=.15/.80, verified branch parameters and ASTs, and fit-central-value semantics. Fixed condition K_phi_common and its parameter role must say K_phi=0.065 is a constructed slice through both source global fits, not two simulation runs from the two matched mu_f branches. The St=.65 and 206.5 points are provenance for how the reference slice was chosen, not paired direct samples. Do not create source_ambiguities; keep uncertainty provenance unchanged. No extra claims.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nRevision context from an independent review of a prior ScienceCard:\n{\"issues\":[{\"code\":\"card.constant_k_fixed_condition_still_implies_direct_two_branch_sampling\",\"detail\":\"The prior review explicitly required the fixed-condition wording to identify a constructed K_phi=0.065 fit slice. It remains unchanged: 'The common K_phi value for the two simulation runs is ...'. Source lines 274-276 describe two St points in the reference-case analysis, not one directly sampled point or curve in each private mu_f world. Because K_phi_common is selected as a common condition for the matched family, revise its statement to: 'For both private mu_f branches, the Oracle evaluates the source-reported K_phi/K_mu fit laws on the constructed slice K_phi=J+0.1 I^2=0.065; the source directly reports this K_phi at St=0.65 and 206.5 in the reference analysis.' Give the K_phi_common parameter role the same fit-slice semantics. Do not change the value, ASTs, branch parameters, St domain, or the already-correct claim/readout provenance.\",\"line_ranges\":[{\"line_end\":125,\"line_start\":123},{\"line_end\":276,\"line_start\":234},{\"line_end\":375,\"line_start\":340}]}],\"previous_science_card\":{\"assessment\":\"The source supports the normalized-friction fits for the viscous-inertial transition. The public control St ranges from 0.01 to 300. The common fixed condition K_phi = J + 0.1 I^2 = 0.065 is supported by the two simulation runs at St=0.65 and 206.5. The derived relations J(St)=0.065/(1+0.1 St), K_mu(St)=0.065*(1+alpha_mu St)/(1+0.1 St), and r(St)=1+a_mu*sqrt(K_mu(St)) are consistent with the source equations and fits. The private branch mu_f=0.15 uses a_mu=14.3 and alpha_mu=0.029; the alternate branch mu_f=0.80 uses a_mu=26.5 and alpha_mu=0.00875. All constants are anchored. The case is authoring-ready.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"inset provides mu/mu_c vs K_mu with a single fit mu = mu_c (1 + a_mu K_mu^{1/2}) with a_mu=14.3\"},{\"line_end\":252,\"line_start\":252,\"support\":\"K_mu = J + alpha_mu I^2 with alpha_mu = 0.029\"},{\"line_end\":274,\"line_start\":274,\"support\":\"two simulation runs with the same K-value (K=0.065)\"},{\"line_end\":358,\"line_start\":358,\"support\":\"Table: mu_f=0.15, a_mu=14.3, alpha_mu=0.029\"}],\"applicability\":\"Valid for the reference interparticle friction mu_f=0.15 and for St in the range 0.01-300.\",\"claim_id\":\"r_vs_St_muf015\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":238,\"line_start\":238,\"support\":\"The range of St numbers in this study is 0.01-300.\"}],\"control_name\":\"St\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The range of St numbers in this study is 0.01-300.\",\"maximum\":300.0,\"minimum\":0.01}],\"control_names\":[\"St\"],\"depends_on\":[],\"fixed_condition_ids\":[\"K_phi_common\",\"mu_f_reference\"],\"mechanism_ids\":[\"viscous_inertial_rheology\"],\"oracle_outputs\":{\"r\":{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"a_mu_muf015\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"K_phi_common\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_mu_muf015\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"multiply\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_phi\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"divide\"},{\"param\":\"half\"}],\"op\":\"power\"}],\"op\":\"multiply\"}],\"op\":\"add\"}},\"quantitative_form\":\"r(St) = 1 + 14.3 * sqrt(0.065 * (1 + 0.029 * St) / (1 + 0.1 * St))\",\"readout_names\":[\"r\"],\"statement\":\"For the reference interparticle friction mu_f=0.15, the normalized friction r = mu/mu_c as a function of Stokes number St is given by r(St) = 1 + a_mu * sqrt(K_mu(St)), where K_mu(St) = K_phi * (1 + alpha_mu * St) / (1 + 0.1 * St) with K_phi = 0.065, a_mu = 14.3, and alpha_mu = 0.029.\",\"statistical_basis\":\"Central value implied by the reported fits at constructed K_phi=0.065; coefficients a_mu and alpha_mu from Table 1.\",\"uncertainty\":\"mu_c has uncertainty ±0.02 with convention source_unspecified; no uncertainty reported for a_mu or alpha_mu; no pointwise uncertainty for the derived r(St) curve.\"},{\"anchors\":[{\"line_end\":375,\"line_start\":340,\"support\":\"Figure 6 caption and surrounding text: mu/mu_c versus K_mu with fit mu = mu_c(1 + a_mu K_mu^{1/2}) for changed friction; curves collapse against K_mu with alpha_mu decreasing with increasing mu_f.\"},{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80, a_mu=26.5, alpha_mu=0.00875\"}],\"applicability\":\"Valid for the alternate interparticle friction mu_f=0.80 and for St in the range 0.01-300.\",\"claim_id\":\"r_vs_St_muf080\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":238,\"line_start\":238,\"support\":\"The range of St numbers in this study is 0.01-300.\"}],\"control_name\":\"St\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The range of St numbers in this study is 0.01-300.\",\"maximum\":300.0,\"minimum\":0.01}],\"control_names\":[\"St\"],\"depends_on\":[],\"fixed_condition_ids\":[\"K_phi_common\",\"mu_f_alternate\"],\"mechanism_ids\":[\"viscous_inertial_rheology\"],\"oracle_outputs\":{\"r\":{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"a_mu_muf080\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"K_phi_common\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_mu_muf080\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"multiply\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_phi\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"divide\"},{\"param\":\"half\"}],\"op\":\"power\"}],\"op\":\"multiply\"}],\"op\":\"add\"}},\"quantitative_form\":\"r(St) = 1 + 26.5 * sqrt(0.065 * (1 + 0.00875 * St) / (1 + 0.1 * St))\",\"readout_names\":[\"r\"],\"statement\":\"For the alternate interparticle friction mu_f=0.80, the normalized friction r = mu/mu_c as a function of Stokes number St is given by r(St) = 1 + a_mu * sqrt(K_mu(St)), where K_mu(St) = K_phi * (1 + alpha_mu * St) / (1 + 0.1 * St) with K_phi = 0.065, a_mu = 26.5, and alpha_mu = 0.00875.\",\"statistical_basis\":\"Central value implied by the reported fits at constructed K_phi=0.065; coefficients a_mu and alpha_mu from Table 1.\",\"uncertainty\":\"mu_c has uncertainty ±0.08 with convention source_unspecified; no uncertainty reported for a_mu or alpha_mu; no pointwise uncertainty for the derived r(St) curve.\"}],\"controls\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":238,\"line_start\":238,\"support\":\"The range of St numbers in this study is 0.01-300.\"}],\"definition\":\"Stokes number, defined as the ratio of inertial to viscous stress scales I^2/J.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The range of St numbers in this study is 0.01-300.\",\"maximum\":300.0,\"minimum\":0.01,\"name\":\"St\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":274,\"line_start\":274,\"support\":\"two simulation runs with the same K-value (K=0.065)\"}],\"condition_id\":\"K_phi_common\",\"statement\":\"The common K_phi value for the two simulation runs is K_phi = J + 0.1 I^2 = 0.065.\"},{\"anchors\":[{\"line_end\":193,\"line_start\":193,\"support\":\"mu_f=0.15 (which is our reference mu_f)\"}],\"condition_id\":\"mu_f_reference\",\"statement\":\"The reference interparticle friction coefficient is mu_f = 0.15.\"},{\"anchors\":[{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80\"}],\"condition_id\":\"mu_f_alternate\",\"statement\":\"An alternate interparticle friction coefficient is mu_f = 0.80.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":123,\"line_start\":123,\"support\":\"K = J + alpha I^2 with alpha = 1/St_{v->i}\"},{\"line_end\":177,\"line_start\":177,\"support\":\"Fits mu = mu_c(1 + a_mu K_mu^{1/2}) with a_mu=14.3\"},{\"line_end\":252,\"line_start\":246,\"support\":\"Definitions of K_phi and K_mu with alpha_phi=0.1 and alpha_mu=0.029\"},{\"line_end\":360,\"line_start\":358,\"support\":\"Table of fit coefficients for mu_f=0.15, 0.5, 0.8\"}],\"equations\":[\"K_phi = J + alpha_phi I^2, alpha_phi = 0.1\",\"K_mu = J + alpha_mu I^2\",\"r = mu/mu_c = 1 + a_mu * sqrt(K_mu)\",\"phi = phi_c (1 - a_phi sqrt(K_phi))\"],\"mechanism_id\":\"viscous_inertial_rheology\",\"parameters\":[{\"anchors\":[{\"line_end\":246,\"line_start\":246,\"support\":\"K=K_phi=J+alpha_phi I^2, where alpha_phi=1/St_{v->i}=0.1\"}],\"name\":\"alpha_phi\",\"role\":\"coefficient in K_phi definition\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.1},{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"inset provides mu/mu_c vs K_mu with a single fit mu = mu_c (1 + a_mu K_mu^{1/2}) with a_mu=14.3\"},{\"line_end\":358,\"line_start\":358,\"support\":\"Table: mu_f=0.15, a_mu=14.3\"}],\"name\":\"a_mu_muf015\",\"role\":\"fit coefficient in r = 1 + a_mu sqrt(K_mu) for mu_f=0.15\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":14.3},{\"anchors\":[{\"line_end\":252,\"line_start\":252,\"support\":\"K_mu = J + alpha_mu I^2 with alpha_mu = 0.029\"},{\"line_end\":358,\"line_start\":358,\"support\":\"Table: mu_f=0.15, alpha_mu=0.029\"}],\"name\":\"alpha_mu_muf015\",\"role\":\"coefficient in K_mu for mu_f=0.15\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.029},{\"anchors\":[{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80, a_mu=26.5\"}],\"name\":\"a_mu_muf080\",\"role\":\"fit coefficient in r = 1 + a_mu sqrt(K_mu) for mu_f=0.80\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":26.5},{\"anchors\":[{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80, alpha_mu=0.00875\"}],\"name\":\"alpha_mu_muf080\",\"role\":\"coefficient in K_mu for mu_f=0.80\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.00875},{\"anchors\":[{\"line_end\":248,\"line_start\":248,\"support\":\"mu_c = 0.30 ± 0.02 at jamming\"},{\"line_end\":360,\"line_start\":358,\"support\":\"Table: mu_c values for different mu_f\"}],\"name\":\"mu_c\",\"role\":\"critical macroscopic friction at jamming\",\"uncertainty\":\"±0.02 for mu_f=0.15, ±0.05 for mu_f=0.5, ±0.08 for mu_f=0.8; convention source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.3},{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"mu = mu_c (1 + a_mu K_mu^{1/2})\"}],\"name\":\"one\",\"role\":\"additive constant in r = 1 + a_mu sqrt(K_mu)\",\"uncertainty\":\"none\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"mu = mu_c (1 + a_mu K_mu^{1/2})\"}],\"name\":\"half\",\"role\":\"exponent in sqrt(K_mu)\",\"uncertainty\":\"none\",\"unit\":\"dimensionless\",\"value\":0.5},{\"anchors\":[{\"line_end\":274,\"line_start\":274,\"support\":\"two simulation runs with the same K-value (K=0.065)\"}],\"name\":\"K_phi_common\",\"role\":\"common K_phi value for the two simulation runs\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.065}],\"statement\":\"The macroscopic friction coefficient mu is governed by a single dimensionless number K_mu = J + alpha_mu I^2, with alpha_mu = 1/St_{v->i}^mu, and the normalized friction r = mu/mu_c follows r = 1 + a_mu * sqrt(K_mu). The packing fraction phi follows phi = phi_c (1 - a_phi sqrt(K_phi)) with K_phi = J + alpha_phi I^2 and alpha_phi = 0.1.\",\"variable_names\":[\"St\",\"J\",\"I\",\"K_phi\",\"K_mu\",\"mu\",\"mu_c\",\"r\",\"a_mu\",\"alpha_mu\",\"phi\",\"phi_c\",\"a_phi\",\"alpha_phi\"]}],\"paper_scope\":\"Particle-resolved simulations of dense frictional suspensions undergoing the viscous-inertial transition using pressure-imposed rheology. The study varies fluid viscosity, shear rate, and granular pressure, and examines the effect of interparticle friction on the transition. The key findings are the distinct scalings of packing fraction phi and macroscopic friction mu, governed by different alpha values, and the role of tangential contact and lubrication forces.\",\"readouts\":[{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"mu/mu_c vs K_mu with fit mu = mu_c (1 + a_mu K_mu^{1/2})\"},{\"line_end\":248,\"line_start\":248,\"support\":\"mu_c = 0.30 ± 0.02 at jamming\"}],\"definition\":\"Normalized macroscopic friction coefficient, r = mu/mu_c.\",\"name\":\"r\",\"resolution\":null,\"statistic\":\"Central value implied by the reported fits at constructed K_phi=0.065; not a table of raw means at every St and mu_f.\",\"uncertainty\":\"mu_c has uncertainty ±0.02 for mu_f=0.15, ±0.05 for mu_f=0.5, ±0.08 for mu_f=0.8, with convention source_unspecified; no uncertainty reported for a_mu or alpha_mu; no pointwise uncertainty for the derived r(St) curve.\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2505.04242v1\",\"citation\":\"Sudarshan Konidena, Tangential Forces Govern the Viscous-Inertial Transition in Dense Frictional Suspensions, Physical Review Letters (2026), DOI:10.1103/66pp-4rdj\",\"journal_doi\":\"10.1103/66pp-4rdj\"},\"source_ambiguities\":[]}}\nThe previous ScienceCard is an editable rejected draft, not a source of new scientific facts. Use it as the baseline so supported content is not lost, but recheck every retained field against the supplied source. Address every listed issue by inspecting its line ranges, remove or revise unsupported content, and do not assume the review or prior draft is correct. The supplied source remains the sole authority. Return one complete revised ScienceCard for a new independent review.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: 01_main.tex =====\nL000002\t\nL000003\t\nL000004\t\nL000005\t\nL000006\t\nL000007\t\nL000008\t\nL000009\t\nL000010\t\nL000011\t\nL000012\t\nL000013\t\nL000014\t\nL000015\t\nL000016\t\nL000017\t\nL000018\t\nL000019\t\nL000020\t\nL000021\t\nL000022\t\\documentclass[\nL000023\t reprint,\nL000024\t\nL000025\t\nL000026\t\nL000027\t\nL000028\t\nL000029\t\nL000030\t\nL000031\t\nL000032\t\nL000033\t\nL000034\t amsmath,amssymb,\nL000035\t aps,\nL000036\t\nL000037\t\nL000038\t\nL000039\t\nL000040\t\nL000041\t\nL000042\t]{revtex4-2}\nL000043\t\nL000044\t\\usepackage{graphicx}\nL000045\t\\usepackage{dcolumn}\nL000046\t\\usepackage{bm}\nL000047\t\\usepackage[usenames,dvipsnames]{xcolor}\nL000048\t\\usepackage[normalem]{ulem}\nL000049\t\nL000050\t\nL000051\t\nL000052\t\nL000053\t\nL000054\t\nL000055\t\nL000056\t\nL000057\t\nL000058\t\nL000059\t\nL000060\t\\newcommand{\\mbs}[1]{\\boldsymbol{#1}}\nL000061\t\\newcommand{\\BV}{\\textcolor{red}}\nL000062\t\\newcommand{\\Sud}{\\textcolor{blue}}\nL000063\t\nL000064\t\nL000065\t\\begin{document}\nL000066\t\nL000067\t\\preprint{APS/123-QED}\nL000068\t\nL000069\t\\title{Tangential Forces Govern the Viscous-Inertial Transition in Dense Frictional Suspensions\nL000070\t\nL000071\t}\nL000072\t\nL000073\t\\author{Sudarshan Konidena$^1$}\nL000074\t\\author{Franco Tapia$^1$}\nL000075\t\\author{Alireza Khodabakhshi$^1$}\nL000076\t\\author{Élisabeth Guazzelli$^2$}\nL000077\t\\author{\\\\Pascale Aussillous$^3$}\nL000078\t \\author{Bernhard Vowinckel$^1$}\nL000079\t \\email{bernhard.vowinckel@tu-dresden.de}\nL000080\t\\affiliation{\nL000081\t $^1$Institute of Urban and Industrial Water Management, Technische Universität Dresden, 01062 Dresden, Germany\nL000082\t}\nL000083\t\\affiliation{\nL000084\t $^2$Université Paris Cit\\'e, CNRS, Matière et Systèmes Complexes (MSC) UMR 7057, Paris, France\nL000085\t}\nL000086\t\\affiliation{\nL000087\t $^3$Aix Marseille Université, CNRS, IUSTI, Marseille, France\nL000088\t}\nL000089\t\nL000090\t\nL000091\t\\date{\\today}\nL000092\t\nL000093\t\nL000094\t\\begin{abstract}\nL000095\tWe present particle-resolved simulations of dense frictional suspensions undergoing the viscous-inertial transition using pressure-imposed rheology.\nL000096\t\nL000097\tBy varying the fluid viscosity, shear rate, and granular pressure, we find that the transition is independent of the packing fraction and occurs at a Stokes number of 10.\nL000098\t\nL000099\tOur results reveal that the shear stress exhibits a slower transition than the particle pressure, attributed to the combined effect of tangential contact and lubrication forces, as the frictional particles concurrently shift from rolling to sliding contacts. This shift is controlled by the Stokes number but also by the distance from jamming.\nL000100\t\nL000101\tAdditionally, we examine the role of increasing inter-particle friction on the viscous-inertial transition.\nL000102\t\nL000103\t\\end{abstract}\nL000104\t\nL000105\t\nL000106\t\nL000107\t\nL000108\t\\maketitle\nL000109\t\nL000110\t\nL000111\t\\textit{Introduction:} Flows of dense suspensions are ubiquitous in nature and industrial applications \\cite{vowinckel2021incorporating}. Their behaviors are very complex and far from being fully understood across flow regimes \\cite{guazzelli2018rheology}.\nL000112\t\nL000113\tIn the viscous regime, the rheology is controlled by the dimensionless number $J$, defined as $J=\\eta_f \\dot \\gamma / P$, the ratio of the viscous stress scale to the confining pressure, with $\\eta_f$, $\\dot \\gamma$ and $P$ being fluid viscosity, shear rate, and granular (confining) pressure \\cite{boyer2011unifying}.\nL000114\t\nL000115\tInertial flows are characterized by an analogous dimensionless quantity $I$, defined as $I^2 = \\rho_p d^2 \\dot \\gamma ^2/ P$, the ratio of the inertial stress scale to the confining pressure, with $\\rho_p$ and $d$ being particle density and diameter, respectively \\cite{forterre2008flows}.\nL000116\t\nL000117\tA few experimental \\cite{bagnold1954,fall2010transition, madraki2020shear, tapia2022viscous}, theoretical and numerical \\cite{trulsson2012transition, ness2015flow, DeGiuli2015transition, DeGiuli2016phaseDiagram, trulsson2017friction, amarsid2017viscoinertial, vo2020additive} studies have focused on understanding the rheology in the transition between the viscous and inertial regimes.\nL000118\t\nL000119\tAlthough relevant to many environmental and engineering flows \\cite{jerolmack2019viewing,ness2022physics}, there remains little consensus on a unified framework for the viscous-inertial transition, posing challenges for conventional two-phase flow modeling approaches \\cite{ouriemi2009sediment,chauchat2017sedfoam}.\nL000120\t\nL000121\t\nL000122\t\nL000123\t\\citet{trulsson2012transition} suggested that the packing fraction $\\phi$ and macroscopic friction coefficient $\\mu$ are governed by a single dimensionless number $K = J + \\alpha I^2$  in the viscous-inertial regime, with $\\alpha= 1/St_{v \\rightarrow i}$ where $St_{v \\rightarrow i}$ is the Stokes number at which the viscous to inertial transition occurs.\nL000124\t\nL000125\tThe Stokes number $St$ is defined as the ratio of inertial to viscous stress scales $I^2/J$.\nL000126\t\nL000127\tOther numerical studies \\cite{amarsid2017viscoinertial, ness2015flow} with frictional non-colloidal spheres agree well with the findings of \\citet{trulsson2012transition} and report that the viscous-inertial transition occurs at $St_{v \\rightarrow i} = 1-2 $.\nL000128\t\nL000129\tIn contrast, experiments with frictionless colloidal spheres reported that $St_{v \\rightarrow i} \\rightarrow 0$ when approaching the jamming transition \\cite{fall2010transition, madraki2020shear}, which is consistent with the theory of \\citet{DeGiuli2015transition}.\nL000130\t\nL000131\tConversely, for frictional spheres,  \\citet{tapia2022viscous} found that the transition occurs at $St_{v \\rightarrow i} = 10 $ independent of $\\phi$, consistent with the seminal experiments of \\citet{bagnold1954}.\nL000132\t\nL000133\tAnother significant observation in \\cite{tapia2022viscous} is that $\\phi$ and $\\mu$ are governed by two different values for $\\alpha$ ($\\alpha_{\\phi} = 0.1$ and $\\alpha_{\\mu}=0.0088$) reflecting the slower transition of the shear stress compared to the granular pressure.\nL000134\t\nL000135\tThese differing values of $\\alpha$ are maintained for a suspension consisting of soft spheres having low interparticle friction \\cite{tapia2024soft}.\nL000136\t\nL000137\tNumerical studies \\cite{trulsson2012transition, ness2015flow, amarsid2017viscoinertial, vo2020additive} have not yet captured this behavior.\nL000138\t\nL000139\t\nL000140\tIn this work, we perform particle resolved simulations using pressure-imposed rheology and show that the combined effect of tangential contact and lubrication forces are responsible for the two distinct scalings of $\\phi$ and $\\mu$ observed by \\citet{tapia2022viscous}.\nL000141\t\nL000142\tWe also demonstrate that the slower transition in $\\mu$ is governed by the rolling-to-sliding transition in the contact network, which depends on viscosity and distance from jamming.\nL000143\t\nL000144\tPrevious numerical works \\cite{trulsson2012transition, ness2015flow, amarsid2017viscoinertial} underestimate the magnitude of tangential contact force and lubrication, leading to the absence of two different scalings for $\\phi$ and $\\mu$.\nL000145\t\nL000146\t\nL000147\t\\textit{Numerical Method:} The flow behavior of the suspension is analyzed using particle-resolved computational fluid dynamics simulations.\nL000148\t\nL000149\tOur simulations integrate the discrete element method (DEM) to model particle dynamics and the immersed boundary method (IBM) to resolve the fluid flow.\nL000150\t\nL000151\tThe collision model for particle dynamics is adapted from the work of \\citet{biegert2017collision}.\nL000152\t\nL000153\t\nL000154\t\nL000155\tThe model involves lubrication forces $\\mbs{F}_{l}$, normal contact forces $\\mbs{F}_{n}$ and frictional contact forces $\\mbs{F}_{t}$, to provide the total collision force between neighboring particles $p$ and $q$ as $\\textbf{F}_{c,p} =\\textbf{F}_{l,pq} + \\textbf{F}_{n,pq} + \\textbf{F}_{t,pq}$. With the lubrication force represented as,\nL000156\t\nL000157\t\\begin{equation}\\label{eq:lubrication}\nL000158\t\nL000159\t\t\\textbf{F}_{l} = \\frac{6 \\pi \\eta_f R_{eff}^2}{max(\\zeta_n,\\zeta_{n,min})} \\hspace{0.5cm},\nL000160\t\nL000161\t\\end{equation}\nL000162\t\nL000163\twhere, $\\zeta_n$ is the gap size of two interacting particles, $\\zeta_{n,min}$ is the critical value below which the lubrication forces are kept constant, and $R_{eff}$ is the effective radius accounting for polydispersity.\nL000164\t\nL000165\tThe repulsive normal component is represented by a nonlinear spring-dashpot model\nL000166\t\nL000167\t\\begin{equation} \\label{eq:acm_force}\nL000168\t\\textbf{F}_{n,pq} = -k_n |\\zeta_n|^{3/2} \\textbf{n} - d_n \\textbf{g}_{n,cp} \\qquad ,\nL000169\t\\end{equation}\nL000170\t\nL000171\twhere, $d_n$ and $k_n$ represent damping and stiffness coefficients respectively, adjusted to obtain a restitution coefficient $e_c$.\nL000172\t\nL000173\tThe normal vector pointing toward the collision partner is given by \\textbf{n}, and \\textbf{g}$_{n,cp}$ is the normal component of the relative particle velocity at the contact point.\nL000174\t\nL000175\t\\begin{figure}[b]\nL000176\t\\includegraphics[width=0.48\\textwidth]{Figure_1.pdf}\nL000177\t\\caption{\\label{fig:setup_rheology} Rheological data of the pressure-imposed rheometry with the $3$ different fluid viscosities $\\eta_f = 10, 100, 1000$. (a) $\\phi/\\phi_c$ vs $K_{\\phi}$ with fits corresponding to $\\phi = \\phi_c(1 - a_\\phi K_\\phi ^{1/2})$ with $a_\\phi = 0.62$; the inset shows snapshot of the setup used in this work. (b) $\\mu/\\mu_c$ vs $K_{\\phi}$ with fits $\\mu = \\mu_c(1 + a_\\mu K_\\phi ^{1/2})$ with distinct $a_\\mu$ for each viscosity; the inset provides $\\mu/\\mu_c$ vs $K_\\mu$ with a single fit $\\mu = \\mu_c (1 + a_\\mu K_\\mu ^{1/2}) $ with $a_{\\mu}=14.3$. }\nL000178\t\\end{figure}\nL000179\t\nL000180\tThe tangential forces are given by\nL000181\t\nL000182\t\\begin{equation} \\label{eq:lin_tan}\nL000183\t\\textbf{F}_{t,pq} = \\min \\left(-k_t  \\boldsymbol{\\zeta}_t - d_t \\textbf{g}_{t,cp} , ||\\mu_f \\textbf{F}_n|| \\textbf{t} \\right)  \\qquad ,\nL000184\t\\end{equation}\nL000185\t\nL000186\twhich takes the minimum of either the rolling (1st term on the right hand side)  or the sliding (2nd term) components.\nL000187\t\nL000188\tIn Eq.\\,(\\ref{eq:lin_tan}), $\\mu_f$ represents the friction coefficient between the two surfaces and $\\boldsymbol{\\zeta}_t$ is the tangential displacement accumulated during the contact time between two particles \\citep{thornton2013investigation}.\nL000189\t\nL000190\tFurther, \\textbf{g}$_{t,cp}$ is the tangential component of the relative surface velocities and \\textbf{t} points in the direction of the tangential force.\nL000191\t\nL000192\t\nL000193\tThe parameters $e_c=0.97$ and $\\mu_f=0.15$ (which is our reference $\\mu_f$) have been taken from experiments involving glass spheres \\cite{gondret2002bouncing,joseph2004oblique}.\nL000194\t\nL000195\tThe computational domain closely replicates the apparatus of \\citet{tapia2022viscous} for pressure-imposed rheology.\nL000196\t\nL000197\tThe shear cell has dimensions $L_x\\times L_y \\times L_z=10 d\\times 10.6 d \\times 10 d$ and a grid resolution of $N_x\\times N_y \\times N_z= 200\\times 212 \\times 200$.\nL000198\t\nL000199\tIt consists of 871 neutrally buoyant monodisperse particles (with a diameter variance of $5\\%$ to prevent crystallization) in a viscous fluid.\nL000200\t\nL000201\tThese particles are sheared by top and bottom plates, i.e., the red particles in the inset of Fig.\\,\\ref{fig:setup_rheology}(a), with a shear rate $\\dot \\gamma$ thereby imposing a linear shear profile.\nL000202\t\nL000203\tEach plate comprises 49 particles, for a total of 98 plate particles.\nL000204\t\nL000205\tThe plate particles are larger than those in the suspension ($1.3 d$) and form porous walls.\nL000206\t\nL000207\tEach particle of the top plate is assigned a weight to exert granular pressure $P$ on the suspension.\nL000208\t\nL000209\tA no-slip condition is applied on the shearing walls and on the particle surface. Periodic boundary conditions are applied in the flow and vorticity directions.\nL000210\t\nL000211\tA reservoir space between the top plate particles and the top wall enables movement in the velocity-gradient direction in response to the suspension dilating or compacting under shear.\nL000212\t\nL000213\tThe volume fraction $\\phi$ is determined by the distance measured between the two horizontal planes cutting the top and bottom plate spheres at their center.\nL000214\t\nL000215\tThe volume occupied by the plate particles is excluded, ensuring that only the volume available for particle flow is considered.\nL000216\t\nL000217\t\nL000218\t\nL000219\t\nL000220\t\\begin{figure}\nL000221\t\\includegraphics[width=0.480\\textwidth]{Figure_2.pdf}\nL000222\t\\caption{\\label{fig:stress_decomposition} Variation of hydrodynamic, normal contact, and tangential contact components, $\\mu_h$, $\\mu_n$ and $\\mu_t$, respectively, with $K_{\\phi}$ and corresponding fits $\\mu/\\mu_c = b + a_\\mu K_\\phi ^{n} $. (a) $\\mu_h/\\mu_c$ versus $K_\\phi$ with $b=0$ and $n=1.5$, inset shows $\\mu_n/\\mu_c$ with $b=1$ and $n=0.5$, (b) $\\mu_t/\\mu_c$ versus $K_\\phi$ with $b=0.04$ and $n=0.75$.}\nL000223\t\\end{figure}\nL000224\t\nL000225\t\nL000226\t\nL000227\t\\begin{figure*}\nL000228\t\\includegraphics[width=0.705\\textwidth]{Figure_3.png}\nL000229\t\\caption{\\label{fig:force_networks}Snapshots of the force networks in the simulation runs for $\\eta_f=1000$ (a,b,c) and $\\eta_f=10$ (d,e,f). The network is formed by the tangential component of the contacts (a,d) that is decomposed into  rolling (b,e) and sliding (c,f).}\nL000230\t\\end{figure*}\nL000231\t\nL000232\t\nL000233\t\nL000234\t\\textit{Results:}\nL000235\t\nL000236\tWe performed simulations with three different viscosities $\\eta_f = 10, 100, 1000$ at varying $\\dot \\gamma$, where $\\eta_f$ is normalized by the viscosity of water.\nL000237\t\nL000238\tThe range of $St$ numbers in this study is $0.01-300$.\nL000239\t\nL000240\tWe evaluated the shear stress $\\tau$ due to contact, lubrication and long-range hydrodynamic forces (volume averaged) on the top and bottom plate particles.\nL000241\t\nL000242\tThe rheological data and plots are given in the Supplemental Material \\footnote{See Supplemental Material at http://.}.\nL000243\t\nL000244\t\nL000245\t\nL000246\tTo investigate the transition, we adopt the definition of \\citet{tapia2022viscous} and use $K=K_{\\phi}=J+\\alpha_{\\phi} I^2$, where $\\alpha_{\\phi}=1/St_{v\\rightarrow i}=0.1$.\nL000247\t\nL000248\tThe rheological data for $\\phi$ and $\\mu$ in Fig.\\,\\ref{fig:setup_rheology} are normalized by their critical values $\\phi_c=0.60 \\pm 0.02$ and $\\mu_c = 0.30 \\pm 0.02$ at jamming, obtained by fitting $1-\\phi/\\phi_c$ and $\\mu/\\mu_c -1$ with $K^{1/2}$.\nL000249\t\nL000250\tThe data for $\\phi$ collapse, indicating a uniform transition of $P$ from the viscous to the inertial regime at $St_{v\\rightarrow i}=10$, while those for $\\mu$ do not.\nL000251\t\nL000252\tThey collapse when plotted against a different $K$ defined as $K_{\\mu}= J + \\alpha_{\\mu} I^2$ with $\\alpha_{\\mu} = 0.029$ which yields a different transitional Stokes number of $St_{v\\rightarrow i}^{\\mu}=35$, as shown in the inset of Fig.\\,\\ref{fig:setup_rheology}(b).\nL000253\t\nL000254\tThese numerical results recover the transition at a Stokes number $St_{v\\rightarrow i}=10$ independent of $\\phi$ found experimentally by \\citet{tapia2022viscous} for spheres suspended in water-UCON oil mixture with an interparticle friction $\\mu_f= 0.14$ \\cite{Tapia2023erratum} similar to the present reference $\\mu_f= 0.15$.\nL000255\t\nL000256\tIn addition, they show a different scaling for $\\mu$ with a larger transitional $St_{v\\rightarrow i}^{\\mu}$. This qualitatively agrees with the experiments, although the numerical $St_{v\\rightarrow i}^{\\mu}(=35)$ is smaller than the experimental $St_{v\\rightarrow i}^{\\mu}(=114)$, which may be attributed to the confinement, lubrication and friction models used in the present simulations.\nL000257\t\nL000258\t\nL000259\t\nL000260\tWe turn to understand the origin of the distinct $St_{v\\rightarrow i}$ values for the transition of $\\phi$ and $\\mu$.\nL000261\t\nL000262\tThe macroscopic friction coefficient $\\mu$, shown in Fig.\\,\\ref{fig:setup_rheology}(b), can be decomposed into its three components presented separately in Fig.\\,\\ref{fig:stress_decomposition}: normal contact $\\mu_n$, tangential contact $\\mu_t$, and hydrodynamics $\\mu_h$ (including both lubrication and long-range hydrodynamic interactions).\nL000263\t\nL000264\tClearly, the normal contribution $\\mu_n (K_{\\phi})/\\mu_c$ (in the inset) is devoid of the diverging behavior, implying that normal contact forces are not responsible for the differing scaling of $\\mu$.\nL000265\t\nL000266\tConversely, the hydrodynamic contribution $\\mu_h (K_{\\phi})/\\mu_c$, which is dominated by lubrication, is negligible for low $K_{\\phi}$ values, but exhibits a divergent trend at large $K_{\\phi}$ values where it becomes comparable to the friction forces.\nL000267\t\nL000268\tThe tangential component $\\mu_t (K_{\\phi})/\\mu_c$ has its maximum divergence with $K_{\\phi}$ compared to $\\mu_n (K_{\\phi})$ and $\\mu_h (K_{\\phi})$.\nL000269\t\nL000270\tThus, we argue that $\\mu_t$ triggers the influence of lubrication forces and is responsible for the differing scaling of $\\mu$.\nL000271\t\nL000272\t\nL000273\t\nL000274\tTo this end, we probe the role of tangential contact forces by analyzing two simulation runs with the same $K$-value ($K=0.065$) which result in different $\\mu$ values, as shown in Fig.\\,\\ref{fig:setup_rheology}(b).\nL000275\t\nL000276\tThe Stokes numbers corresponding to the viscosities $\\eta_f=1000$ and $10$ are $St =0.65$ and $206.5$, respectively.\nL000277\t\nL000278\tThe snapshots given in Figs.\\,\\ref{fig:force_networks}(a) and \\ref{fig:force_networks}(d) show the force networks in the suspensions for the tangential components in the steady state of the simulations normalized by the mean total contact force recorded for the respective snapshot.\nL000279\t\nL000280\tFigs.\\,\\ref{fig:force_networks}(a) and \\ref{fig:force_networks}(d) illustrate the characteristic network for the viscous and inertial regimes, respectively.\nL000281\t\nL000282\tClearly, the force network of the tangential forces becomes weaker with higher $St$.\nL000283\t\nL000284\tUsing Eq.\\,\\eqref{eq:lin_tan}, we further decompose this force network into rolling and sliding components. This is illustrated in Figs.\\,\\ref{fig:force_networks}(b) and \\ref{fig:force_networks}(c) for $\\eta_f=1000$.\nL000285\t\nL000286\tFor this simulation run, most of the network structure is formed by rolling contacts, where the individual forces are strong and well connected throughout the entire suspension.\nL000287\t\nL000288\tAt the same time, the sliding contact forces are smaller in magnitude and sparse.\nL000289\t\nL000290\tThe spatial pattern of the network distribution completely changes as the viscosity is decreased by two orders of magnitude, see Figs.\\,\\ref{fig:force_networks}(e) and \\ref{fig:force_networks}(f).\nL000291\t\nL000292\tHere, the rolling contacts become less important, because they are sparse, whereas the fabric of the suspension is now supported by the network of sliding contacts.\nL000293\t\nL000294\tNevertheless, the magnitude of rolling contact is higher than that of sliding, even for higher $St$.\nL000295\t\nL000296\tIn summary, the suspension transits from having rolling contacts in the viscosity dominant regime to sliding contacts in the inertial regime for the same $K$-value.\nL000297\t\nL000298\t\nL000299\t\\begin{figure}\nL000300\t\\includegraphics[width=0.465\\textwidth]{Figure_4.pdf}\nL000301\t\\caption{\\label{fig:rolling_sliding} Variation of the fraction of sliding to rolling contacts $\\chi$, (a) with $St$ satisfying the function $\\chi(St)= (c\\cdot St)/(1+ c\\cdot St)$ and (b) as a function of $St$ and $\\Delta \\phi /\\phi_c$, the distance from jamming, $\\chi(St, \\, \\Delta \\phi /\\phi_c)= (St \\, \\Delta \\phi /\\phi_c)^{1/2}/[1+ (St \\, \\Delta \\phi /\\phi_c)^{1/2}]$.\nL000302\t}\nL000303\t\\end{figure}\nL000304\t\nL000305\t\nL000306\tWe now evaluate the influence of $St$ on the ratio of the total number of sliding to rolling contacts $\\chi$ \\cite{trulsson2017friction, DeGiuli2015transition, DeGiuli2016phaseDiagram} in Fig.\\,\\ref{fig:rolling_sliding}(a).\nL000307\t\nL000308\tWe obtain different shifted curves with decreasing viscosities corresponding to the diminishing slope with $K_{\\phi}^{1/2}$ in Fig.\\,\\ref{fig:setup_rheology}(b).\nL000309\t\nL000310\tStrikingly, the rolling-to-sliding transition occurs at lower $St$ for higher viscosities. For the largest viscosity, the distance from jamming $\\Delta \\phi=(\\phi_c-\\phi)$ is small and the contact network is dominated by rolling contacts. Conversely, for the lowest viscosity, $\\Delta \\phi$ is larger and sliding contacts prevail.\nL000311\t\nL000312\tBased on this observation, the data can be collapsed in Fig.\\,\\ref{fig:rolling_sliding}(b) into a single curve by rescaling $St$ with $St \\, \\Delta \\phi /\\phi_c$ and using a power law of $1/2$, which is also equivalent to using $(St K_{\\phi}^{1/2})^{1/2}$.\nL000313\t\nL000314\tThis illustrates that the transitional $St$ is governed by the rolling-to-sliding transition and the distance from jamming.\nL000315\t\nL000316\t\nL000317\t\\begin{figure}\nL000318\t\\includegraphics[width=0.43\\textwidth]{Figure_5.pdf}\nL000319\t\\caption{\\label{fig:topplate_response} Granular pressure $P$ (a) and the corresponding volume fraction $\\phi$ variation (b) of the simulations for several strain units, $\\dot{\\gamma} \\delta t$, in the well-developed state at $St=0.0125$, $20$, and $120$ represented by brown, black and purple lines respectively. $\\bar\\phi$ and $\\bar P$ are the mean values for the respective $St$.}\nL000320\t\\end{figure}\nL000321\t\nL000322\t\nL000323\tThe macroscopic response of the pressure-imposed shear cell to changes in the supension microstructure over a few strain units (in the well-developed state) can be seen in Fig.\\,\\ref{fig:topplate_response}. The analysis is presented for three Stokes numbers ($St=0.0125$, $20$, and $120$), representing one at each extreme of the viscous and inertial regimes and an intermediate value. Fig.\\,\\ref{fig:topplate_response}(a) shows P acting on the top plate, whereas the response of $\\phi$ is shown in Fig.\\,\\ref{fig:topplate_response}(b).\nL000324\t\nL000325\tAt $St=0.0125$, strong rolling contacts create a dense network that couples plate motion to pressure fluctuations. At higher $St$, this coupling weakens, and the system becomes more fluidized (at $St = 120$), with sliding contacts leading to less fluctuations of the top plate.\nL000326\t\nL000327\tA movie showing the two simulation runs of  $St=0.0125,120$ is given in \\footnote{See movie at http://.}.\nL000328\t\nL000329\tThese results underscore the role of microstructural transitions from rolling-to-sliding in controlling the macroscopic behavior.\nL000330\t\nL000331\t\nL000332\t\nL000333\t\nL000334\t\nL000335\t\nL000336\t\nL000337\t\nL000338\t\nL000339\t\nL000340\t\\begin{figure}\nL000341\t    \\includegraphics[width=0.48\\textwidth]{Figure_6.pdf}\nL000342\t    \\caption{\\label{fig:changing_fric}\nL000343\t    Rheological data for change in microscopic friction coefficient.\nL000344\t    (a) $\\phi/\\phi_c$ vs $K_{\\phi}$ with the fit\nL000345\t    $\\phi = \\phi_c(1 - a_\\phi K_\\phi ^{1/2})$ and\nL000346\t    (b) $\\mu/\\mu_c$ versus $K_{\\phi}$ and in the inset versus $K_{\\mu}$\nL000347\t    for the typical case of $\\mu_f=0.5$ with the fit\nL000348\t    $\\mu = \\mu_c(1 + a_\\mu K_\\mu ^{1/2})$. The values obtained by the different fits are given in Table. \\ref{tab:K_parameters}}\nL000349\t\\end{figure}\nL000350\t\nL000351\t\nL000352\t\\begin{table}\nL000353\t\\caption{\\label{tab:K_parameters} Coefficients of the fits in $K_{\\phi}$ and $K_{\\mu}$.}\nL000354\t\\begin{ruledtabular}\nL000355\t\\begin{tabular}{ccccccc}\nL000356\t            \\(\\mu_f\\) & \\(\\phi_c\\) & \\(a_\\phi\\) & \\(\\alpha_\\phi\\) & \\(\\mu_c\\) & \\(a_\\mu\\) & \\(\\alpha_\\mu\\) \\\\\nL000357\t            \\hline\nL000358\t            0.15 & 0.60 $\\pm$ 0.02 & 0.62 & 0.1 & 0.3 $\\pm$ 0.02 & 14.3 & 0.029 \\\\\nL000359\t            0.50 & 0.58 $\\pm$ 0.01 & 0.75 & 0.1 & 0.3 $\\pm$ 0.05 & 20.7 & 0.0156 \\\\\nL000360\t            0.80 & 0.55 $\\pm$ 0.05 & 0.82 & 0.1 & 0.3 $\\pm$ 0.08 & 26.5 & 0.00875 \\\\\nL000361\t        \\end{tabular}\nL000362\t\\end{ruledtabular}\nL000363\t\\end{table}\nL000364\t\nL000365\tFinally, in Fig.\\,\\ref{fig:changing_fric} we investigate the effect of increasing the interparticle friction coefficient $\\mu_f$ above the reference case ($\\mu_f=0.15$) on the viscous-inertial transition as described in Fig.\\,\\ref{fig:setup_rheology}.\nL000366\t\nL000367\tA result of interest is that $\\mu_c$ is not significantly affected by varying $\\mu_f$ while $\\phi_c$ slightly decreases\nL000368\twith increasing $\\mu_f$, consistent with experiments \\cite{Tapia2019roughness}.\nL000369\t\nL000370\tThe data for $\\phi$ collapse for all studied $\\mu_f= 0.15,0.5, 0.8$ using the same $\\alpha_{\\phi} = 0.1$ in Fig.\\,\\ref{fig:changing_fric}(a). This implies that the transitional Stokes number remains $St_{v \\rightarrow i} = 10$, still in agreement with the experiments of \\citet{tapia2022viscous}.\nL000371\t\nL000372\tConversely, $\\mu$ shows different curves when plotted against $K_\\phi$ in Fig.\\,\\ref{fig:changing_fric}(b) with a shift of increasing magnitude for the large-viscosity curves with increasing $\\mu_f$. The curves for $\\mu$ collapse when plotted against $K_{\\mu}= J + \\alpha_{\\mu} I^2$ as seen as an example in the inset for $\\mu_f=0.5$ but with values for $\\alpha_{\\mu}$ which are decreasing with increasing $\\mu_f$.\nL000373\tThus, $\\mu$ which encapsulates the response of the anisotropy of the stresses shows transition that is affected by the interparticle friction as $St^{\\mu}_{v \\rightarrow i}$ increases with increasing $\\mu_f$ ($St^{\\mu}_{v \\rightarrow i}=35, 64, 114$ for $\\mu_f=0.15, 0.5, 0.8$ respectively).\nL000374\t\nL000375\tInterestingly, quantitative agreement with the experimental value of $St^{\\mu}_{v \\rightarrow i}$ \\cite{tapia2022viscous} can only be achieved by using a much higher $\\mu_f$.\nL000376\t\nL000377\t\nL000378\t\\textit{Conclusion:} We have investigated the rheological response of dense suspensions close to jamming at the viscous-inertial transition.\nL000379\t\nL000380\tThe primary outcome of our particle resolved simulations is that the transition of the granular pressure $P$ which is reflected in $\\phi$ does indeed occur at $St_{v \\rightarrow i}=10$, in quantitative agreement with the experiments of \\citet{tapia2022viscous}.\nL000381\tThe second result is the qualitative agreement with the different transition in $\\mu$ which indicates a slower transition of $\\tau$ compared to that of $P$.\nL000382\tOur numerical simulations rationalize the idea presented in \\citet{tapia2022viscous} that the change in the nature of the particle interactions is responsible for the transitional behavior of $\\mu$ by clearly showing that the viscous-inertial transition is related to the suspension transiting from rolling to sliding.\nL000383\t\nL000384\tThis slower transition is due to the combined effect of tangential contact and lubrication forces.\nL000385\t\nL000386\tWe show that the rolling-to-sliding transition is governed not only by the Stokes number, but also by the distance from jamming.\nL000387\t\nL000388\t\nL000389\tPrevious numerical studies \\cite{amarsid2017viscoinertial, ness2015flow, trulsson2012transition} have not explored the influence of the distance from jamming and underestimated the combined contribution of the tangential and lubrication force components.\nL000390\t\nL000391\tFinally, increasing the interparticle friction does not seem to affect the transition in $\\phi$ but it impacts the transition in $\\mu$.  Further investigation is needed to determine the extent of this effect, as well as to investigate decreasing the friction toward the frictionless limit.\nL000392\t\nL000393\t\nL000394\t\\begin{acknowledgments}\nL000395\tThe authors gratefully acknowledge support through the French National Research Agency - German Research Foundation (ANR-DFG) grant VO2413/3-1 and the Humboldt foundation. The authors also acknowledge the GCS Supercomputer SUPERMUC-NG at Leibniz Supercomputing Centre and ZIH at TU Dresden for providing computing facilities.\nL000396\t\nL000397\t\\end{acknowledgments}\nL000398\t\nL000399\t\nL000400\t\nL000401\t\nL000402\t\nL000403\t\nL000404\t\nL000405\t\nL000406\t\nL000407\t\nL000408\t\nL000409\t\\bibliography{99_bibliography}\nL000410\t\nL000411\t\\end{document}\nL000412\t===== END FILE: 01_main.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

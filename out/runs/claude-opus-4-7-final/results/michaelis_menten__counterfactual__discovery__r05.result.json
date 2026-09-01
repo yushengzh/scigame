@@ -1,0 +1,175 @@
+{
+  "active_pass": true,
+  "active_pass_category": "pass",
+  "attempts_used": 4,
+  "case_family": "michaelis_menten",
+  "case_id": "enzyme.rate.world_b",
+  "elapsed_s": 101.079,
+  "ended_at": "2026-08-27T02:33:03Z",
+  "episode_id": "michaelis_menten__counterfactual__discovery__r05",
+  "error_message": null,
+  "error_type": null,
+  "evaluation_message": "The submitted predictor passed the held-out interventions.",
+  "evaluation_success": true,
+  "failure_analysis": {
+    "coverage": {
+      "controlled_contrasts": 0,
+      "forecast_update_turns": 0,
+      "hypothesis_rewrite_pairs_excluded": 0,
+      "natural_language_judge_used": false,
+      "observed_prediction_points": 0
+    },
+    "first_observed_misstep": null,
+    "incidents": [
+      {
+        "action_index": 1,
+        "code": "model_invariant",
+        "event_refs": [
+          {
+            "event_sequence": 3,
+            "event_type": "action.parse_failed",
+            "json_path": "$.payload.wire_error"
+          },
+          {
+            "event_sequence": 7,
+            "event_type": "action.decoded",
+            "json_path": "$.payload.action"
+          }
+        ],
+        "message": "forecast MM must contain exactly every requested readout",
+        "stage": "action_generation",
+        "status": "recovered"
+      },
+      {
+        "action_index": 4,
+        "code": "invalid_json",
+        "event_refs": [
+          {
+            "event_sequence": 21,
+            "event_type": "action.parse_failed",
+            "json_path": "$.payload.wire_error"
+          },
+          {
+            "event_sequence": 25,
+            "event_type": "action.decoded",
+            "json_path": "$.payload.action"
+          }
+        ],
+        "message": "Expecting value: line 1 column 1 (char 0)",
+        "stage": "action_generation",
+        "status": "recovered"
+      }
+    ],
+    "modes": [],
+    "schema": "role_benchmark.failure_analysis",
+    "status": "passed_no_failure",
+    "terminal_failure": null
+  },
+  "final_submission": {
+    "confidence": 0.92,
+    "explanation": "Data: (S=10,E=1)->22.22; (S=0.5,E=1)->25.6; (S=0.05,E=1)->3.81; (S=0.5,E=2)->51.2. Fits rate = 80*E*S/(1+S+S^2/4): check S=10: 80*10/(1+10+25)=800/36=22.22 ✓; S=0.5: 80*0.5/(1+0.5+0.0625)=40/1.5625=25.6 ✓; S=0.05: 80*0.05/(1+0.05+0.000625)=4/1.050625=3.807 ✓; S=0.5,E=2: 51.2 ✓. Linear in E confirmed.",
+    "hypothesis_id": "SI_LINEAR_E",
+    "model": "expression",
+    "parameters": {
+      "outputs": {
+        "initial_rate_um_per_min": {
+          "args": [
+            {
+              "args": [
+                80,
+                {
+                  "var": "enzyme_concentration_relative"
+                },
+                {
+                  "var": "substrate_concentration_mm"
+                }
+              ],
+              "op": "multiply"
+            },
+            {
+              "args": [
+                1,
+                {
+                  "var": "substrate_concentration_mm"
+                },
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "var": "substrate_concentration_mm"
+                        },
+                        2
+                      ],
+                      "op": "power"
+                    },
+                    4
+                  ],
+                  "op": "divide"
+                }
+              ],
+              "op": "add"
+            }
+          ],
+          "op": "divide"
+        }
+      }
+    },
+    "scope_conditions": [
+      "S in [0.05,10] mM",
+      "E_rel in [0.25,2]",
+      "fixed buffer and temperature",
+      "initial rates"
+    ]
+  },
+  "log_path": "episodes/michaelis_menten__counterfactual__discovery__r05.jsonl",
+  "oracle_llm_stats": null,
+  "oracle_model": "case_world_model",
+  "oracle_profile": "oracle_case_world_model",
+  "player_llm_stats": {
+    "decoded_actions": 5,
+    "first_pass_valid_actions": 3,
+    "input_tokens": 34740,
+    "output_tokens": 9101,
+    "player_turns": 5,
+    "primary_calls": 5,
+    "repair_calls": 2
+  },
+  "player_model": "claude-opus-4-7",
+  "player_profile": "player_1",
+  "protocol_completion": true,
+  "provider": "openai_chat",
+  "reason_code": "submitted",
+  "reasoning_effort": null,
+  "repeat": 5,
+  "run_id": "michaelis_menten__counterfactual__discovery__r05",
+  "schedule_index": 345,
+  "schema": "role_benchmark.case_matrix_episode",
+  "scientifically_evaluable": true,
+  "scores": {
+    "confidence_threshold_reached": 1.0,
+    "hidden_test_max_scaled_error": 0.0,
+    "hidden_test_mean_scaled_error": 0.0,
+    "initial_rate_um_per_min_max_scaled_error": 0.0,
+    "predictive_model_pass": 1.0
+  },
+  "started_at": "2026-08-27T02:31:22Z",
+  "status": "evaluated",
+  "termination_kind": "submitted",
+  "termination_message": "Player committed a protocol-valid final submission.",
+  "thinking": null,
+  "track": "discovery",
+  "trajectory_scores": {
+    "belief_update_aligned_pair_count": 0.0,
+    "belief_update_inert_pair_count": 0.0,
+    "belief_update_opposed_pair_count": 0.0,
+    "duplicate_setup_count": 0.0,
+    "evidence_aligned_belief_update_rate": 0.0,
+    "experiment_discriminativeness_mean": 0.47190125064167443,
+    "forecast_pair_count": 40.0,
+    "hypothesis_rewrite_excluded_pair_count": 10.0,
+    "scorable_belief_pair_count": 0.0,
+    "unsupported_confidence_shift_pair_count": 0.0
+  },
+  "world": "counterfactual"
+}

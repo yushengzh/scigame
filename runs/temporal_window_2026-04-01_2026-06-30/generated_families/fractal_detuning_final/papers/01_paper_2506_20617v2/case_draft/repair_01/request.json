@@ -1,0 +1,970 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific benchmark case author. You receive one private, source-grounded science card. You do not receive the paper and must not add facts from memory.\nReturn exactly one JSON object matching the supplied CaseDraftBatch schema, without Markdown or extra text.\nUse only science-card mechanisms, claims, controls, readouts, fixed conditions, numeric values, domains, statistics, and uncertainty statements.\nPrefer one coherent family that groups linked claims sharing a mechanism, rather than one isolated fitted equation. Use one or two readouts only when the card supports them.\nEvery shared Player fact, identification-only fact, and Oracle-only fact must be listed separately in information_boundary and select only existing card claim_ids, mechanism_ids, and fixed_condition_ids. shared_player is field-level: provide exactly one trace named title, background, apparatus, control.NAME, readout.NAME, initial_observation.INDEX, fixed_condition.ID, or note.INDEX for every corresponding public field. Emit line_ranges as exactly [] in every information_boundary trace; never transcribe or invent a locator. After parsing, deterministic code copies the canonical exact ranges from the reviewed ScienceCard: anchors of the selected IDs; for control.NAME, that control's anchors and both selected branches' claim-domain anchors; for readout.NAME, its definition and optional resolution anchors; and for fixed_condition.ID, that condition's anchors. This does not repair IDs, fields, or prose. Therefore each public control/readout trace must select a supporting claim from both branches, and every selected ID must be relevant to its field.\nThe user message supplies an immutable machine_interface_mapping from the ScienceCard's original control, readout, and fixed-condition symbols to lower_snake_case CaseDraft machine IDs. Preserve the ScienceCard and all source IDs cited in information_boundary claim_ids, mechanism_ids, and fixed_condition_ids exactly as supplied; leave input locators untouched and do not copy them into the response. The mapping applies only to the generated CaseDraft interface. Use mapped control/readout IDs everywhere in candidate.controls[].name, candidate.readouts[].name, relationship_targets[].control/readout, candidate.oracle.outputs keys and every oracle {\"var\": ...} leaf, diagnostic_conditions and hidden_conditions keys, and control.NAME/readout.NAME shared_player field suffixes. Use mapped fixed-condition IDs in fixed_condition.ID shared_player field suffixes; the trace's fixed_condition_ids array still cites the exact original ScienceCard ID. Never emit an original ScienceCard symbol in one of those machine-interface positions when it differs from its mapped ID. Do not alter, extend, or reinterpret machine_interface_mapping.\nEmit candidate.common_fixed_conditions, candidate.oracle.paper_fixed_conditions, and candidate.oracle.counterfactual_fixed_conditions as exactly []. Deterministic code derives their unique shared, paper-only, and alternate-only memberships from the selected reviewed claim groups, then copies the ScienceCard order, mapped runtime ID, and exact source statement. Do not transcribe or paraphrase a fixed-condition statement. This does not fill information_boundary: include one fixed_condition.MAPPED_ID shared_player trace for every condition common to both selected branches, cite its exact original ScienceCard ID in fixed_condition_ids, and leave line_ranges empty for the locator binder.\nShared Player information gives only the minimum system, protocol, actual controls, operational readouts, and common fixed conditions needed to experiment. Do not reveal a fitted equation, coefficient, exponent, numeric outcome, hidden regime, source identity, or answer direction.\nInitial observations must be qualitative and contain no digits or precomputed measurements. They may state that the phenomenon and readouts exist, but not how a readout changes with a control.\nBefore returning, perform a literal Player-prose check. In title, background, apparatus.description, every initial_observation, and every note, omit digits, equations, proportionality notation, coefficients, exponents, answer directions, private-condition names, and source identity. Do not repeat common fixed-condition values there; candidate.common_fixed_conditions is their only public location. Control and readout descriptions state operational meanings only and omit equations or control-response claims. Safe prose is deliberately short, for example: \"The apparatus exposes an adjustable control and a measurable response. Determine their relationship experimentally.\" Never preserve a more detailed sentence merely because it is scientifically true when that sentence crosses the public boundary.\nIdentification may expose a source-defined response skeleton and named parameter slots but no true values. Discovery receives only the generic expression language through the existing runtime.\nOracle domains must be traceable to the card. A science-card readout's statistic and uncertainty describe the source data and remain private provenance; they are not the semantics of a fresh benchmark query. For structured ScienceClaim oracle_outputs, set candidate.readout.statistic exactly to \"Deterministic central value of the source-reported quantitative relation.\" and candidate.readout.uncertainty exactly to \"Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.\" Never call a deterministic expression result a newly sampled measurement, ensemble, or replicate, and never attach source data-point error bars or fit-parameter uncertainty to an individual query value. The deterministic binder enforces these two phrases after parsing. The legacy compatibility path without structured oracle_outputs alone copies the source readout statistic and uncertainty. When the card supplies a resolution, copy its value and kind exactly; when resolution=null, emit resolution=null and resolution_kind=null, and the Oracle returns an unquantized deterministic central value. Do not invent single-realization noise or imply that an exact simulator output is a claim of infinite experimental precision. candidate.relative_tolerance is a benchmark scoring convention, not paper-reported measurement uncertainty. The current Oracle is deterministic, so candidate.max_replicates must be exactly 1.\nUnder strict source-contained authoring, the alternate world must select another regime or branch that the same paper explicitly reports. Set counterfactual_derivation.kind to reported_regime_selection. Partition source_claim_ids into non-empty disjoint paper_claim_ids and counterfactual_claim_ids. Copy their applicability statements into the corresponding private Oracle fields; the fixed-condition binder, not your response, derives branch-only and shared condition lists from those selected claims. Treat a complete source-reported apparatus or regime configuration as a descriptive branch, even when several physical settings differ; do not make a single-factor causal claim unless the source does. A Player control must be executable in both branches: use either a nonzero candidate interval wholly contained in every selected claim's continuous_interval, or at least two candidate allowed_values contained in every selected numeric_values/continuous_interval domain. The benchmark query set may be a source-supported subset; it need not equal the paper's full applicability intersection. Do not compile fixed_value, symbolic, or unreported domains as Player controls. Do not invent z=1, a new exponent, a new coefficient, a new equation, or any other unreported scientific value. A numeric selector may choose between two fully reported branches, but it is benchmark machinery rather than a paper claim.\nKeep the paper-defined branch equations unchanged. Choose a single selector parameter and assign the two branches the values zero and one. When the supplied ScienceClaims contain oracle_outputs, the response schema requires candidate.oracle.outputs, paper_parameters, and counterfactual_parameters to be empty objects. Emit exactly {} for those three fields: deterministic code will compile the reviewed claim programs with the selector and insert the exact source parameters after parsing. Do not transcribe, simplify, or regenerate those formulas. The compatibility path for an older card without structured oracle_outputs retains the previous full Oracle fields.\nWhen the user message supplies a reviewer-selected branch partition, paper_claim_ids and counterfactual_claim_ids must use those two complete groups. You may swap the two groups as wholes; never move an individual claim between groups.\nIf a paper reports only isolated values of a regime condition, such as two temperatures, use that condition as the hidden world selector. Do not expose it as a continuous Player control and do not interpolate between its reported values. Public controls are quantities for which both reported branch equations support arbitrary in-domain queries.\ncandidate.notes are Player-visible. They may give world-neutral operational guidance but must not restate fixed-condition values, mention historical/counterfactual worlds, a selector, private regime values, branch equations, answer directions, or source identity. Exact common condition statements are inserted only by the deterministic fixed-condition binder.\nIf the card has no source-reported alternative regime that yields a meaningful relationship-level difference under the same public controls and readouts, return status=not_authorable and drafts=[].\nFor every readout, provide a relationship target. Worlds must differ in their executable control-response relation, not merely in prose labels or by an additive constant; declared directions must agree with the executable Oracle. Diagnostic conditions should distinguish the worlds within the Player budget. Hidden conditions must be disjoint and spread across the source-supported interior domain.\nUse source-derived reporting precision only as interface rounding; never present it as measurement resolution unless the card says so.\nThe Young double-slit exemplar is useful because its public observations are qualitative, its controls have independent experimental meaning, and one hidden mechanism change propagates predictively. The Brownian exemplar is useful because it defines an ensemble readout precisely and separates time and particle-size relationships. Copy these design principles, not their physics or numbers.\nThe generated candidate remains a draft. A deterministic filter and human source review decide acceptance.\n\nCaseDraftBatch JSON Schema:\n{\"$defs\":{\"expression_template\":{\"anyOf\":[{\"type\":\"number\"},{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/expression_template\"},\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"subtract\",\"multiply\",\"divide\",\"power\",\"negate\",\"exp\",\"log\",\"sin\",\"maximum\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]},\"temporal_case_candidate\":{\"additionalProperties\":false,\"properties\":{\"apparatus\":{\"additionalProperties\":false,\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"name\",\"description\"],\"type\":\"object\"},\"background\":{\"minLength\":1,\"type\":\"string\"},\"budget\":{\"minimum\":1,\"type\":\"integer\"},\"claim\":{\"minLength\":1,\"type\":\"string\"},\"common_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"confidence_threshold\":{\"exclusiveMinimum\":0,\"maximum\":1,\"type\":\"number\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"oneOf\":[{\"properties\":{\"allowed_values\":{\"maxItems\":0,\"type\":\"array\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"}}},{\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"minItems\":2,\"type\":\"array\",\"uniqueItems\":true},\"maximum\":{\"type\":\"null\"},\"minimum\":{\"type\":\"null\"}}}],\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"description\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"minimum\",\"maximum\",\"allowed_values\"],\"type\":\"object\"},\"maxItems\":5,\"minItems\":1,\"type\":\"array\"},\"counterfactual_change\":{\"minLength\":1,\"type\":\"string\"},\"diagnostic_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"family\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"hidden_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"initial_observations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"max_replicates\":{\"minimum\":1,\"type\":\"integer\"},\"notes\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\"},\"oracle\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_applicability\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\",\"uniqueItems\":true},\"counterfactual_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"counterfactual_parameters\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"},\"kind\":{\"const\":\"closed_form\"},\"outputs\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"},\"paper_applicability\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\",\"uniqueItems\":true},\"paper_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"paper_parameters\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"}},\"required\":[\"kind\",\"outputs\",\"paper_parameters\",\"counterfactual_parameters\",\"paper_applicability\",\"counterfactual_applicability\",\"paper_fixed_conditions\",\"counterfactual_fixed_conditions\"],\"type\":\"object\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"oneOf\":[{\"properties\":{\"resolution\":{\"exclusiveMinimum\":0,\"type\":\"number\"},\"resolution_kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"}}},{\"properties\":{\"resolution\":{\"type\":\"null\"},\"resolution_kind\":{\"type\":\"null\"}}}],\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"exclusiveMinimum\":0,\"type\":\"number\"},{\"type\":\"null\"}]},\"resolution_kind\":{\"anyOf\":[{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},{\"type\":\"null\"}]},\"statistic\":{\"enum\":[\"Deterministic central value of the source-reported quantitative relation.\"],\"type\":\"string\"},\"uncertainty\":{\"enum\":[\"Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.\"],\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"resolution_kind\"],\"type\":\"object\"},\"maxItems\":2,\"minItems\":1,\"type\":\"array\"},\"relative_tolerance\":{\"exclusiveMaximum\":1,\"exclusiveMinimum\":0,\"type\":\"number\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"},\"locator\":{\"minLength\":1,\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\",\"locator\",\"role\"],\"type\":\"object\"},\"title\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"family\",\"title\",\"claim\",\"source\",\"apparatus\",\"background\",\"initial_observations\",\"common_fixed_conditions\",\"controls\",\"readouts\",\"oracle\",\"diagnostic_conditions\",\"hidden_conditions\",\"budget\",\"max_replicates\",\"confidence_threshold\",\"relative_tolerance\",\"notes\",\"counterfactual_change\"],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"drafts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"candidate\":{\"$ref\":\"#/$defs/temporal_case_candidate\"},\"counterfactual_derivation\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"counterfactual_value\":{\"enum\":[0.0,1.0],\"type\":\"number\"},\"description\":{\"minLength\":1,\"type\":\"string\"},\"historical_value\":{\"enum\":[0.0,1.0],\"type\":\"number\"},\"kind\":{\"enum\":[\"benchmark_authored_parameter_substitution\",\"reported_regime_selection\"],\"type\":\"string\"},\"paper_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"paper_defined_equations_unchanged\":{\"type\":\"boolean\"},\"selector_parameter\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"source_mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"kind\",\"description\",\"source_claim_ids\",\"paper_claim_ids\",\"counterfactual_claim_ids\",\"source_mechanism_ids\",\"selector_parameter\",\"historical_value\",\"counterfactual_value\",\"paper_defined_equations_unchanged\"],\"type\":\"object\"},\"design_summary\":{\"minLength\":1,\"type\":\"string\"},\"information_boundary\":{\"additionalProperties\":false,\"properties\":{\"identification_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"oracle_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"shared_player\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"field\":{\"minLength\":1,\"type\":\"string\"},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"field\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"shared_player\",\"identification_only\",\"oracle_only\"],\"type\":\"object\"},\"relationship_targets\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"control\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"counterfactual_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_decreasing\",\"non_increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"counterfactual_shape\":{\"minLength\":1,\"type\":\"string\"},\"historical_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_decreasing\",\"non_increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"historical_shape\":{\"minLength\":1,\"type\":\"string\"},\"readout\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"control\",\"readout\",\"historical_direction\",\"counterfactual_direction\",\"historical_shape\",\"counterfactual_shape\",\"source_claim_ids\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"design_summary\",\"information_boundary\",\"counterfactual_derivation\",\"relationship_targets\",\"candidate\"],\"type\":\"object\"},\"maxItems\":1,\"type\":\"array\"},\"status\":{\"enum\":[\"authored\",\"not_authorable\"],\"type\":\"string\"}},\"required\":[\"assessment\",\"status\",\"drafts\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Private science card; this is the only scientific authority:\n{\"assessment\":\"The source provides the statistical mean-field effective detuning diagnostic delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4) in the main text (lines 573-575) and End Matter (lines 707-710), with the interface energy scale eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4) (lines 697-699). The routing hint specifies public control delta with discrete values {1,2,3} and a benchmark mechanism parameter d_H_fixed=1.5, with private branches c=1 (statistical-interface correction) and c=0 (homogeneous single-mode baseline). The source supports the formula with c=1 (the (4-2*d_H) factor) and the homogeneous baseline c=0 corresponds to the single-mode mean-field with no interface correction (delta_eff = delta). The source does not explicitly state the domain delta in [1,3] for this diagnostic; the hint provides this as the intended public control. The source states the diagnostic is a necessary-condition lower bound for the critical detuning, not the true numerical critical point. The extraction includes one mechanism with the effective detuning equation, one control (delta), one readout (delta_eff), and two claims for the two branches. The case is authoring-ready because the source supports a numeric control-to-readout relation with explicit parameters.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":576,\"line_start\":573,\"support\":\"The equation for delta_eff is given, and it is stated that this provides a lower bound for the critical detuning.\"},{\"line_end\":710,\"line_start\":707,\"support\":\"The same equation is given in the End Matter, with the statement that bistability is a necessary condition.\"}],\"applicability\":\"This diagnostic is a necessary condition for the phase transition; it provides a lower bound for the critical detuning. It is not the true numerical critical point or an exact experimental measurement.\",\"claim_id\":\"statistical_interface_effective_detuning\",\"control_domains\":[{\"allowed_values\":[1.0,2.0,3.0],\"anchors\":[{\"line_end\":570,\"line_start\":568,\"support\":\"The paper discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma.\"}],\"control_name\":\"delta\",\"domain_kind\":\"numeric_values\",\"domain_statement\":\"The paper explicitly discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma in the context of the lower critical dimension.\",\"maximum\":null,\"minimum\":null}],\"control_names\":[\"delta\"],\"depends_on\":[],\"fixed_condition_ids\":[\"statistical_interface_correction\"],\"mechanism_ids\":[\"statistical_mean_field_effective_detuning\"],\"oracle_outputs\":{\"delta_eff\":{\"args\":[{\"var\":\"delta\"},{\"args\":[{\"param\":\"c_interface\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"four_minus_2dH_coefficient\"},{\"args\":[{\"param\":\"two_coefficient\"},{\"param\":\"d_H_fixed\"}],\"op\":\"multiply\"}],\"op\":\"subtract\"},{\"param\":\"four_coefficient\"}],\"op\":\"divide\"},{\"args\":[{\"args\":[{\"args\":[{\"var\":\"delta\"},{\"param\":\"two_coefficient\"}],\"op\":\"power\"},{\"args\":[{\"args\":[{\"param\":\"gamma_rate\"},{\"param\":\"two_coefficient\"}],\"op\":\"power\"},{\"param\":\"four_coefficient\"}],\"op\":\"divide\"}],\"op\":\"add\"},{\"param\":\"half_coefficient\"}],\"op\":\"power\"}],\"op\":\"multiply\"}],\"op\":\"multiply\"}],\"op\":\"subtract\"}},\"quantitative_form\":\"delta_eff = delta - c*(4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4)\",\"readout_names\":[\"delta_eff\"],\"statement\":\"For a fractal driving pattern with statistical-interface correction (c=1), the effective detuning is delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4). This is a necessary-condition lower-bound diagnostic for the critical detuning, not the true numerical critical point.\",\"statistical_basis\":\"Analytical mean-field derivation, no statistical aggregation.\",\"uncertainty\":\"source_unspecified\"},{\"anchors\":[{\"line_end\":623,\"line_start\":613,\"support\":\"The single-mode mean-field equation for homogeneous 2D driving has no interface term, so delta_eff = delta.\"}],\"applicability\":\"This is the homogeneous single-mode baseline without interface corrections, used for comparison with the statistical-interface case.\",\"claim_id\":\"homogeneous_single_mode_effective_detuning\",\"control_domains\":[{\"allowed_values\":[1.0,2.0,3.0],\"anchors\":[{\"line_end\":570,\"line_start\":568,\"support\":\"The paper discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma.\"}],\"control_name\":\"delta\",\"domain_kind\":\"numeric_values\",\"domain_statement\":\"The paper explicitly discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma in the context of the lower critical dimension.\",\"maximum\":null,\"minimum\":null}],\"control_names\":[\"delta\"],\"depends_on\":[],\"fixed_condition_ids\":[\"homogeneous_single_mode_baseline\"],\"mechanism_ids\":[\"statistical_mean_field_effective_detuning\"],\"oracle_outputs\":{\"delta_eff\":{\"args\":[{\"var\":\"delta\"},{\"args\":[{\"param\":\"c_homogeneous\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"four_minus_2dH_coefficient\"},{\"args\":[{\"param\":\"two_coefficient\"},{\"param\":\"d_H_fixed\"}],\"op\":\"multiply\"}],\"op\":\"subtract\"},{\"param\":\"four_coefficient\"}],\"op\":\"divide\"},{\"args\":[{\"args\":[{\"args\":[{\"var\":\"delta\"},{\"param\":\"two_coefficient\"}],\"op\":\"power\"},{\"args\":[{\"args\":[{\"param\":\"gamma_rate\"},{\"param\":\"two_coefficient\"}],\"op\":\"power\"},{\"param\":\"four_coefficient\"}],\"op\":\"divide\"}],\"op\":\"add\"},{\"param\":\"half_coefficient\"}],\"op\":\"power\"}],\"op\":\"multiply\"}],\"op\":\"multiply\"}],\"op\":\"subtract\"}},\"quantitative_form\":\"delta_eff = delta - c*(4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4)\",\"readout_names\":[\"delta_eff\"],\"statement\":\"For a homogeneous single-mode baseline (c=0), the effective detuning is delta_eff = delta, i.e., no interface correction. This corresponds to the standard single-mode mean-field description.\",\"statistical_basis\":\"Analytical mean-field derivation, no statistical aggregation.\",\"uncertainty\":\"source_unspecified\"}],\"controls\":[{\"allowed_values\":[1.0,2.0,3.0],\"anchors\":[{\"line_end\":570,\"line_start\":568,\"support\":\"The paper discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma.\"}],\"definition\":\"Detuning between the driving frequency and the frequency of the spatially uniform, lowest-frequency bosonic mode, in units of gamma.\",\"domain_kind\":\"numeric_values\",\"domain_statement\":\"The paper explicitly discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma in the context of the lower critical dimension.\",\"maximum\":null,\"minimum\":null,\"name\":\"delta\",\"unit\":\"gamma\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The formula includes the (4-2*d_H) factor.\"}],\"condition_id\":\"statistical_interface_correction\",\"statement\":\"The statistical mean-field effective detuning includes the interface correction term (4-2*d_H)*eta(delta), corresponding to c=1 in the diagnostic.\"},{\"anchors\":[{\"line_end\":623,\"line_start\":613,\"support\":\"The single-mode mean-field equation for homogeneous 2D driving has no interface term, so delta_eff = delta.\"}],\"condition_id\":\"homogeneous_single_mode_baseline\",\"statement\":\"The homogeneous single-mode baseline corresponds to no interface correction, i.e., c=0, giving delta_eff = delta.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":576,\"line_start\":572,\"support\":\"The statistical mean-field theory yields an effective detuning that displays bistability when delta_eff > sqrt(3)/2 gamma, providing a lower bound for the critical detuning.\"},{\"line_end\":710,\"line_start\":707,\"support\":\"The equation of state exhibits bistability when delta_eff = delta - (4-2*d_H)*eta(delta) > sqrt(3)/2 gamma.\"}],\"equations\":[\"delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4)\",\"eta(delta) = (1/4) * sqrt(delta^2 + gamma^2/4)\"],\"mechanism_id\":\"statistical_mean_field_effective_detuning\",\"parameters\":[{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The equation includes gamma as the dissipation rate; the paper uses gamma as the unit for detuning values.\"}],\"name\":\"gamma_rate\",\"role\":\"Dissipation rate, used as the unit of detuning; set to 1 in the equation.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"gamma\",\"value\":1.0},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The inequality delta_eff > sqrt(3)/2 * gamma is stated.\"}],\"name\":\"sqrt3_over_2_gamma\",\"role\":\"Threshold for bistability: delta_eff must exceed this value.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"gamma\",\"value\":0.8660254037844386},{\"anchors\":[{\"line_end\":699,\"line_start\":697,\"support\":\"eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4) is given.\"}],\"name\":\"eta_coefficient\",\"role\":\"Coefficient in the interface energy scale eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4).\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.25},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The formula delta_eff = delta - (4-2*d_H)/4 * sqrt(...) includes the factor (4-2*d_H).\"}],\"name\":\"interface_correction_coefficient\",\"role\":\"Coefficient multiplying (4-2*d_H) in the effective detuning formula; represents the statistical-interface correction.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The formula includes the constant 4 in (4-2*d_H).\"}],\"name\":\"four_minus_2dH_coefficient\",\"role\":\"Constant 4 in the term (4-2*d_H).\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":4.0},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The formula includes the constant 2 in (4-2*d_H) and in delta^2.\"}],\"name\":\"two_coefficient\",\"role\":\"Constant 2 in the term (4-2*d_H) and in the exponent of delta^2.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":2.0},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The formula includes the constant 4 in the denominator and in gamma^2/4.\"}],\"name\":\"four_coefficient\",\"role\":\"Constant 4 in the denominator of the interface correction and in gamma^2/4.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":4.0},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The formula includes the square root, which is equivalent to an exponent of 1/2.\"}],\"name\":\"half_coefficient\",\"role\":\"Exponent 1/2 in the square root sqrt(delta^2 + gamma^2/4).\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.5},{\"anchors\":[{\"line_end\":548,\"line_start\":548,\"support\":\"The paper reports the Sierpinski cross has d_H approximately 1.5.\"}],\"name\":\"d_H_fixed\",\"role\":\"Benchmark instantiation of the Hausdorff dimension, fixed at 1.5 as reported for the Sierpinski cross; not an empirical estimate.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":1.5},{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The effective detuning formula includes the interface correction term (4-2*d_H)/4 * sqrt(...), corresponding to c=1.\"}],\"name\":\"c_interface\",\"role\":\"Private branch parameter for the statistical-interface correction; multiplies the interface term (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4).\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":623,\"line_start\":613,\"support\":\"The single-mode mean-field equation for homogeneous 2D driving has no interface term, so delta_eff = delta.\"}],\"name\":\"c_homogeneous\",\"role\":\"Private branch parameter for the homogeneous single-mode baseline; sets the interface correction to zero.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.0}],\"statement\":\"Statistical mean-field theory incorporating kinetic energy contributions at interfaces between driven and undriven regions yields an effective detuning delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4). Bistability, a necessary condition for the phase transition, occurs when delta_eff > sqrt(3)/2 * gamma. This provides a lower bound for the critical detuning.\",\"variable_names\":[\"delta_eff\",\"delta\",\"d_H\",\"gamma\",\"eta\"]}],\"paper_scope\":\"The paper investigates a driven-dissipative interacting bosonic system described by a non-equilibrium Gross-Pitaevskii equation, where the effective spatial dimension is controlled by the fractal shape of the driving field. It determines the lower critical fractal dimension for a first-order phase transition and shows it can be tuned via the detuning. The statistical mean-field effective detuning diagnostic provides a lower bound for the critical detuning as a function of the Hausdorff dimension.\",\"readouts\":[{\"anchors\":[{\"line_end\":575,\"line_start\":573,\"support\":\"The definition of delta_eff is given in the equation.\"}],\"definition\":\"Effective detuning in the statistical mean-field theory, defined as delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4). It is a diagnostic for the necessary condition for bistability and phase transition.\",\"name\":\"delta_eff\",\"resolution\":null,\"statistic\":\"Deterministic formula, no statistical aggregation.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"gamma\"}],\"source\":{\"arxiv_versioned_id\":\"2506.20617v2\",\"citation\":\"Mattheus Burkhard, Tunable Lower Critical Fractal Dimension for a Nonequilibrium Phase Transition, Physical Review Letters (2026), DOI:10.1103/36fj-lsw7\",\"journal_doi\":\"10.1103/36fj-lsw7\"},\"source_ambiguities\":[]}\nImmutable CaseDraft machine interface; use mapped values in every generated machine-interface position while leaving the ScienceCard above unchanged:\n{\"machine_interface_mapping\":{\"controls\":{\"delta\":\"delta\"},\"fixed_conditions\":{\"homogeneous_single_mode_baseline\":\"homogeneous_single_mode_baseline\",\"statistical_interface_correction\":\"statistical_interface_correction\"},\"immutable\":true,\"readouts\":{\"delta_eff\":\"delta_eff\"}}}\nReviewer-selected branch partition; preserve each group intact, though the two complete groups may swap world labels:\n{\"branch_a_claim_ids\":[\"statistical_interface_effective_detuning\"],\"branch_b_claim_ids\":[\"homogeneous_single_mode_effective_detuning\"]}",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one complete corrected CaseDraftBatch JSON object. This is a bounded mechanical repair only: change only the field or fields needed to satisfy the exact schema/interface/field-lineage/public-leakage error. When the diagnostic names Player-visible prose, remove or neutrally rephrase only the leaking numeric answer, formula, direction, private regime, or source identity; do not move it to another public field. Preserve all private scientific truth, quantities, source IDs, branch assignments, conditions, domains, and information-boundary semantics from the rejected response. A public-leakage repair may and must omit the rejected public phrase; that omission does not alter the private truth contract. Only add, remove, or rename trace fields when the exact field-lineage diagnostic requires it. Do not add, remove, reinterpret, or improve scientific content. Emit line_ranges as [] in every trace; reviewed ScienceCard locators are copied later by deterministic code and must not be generated. When an interface identifier violates lower_snake_case, rename that same interface identifier consistently everywhere it is referenced; do not rename source ScienceCard IDs. Return JSON only, with no Markdown or commentary.\",\"machine_interface_mapping\":{\"controls\":{\"delta\":\"delta\"},\"fixed_conditions\":{\"homogeneous_single_mode_baseline\":\"homogeneous_single_mode_baseline\",\"statistical_interface_correction\":\"statistical_interface_correction\"},\"immutable\":true,\"readouts\":{\"delta_eff\":\"delta_eff\"}},\"previous_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides a statistical mean-field effective detuning diagnostic delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4) in the main text and End Matter, with the interface energy scale eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4). The routing hint specifies public control delta with discrete values {1,2,3} and a benchmark mechanism parameter d_H_fixed=1.5, with private branches c=1 (statistical-interface correction) and c=0 (homogeneous single-mode baseline). The source supports the formula with c=1 and the homogeneous baseline c=0 corresponds to the single-mode mean-field with no interface correction (delta_eff = delta). The source does not explicitly state the domain delta in [1,3] for this diagnostic; the hint provides this as the intended public control. The source states the diagnostic is a necessary-condition lower bound for the critical detuning, not the true numerical critical point. The extraction includes one mechanism with the effective detuning equation, one control (delta), one readout (delta_eff), and two claims for the two branches. The case is authoring-ready because the source supports a numeric control-to-readout relation with explicit parameters.\\\",\\n  \\\"status\\\": \\\"authored\\\",\\n  \\\"drafts\\\": [\\n    {\\n      \\\"design_summary\\\": \\\"The case contrasts two mean-field descriptions of a driven-dissipative bosonic system: one with a statistical-interface correction to the effective detuning and one homogeneous single-mode baseline without that correction. The public control is the detuning delta, and the readout is the effective detuning delta_eff. The two branches differ in the presence of the interface correction term, leading to different quantitative relationships between delta and delta_eff.\\\",\\n      \\\"information_boundary\\\": {\\n        \\\"shared_player\\\": [\\n          {\\n            \\\"field\\\": \\\"title\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"background\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"apparatus\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"control.delta\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"readout.delta_eff\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"initial_observation.0\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"fixed_condition.statistical_interface_correction\\\",\\n            \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [\\\"statistical_interface_correction\\\"],\\n            \\\"line_ranges\\\": []\\n          },\\n          {\\n            \\\"field\\\": \\\"fixed_condition.homogeneous_single_mode_baseline\\\",\\n            \\\"claim_ids\\\": [\\\"homogeneous_single_mode_effective_detuning\\\"],\\n            \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n            \\\"fixed_condition_ids\\\": [\\\"homogeneous_single_mode_baseline\\\"],\\n            \\\"line_ranges\\\": []\\n          }\\n        ],\\n        \\\"identification_only\\\": {\\n          \\\"items\\\": [\\n            \\\"The system is a driven-dissipative interacting bosonic system described by a non-equilibrium Gross-Pitaevskii equation.\\\",\\n            \\\"The effective spatial dimension is controlled by the fractal shape of the driving field.\\\",\\n            \\\"The statistical mean-field theory yields an effective detuning that serves as a diagnostic for the necessary condition for bistability and phase transition.\\\"\\n          ],\\n          \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n          \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n          \\\"fixed_condition_ids\\\": [],\\n          \\\"line_ranges\\\": []\\n        },\\n        \\\"oracle_only\\\": {\\n          \\\"items\\\": [\\n            \\\"The effective detuning is defined by the equation delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4) for the statistical-interface branch.\\\",\\n            \\\"For the homogeneous single-mode baseline, the effective detuning equals the bare detuning: delta_eff = delta.\\\",\\n            \\\"The interface energy scale is eta(delta) = (1/4) * sqrt(delta^2 + gamma^2/4).\\\",\\n            \\\"Bistability occurs when delta_eff > sqrt(3)/2 * gamma, providing a lower bound for the critical detuning.\\\",\\n            \\\"The benchmark uses a fixed Hausdorff dimension d_H = 1.5, corresponding to the Sierpinski cross.\\\"\\n          ],\\n          \\\"claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n          \\\"mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n          \\\"fixed_condition_ids\\\": [\\\"statistical_interface_correction\\\", \\\"homogeneous_single_mode_baseline\\\"],\\n          \\\"line_ranges\\\": []\\n        }\\n      },\\n      \\\"counterfactual_derivation\\\": {\\n        \\\"kind\\\": \\\"reported_regime_selection\\\",\\n        \\\"description\\\": \\\"The two branches correspond to two reported regimes: the statistical-interface correction (c=1) and the homogeneous single-mode baseline (c=0). The selector parameter c selects which regime is active.\\\",\\n        \\\"source_claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"],\\n        \\\"paper_claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\"],\\n        \\\"counterfactual_claim_ids\\\": [\\\"homogeneous_single_mode_effective_detuning\\\"],\\n        \\\"source_mechanism_ids\\\": [\\\"statistical_mean_field_effective_detuning\\\"],\\n        \\\"selector_parameter\\\": \\\"c\\\",\\n        \\\"historical_value\\\": 1.0,\\n        \\\"counterfactual_value\\\": 0.0,\\n        \\\"paper_defined_equations_unchanged\\\": true\\n      },\\n      \\\"relationship_targets\\\": [\\n        {\\n          \\\"control\\\": \\\"delta\\\",\\n          \\\"readout\\\": \\\"delta_eff\\\",\\n          \\\"historical_direction\\\": \\\"decreasing\\\",\\n          \\\"counterfactual_direction\\\": \\\"increasing\\\",\\n          \\\"historical_shape\\\": \\\"delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4)\\\",\\n          \\\"counterfactual_shape\\\": \\\"delta_eff = delta\\\",\\n          \\\"source_claim_ids\\\": [\\\"statistical_interface_effective_detuning\\\", \\\"homogeneous_single_mode_effective_detuning\\\"]\\n        }\\n      ],\\n      \\\"candidate\\\": {\\n        \\\"family\\\": \\\"statistical_mean_field_effective_detuning\\\",\\n        \\\"title\\\": \\\"Effective detuning in a driven-dissipative bosonic system\\\",\\n        \\\"claim\\\": \\\"The effective detuning in the statistical mean-field theory depends on the detuning and on whether an interface correction is present.\\\",\\n        \\\"source\\\": {\\n          \\\"citation\\\": \\\"Mattheus Burkhard, Tunable Lower Critical Fractal Dimension for a Nonequilibrium Phase Transition, Physical Review Letters (2026), DOI:10.1103/36fj-lsw7\\\",\\n          \\\"journal_doi\\\": \\\"10.1103/36fj-lsw7\\\",\\n          \\\"arxiv_versioned_id\\\": \\\"2506.20617v2\\\",\\n          \\\"locator\\\": \\\"Main text and End Matter\\\",\\n          \\\"role\\\": \\\"Source paper\\\"\\n        },\\n        \\\"apparatus\\\": {\\n          \\\"name\\\": \\\"driven_dissipative_bosonic_system\\\",\\n          \\\"description\\\": \\\"The apparatus exposes an adjustable detuning and a measurable effective detuning. Determine their relationship experimentally.\\\"\\n        },\\n        \\\"background\\\": \\\"A driven-dissipative interacting bosonic system exhibits a phase transition whose lower critical dimension depends on the fractal shape of the driving field. The effective detuning is a diagnostic for the necessary condition for bistability.\\\",\\n        \\\"initial_observations\\\": [\\n          \\\"The system exhibits a measurable effective detuning that depends on the applied detuning.\\\"\\n        ],\\n        \\\"common_fixed_conditions\\\": [],\\n        \\\"controls\\\": [\\n          {\\n            \\\"name\\\": \\\"delta\\\",\\n            \\\"description\\\": \\\"Detuning between the driving frequency and the frequency of the spatially uniform, lowest-frequency bosonic mode.\\\",\\n            \\\"unit\\\": \\\"gamma\\\",\\n            \\\"minimum\\\": null,\\n            \\\"maximum\\\": null,\\n            \\\"allowed_values\\\": [1.0, 2.0, 3.0]\\n          }\\n        ],\\n        \\\"readouts\\\": [\\n          {\\n            \\\"name\\\": \\\"delta_eff\\\",\\n            \\\"description\\\": \\\"Effective detuning in the statistical mean-field theory, used as a diagnostic for the necessary condition for bistability.\\\",\\n            \\\"unit\\\": \\\"gamma\\\",\\n            \\\"statistic\\\": \\\"Deterministic central value of the source-reported quantitative relation.\\\",\\n            \\\"uncertainty\\\": \\\"Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.\\\",\\n            \\\"resolution\\\": null,\\n            \\\"resolution_kind\\\": null\\n          }\\n        ],\\n        \\\"oracle\\\": {\\n          \\\"kind\\\": \\\"closed_form\\\",\\n          \\\"outputs\\\": {},\\n          \\\"paper_parameters\\\": {},\\n          \\\"counterfactual_parameters\\\": {},\\n          \\\"paper_applicability\\\": [\\n            \\\"This diagnostic is a necessary condition for the phase transition; it provides a lower bound for the critical detuning. It is not the true numerical critical point or an exact experimental measurement.\\\"\\n          ],\\n          \\\"counterfactual_applicability\\\": [\\n            \\\"This is the homogeneous single-mode baseline without interface corrections, used for comparison with the statistical-interface case.\\\"\\n          ],\\n          \\\"paper_fixed_conditions\\\": [],\\n          \\\"counterfactual_fixed_conditions\\\": []\\n        },\\n        \\\"diagnostic_conditions\\\": [\\n          {\\\"delta\\\": 1.0},\\n          {\\\"delta\\\": 2.0},\\n          {\\\"delta\\\": 3.0}\\n        ],\\n        \\\"hidden_conditions\\\": [\\n          {\\\"delta\\\": 1.0},\\n          {\\\"delta\\\": 2.0},\\n          {\\\"delta\\\": 3.0}\\n        ],\\n        \\\"budget\\\": 6,\\n        \\\"max_replicates\\\": 1,\\n        \\\"confidence_threshold\\\": 0.9,\\n        \\\"relative_tolerance\\\": 0.05,\\n        \\\"notes\\\": [\\n          \\\"The effective detuning is a diagnostic for the necessary condition for bistability, not the exact critical point.\\\"\\n        ],\\n        \\\"counterfactual_change\\\": \\\"The interface correction is removed, leaving only the bare detuning.\\\"\\n      }\\n    }\\n  ]\\n}\",\"schema\":{\"$defs\":{\"expression_template\":{\"anyOf\":[{\"type\":\"number\"},{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/expression_template\"},\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"subtract\",\"multiply\",\"divide\",\"power\",\"negate\",\"exp\",\"log\",\"sin\",\"maximum\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]},\"temporal_case_candidate\":{\"additionalProperties\":false,\"properties\":{\"apparatus\":{\"additionalProperties\":false,\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"name\",\"description\"],\"type\":\"object\"},\"background\":{\"minLength\":1,\"type\":\"string\"},\"budget\":{\"minimum\":1,\"type\":\"integer\"},\"claim\":{\"minLength\":1,\"type\":\"string\"},\"common_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"confidence_threshold\":{\"exclusiveMinimum\":0,\"maximum\":1,\"type\":\"number\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"oneOf\":[{\"properties\":{\"allowed_values\":{\"maxItems\":0,\"type\":\"array\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"}}},{\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"minItems\":2,\"type\":\"array\",\"uniqueItems\":true},\"maximum\":{\"type\":\"null\"},\"minimum\":{\"type\":\"null\"}}}],\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"description\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"minimum\",\"maximum\",\"allowed_values\"],\"type\":\"object\"},\"maxItems\":5,\"minItems\":1,\"type\":\"array\"},\"counterfactual_change\":{\"minLength\":1,\"type\":\"string\"},\"diagnostic_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"family\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"hidden_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"initial_observations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"max_replicates\":{\"minimum\":1,\"type\":\"integer\"},\"notes\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\"},\"oracle\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_applicability\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\",\"uniqueItems\":true},\"counterfactual_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"counterfactual_parameters\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"},\"kind\":{\"const\":\"closed_form\"},\"outputs\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"},\"paper_applicability\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\",\"uniqueItems\":true},\"paper_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"paper_parameters\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"}},\"required\":[\"kind\",\"outputs\",\"paper_parameters\",\"counterfactual_parameters\",\"paper_applicability\",\"counterfactual_applicability\",\"paper_fixed_conditions\",\"counterfactual_fixed_conditions\"],\"type\":\"object\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"oneOf\":[{\"properties\":{\"resolution\":{\"exclusiveMinimum\":0,\"type\":\"number\"},\"resolution_kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"}}},{\"properties\":{\"resolution\":{\"type\":\"null\"},\"resolution_kind\":{\"type\":\"null\"}}}],\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"exclusiveMinimum\":0,\"type\":\"number\"},{\"type\":\"null\"}]},\"resolution_kind\":{\"anyOf\":[{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},{\"type\":\"null\"}]},\"statistic\":{\"enum\":[\"Deterministic central value of the source-reported quantitative relation.\"],\"type\":\"string\"},\"uncertainty\":{\"enum\":[\"Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.\"],\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"resolution_kind\"],\"type\":\"object\"},\"maxItems\":2,\"minItems\":1,\"type\":\"array\"},\"relative_tolerance\":{\"exclusiveMaximum\":1,\"exclusiveMinimum\":0,\"type\":\"number\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"},\"locator\":{\"minLength\":1,\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\",\"locator\",\"role\"],\"type\":\"object\"},\"title\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"family\",\"title\",\"claim\",\"source\",\"apparatus\",\"background\",\"initial_observations\",\"common_fixed_conditions\",\"controls\",\"readouts\",\"oracle\",\"diagnostic_conditions\",\"hidden_conditions\",\"budget\",\"max_replicates\",\"confidence_threshold\",\"relative_tolerance\",\"notes\",\"counterfactual_change\"],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"drafts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"candidate\":{\"$ref\":\"#/$defs/temporal_case_candidate\"},\"counterfactual_derivation\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"counterfactual_value\":{\"enum\":[0.0,1.0],\"type\":\"number\"},\"description\":{\"minLength\":1,\"type\":\"string\"},\"historical_value\":{\"enum\":[0.0,1.0],\"type\":\"number\"},\"kind\":{\"enum\":[\"benchmark_authored_parameter_substitution\",\"reported_regime_selection\"],\"type\":\"string\"},\"paper_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"paper_defined_equations_unchanged\":{\"type\":\"boolean\"},\"selector_parameter\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"source_mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"kind\",\"description\",\"source_claim_ids\",\"paper_claim_ids\",\"counterfactual_claim_ids\",\"source_mechanism_ids\",\"selector_parameter\",\"historical_value\",\"counterfactual_value\",\"paper_defined_equations_unchanged\"],\"type\":\"object\"},\"design_summary\":{\"minLength\":1,\"type\":\"string\"},\"information_boundary\":{\"additionalProperties\":false,\"properties\":{\"identification_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"oracle_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"shared_player\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"field\":{\"minLength\":1,\"type\":\"string\"},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"maxItems\":0,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"field\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"shared_player\",\"identification_only\",\"oracle_only\"],\"type\":\"object\"},\"relationship_targets\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"control\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"counterfactual_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_decreasing\",\"non_increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"counterfactual_shape\":{\"minLength\":1,\"type\":\"string\"},\"historical_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_decreasing\",\"non_increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"historical_shape\":{\"minLength\":1,\"type\":\"string\"},\"readout\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"control\",\"readout\",\"historical_direction\",\"counterfactual_direction\",\"historical_shape\",\"counterfactual_shape\",\"source_claim_ids\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"design_summary\",\"information_boundary\",\"counterfactual_derivation\",\"relationship_targets\",\"candidate\"],\"type\":\"object\"},\"maxItems\":1,\"type\":\"array\"},\"status\":{\"enum\":[\"authored\",\"not_authorable\"],\"type\":\"string\"}},\"required\":[\"assessment\",\"status\",\"drafts\"],\"type\":\"object\"},\"validation_error\":{\"code\":\"case_draft.public_lineage\",\"detail\":\"must contain exactly one field-level trace for each Player-visible field (missing=['note.0'], extra=['fixed_condition.homogeneous_single_mode_baseline', 'fixed_condition.statistical_interface_correction'])\",\"path\":\"$.drafts[0].information_boundary.shared_player\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_case_authoring",
+    "repair_reason": "case_draft.public_lineage",
+    "source_mode": "science_card_only"
+  },
+  "response_schema": {
+    "$defs": {
+      "expression_template": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/expression_template"
+                },
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "subtract",
+                  "multiply",
+                  "divide",
+                  "power",
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "maximum",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "temporal_case_candidate": {
+        "additionalProperties": false,
+        "properties": {
+          "apparatus": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "description"
+            ],
+            "type": "object"
+          },
+          "background": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "budget": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "claim": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "common_fixed_conditions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "condition_id": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "statement": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "condition_id",
+                "statement"
+              ],
+              "type": "object"
+            },
+            "maxItems": 0,
+            "type": "array"
+          },
+          "confidence_threshold": {
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "type": "number"
+          },
+          "controls": {
+            "items": {
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "properties": {
+                    "allowed_values": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "maximum": {
+                      "type": "number"
+                    },
+                    "minimum": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "allowed_values": {
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "maximum": {
+                      "type": "null"
+                    },
+                    "minimum": {
+                      "type": "null"
+                    }
+                  }
+                }
+              ],
+              "properties": {
+                "allowed_values": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maximum": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "minimum": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "unit": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "unit",
+                "minimum",
+                "maximum",
+                "allowed_values"
+              ],
+              "type": "object"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array"
+          },
+          "counterfactual_change": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "diagnostic_conditions": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "family": {
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "hidden_conditions": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "initial_observations": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "max_replicates": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "oracle": {
+            "additionalProperties": false,
+            "properties": {
+              "counterfactual_applicability": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "counterfactual_fixed_conditions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition_id": {
+                      "pattern": "^[a-z][a-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "statement": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition_id",
+                    "statement"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 0,
+                "type": "array"
+              },
+              "counterfactual_parameters": {
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "type": "object"
+              },
+              "kind": {
+                "const": "closed_form"
+              },
+              "outputs": {
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "type": "object"
+              },
+              "paper_applicability": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "paper_fixed_conditions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition_id": {
+                      "pattern": "^[a-z][a-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "statement": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition_id",
+                    "statement"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 0,
+                "type": "array"
+              },
+              "paper_parameters": {
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "type": "object"
+              }
+            },
+            "required": [
+              "kind",
+              "outputs",
+              "paper_parameters",
+              "counterfactual_parameters",
+              "paper_applicability",
+              "counterfactual_applicability",
+              "paper_fixed_conditions",
+              "counterfactual_fixed_conditions"
+            ],
+            "type": "object"
+          },
+          "readouts": {
+            "items": {
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "properties": {
+                    "resolution": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    },
+                    "resolution_kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resolution": {
+                      "type": "null"
+                    },
+                    "resolution_kind": {
+                      "type": "null"
+                    }
+                  }
+                }
+              ],
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "resolution": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "resolution_kind": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "statistic": {
+                  "enum": [
+                    "Deterministic central value of the source-reported quantitative relation."
+                  ],
+                  "type": "string"
+                },
+                "uncertainty": {
+                  "enum": [
+                    "Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query."
+                  ],
+                  "type": "string"
+                },
+                "unit": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "unit",
+                "statistic",
+                "uncertainty",
+                "resolution",
+                "resolution_kind"
+              ],
+              "type": "object"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "type": "array"
+          },
+          "relative_tolerance": {
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "source": {
+            "additionalProperties": false,
+            "properties": {
+              "arxiv_versioned_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "citation": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "journal_doi": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "locator": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "role": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "citation",
+              "journal_doi",
+              "arxiv_versioned_id",
+              "locator",
+              "role"
+            ],
+            "type": "object"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "title",
+          "claim",
+          "source",
+          "apparatus",
+          "background",
+          "initial_observations",
+          "common_fixed_conditions",
+          "controls",
+          "readouts",
+          "oracle",
+          "diagnostic_conditions",
+          "hidden_conditions",
+          "budget",
+          "max_replicates",
+          "confidence_threshold",
+          "relative_tolerance",
+          "notes",
+          "counterfactual_change"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "drafts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "candidate": {
+              "$ref": "#/$defs/temporal_case_candidate"
+            },
+            "counterfactual_derivation": {
+              "additionalProperties": false,
+              "properties": {
+                "counterfactual_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "counterfactual_value": {
+                  "enum": [
+                    0.0,
+                    1.0
+                  ],
+                  "type": "number"
+                },
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "historical_value": {
+                  "enum": [
+                    0.0,
+                    1.0
+                  ],
+                  "type": "number"
+                },
+                "kind": {
+                  "enum": [
+                    "benchmark_authored_parameter_substitution",
+                    "reported_regime_selection"
+                  ],
+                  "type": "string"
+                },
+                "paper_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "paper_defined_equations_unchanged": {
+                  "type": "boolean"
+                },
+                "selector_parameter": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "source_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "source_mechanism_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "kind",
+                "description",
+                "source_claim_ids",
+                "paper_claim_ids",
+                "counterfactual_claim_ids",
+                "source_mechanism_ids",
+                "selector_parameter",
+                "historical_value",
+                "counterfactual_value",
+                "paper_defined_equations_unchanged"
+              ],
+              "type": "object"
+            },
+            "design_summary": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "information_boundary": {
+              "additionalProperties": false,
+              "properties": {
+                "identification_only": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "fixed_condition_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "fixed_condition_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                },
+                "oracle_only": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "fixed_condition_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "fixed_condition_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                },
+                "shared_player": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claim_ids": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "field": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "fixed_condition_ids": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "line_ranges": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "line_end": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "line_start": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "line_start",
+                            "line_end"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 0,
+                        "type": "array"
+                      },
+                      "mechanism_ids": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "claim_ids",
+                      "mechanism_ids",
+                      "fixed_condition_ids",
+                      "line_ranges"
+                    ],
+                    "type": "object"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "shared_player",
+                "identification_only",
+                "oracle_only"
+              ],
+              "type": "object"
+            },
+            "relationship_targets": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "control": {
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "counterfactual_direction": {
+                    "enum": [
+                      "approximately_invariant",
+                      "decreasing",
+                      "increasing",
+                      "non_decreasing",
+                      "non_increasing",
+                      "non_monotonic",
+                      "source_defined"
+                    ],
+                    "type": "string"
+                  },
+                  "counterfactual_shape": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "historical_direction": {
+                    "enum": [
+                      "approximately_invariant",
+                      "decreasing",
+                      "increasing",
+                      "non_decreasing",
+                      "non_increasing",
+                      "non_monotonic",
+                      "source_defined"
+                    ],
+                    "type": "string"
+                  },
+                  "historical_shape": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "readout": {
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "source_claim_ids": {
+                    "items": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "control",
+                  "readout",
+                  "historical_direction",
+                  "counterfactual_direction",
+                  "historical_shape",
+                  "counterfactual_shape",
+                  "source_claim_ids"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "design_summary",
+            "information_boundary",
+            "counterfactual_derivation",
+            "relationship_targets",
+            "candidate"
+          ],
+          "type": "object"
+        },
+        "maxItems": 1,
+        "type": "array"
+      },
+      "status": {
+        "enum": [
+          "authored",
+          "not_authorable"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "assessment",
+      "status",
+      "drafts"
+    ],
+    "type": "object"
+  }
+}

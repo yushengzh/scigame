@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2509.13502v3\", \"citation\": \"Carlo Vanoni, Effective Delocalization in the One-Dimensional Anderson Model with Stealthy Disorder, Physical Review Letters (2026), DOI:10.1103/nl7n-bqn4\", \"journal_doi\": \"10.1103/nl7n-bqn4\"}\n\nSource-grounded routing hint from pre-screening:\nPreserve only the source-backed leading asymptotic normalized localization-length family. Define q=W/W_ref and Y(q)=lim_(W_ref->0 at fixed finite q) xi(q W_ref)/xi(W_ref)=q^(-p), with a public finite benchmark interval q in [1,10]. Historical private chi=0.1 has p=2 and AST exponent negative_p=-2; alternate private chi=0.2 has p=4 and AST exponent negative_p=-4. The two oracle ASTs must be structurally identical power(q,negative_p), differing only in private negative_p. Keep weak-disorder and E=-1.8 conditions and exact source locators. Correct the prior support text: E=-2 cos(k)=-1.8 gives k=acos(0.9), 2k approximately 0.90205; at chi=0.1, k0=2 pi chi approximately 0.62832, hence k0<2k and S(2k)=1; at chi=0.2, k0 approximately 1.25664, hence 2k<k0<pi-k, the first-order term vanishes and the W^-4 second-order branch applies. Do not encode absolute localization coefficients, an unsupported W interval, finite-size numerical measurements, or extra claims. Treat q interval and normalization as benchmark-derived from the source asymptotic law, not directly reported measurements; source_ambiguities remains empty only if the selected cluster is source-unambiguous.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nRevision context from an independent review of a prior ScienceCard:\n{\"issues\":[{\"code\":\"fixed_condition.anchor_inequality_false\",\"detail\":\"In stealthiness_chi_0_1, replace the line-265 support description with the correct derivation: E=-2 cos(k)=-1.8 gives 2k=2 acos(0.9)=0.9020536; chi=0.1 gives k0=0.2*pi=0.6283185; hence k0<2k and S(2k)=Theta(2k-k0)=1. Retain the already-correct branch statement, private exponent -2, normalized q definition, domains, and all other locators.\",\"line_ranges\":[{\"line_end\":142,\"line_start\":138},{\"line_end\":265,\"line_start\":238},{\"line_end\":352,\"line_start\":345}]}],\"previous_science_card\":{\"assessment\":\"The source provides a perturbative asymptotic series for the inverse localization length in the 1D Anderson model with stealthy hyperuniform disorder. The selected cluster is the leading-order scaling family: for chi=0.1 the first nonzero Born order is W^2 giving xi ~ W^{-2}, and for chi=0.2 the second nonzero order is W^4 giving xi ~ W^{-4}. The routing hint directs extraction of the normalized leading localization-length predictor Y(q)=lim_{W_ref->0 at fixed q} xi(q*W_ref)/xi(W_ref)=q^{-p}, which cancels all unreported chi-dependent coefficients and avoids absolute W domains and figure data. The source supports the exponents p=2 (first order, chi=0.1) and p=4 (second order, chi=0.2) via the perturbation theory statements and the explicit second-order expression. The normalized predictor is a theoretical leading asymptotic quantity, not a finite-size numerical xi. The source does not provide a continuous W domain for the absolute xi, so the control is the finite benchmark ratio q in [1,10] within the fixed-ratio asymptotic variable. The private branches are chi=0.1 and chi=0.2, each with distinct source-anchored fixed conditions. The ASTs are identical power(q, negative_p) with private exponents -2 and -4. No absolute coefficients, E, k0, S(2k), or numerical protocol are encoded in the oracle. The source_ambiguities array is empty because the selected cluster is unambiguous. case_authoring_ready is true.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":260,\"line_start\":260,\"support\":\"Equation (eq:first-order) gives 1/xi = W^2 S(2k)/(8 sin^2 k), so xi ~ W^{-2}.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.1, perturbation theory predicts xi ~ W^{-2}.\"}],\"applicability\":\"Valid for chi=0.1, energy E=-1.8, and weak disorder W << 1. The first-order term is nonzero because S(2k) is nonzero for this chi.\",\"claim_id\":\"first_order_normalized_scaling_chi_0_1\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":128,\"line_start\":128,\"support\":\"Perturbation theory at small disorder W << 1, which justifies the fixed-ratio asymptotic limit.\"},{\"line_end\":316,\"line_start\":312,\"support\":\"The inverse localization length is expressed as an asymptotic series in powers of W^2, supporting the scaling form.\"}],\"control_name\":\"benchmark_ratio_q\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Finite benchmark ratio q in [1,10] within the fixed-ratio asymptotic variable, as specified by the routing hint.\",\"maximum\":10.0,\"minimum\":1.0}],\"control_names\":[\"benchmark_ratio_q\"],\"depends_on\":[],\"fixed_condition_ids\":[\"stealthiness_chi_0_1\",\"energy_E_minus_1_8\",\"hopping_amplitude_unity\"],\"mechanism_ids\":[\"first_order_self_energy\"],\"oracle_outputs\":{\"normalized_localization_length_predictor\":{\"args\":[{\"var\":\"benchmark_ratio_q\"},{\"param\":\"first_order_exponent\"}],\"op\":\"power\"}},\"quantitative_form\":\"Y(q) = q^{-2}\",\"readout_names\":[\"normalized_localization_length_predictor\"],\"statement\":\"For chi=0.1 and energy E=-1.8, the leading-order localization length scales as xi ~ W^{-2}. The normalized predictor Y(q) = q^{-2}.\",\"statistical_basis\":\"Theoretical leading asymptotic prediction; no numerical averaging or fitting is involved.\",\"uncertainty\":\"source_unspecified\"},{\"anchors\":[{\"line_end\":280,\"line_start\":280,\"support\":\"Text states the correction to xi at second order will be of the form xi ~ W^{-4}.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.2, 0.25, 0.3, perturbation theory predicts xi ~ W^{-4}.\"}],\"applicability\":\"Valid for chi=0.2, energy E=-1.8, and weak disorder W << 1. The first-order term vanishes because S(2k)=0 for this chi.\",\"claim_id\":\"second_order_normalized_scaling_chi_0_2\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":128,\"line_start\":128,\"support\":\"Perturbation theory at small disorder W << 1, which justifies the fixed-ratio asymptotic limit.\"},{\"line_end\":316,\"line_start\":312,\"support\":\"The inverse localization length is expressed as an asymptotic series in powers of W^2, supporting the scaling form.\"}],\"control_name\":\"benchmark_ratio_q\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Finite benchmark ratio q in [1,10] within the fixed-ratio asymptotic variable, as specified by the routing hint.\",\"maximum\":10.0,\"minimum\":1.0}],\"control_names\":[\"benchmark_ratio_q\"],\"depends_on\":[],\"fixed_condition_ids\":[\"stealthiness_chi_0_2\",\"energy_E_minus_1_8\",\"hopping_amplitude_unity\"],\"mechanism_ids\":[\"second_order_self_energy\"],\"oracle_outputs\":{\"normalized_localization_length_predictor\":{\"args\":[{\"var\":\"benchmark_ratio_q\"},{\"param\":\"second_order_exponent\"}],\"op\":\"power\"}},\"quantitative_form\":\"Y(q) = q^{-4}\",\"readout_names\":[\"normalized_localization_length_predictor\"],\"statement\":\"For chi=0.2 and energy E=-1.8, the leading-order localization length scales as xi ~ W^{-4}. The normalized predictor Y(q) = q^{-4}.\",\"statistical_basis\":\"Theoretical leading asymptotic prediction; no numerical averaging or fitting is involved.\",\"uncertainty\":\"source_unspecified\"}],\"controls\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":128,\"line_start\":128,\"support\":\"Perturbation theory at small disorder W << 1, which justifies the fixed-ratio asymptotic limit.\"},{\"line_end\":316,\"line_start\":312,\"support\":\"The inverse localization length is expressed as an asymptotic series in powers of W^2, supporting the scaling form.\"}],\"definition\":\"Finite benchmark ratio q = W/W_ref, used in the fixed-ratio asymptotic variable. The normalized predictor is Y(q) = lim_{W_ref->0 at fixed q} xi(q*W_ref)/xi(W_ref) = q^{-p}.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Finite benchmark ratio q in [1,10] within the fixed-ratio asymptotic variable, as specified by the routing hint. The source does not provide a continuous W domain for absolute xi, so the control is the ratio q.\",\"maximum\":10.0,\"minimum\":1.0,\"name\":\"benchmark_ratio_q\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":115,\"line_start\":115,\"support\":\"Text defines chi = k0/(2*pi).\"},{\"line_end\":240,\"line_start\":240,\"support\":\"Text states chi = k0/(2*pi) and S(q) = Theta(|q|-k0).\"},{\"line_end\":265,\"line_start\":265,\"support\":\"Text states if k0 > 2k, the first-order term vanishes; for chi=0.1, k0=0.2*pi and at E=-1.8, k is such that 2k < k0, so S(2k) is nonzero.\"},{\"line_end\":345,\"line_start\":345,\"support\":\"Caption of Fig. loclength_W lists chi=0.1 as a value for which perturbation theory predicts xi ~ W^{-2}.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.1, perturbation theory predicts xi ~ W^{-2}.\"}],\"condition_id\":\"stealthiness_chi_0_1\",\"statement\":\"Stealthiness parameter chi = 0.1, corresponding to k0 = 2*pi*chi = 0.2*pi. For this chi, the first-order term is nonzero because S(2k) is nonzero.\"},{\"anchors\":[{\"line_end\":115,\"line_start\":115,\"support\":\"Text defines chi = k0/(2*pi).\"},{\"line_end\":240,\"line_start\":240,\"support\":\"Text states chi = k0/(2*pi) and S(q) = Theta(|q|-k0).\"},{\"line_end\":265,\"line_start\":265,\"support\":\"Text states if k0 > 2k, the first-order term vanishes; for chi=0.2, k0=0.4*pi and at E=-1.8, k is such that 2k < k0, so S(2k)=0.\"},{\"line_end\":280,\"line_start\":280,\"support\":\"Text states the second-order correction is of the form xi ~ W^{-4} when 2k < k0 < pi - k.\"},{\"line_end\":345,\"line_start\":345,\"support\":\"Caption of Fig. loclength_W lists chi=0.2 as a value for which perturbation theory predicts xi ~ W^{-4}.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.2, 0.25, 0.3, perturbation theory predicts xi ~ W^{-4}.\"}],\"condition_id\":\"stealthiness_chi_0_2\",\"statement\":\"Stealthiness parameter chi = 0.2, corresponding to k0 = 2*pi*chi = 0.4*pi. For this chi, the first-order term vanishes because S(2k)=0, and the second-order term is the leading contribution.\"},{\"anchors\":[{\"line_end\":345,\"line_start\":345,\"support\":\"Caption of Fig. loclength_W states eigenstates at energy E = -1.8.\"}],\"condition_id\":\"energy_E_minus_1_8\",\"statement\":\"Energy fixed at E = -1.8 for the numerical localization length measurements, corresponding to the horizontal red line in the phase diagram.\"},{\"anchors\":[{\"line_end\":138,\"line_start\":138,\"support\":\"Text states 'We have set the hopping amplitude to unity, so that the strength of the disorder is the only relevant energy scale in the problem.'\"}],\"condition_id\":\"hopping_amplitude_unity\",\"statement\":\"The hopping amplitude is set to unity, so the disorder strength W is the only relevant energy scale.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":260,\"line_start\":260,\"support\":\"Equation (eq:first-order) states 1/xi(k) = W^2 S(2k)/(8 sin^2 k).\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.1, perturbation theory predicts xi ~ W^{-2}.\"}],\"equations\":[\"1/xi(k) = W^2 S(2k)/(8 sin^2 k)\"],\"mechanism_id\":\"first_order_self_energy\",\"parameters\":[{\"anchors\":[{\"line_end\":260,\"line_start\":260,\"support\":\"Equation (eq:first-order) gives 1/xi = W^2 S(2k)/(8 sin^2 k), so the leading W-dependence is W^2, hence xi ~ W^{-2}.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.1, perturbation theory predicts xi ~ W^{-2}.\"}],\"name\":\"first_order_exponent\",\"role\":\"exponent of W in the first-order inverse localization length, giving xi ~ W^{-2}\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":-2.0}],\"statement\":\"First-order perturbative self-energy contribution to the inverse localization length for stealthy hyperuniform disorder, valid when S(2k) is nonzero. The leading term is 1/xi = W^2 S(2k)/(8 sin^2 k), giving xi ~ W^{-2}.\",\"variable_names\":[\"xi\",\"W\",\"k\",\"S\",\"k0\",\"chi\"]},{\"anchors\":[{\"line_end\":534,\"line_start\":526,\"support\":\"Equation (eq:second-order) gives the full second-order inverse localization length expression with W^4 prefactor.\"},{\"line_end\":280,\"line_start\":280,\"support\":\"Text states the correction to xi at second order will be of the form xi ~ W^{-4}.\"}],\"equations\":[\"1/xi(k) = W^4/(32 pi sin^2(k)) * [ ... ]\"],\"mechanism_id\":\"second_order_self_energy\",\"parameters\":[{\"anchors\":[{\"line_end\":280,\"line_start\":280,\"support\":\"Text states the correction to xi at second order will be of the form xi ~ W^{-4}.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states for chi=0.2, 0.25, 0.3, perturbation theory predicts xi ~ W^{-4}.\"}],\"name\":\"second_order_exponent\",\"role\":\"exponent of W in the second-order inverse localization length, giving xi ~ W^{-4}\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":-4.0}],\"statement\":\"Second-order perturbative self-energy contribution to the inverse localization length, valid when the first-order term vanishes (2k < k0 < pi - k). The leading term is 1/xi = W^4 times a k,k0-dependent bracket divided by 32 pi sin^2(k), giving xi ~ W^{-4}.\",\"variable_names\":[\"xi\",\"W\",\"k\",\"k0\",\"chi\"]}],\"paper_scope\":\"The paper studies the 1D Anderson model with stealthy hyperuniform disorder, computing the localization length via a perturbative self-energy expansion and numerical diagonalization. It focuses on the scaling of the localization length with disorder strength W and stealthiness parameter chi, showing effective delocalization for finite systems. The selected cluster is the leading-order asymptotic scaling family for the normalized localization-length predictor.\",\"readouts\":[{\"anchors\":[{\"line_end\":316,\"line_start\":312,\"support\":\"The inverse localization length is expressed as an asymptotic series in powers of W^2, supporting the scaling form.\"},{\"line_end\":352,\"line_start\":352,\"support\":\"Text states perturbation theory predicts xi ~ W^{-2} for chi=0.1 and xi ~ W^{-4} for chi=0.2, 0.25, 0.3.\"}],\"definition\":\"Theoretical leading asymptotic normalized predictor Y(q) = lim_{W_ref->0 at fixed q} xi(q*W_ref)/xi(W_ref) = q^{-p}, where p is the leading-order exponent. This is a deterministic leading-order prediction, not a finite-size numerical xi.\",\"name\":\"normalized_localization_length_predictor\",\"resolution\":null,\"statistic\":\"Theoretical leading asymptotic normalized predictor; no numerical averaging or fitting is involved.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2509.13502v3\",\"citation\":\"Carlo Vanoni, Effective Delocalization in the One-Dimensional Anderson Model with Stealthy Disorder, Physical Review Letters (2026), DOI:10.1103/nl7n-bqn4\",\"journal_doi\":\"10.1103/nl7n-bqn4\"},\"source_ambiguities\":[]}}\nThe previous ScienceCard is an editable rejected draft, not a source of new scientific facts. Use it as the baseline so supported content is not lost, but recheck every retained field against the supplied source. Address every listed issue by inspecting its line ranges, remove or revise unsupported content, and do not assume the review or prior draft is correct. The supplied source remains the sole authority. Return one complete revised ScienceCard for a new independent review.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main.tex =====\nL000002\t\\documentclass[reprint,aps,prb,english,superscriptaddress]{revtex4-2}\nL000003\t\nL000004\t\\usepackage{graphicx}\nL000005\t\\usepackage{bm,amssymb,amsmath,mathrsfs,amstext,latexsym}\nL000006\t\nL000007\t\\usepackage{physics}\nL000008\t\\usepackage{enumitem}\nL000009\t\\usepackage{graphicx}\nL000010\t\nL000011\t\\usepackage[usenames,dvipsnames]{xcolor}\nL000012\t\\usepackage[colorlinks=true,citecolor=blue,urlcolor=blue,linkcolor=blue]{hyperref}\nL000013\t\\usepackage[normalem]{ulem}\nL000014\t\\usepackage{booktabs}\nL000015\t\nL000016\t\\newcommand{\\der}[2]{\\frac{d #1}{d #2}}\nL000017\t\\newcommand{\\pd}[2]{\\frac{\\partial #1}{\\partial #2}}\nL000018\t\nL000019\t\nL000020\t\nL000021\t\\newcommand{\\av}[1]{\\langle #1 \\rangle}\nL000022\t\nL000023\t\nL000024\t\\newcommand{\\Bra}[1]{\\left\\langle #1 \\right|}\nL000025\t\\newcommand{\\Ket}[1]{\\left| #1 \\right\\rangle}\nL000026\t\\newcommand{\\Braket}[2]{\\left\\langle #1 \\middle| #2 \\right\\rangle}\nL000027\t\\newcommand{\\Av}[1]{\\left \\langle #1 \\right \\rangle}\nL000028\t\nL000029\t\\let\\Re\\relax\nL000030\t\\let\\Im\\relax\nL000031\t\\DeclareMathOperator{\\Re}{Re}\nL000032\t\\DeclareMathOperator{\\Im}{Im}\nL000033\t\\let\\tilde\\relax\nL000034\t\\newcommand{\\tilde}[1]{\\widetilde{#1}}\nL000035\t\nL000036\t\\def\\rmd{\\mathrm{d}}\nL000037\t\\def\\rmD{\\mathcal{D}}\nL000038\t\\def\\rmi{\\mathrm{i}}\nL000039\t\\def\\rme{\\mathrm{e}}\nL000040\t\nL000041\t\\def\\H{\\mathcal{H}}\nL000042\t\\def\\tro{\\bar{\\mathrm{Tr}}}\nL000043\t\\def\\e{\\varepsilon}\nL000044\t\\def\\ep{\\epsilon}\nL000045\t\\def\\D{\\Delta}\nL000046\t\\def\\d{\\delta}\nL000047\t\\def\\p{\\partial}\nL000048\t\\def\\IPR{\\mathrm{IPR}}\nL000049\t\nL000050\t\nL000051\t\\newcommand{\\cv}[1]{{\\color{blue}{#1 [CV]}}}\nL000052\t\\newcommand{\\fb}[1]{{\\color{red} {#1 [FB]}}}\nL000053\t\\newcommand{\\mcr}[1]{{\\color{red} {#1 [MCR]}}}\nL000054\t\nL000055\t\nL000056\t\nL000057\t\\begin{document}\nL000058\t\nL000059\t\\title{Effective delocalization in the one-dimensional Anderson model with stealthy disorder}\nL000060\t\nL000061\t\\author{Carlo Vanoni}\nL000062\t\\affiliation{Department of Physics, Princeton University, Princeton, New Jersey, 08544, USA}\nL000063\t\nL000064\t\\author{Jonas Karcher}\nL000065\t\\affiliation{Max Planck Institute for the Physics of Complex Systems, N\\\"othnitzer Str. 38, 01187 Dresden, Germany}\nL000066\t\nL000067\t\\author{Mikael C. Rechtsman}\nL000068\t\\affiliation{Department of Physics, The Pennsylvania State University, University Park, PA, USA}\nL000069\t\nL000070\t\\author{Boris L. Altshuler}\nL000071\t\\affiliation{Physics Department, Columbia University, 538 West 120th Street, New York, New York 10027, USA}\nL000072\t\nL000073\t\\author{Paul J. Steinhardt}\nL000074\t\\email{steinh@princeton.edu}\nL000075\t\\affiliation{Department of Physics, Princeton University, Princeton, New Jersey, 08544, USA}\nL000076\t\nL000077\t\\author{Salvatore Torquato}\nL000078\t\\affiliation{Department of Chemistry, Princeton University, Princeton, New Jersey 08544, USA}\nL000079\t\\affiliation{Department of Physics, Princeton University, Princeton, New Jersey, 08544, USA}\nL000080\t\\affiliation{Princeton Institute for the Science and Technology of Materials, Princeton University, Princeton, New Jersey 08544, USA}\nL000081\t\\affiliation{Program in Applied and Computational Mathematics, Princeton University, Princeton, New Jersey 08544, USA}\nL000082\t\nL000083\t\\date{\\today}\nL000084\t\nL000085\t\nL000086\t\nL000087\t\\begin{abstract}\nL000088\t    We study analytically and numerically the Anderson model in one dimension with “stealthy\" disorder, defined as having a power spectrum that vanishes in a continuous band of wave numbers. Motivated by recent studies on the optical transparency properties of stealthy hyperuniform layered media, we compute the localization length using a perturbative expansion of the self-energy. We find that, for fixed energy and small but finite disorder strength $W$, there exists for any finite length system a range of stealthiness $\\chi$ for which the localization length exceeds the system size. This kind of “effective delocalization\" is the result of the novel kind of correlated disorder that spans a continuous range of length scales, a defining characteristic of stealthy systems. Unlike uncorrelated disorder, for which the localization length $\\xi$ scales as $W^{-2}$ to leading order for small W, the leading order terms in the perturbation expansion of $\\xi$ for stealthy disordered systems vanish identically for a progressively large number of terms as $\\chi$ increases such that $\\xi$ scales as $W^{-2n}$ with arbitrarily large $n$. Moreover, we support our analytical results with numerical simulations. Our results introduce stealthy disorder into quantum tight-binding models and show that enforcing a low-$k$ spectral gap markedly alters the scattering landscape, enabling localization lengths that exceed the system size at fixed disorder strength. Since this mechanism relies only on the spectral properties of the disorder, it carries over directly to photonic and phononic wave systems.\nL000089\t\\end{abstract}\nL000090\t\nL000091\t\nL000092\t\\maketitle\nL000093\t\nL000094\t\nL000095\t\\section{Introduction}\nL000096\t\nL000097\tSince the seminal work by P. W. Anderson in the late 1950s~\\cite{Anderson1958absence}, the interplay between randomness and quantum effects in non-interacting systems has received considerable attention in the condensed matter community~\\cite{evers2008anderson}. The impact of space dimensionality has been addressed in the scaling theory of localization~\\cite{abrahams1979scaling} and in recent investigations~\\cite{ueoka2014dimensional,Tarquini2017critical,altshuler2025Renormalization}, including the infinite-dimensional limit~\\cite{tikhonov2016Anderson,bera2018return,sierant2023universality,vanoni2023renormalization,Derrida1980REM,Baldwin2016ManyBody,Balducci2025Scaling}, relevant for the interacting case, known as many-body localization~\\cite{altshuler1997quasiparticle,Basko06,oganesyan2007localization,ros2015integrals,tikhonov2021AndersonMBL,niedda2024renormalizationgroupanalysismanybodylocalization}.\nL000098\tIn one and two dimensions and for a random uncorrelated onsite potential, it is well known~\\cite{abrahams1979scaling} that any small amount of disorder (whose strength $W^2$ is parametrized by its variance) leads to the localization of the wave functions. In 1D, the localization length $\\xi$ at small disorder is proportional to $W^{-2}$~\\cite{Lee1985Disordered}.\nL000099\t\nL000100\tWhen introducing correlations in the potential energy, the scenario can change and show interesting new phenomena. This occurs, for instance, in the case of quasi-periodic systems~\\cite{Aubry1980Annals,Luschen2018}, displaying extended, critical, and localized phases, separated by non-trivial mobility edges~\\cite{Ganeshan2015Nearest,Biddle2010Predicted,Goncalves2023Critical}.\nL000101\tAnother example, relevant to polymer physics, is that of random dimers~\\cite{Dunlap1990Absence,Phillips1991Localization}, where a particle can become delocalized in one dimension if two uncorrelated random energies are assigned at random to pairs of lattice sites. However, only two states are extended in this case.\nL000102\tA further interesting case that has received attention in the literature, also because of its experimental relevance in cold-atom ~\\cite{Sanchez2007Anderson,Billy2008} and photonics \\cite{schwartz2007transport,dikopoltsev2022observation} experiments, is that of speckle potentials, in which the two-point correlation function has a high-momentum cutoff.\nL000103\tIn one-dimensional (1D) systems, speckle correlations suppress back-scattering and can lead to an effective suppression of Anderson localization~\\cite{Lugan2009Onedimensional,Piraud2012Anderson,morpurgo2025localizationtransitioninteractingquantum}.\nL000104\tThe effect of correlated disorder on Anderson localization has also been studied previously in a series of papers~\\cite{izrailev_localization_1999,izrailev_anomalous_2012,Izrailev1995Hamiltonian}, where it has been shown that the inverse localization length is proportional to the product of the Fourier transform of the correlation of the disorder and $W^2$~\\cite{izrailev_localization_1999}.\nL000105\tAccording to these results, the localization length should diverge if the power spectrum vanishes.\nL000106\tHowever, these results should be regarded as a perturbative outcome including only the first-order term at small $W$. Higher-order terms thus lead to a finite localization length.\nL000107\t\nL000108\tA special type of disorder is provided by hyperuniform systems~\\cite{To03a,To18a}, which are characterized by an anomalous suppression of large-scale density fluctuations. In momentum space, they are characterized by a structure factor $\\mathcal{S}(k)$ that vanishes as $k \\to 0$. Since the first studies in the early 2000s, hyperuniform systems have appeared in a wide variety of systems, ranging from number theory~\\cite{To18d,To08b} to biological systems~\\cite{jiao_avian_2014,Ma15} (see Ref.~\\cite{To18a} for a review).\nL000109\t\nL000110\tAmong hyperuniform disordered systems, there is a special class that is referred to as stealthy hyperuniformity~\\cite{uche_constraints_2004,batten_classical_2008,Zh15a,Zh15b}. In this context, stealthy means that the structure factor of such systems vanishes for a continuous range of wave numbers. Therefore, a stealthy hyperuniform system is such that\nL000111\t\\begin{equation*}\nL000112\t    \\mathcal{S}(k)=0 \\quad \\mathrm{for} \\ 0 \\leq k<k_0.\nL000113\t\\end{equation*}\nL000114\t\nL000115\tIt is useful to introduce the stealthiness parameter $0\\leq \\chi \\leq 1/2$, defined as the relative fraction of constrained wavevectors. For point patterns, the configuration converges to a periodic lattice in the limit $\\chi \\to 1/2$. For the specific case 1D systems, relevant in this paper, $\\chi = k_0/(2\\pi)$~\\cite{batten_classical_2008}.\nL000116\tStealthy hyperuniform systems display remarkable properties, including superior transport~\\cite{To21d}, elasticity~\\cite{kim_effective_2020}, and wave propagation properties~\\cite{kim_effective_2023,Vanoni2025Dynamical} compared to non-stealthy and non-hyperuniform isotropic amorphous states of matter~\\cite{To18a}.\nL000117\t\nL000118\tIn a recent study, Klatt et al.~\\cite{klatt2025transparencyversusandersonlocalization} studied the electromagnetic wave transmission in disordered stealthy hyperuniform layered media formed by slabs of alternating high and low dielectric constant.\nL000119\tBy computing the Lyapunov exponent using transfer matrix methods, they found no evidence of localization for system sizes up to 10000 slabs, similar to what is found in periodic systems.\nL000120\tOn the analytical side, it has been shown in Ref.~\\cite{kim_effective_2023} that the nonlocal strong contrast expansion~\\cite{torquato_nonlocal_2021} truncated at third-order predicts that 1D disordered stealthy hyperuniform layered media have perfect transparency (no Anderson localization) for a range of frequencies. Therefore, Anderson localization could only arise at fourth order and beyond.\nL000121\tIt should be mentioned that the nonlocal strong contrast expansion is characterized by fast convergence, and lower-order terms provide accurate approximations for the effective dielectric constant.\nL000122\t\nL000123\tMotivated by the aforementioned effects of correlated disorder on Anderson localization and the recent results on the effect of stealthy hyperuniformity on 1D layered media, in this work, we study the effect of stealthy disorder in the 1D Anderson model.\nL000124\tIn this context, the stealthiness parameter $\\chi$ measures the fraction of harmonics for which the power spectrum of the random potential vanishes (see Eq.~\\eqref{eq:stealthiness}). Unlike the quasi-periodic models, in this case, the system is disordered and allows a continuous range of energies, unlike the random dimer model.\nL000125\tIt should be mentioned that the effect on localization of non-stealthy hyperuniform disorder in quantum systems has been addressed in the literature~\\cite{Crowley2019Quantum,Shi2022Manybody}; a recent finding, for example, showed that Lifshitz tails have different scalings compared to uncorrelated disorder, effectively widening the band gap~\\cite{Karcher2024Effect}. Experiments on disordered two-dimensional stealthy photonic crystal systems have demonstrated non-trivial wave transport properties with both strong disorder and non-Hermiticity \\cite{barsukova2025stealthy}. However, the latter work did not examine localization behavior.\nL000126\t\nL000127\t\nL000128\tWe determine the localization length using a perturbation theory expansion of the self-energy at small disorder $W \\ll 1$ for the special case of stealthy hyperuniform disorder. Our procedure can be applied to any kind of stealthy disorder.\nL000129\tWe are able to determine, for each energy and size of the stealthy region, the power of $W$ responsible for the leading contribution to the localization length. In particular, we find that, for any given length of the 1D system $L$, energy and weak disorder $W \\ll 1$, there exists a value of the stealthiness parameter $\\chi$ in which the system is disordered but with localization length exceeding the system size, and thus effectively delocalized. If the thermodynamic limit $L \\to \\infty$ is taken first, the localization length is always finite, thus not violating localization theorems~\\cite{Wegner1976,abrahams1979scaling}.\nL000130\t\nL000131\tWe support our analytical findings with a numerical diagonalization computation of the localization length obtained from the fractal dimension of eigenstates in systems of sizes up to $L=O(10^6)$. We find that the perturbative calculation predicts the correct scaling of the localization length when varying the size of the stealthy region, and locates correctly the transition point between regions with different scalings.\nL000132\t\nL000133\t\nL000134\t\nL000135\t\nL000136\t\\section{Model}\nL000137\t\nL000138\tWe consider the Anderson model in one spatial dimension with the Hamiltonian $H = H_0 + V$ obtained by summing the tight-binding Hamiltonian $H_0 = -\\sum_j (c_{j+1}^{\\dagger} c_j + c_{j}^{\\dagger} c_{j+1})$ and potential energy $V = \\sum_j w_j c^{\\dagger}_j c_j$, where $c_j^{\\dagger}$ and $c_j$ are the creation and annihilation operators (respectively) for a particle at site $j$ of the chain, with periodic boundary conditions. The disorder is contained in the random numbers $w_j$, which will be specified later. We have set the hopping amplitude to unity, so that the strength of the disorder is the only relevant energy scale in the problem.\nL000139\t\nL000140\tBy introducing the creation and annihilation operators ($\\tilde{c}_k^{\\dagger}$ and $\\tilde{c}_k$ respectively) for a particle of momentum $k$ through the relation $c_j = \\frac{1}{\\sqrt{L}} \\sum_k e^{ikj} \\tilde{c}_k$, we can write\nL000141\t\\begin{gather}\nL000142\t     H_0 = \\sum_k \\epsilon_k \\tilde{c}^{\\dagger}_k \\tilde{c}_k, \\quad \\epsilon_k = -2 \\cos k, \\label{eq:H0_Fourier} \\\\\nL000143\t     V = \\frac{1}{L} \\sum_{k,k'} \\left( \\sum_q \\tilde{w}_q \\delta_{k'-k,q} \\right) \\tilde{c}^{\\dagger}_{k'} \\tilde{c}_k = \\sum_{k,q} \\tilde{w}_q \\tilde{c}^{\\dagger}_{k+q} \\tilde{c}_k, \\label{eq:V_Fourier}\nL000144\t\\end{gather}\nL000145\twhere we used $\\tilde{w}_q = \\sum_j e^{-iqj} w_j$. In the following, we will always use the Fourier-space representation of $H_0$ and $V$ defined above; henceforth, we will drop the tildes to simplify the notation.\nL000146\t\nL000147\tWe are interested in extracting the random numbers $w_j$, $j=1,\\dots, L$, for a prescribed power spectrum\nL000148\t\\begin{equation}\nL000149\t    S(q) = \\frac{|w_q|^2}{W^2},\nL000150\t\\end{equation}\nL000151\tand do so by means of a Fourier filtering procedure.\nL000152\tAs a first step, we define the amplitudes\nL000153\t\\begin{equation}\nL000154\t    A(q) = \\sqrt{S(q)},\nL000155\t\\end{equation}\nL000156\twith $S(q) = S(-q)$. We then extract complex Gaussian random variables $\\eta_q$, i.e., distributed according to $p(\\eta_q) = \\mathcal{N}(0,1)$, so that $\\langle \\eta_q \\eta_{q'}^* \\rangle = \\delta(q-q')$.\nL000157\tThe Fourier components of the desired random variables are then given by\nL000158\t\\begin{equation}\nL000159\t    w_q = W A(q) \\, \\eta_q\nL000160\t\\end{equation}\nL000161\twith the constraint $w_q = w_{-q}^*$. In the previous expression, we have introduced the disorder strength $W$.\nL000162\tFollowing this procedure, we get random numbers $w_q$ such that\nL000163\t\\begin{equation}\nL000164\t\\label{eq:corrdis}\nL000165\t    \\langle w_q \\rangle = 0, \\quad \\langle w_q w_{q'} \\rangle =  W^2 S(q) \\, \\delta(q+q').\nL000166\t\\end{equation}\nL000167\tBy construction, the higher-order moments $\\langle w_{q_1} w_{q_2} \\dots w_{q_n} \\rangle$ are expressed in terms of the two-point function only for even values of $n$ and vanish for odd values of $n$.\nL000168\t\nL000169\t\\section{Perturbation theory}\nL000170\t\nL000171\tWe are now interested in calculating the dependence of the localization length $\\xi(k)$ on $W$ at a given momentum (or, equivalently, energy through the dispersion relation in Eq.~\\eqref{eq:H0_Fourier}).\nL000172\tIn 1D systems, the localization length is proportional to the mean free path $\\ell(k)$, according to $\\xi(k) \\simeq 2 \\ell(k)$~\\cite{Lee1985Disordered}, which in turn is proportional to the mean survival time $\\tau(k)$, defined as $\\ell(k) = (\\partial_k \\epsilon_k) \\tau(k)$~\\footnote{The mean survival time $\\tau$ can be interpreted as the average time between two scattering events of the quantum particle on the disordered potential}.\nL000173\tAt this point, it is well known~\\cite{Fetter2003Quantum} that the mean survival time is related to the imaginary part of the on-shell self-energy $\\Sigma(k, \\epsilon_k)$ according to\nL000174\t\\begin{equation}\nL000175\t\\label{eq:survtime}\nL000176\t    \\frac{1}{\\tau(k)} = -2 \\, \\mathrm{Im} \\Sigma(k,\\epsilon_k).\nL000177\t\\end{equation}\nL000178\tIn the weak disorder limit $W \\ll 1$ (corresponding to the weak scattering limit $(k \\ell)^{-1} \\ll 1$), we can treat the potential $V$ as a small perturbation and compute the self-energy from the perturbation theory of the propagator\nL000179\t\\begin{equation}\nL000180\t    G(k,E) = \\frac{1}{E-\\epsilon_k -V + i \\varepsilon^+}.\nL000181\t\\end{equation}\nL000182\tFollowing the standard textbook approach~\\cite{Fetter2003Quantum,Akkermans_Montambaux_2007}, we can expand the propagator in powers of $V$ as\nL000183\t\\begin{equation}\nL000184\t\\label{eq:DysonEq}\nL000185\t    G = G_0 + G_0 V G_0 + G_0 V G_0 V G_0 + \\dots\nL000186\t\\end{equation}\nL000187\twhere the bare propagator $G_0$ is given by\nL000188\t\\begin{equation}\nL000189\t    G_0(k,E) = \\frac{1}{E-\\epsilon_k +i\\varepsilon^+}.\nL000190\t\\end{equation}\nL000191\tThe Dyson equation~(\\ref{eq:DysonEq}) can be represented graphically, as shown in Fig.~\\ref{fig:dysonEq}.\nL000192\t\\begin{figure}\nL000193\t    \\centering\nL000194\t    \\includegraphics[width=\\linewidth]{DysonEq.pdf}\nL000195\t    \\caption{Graphical representation of Dyson equation, see Eq.~\\eqref{eq:DysonEq} in the main text.}\nL000196\t    \\label{fig:dysonEq}\nL000197\t\\end{figure}\nL000198\t\nL000199\tAfter disorder averaging, only terms containing an even number of $V$ insertions will contribute, in virtue of Wick's theorem for Gaussian random variables. In addition, from Eq.~\\eqref{eq:V_Fourier} we can see that the vertex of Feynman diagrams, given by $V$, has the effect of increasing the momentum $k \\to k+q$, with momentum conservation at each vertex (see Eq.~\\eqref{eq:corrdis}).\nL000200\tWith these observations, the propagator can be written as\nL000201\t\\begin{equation}\nL000202\t    G = G_0 + G_0 \\Sigma G,\nL000203\t\\end{equation}\nL000204\twhere $\\Sigma(k, E)$ is the self-energy, i.e., it contains all diagrams without external $G_0$ legs and such that they cannot be split in two by removing a single $G_0$ line~\\footnote{Sometimes in the many-body quantum physics literature $\\Sigma(k, E)$ is referred to as the \\emph{proper} self-energy, to distinguish it from the self-energy diagrams including contributions that are one-particle reducible. We will not make this distinction here, as all the relations we will need only include the proper self-energy.}.\nL000205\t\\begin{figure}\nL000206\t    \\centering\nL000207\t    \\includegraphics[width=0.3\\linewidth]{1order.pdf}\nL000208\t    \\includegraphics[width=0.3\\linewidth]{2order1.pdf}\nL000209\t    \\includegraphics[width=0.3\\linewidth]{2order2.pdf}\nL000210\t    \\caption{Self-energy $\\Sigma(k,E)$ contribution up to second order in $S(q)$: (left) first-order contribution $\\Sigma^{(1)}(k,E)$, (center) second order contribution with crossing disorder lines $\\Sigma^{(2)}_{\\mathrm{cross}}(k,E)$, (right) second order contribution without crossing disorder lines $\\Sigma^{(2)}_{\\mathrm{non-cross}}(k,E)$.}\nL000211\t    \\label{fig:selfenergy}\nL000212\t\\end{figure}\nL000213\t\nL000214\tThe individual contributions to the self-energy up to second order in $W^2 S(q)$ illustrated diagrammatically in Fig.~\\ref{fig:selfenergy} are:\nL000215\t\\begin{equation}\nL000216\t\\label{eq:Sigma1_def}\nL000217\t    \\Sigma^{(1)}(k,E) = W^2 \\int_{-\\pi}^{\\pi} \\frac{dq}{2\\pi} S(q)G_0(k-q,E),\nL000218\t\\end{equation}\nL000219\t\\begin{multline}\nL000220\t    \\Sigma^{(2)}_{\\mathrm{cross}}(k,E) = W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\\times\\\\\nL000221\t    G_0(k-q_1,E)G_0(k-q_2,E)G_0(k-q_1-q_2,E),\nL000222\t\\end{multline}\nL000223\t\\begin{multline}\nL000224\t    \\Sigma^{(2)}_{\\mathrm{non-cross}}(k,E) = W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\\times\\\\\nL000225\t    [G_0(k-q_1,E)]^2G_0(k-q_1-q_2,E).\nL000226\t\\end{multline}\nL000227\t\nL000228\tAccording to Eq.~\\eqref{eq:survtime}, we need to take the imaginary part of the self-energy and evaluate it on-shell, i.e., set $E = \\epsilon_k$. This implies we have to consider the real and imaginary contributions to the bare propagator $G_0$,\nL000229\t\\begin{equation}\nL000230\t    G_0(k', \\epsilon_k) = \\mathcal{P}\\left(\\frac{1}{\\epsilon_k-\\epsilon_{k'}}\\right) -i\\pi \\delta(\\epsilon_k-\\epsilon_{k'}),\nL000231\t\\end{equation}\nL000232\twhere $\\mathcal{P}$ denotes the principal value.\nL000233\tBy virtue of the dispersion relation $\\epsilon_k = -2 \\cos k$, the imaginary part enforces having either no scattering ($k=k'$) or back-scattering $k=-k'$. This is a consequence of the 1D geometry, as there are no other angles available for scattering other than $0$ and $\\pi$.\nL000234\t\nL000235\tFor concreteness, we specify a particular form for the stealthy potential, which we choose to be stealthy hyperuniform, motivated by the connection we discussed earlier with optical transparency in layered media~\\cite{klatt2025transparencyversusandersonlocalization}. We thus define, restricting to the first Brillouin zone,\nL000236\t\\begin{equation}\nL000237\t\\label{eq:stealthiness}\nL000238\t    S(q) = \\Theta(|q|-k_0), \\quad |q| < \\pi,\nL000239\t\\end{equation}\nL000240\twhere the stealthy interval size $k_0$ is related to the $\\chi$ parameter commonly used in stealthy hyperuniformity via $\\chi = k_0/(2\\pi)$. Notice that for $\\chi = 0$, $w_q$ are independently distributed Gaussian random variables, and so are the $w_i$, recovering the totally uncorrelated case. For $\\chi=1/2$, $w_i = (-1)^i$, corresponding to no disorder.\nL000241\tThe spectrum of the Hamiltonian $H$ with $W=0$ is symmetric and double degenerate; therefore, we can focus on the interval $0 \\le k <\\pi/2$ without loss of generality.\nL000242\t\nL000243\tWe can now analyze in more detail the computation of the imaginary part of the self-energy $\\mathrm{Im} \\, \\Sigma(k,\\epsilon_k)$.\nL000244\tFrom Eq.~\\eqref{eq:Sigma1_def}, we have\nL000245\t\\begin{align}\nL000246\t    \\mathrm{Im} \\Sigma^{(1)}(k,\\epsilon_k) &= W^2 \\int_{-\\pi}^{\\pi} \\frac{dq}{2 \\pi} S(q) \\ \\mathrm{Im} G_0(k-q,\\epsilon_k)\\\\\nL000247\t    &= -\\pi W^2 \\int_{-\\pi}^{\\pi} \\frac{dq}{2 \\pi} S(q)\\delta(\\epsilon_k-\\epsilon_{k-q})\nL000248\t\\end{align}\nL000249\tAs discussed before, the dispersion relation $\\epsilon_k = -2 \\cos k$ imposes $q=0 \\; \\mathrm{mod} \\,2\\pi$, corresponding to no scattering, or $q=2k \\; \\mathrm{mod} \\,2\\pi$, meaning back-scattering, which is responsible for localization. Therefore we get\nL000250\t\\begin{equation}\nL000251\t    \\mathrm{Im} \\Sigma^{(1)}(k,\\epsilon_k) = - \\frac{W^2}{4 \\sin k} (S(0) + S(2k)),\nL000252\t\\end{equation}\nL000253\tand the inverse mean survival time, through second order in $W$, is given by\nL000254\t\\begin{equation}\nL000255\t    \\frac{1}{\\tau(k)} = \\frac{W^2}{2 \\sin k} S(2k),\nL000256\t\\end{equation}\nL000257\twhere we dropped the forward scattering contribution $S(0)$, which does not contribute to the localization length. We then finally get\nL000258\t\\begin{equation}\nL000259\t\\label{eq:first-order}\nL000260\t    \\frac{1}{\\xi(k)} = \\frac{W^2}{8 \\sin^2 k} S(2k).\nL000261\t\\end{equation}\nL000262\tA few comments are in order.\nL000263\tThe result in Eq.~\\eqref{eq:first-order} is well known, and coincides with the finding of Izrailev and Krokhin~\\cite{izrailev_localization_1999}. This result can also be derived from Boltzmann conductivity~\\cite{herbut2000commentlocalizationmobilityedge}, and using Fermi's Golden Rule~\\cite{Licciardello_1975_Conductivity,scardicchio2017perturbationtheoryapproachesanderson}. Note also that the expression in Eq.~\\eqref{eq:first-order} is analogous to the one found within the strong-contrast expansion for the dynamic dielectric constant in 1D stealthy hyperuniform two-phase media~\\cite{kim_effective_2023}, where the power spectrum at momentum $2k$ is replaced by the spectral density at momentum $2k$.\nL000264\t\nL000265\tIn the case of stealthy hyperuniform disorder we are interested in, it is possible to have no direct back-scattering at small $k$, as $S(q) = 0$ for $q < k_0 = 2\\pi \\chi$. Therefore, if $k_0>2k$, the right-hand side of Eq.~\\eqref{eq:first-order} vanishes, and one needs to consider higher-order contributions to the self-energy. As a sanity check, notice that the middle of the spectrum corresponds to $k=\\pi/2$, and one can avoid single back-scattering at $E \\simeq 0$ only if $\\chi \\simeq 1/2$.\nL000266\t\nL000267\tLet us then consider the case $k_0>2k$ and study the second-order correction to the self-energy, $\\Sigma^{(2)}(k,\\epsilon_k)$, and consider the diagram $\\Sigma^{(2)}_{\\mathrm{cross}}(k,\\epsilon_k)$---the discussion for $\\Sigma^{(2)}_{\\mathrm{non-cross}}(k,\\epsilon_k)$ is analogous.\nL000268\tSince we are interested in the imaginary part of $\\Sigma^{(2)}_{\\mathrm{cross}}(k,\\epsilon_k)$, there are two possibilities: either we take the imaginary parts of all three Green's functions, or the imaginary part of one and the real part of the other two.\nL000269\tThe former imposes $\\delta(\\epsilon_k-\\epsilon_{k-q_1})\\delta(\\epsilon_k-\\epsilon_{k-q_2})\\delta(\\epsilon_k-\\epsilon_{k-q_1-q_2})$, which can be satisfied only if $q_1=q_2=0$---so no back-scattering---or if $q_1 = 2k$ and $q_2 = 0$---which then gives $S(2k) = 0$ since $2k<k_0$.\nL000270\tWe can instead obtain a non-trivial result when considering $\\mathrm{Im} \\, G_0(k-q_1-q_2,E)$ and the real part of $G_0(k-q_1,E)$ and $G_0(k-q_2,E)$. This gives\nL000271\t\\begin{multline}\nL000272\t     \\mathrm{Im}\\, \\Sigma^{(2)}_{\\mathrm{cross}}(k,\\epsilon_k) = -\\pi W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\\times\\\\\nL000273\t    \\mathcal{P}\\left(\\frac{1}{\\epsilon_k - \\epsilon_{k-q_1}}\\right)\\mathcal{P}\\left(\\frac{1}{\\epsilon_k - \\epsilon_{k-q_2}}\\right)\\delta(\\epsilon_k-\\epsilon_{k-q_1-q_2}).\nL000274\t\\end{multline}\nL000275\tTherefore, one can now get back-scattering by satisfying the equation\nL000276\t\\begin{gather}\nL000277\t    q_1+q_2 = 2k\\ \\mathrm{mod}\\, 2\\pi, \\\\\nL000278\t    {\\rm where} \\; k_0 \\le | q_{1,2}| < \\pi \\; {\\rm and} \\; 2k< k_0. \\nonumber\nL000279\t\\end{gather}\nL000280\tThe first constraint comes from the stealthy hyperuniform disorder, and the second constraint is given by the perturbation theory order. Clearly, there is a solution only for $q_1>0$ and $q_2 <0$ or vice versa. Such an equation can be satisfied only if $k_0 < \\pi-k$. It is easy to show that $\\Sigma^{(2)}_{\\mathrm{non-cross}}(k,\\epsilon_k)$ gives the same conditions. Henceforth, one can compute explicitly the correction to $\\xi(k)$ at second order, which will be of the form $\\xi \\sim W^{-4}$. We report the calculation in the Supplemental Material.\nL000281\t\nL000282\tWe can see, however, that not all possible combinations of $k$ (or energy $\\epsilon_k$) and $k_0$ (or $\\chi$) are included up to second order. This means that there are values of energy and size of the stealthiness parameter $\\chi$ for which the first non-zero contribution to the $\\xi$ occurs at third or higher order, corresponding to $\\xi \\sim W^{-2n}$ for $n\\ge 3$. For instance, assume that $k_0 > \\pi - k$ (given by $\\Sigma^{(2)}=0$) and, at the same time, $k_0 > 2k$ (given by $\\Sigma^{(1)}=0$): then computing $\\Sigma^{(3)}(k,\\epsilon_k)$, one finds that, in this range of parameters, it is possible to have back-scattering if there is a solution to the equation\nL000283\t\\begin{gather}\nL000284\t\\label{eq:rangeEq}\nL000285\t    q_1 + q_2 + q_3 = 2k\\ \\mathrm{mod}\\, 2\\pi,\nL000286\t    \\\\ {\\rm where} \\; k_0 \\leq |q_{1,2,3}| < \\pi \\; {\\rm and} \\; \\pi-k_0 < k < \\frac{k_0}{2}.  \\nonumber\nL000287\t\\end{gather}\nL000288\tEquation~(\\ref{eq:rangeEq}) can be satisfied either for $(3k_0 - 2\\pi)/2 < k< k_0/2$ if $4\\pi/5 < k_0 < \\pi$ or for $\\pi - k_0 < k < k_0/2$ if $2\\pi/3 < k_0 < 4\\pi/5$. For this range of parameters, $\\xi \\sim W^{-6}$.\nL000289\t\nL000290\tOnce again, not all possible values of $k$ and $k_0$ give a non-vanishing contribution to $\\mathrm{Im}\\, \\Sigma(k,\\epsilon_k)$ up to third order. To find the leading non-zero contribution to $\\xi$, higher orders need to be included.\nL000291\tBy studying the equations corresponding to Eq.~\\eqref{eq:rangeEq} up to fifth-order in perturbation theory, we can infer that the boundaries between different regions are\nL000292\t\\begin{equation}\nL000293\t\\label{eq:separatixes}\nL000294\t    k=\nL000295\t    \\begin{cases}\nL000296\t        \\frac{a}{2}(k_0-\\pi) + \\frac{\\pi}{2}, \\quad a = n\\pi, \\quad n \\in \\mathbb{N},\\\\\nL000297\t        b(\\pi - k_0), \\quad b = m\\pi, \\quad m \\in \\mathbb{N}.\nL000298\t    \\end{cases}\nL000299\t\\end{equation}\nL000300\t\nL000301\tWe can represent our findings in a diagram, showing, for each value of $k$ (or energy) and $k_0$ (or stealthy parameter $\\chi$), the scaling of the localization length $\\xi$ to leading order in $W$, as shown in Fig.~\\ref{fig:phasediagr}. We present the diagram for other types of stealthy disordered potentials in the Supplemental Material.\nL000302\t\\begin{figure}\nL000303\t    \\centering\nL000304\t    \\includegraphics[width=\\linewidth]{Diagrams.pdf}\nL000305\t\nL000306\t\nL000307\t    \\caption{Phase diagram showing the dependence of the localization length $\\xi(k,k_0)$ on the disorder strength $W$ at the leading non-vanishing order in perturbation theory. We also indicate the expression for the separatrices between different regions, whose general expression is given in Eq.~\\eqref{eq:separatixes}. The red dotted line indicates the energy for which we will present numerical results.}\nL000308\t    \\label{fig:phasediagr}\nL000309\t\\end{figure}\nL000310\tDifferent regions represent different leading order non-zero contributions to the localization length, indicated by the power in the white circles. The scaling with $W^{-2}$ is the usual Anderson localization behavior that one also gets with ordinary (non-stealthy) disorder. The vertical line at $k_0 = \\chi = 0$, corresponding to uncorrelated disorder, always exhibits this behavior, as expected.\nL000311\t\nL000312\tThe inverse localization length can be expressed as an asymptotic series in powers of $W^{2}$ as\nL000313\t\\begin{equation}\nL000314\t\\label{eq:seriesxi}\nL000315\t    \\frac{1}{\\xi(k,k_0)} \\sim \\sum_{n=1}^{\\infty} a_{2n}(k,k_0) \\,W^{2n}.\nL000316\t\\end{equation}\nL000317\tAlong the line $k_0 = \\chi = 0$, each term in the series expansion of Eq.~\\eqref{eq:seriesxi} is non-vanishing.\nL000318\tBy increasing the value of $\\chi$, one gets different scalings of the localization length depending on the energy. This means that, for those values of $k$ and $k_0$, some of the lower order terms $a_{2n}(k,k_0)$ in Eq.~\\eqref{eq:seriesxi} are vanishing.\nL000319\tIn approaching the line $k_0=\\pi$, i.e. $\\chi = 1/2$, which corresponds to the lattice (no disorder), the index $m$ such that $a_{2n} = 0$ for $n<m$ is increasing, and ultimately $m \\to \\infty$ for $\\chi \\to 1/2$.\nL000320\t\nL000321\tThe series in Eq.~\\eqref{eq:seriesxi} is an asymptotic expansion in small $W^2$, which is diverging when non-perturbative effects are excluded, as very often occurs in perturbative calculations~\\cite{Dyson1952Divergence}. Once such non-perturbative effects are taken into account, the divergence is removed and the result can be written as a finite number of terms up to $n=N$ plus a small remainder, which is of order $o(W^{2N})$. When doing so, the vanishing of the lower order terms due to the stealthiness condition implies a larger localization length, scaling with the first non-zero term in $W^2$. In the next Section, we will show that this is indeed the case by numerically computing the dependence of the localization length $\\xi$ on $W$ at different values of $\\chi$, which properly accounts for the remainder terms.\nL000322\t\nL000323\tIn this section, we have discussed the series of transitions in the leading order contribution to the localization length at small disorder $W$.  In the Supplementary Material, we show that analogous transitions occur in the level splitting of adjacent energy levels that become degenerate as $W \\to 0$ due to the $k\\to -k$ symmetry.\nL000324\t\nL000325\t\\section{Numerical results}\nL000326\t\nL000327\tAn eigenstate $\\psi_{\\alpha}$ of the Hamiltonian $H$ with eigenvalue $E_{\\alpha}$ is exponentially localized with localization length $\\xi_{\\alpha}$ if $|\\psi_{\\alpha}|^2 \\sim e^{r/\\xi_{\\alpha}}/\\xi_{\\alpha}$. The participation entropy is defined as $S_{\\alpha} = -\\int_0^{\\infty} dr |\\psi_{\\alpha}(r)|^2 \\ln |\\psi_{\\alpha}(r)|^2$, and we can define the corresponding fractal dimension\nL000328\t\\begin{equation}\nL000329\t\\label{eq:fracdim}\nL000330\t    D_{\\alpha} \\equiv \\frac{S_{\\alpha}}{\\ln L} \\simeq \\frac{1 + \\ln \\xi_{\\alpha}}{\\ln L},\nL000331\t\\end{equation}\nL000332\twhich corresponds to the usual definition of fractal dimension $D_1$ found in the literature~\\cite{Chalker1996Spectral,Bogomolny2011Eigenfunction,kutlin2024investigating}.\nL000333\t\nL000334\tWe compute numerically the fractal dimension from the eigenstates of the Hamiltonian and extract the localization length from the slope of the fractal dimension as a function of $1/\\ln L$ for large $L$, according to Eq.~\\eqref{eq:fracdim}. We consider system sizes up to $L=800000$ and average the obtained $D_{\\alpha}$ over at least $1000$ disorder realizations and over $20$ eigenstates around the target energy $E_{\\alpha}$.\nL000335\t\nL000336\t\\begin{figure}\nL000337\t    \\centering\nL000338\t    \\includegraphics[height=0.7\\linewidth]{corr_length_E-1.80.pdf}\nL000339\t    \\caption{Localization length as a function of $\\chi$ for different values of $W$. The vertical lines are positioned where the perturbation theory predicts a change in the first non-vanishing contribution (corresponding to the first two red dots from the left in Fig.~\\ref{fig:phasediagr}). Further transitions require system sizes larger than the numerically accessible one.}\nL000340\t    \\label{fig:loclength_chi}\nL000341\t\\end{figure}\nL000342\t\\begin{figure}\nL000343\t    \\centering\nL000344\t    \\includegraphics[height=0.7\\linewidth]{corr_length_E-1.80_chi.pdf}\nL000345\t    \\caption{Localization length as a function of $\\log W$ for different values of $\\chi$, as shown in the legend, obtained for eigenstates at energy $E = -1.8$, corresponding to the horizontal red line in Fig.~\\ref{fig:phasediagr}. For $\\chi=0.1$, the perturbation theory predicts that $\\xi \\sim W^{-2}$, as confirmed by the numerical result (see red dashed line, which is a guide for the eye). For $\\chi=0.2, \\, 0.25,\\, 0.3$ the perturbation theory predicts $\\xi \\sim W^{-4}$, as confirmed by the numerical result.}\nL000346\t    \\label{fig:loclength_W}\nL000347\t\\end{figure}\nL000348\t\nL000349\tWe show in Fig.~\\ref{fig:loclength_chi} the localization length as a function of $\\chi$ for a few values of $W$, where the energy is fixed at $E=-1.8$, corresponding to the red dashed line in the top panel of Fig.~\\ref{fig:phasediagr}. By increasing $\\chi$, the localization length $\\xi$ shows sudden increases. Notice that, by decreasing $W$, the transitions in numerical curves are becoming steeper and the $\\chi$ values where they occur are going towards the perturbation theory prediction, reported as vertical black dashed lines, corresponding to the first two red dots from the left in the top panel of Fig.~\\ref{fig:phasediagr}.\nL000350\tSubsequent transitions are not visible due to the limited system sizes that can be reached numerically.\nL000351\t\nL000352\tIn Fig.~\\ref{fig:loclength_W}, we report the scaling of $\\xi$ with $W$ for a few values of $\\chi$. For $\\chi = 0.1$, the perturbation theory predicts the scaling $\\xi \\sim W^{-2}$, as indeed confirmed from the numerical results. For higher values of $\\chi = 0.2,\\, 0.25,\\, 0.3$, the perturbation theory predicts $\\xi \\sim W^{-4}$, as confirmed once again by the numerical data. Therefore, we have confirmed that perturbation theory correctly predicts the scaling $\\xi \\sim W^{-2n}$ and the transition from $n=1$ to $n=2$.\nL000353\t\nL000354\t\nL000355\t\nL000356\t\\section{Discussion}\nL000357\t\nL000358\tGenerically, disordered stealthy hyperuniform materials lack Bragg peaks similar to liquid-like disordered systems and yet suppress long-range density fluctuations as crystals.\nL000359\tOur results indicate that stealthy disorder represents an intermediate regime when it comes to localization in 1D quantum disordered systems as well. The stealthiness parameter $\\chi$ acts as a control knob that varies between $\\chi = 0$, corresponding to a random potential whose values are uncorrelated, and $\\chi = 1/2$, corresponding to a periodic potential.\nL000360\tStealthy disorder leads to effective delocalization, in which the localization length scales as $W^{-2n}$ where $n>1$.\nL000361\t\nL000362\tMore precisely, for an arbitrarily large system size $L$, fixed small disorder $W$, and fixed energy $E$, there exists a stealthy interval size $\\chi < 1/2$ for which $a_{2n} = 0$ (see Eq.~\\eqref{eq:seriesxi}) for all $n<m$ with $m$ arbitrarily large, thus meaning that the localization length $\\xi$ exceeds the system size $L$. Therefore, for all practical purposes, there is a finite continuous range of effectively extended states, associated with the energy $E$, and the system is effectively delocalized. In the limit $\\chi \\rightarrow 1/2$, we expect non-perturbative effects not captured by our treatment to make non-negligible contributions.  We leave the investigation of this region of the phase diagram for future work.\nL000363\t\nL000364\tWe obtained the aforementioned result by computing the localization length in the 1D Anderson model with stealthy disorder, such that its power spectrum vanishes for a continuous band.\nL000365\tFrom the perturbative expansion of the imaginary part of the self-energy, we were able to determine, for each value of the energy and of the stealthiness parameter $\\chi$, the leading contribution $W^{-2n}$, $n\\ge 1$, to the localization length $\\xi$, summarized in Fig.~\\ref{fig:phasediagr}.\nL000366\tWe supported our findings with a numerical analysis of the localization length extracted from the fractal dimension of eigenstates of a given energy.\nL000367\tOur results show that stealthy disorder makes it possible to tune how the localization length scales, enabling it to become larger than the system size even when the disorder variance is held fixed. Unlike uncorrelated disorder, for which $\\xi$ scales as $W^{-2}$ to leading order for small $W$, the result for stealthy disordered systems is that the leading order terms in the perturbation expansion of $\\xi$ vanish identically for a progressively large number of terms as $\\chi$ increases such that $\\xi$ scales as  $W^{-2n}$ with arbitrarily large $n$, where $n$ is a positive integer.\nL000368\t\nL000369\t\nL000370\tOur findings for the Anderson model are reminiscent of recent studies on the propagation of light in a one-dimensional layered medium~\\cite{kim_effective_2023,torquato_nonlocal_2021,klatt2025transparencyversusandersonlocalization}. The disorder strength $W$ in the Anderson problem is analogous to the dielectric contrast in the two-phase layered medium~\\cite{torquato_nonlocal_2021}. In the latter case, complete transparency can be shown to occur at least up to third order in the strong dielectric contrast expansion~\\cite{kim_effective_2023,torquato_nonlocal_2021} for a finite continuous range of frequencies, which matches the result for the tight-binding Anderson model where contributions to the localization length are zero to $2n$-th order for arbitrarily large finite $n$. Moreover, the momentum dependence of the imaginary part of the self-energy in the Anderson problem parallels that of the nonlocal attenuation function in the 1D stealthy two-phase medium~\\cite{kim_effective_2023}.\nL000371\t\nL000372\tFrom a practical perspective, the Anderson model with stealthy disorder can be realized on currently available experimental platforms, such as ultracold atoms in optical lattices, waveguide arrays, photonic lattices in photorefractive crystals in the paraxial regime of propagation, or other programmable quantum simulators, which provide a high degree of tunability of the potential~\\cite{Billy2008,roati2008anderson, Sc07b, lahini_anderson_2008, Schreiber2015Observation,Smith2016}. In addition, stealthy hyperuniformity was recently realized and probed experimentally in a two-dimensional photonic crystal slab platform~\\cite{barsukova2025stealthy}.\nL000373\tWe leave the intriguing question of stealthy hyperuniformity in interacting quantum systems for future work.\nL000374\t\nL000375\t\nL000376\t\nL000377\t\\acknowledgments\nL000378\t\nL000379\tWe are grateful to Federico Balducci for his useful suggestions and collaboration on related topics. We also acknowledge fruitful discussions with Miguel Gonçalves, David Huse, Jaeuk Kim, and Antonello Scardicchio.\nL000380\tThe work of JK, MCR, PJS, ST, and CV was supported by the Army Research Office\nL000381\tunder Cooperative Agreement No. W911NF-22-2-0103.\nL000382\t\nL000383\t\nL000384\t\nL000385\t\\bibliography{references.bib}\nL000386\t\\pagebreak\nL000387\t\\widetext\nL000388\t\\newpage\nL000389\t\nL000390\t\\section*{--- Supplemental Material ---}\nL000391\t\nL000392\t\\subsection{Stealthy non-hyperuniform potentials}\nL000393\t\nL000394\tIn the main text, we discussed in detail the perturbation theory calculation of the localization length and the corresponding numerical results in the case of stealthy hyperuniform disorder, motivated by the recent results on optical properties in layered 1D media~\\cite{klatt2025transparencyversusandersonlocalization}.\nL000395\tAs stated in the main text, the method we presented is valid for any stealthy potential, i.e., with a continuous interval of wave numbers for which the power spectrum vanishes.\nL000396\t\nL000397\tIn this Section, we report the phase diagram, equivalent to Fig. 3 of the main text, for other types of stealthy potentials.\nL000398\t\\begin{figure}[h!]\nL000399\t    \\centering\nL000400\t    \\includegraphics[width=\\linewidth]{Multi_stealthy.pdf}\nL000401\t    \\caption{Different types of stealthy disordered correlations. }\nL000402\t    \\label{fig:Kq_suppl}\nL000403\t\\end{figure}\nL000404\tIn Fig.~\\ref{fig:Kq_suppl} we show three different types of disordered stealthy potentials, whose graphical representation is reported in the first row and labeled (a)-(c).\nL000405\tFor each of them, we show the resulting diagram in the bottom row, obtained following the same procedure presented in the main text for the hyperuniform case.\nL000406\tFigure~\\ref{fig:Kq_suppl} (a) represents a non-hyperuniform stealthy disorder, for which $S(q) = 0$ for $|q|>k_0$. The different position of the stealthy interval leads to a larger localization length near the middle of the spectrum $k=\\pi/2$, rather than the edge $k=0$, as we showed in the main text. This result is equivalent to the one presented in Ref.~\\cite{Lugan2009Onedimensional} for the case of speckle potentials.\nL000407\tFigure~\\ref{fig:Kq_suppl} (b) shows a stealthy hyperuniform disorder, in which the power spectrum vanishes both near $q=0$ and $q=\\pi$, and is often called “multi-stealthy\". In this case, both the center and the edge of the spectrum display a larger localization length, as visible in the diagram. In Figure~\\ref{fig:Kq_suppl} (c), we show another example of non-hyperuniform stealthy disorder, in which the power spectrum vanishes around $q=\\pi/2$. In this case, both the edge and the middle of the spectrum maintain a small localization length $\\xi \\sim W^{-2}$, while for intermediate energies $k \\sim \\pi/4$ it becomes increasingly larger, $\\xi \\sim W^{-2n}$, $n \\ge 2$.\nL000408\t\nL000409\tThe results shown in Fig.~\\ref{fig:Kq_suppl} confirm that the stealthiness condition is instrumental for the suppression of back-scattering, even in the non-hyperuniform case. Also in these cases, it is possible to find a range of values of $k_0$ for which the potential is disordered and the localization length can be made larger than the system size for a fixed energy and disorder strength.\nL000410\t\nL000411\t\nL000412\t\\subsection{Details of the numerical phase diagram}\nL000413\tIn Fig.~\\ref{fig:fits_suppl} (left), we show the phase diagram obtained by numerically computing the localization length with the transfer matrix method, where the scaling exponent $n$ (see Eq.~\\eqref{eq:seriesxi}) is determined with a linear fit $\\log \\xi = - 2n \\log W + C$ sweeping over the phase diagram in $25 \\times 25$ resolution.\nL000414\tWe obtained this full $(k,\\chi)$ phase diagram by automatically fitting the localization length and extracting the value of $n$ for each $(k, \\chi)$ possible. To capture phases with higher $n$, we choose a larger $L=5\\cdot 10^6$ here. To achieve the larger system size efficiently, the transfer matrix method is used.\nL000415\tThe discrepancy between the theoretical prediction and the results shown in Fig.~\\ref{fig:fits_suppl}  in the region near $k=0$ is a numerical artifact due to the asymptotic scaling behavior requiring a larger sample size to set in for this range of $k$.\nL000416\t\nL000417\tIn Fig~\\ref{fig:fits_suppl} (right), we show the data used for the fits at fixed $\\chi=0.25$ and three values of $k$ in distinct phases with $n=1,2,3$. Up to $16$ data points in $W$ enter the fit; points with a localization length larger than the system are excluded from the fit.\nL000418\t\nL000419\t\\begin{figure}[h!]\nL000420\t    \\centering\nL000421\t    \\includegraphics[width=.48\\linewidth]{Fig1.png}\nL000422\t    \\includegraphics[width=.48\\linewidth]{Fig2.png}\nL000423\t    \\caption{{\\it(Left)} Numerical phase diagram, obtained by computing the localization length with the transfer matrix method. More details are provided in the Supplemental Material. Near $k=0$, the fitting deviates from the theoretical prediction because the asymptotic behavior sets in beyond the sample size, $L=5\\cdot 10^6$. In the gray region at large $k$, the localization length exceeds the numerical finite size. {\\it(Right)} Data used for fitting the scaling exponent $n$ in the phase diagram in Fig.~\\ref{fig:phasediagr} (bottom panel) for $\\chi=0.33$ and for three values of $k$ in phases with $n=1,2,3$.}\nL000424\t    \\label{fig:fits_suppl}\nL000425\t\\end{figure}\nL000426\t\nL000427\t\nL000428\t\nL000429\t\nL000430\t\\subsection{Disorder dependence in the level splitting}\nL000431\t\nL000432\tAs anticipated in the main text, the transitions observed in the leading contribution to the localization length in the perturbative expansion at small $W$ in the presence of stealthy disorder can also be observed in the energy levels of the model.\nL000433\tIn the absence of disorder, i.e., $W=0$, the spectrum is doubly degenerate, due to the symmetry $k \\to -k$, as $\\epsilon_k = - 2 \\cos k$.\nL000434\t\nL000435\tLet us consider two degenerate levels $E_1^0 = E_2^0 = E^0$ at zero disorder, and let us denote with $\\ket{\\psi_1^0}$ and $\\ket{\\psi_2^0}$ the corresponding eigenstates. When a small disorder is turned on, the degeneracy is lifted (since there are no other symmetries). The splitting can be computed using degenerate perturbation theory, and, at first order, the new energies of $\\ket{\\psi_1}$ and $\\ket{\\psi_2}$ are\nL000436\t\\begin{equation}\nL000437\t    E_1 = E_1^0 + |\\bra{\\psi_1} V \\ket{\\psi_2}|, \\quad E_2 = E_2^0 -|\\bra{\\psi_1} V \\ket{\\psi_2}|\nL000438\t\\end{equation}\nL000439\tso that\nL000440\t\\begin{equation}\nL000441\t    \\Delta E_{12} = 2|\\bra{\\psi_1} V \\ket{\\psi_2}|.\nL000442\t\\end{equation}\nL000443\tIn the case of uncorrelated disorder, the matrix element $\\bra{\\psi_1} V \\ket{\\psi_2} \\neq 0$, and in particular is proportional to $W$, so that $\\Delta E_{12} \\propto W$. In the case of stealthy disorder, however, the matrix element $\\bra{\\psi_1} V \\ket{\\psi_2}$ can be zero if the potential $V$ has no Fourier components connecting $k$ to $-k$, namely if $\\tilde{V}(2k) = 0$. When this happens, one needs to go to the second order in degenerate perturbation theory, and the effective potential connecting the two levels is\nL000444\t\\begin{equation}\nL000445\t    V_{12}^{(\\mathrm{eff})} = \\sum_{q \\neq 1,2} \\frac{\\bra{\\psi_1} V \\ket{q}\\bra{q} V \\ket{\\psi_2}}{E^0 - E_q},\nL000446\t\\end{equation}\nL000447\tso that $\\Delta E_{12} \\simeq 2 |V_{12}^{(\\mathrm{eff})}| \\propto W^2$. If even $V_{12}^{(\\mathrm{eff})} = 0$ at second order due to the stealthiness condition, the third order should be considered, similar to the case of the imaginary part of the self-energy.\nL000448\t\nL000449\tNote that $\\Delta E_{12} \\sim \\sqrt{\\frac{1}{\\xi(E)}}$; {\\it e.g.,}  when $\\Delta E_{12} \\propto W$, $1/\\xi(E) \\propto W^2$. This can be understood from Fermi's Golden Rule, stating that the transition rate between the states $\\ket{\\psi_1}$ and $\\ket{\\psi_2}$ with density of states $\\rho(E^0)$ is given by\nL000450\t\\begin{equation}\nL000451\t    \\Gamma_{1\\to 2} = 2\\pi |\\bra{\\psi_1} V \\ket{\\psi_2}|^2 \\rho(E^0).\nL000452\t\\end{equation}\nL000453\tThe mean survival time associated with backscattering is $\\tau_{12} \\sim 1/\\Gamma_{1\\to 2}$, and therefore the localization length scales as the inverse of $\\Gamma_{1\\to 2}$. When $\\Delta E_{12} \\propto W$, $\\Gamma_{1\\to2} \\sim 1/\\xi(E) \\propto W^2$, etc.\nL000454\t\nL000455\tThis can also be seen in the numerical data, as reported in Figs~\\ref{fig:Ediff_W} and~\\ref{fig:Ediff_chi}.\nL000456\t\\begin{figure}\nL000457\t    \\centering\nL000458\t    \\includegraphics[width=0.49\\linewidth]{Ediff_chi0.3000_L1000_Esmall.pdf}\nL000459\t    \\includegraphics[width=0.49\\linewidth]{Ediff_chi0.3000_L1000_Elarge.pdf}\nL000460\t    \\caption{Level splitting of two degenerate energy levels in the zero disorder limit as a function of $W$. (Left) For $\\chi = 0.3$ and small energy, such that $\\xi \\sim W^{-4}$, the level spacing is $\\Delta E \\sim W^2$. (Right) For the same stealthiness but bigger energy, such that $\\xi \\sim W^{-2}$, the level spacing $\\Delta E \\sim W$.}\nL000461\t    \\label{fig:Ediff_W}\nL000462\t\\end{figure}\nL000463\t\nL000464\t\\begin{figure}\nL000465\t    \\centering\nL000466\t    \\includegraphics[width=0.49\\linewidth]{Ediff_W0.3000_L1000_Esmall.pdf}\nL000467\t    \\includegraphics[width=0.49\\linewidth]{Ediff_W0.3000_L1000_Elarge.pdf}\nL000468\t    \\caption{Level splitting of two degenerate energy levels in the zero disorder limit for fixed $W$ and across $\\chi$. The vertical lines are determined by the perturbation theory for the self-energy, and the transitions observed in the level splitting coincide, both at small and large energies.}\nL000469\t    \\label{fig:Ediff_chi}\nL000470\t\\end{figure}\nL000471\t\nL000472\t\nL000473\t\nL000474\t\nL000475\t\nL000476\t\\subsection{Fourth order coefficient}\nL000477\t\nL000478\tWe report here the computation of the $W^4$ contribution to the inverse localization length, in the regime in which the $W^2$ contribution vanishes, namely $2k < k_0 < \\pi - k$.\nL000479\tTo do so, we need to compute the diagrams $\\Sigma^{(2)}_{\\mathrm{cross}}(k,E)$ and $\\Sigma^{(2)}_{\\mathrm{non-cross}}(k,E)$, given by\nL000480\t\\begin{equation}\nL000481\t    \\Sigma^{(2)}_{\\mathrm{cross}}(k,E) = W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\nL000482\t    G_0(k-q_1,E)G_0(k-q_2,E)G_0(k-q_1-q_2,E),\nL000483\t\\end{equation}\nL000484\t\\begin{equation}\nL000485\t    \\Sigma^{(2)}_{\\mathrm{non-cross}}(k,E) = W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\nL000486\t    [G_0(k-q_1,E)]^2G_0(k-q_1-q_2,E).\nL000487\t\\end{equation}\nL000488\tWhen $\\Sigma^{(1)}(k,\\epsilon_k) = 0$, we get, following our discussion in the main text,\nL000489\t\\begin{equation}\nL000490\t    \\mathrm{Im}\\, \\Sigma^{(2)}_{\\mathrm{cross}}(k,\\epsilon_k) = -\\pi W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\nL000491\t    \\mathcal{P}\\left(\\frac{1}{\\epsilon_k - \\epsilon_{k-q_1}}\\right)\\mathcal{P}\\left(\\frac{1}{\\epsilon_k - \\epsilon_{k-q_2}}\\right)\\delta(\\epsilon_k-\\epsilon_{k-q_1-q_2}),\nL000492\t\\end{equation}\nL000493\t\\begin{equation}\nL000494\t    \\mathrm{Im}\\, \\Sigma^{(2)}_{\\mathrm{non-cross}}(k,\\epsilon_k) = -\\pi W^4 \\int_{-\\pi}^{\\pi} \\frac{dq_1}{2\\pi}\\int_{-\\pi}^{\\pi} \\frac{dq_2}{2\\pi} S(q_1)S(q_2)\nL000495\t    \\left[\\mathcal{P}\\left(\\frac{1}{\\epsilon_k - \\epsilon_{k-q_1}}\\right)\\right]^2\\delta(\\epsilon_k-\\epsilon_{k-q_1-q_2}).\nL000496\t\\end{equation}\nL000497\tThe $\\delta$-function, in the case of back-scattering we are interested in, is given by\nL000498\t\\begin{equation}\nL000499\t    \\delta(\\epsilon_k-\\epsilon_{k-q_1-q_2}) = \\frac{\\delta(q_2-2k+q_1)}{2 \\sin(k)},\nL000500\t\\end{equation}\nL000501\tand thus\nL000502\t\\begin{equation}\nL000503\t    \\mathrm{Im}\\, \\Sigma^{(2)}_{\\mathrm{cross}}(k,\\epsilon_k) = -\\frac{\\pi W^4}{32\\pi^2 \\sin(k)} \\int_{[-\\pi,-k_0]\\cup [k_0,\\pi]} dq_1\nL000504\t    \\left(\\frac{1}{\\cos(k) - \\cos(k-q_1)}\\right)\\left(\\frac{1}{\\cos(k) - \\cos(-k+q_1)}\\right),\nL000505\t\\end{equation}\nL000506\t\\begin{equation}\nL000507\t    \\mathrm{Im}\\, \\Sigma^{(2)}_{\\mathrm{non-cross}}(k,\\epsilon_k) = -\\frac{\\pi W^4}{32\\pi^2 \\sin(k)} \\int_{[-\\pi,-k_0]\\cup [k_0,\\pi]} dq_1\nL000508\t    \\left(\\frac{1}{\\cos(k) - \\cos(k-q_1)}\\right)^2.\nL000509\t\\end{equation}\nL000510\tThe two integrals are equal, and thus\nL000511\t\\begin{align}\nL000512\t    \\mathrm{Im}\\, \\Sigma^{(2)}(k,\\epsilon_k) &= -\\frac{\\pi W^4}{16\\pi^2 \\sin(k)} \\int_{[-\\pi,-k_0]\\cup [k_0,\\pi]} dq_1\nL000513\t    \\left(\\frac{1}{\\cos(k) - \\cos(k-q_1)}\\right)^2\\\\\nL000514\t    &= -\\frac{\\pi W^4}{16\\pi^2 \\sin(k)} \\left[\nL000515\t    \\frac{1}{2} \\csc ^2(k) \\left(-\\csc (k) \\sin \\left(\\frac{k_0}{2}\\right) \\left(\\csc\nL000516\t   \\left(k-\\frac{k_0}{2}\\right)+\\csc \\left(k+\\frac{k_0}{2}\\right)\\right)\\right.\\right.\\\\\nL000517\t   & \\qquad \\qquad \\left.\\left.\nL000518\t   -2\nL000519\t   \\cot (k) \\log \\left(\\sin \\left(k+\\frac{k_0}{2}\\right) \\left(-\\csc\nL000520\t   \\left(k-\\frac{k_0}{2}\\right)\\right)\\right)+2 \\cot\nL000521\t   \\left(\\frac{k_0}{2}\\right)\\right) \\right].\nL000522\t\\end{align}\nL000523\tThe inverse localization length is then\nL000524\t\\begin{align}\nL000525\t \\label{eq:second-order}\nL000526\t    \\frac{1}{\\xi(k)} = \\frac{W^4}{32\\pi \\sin^2(k)} &\\left[\nL000527\t    \\frac{1}{2} \\csc ^2(k) \\left(-\\csc (k) \\sin \\left(\\frac{k_0}{2}\\right) \\left(\\csc\nL000528\t   \\left(k-\\frac{k_0}{2}\\right)+\\csc \\left(k+\\frac{k_0}{2}\\right)\\right)\\right.\\right.\\\\\nL000529\t   &\\left.\\left.\nL000530\t   -2\nL000531\t   \\cot (k) \\log \\left(\\sin \\left(k+\\frac{k_0}{2}\\right) \\left(-\\csc\nL000532\t   \\left(k-\\frac{k_0}{2}\\right)\\right)\\right)+2 \\cot\nL000533\t   \\left(\\frac{k_0}{2}\\right)\\right) \\right].\nL000534\t\\end{align}\nL000535\tOne can compute the leading order term in $\\pi - k_0$, or equivalently $1/2 - \\chi$. By expanding the above expression around $k_0 = \\pi$, we get.\nL000536\t\\begin{align}\nL000537\t    \\frac{1}{\\xi(k)} = \\frac{W^4}{32\\pi \\sin^2(k)}\\frac{(\\pi-k_0)}{2} \\left[\\sec ^2(k) - \\frac{1}{24} (\\pi - k_0 )^2 (\\cos (2 k)-5)\nL000538\t   \\sec ^4(k)+O\\left((\\pi -k_0)^3\\right)\\right]\nL000539\t\\end{align}\nL000540\t\nL000541\t\nL000542\t\\end{document}\nL000543\t===== END FILE: main.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,1161 @@
+===== BEGIN FILE: main.tex =====
+\documentclass[prl,twocolumn, aps,amssymb,longbibliography,showpacs,superscriptaddress,nofootinbib,floatfix]{revtex4-1}
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{dcolumn}
+\usepackage{siunitx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{mathtools}
+\usepackage{svg}
+\usepackage[english]{babel}
+\usepackage{physics}
+
+\normalsize
+\usepackage{booktabs,makecell,tabularx}
+\usepackage{color}
+\usepackage{comment}
+\usepackage{dsfont}
+\usepackage[export]{adjustbox}
+\usepackage{multirow}
+\usepackage[normalem]{ulem}
+\setcounter{secnumdepth}{3}
+
+
+
+
+
+
+\newcommand{\expct}[1]{\langle #1 \rangle}
+
+\begin{document}
+
+
+\title{Universality of Shallow Global Quenches in Critical Spin Chains}
+\author{Julia Wei}
+\thanks{These authors contributed equally to this work.}
+\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}
+
+\author{Méabh Allen}
+\thanks{These authors contributed equally to this work.}
+\affiliation{Department of Physics, University of California, Berkeley, California 94720 USA}
+
+\author{Jack Kemp}
+\thanks{These authors contributed equally to this work.}
+\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}
+\affiliation{TCM Group, University of Cambridge, JJ Thomson Avenue, Cambridge, CB3 0US UK}
+
+\author{Chenbing Wang}
+\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}
+
+\author{Zixia Wei}
+\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}
+
+\author{Joel E. Moore}
+\affiliation{Department of Physics, University of California, Berkeley, California 94720 USA}
+\affiliation{Materials Science Division, Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA}
+
+\author{Norman Y. Yao}
+\affiliation{Department of Physics, Harvard University, Cambridge, MA 02138 USA}
+
+
+
+\begin{abstract}
+Measuring universal data in the strongly correlated regime of quantum critical points remains a fundamental objective for quantum simulators. In foundational work, Calabrese and Cardy demonstrated how this data governs the dynamics of certain global quenches to 1+1-dimensional conformal field theories.
+
+While the quasiparticle picture they introduce has been widely successful in both theory and experiment, their seminal prediction that the critical exponents are simply encoded in the relaxation rates of local observables is more challenging to investigate experimentally; in particular,  the specific initial state required for their analysis is generated via imaginary time evolution.
+
+In this work, we examine the critical quench dynamics of local observables from two types of readily-accessible initial conditions: ground states and finite-temperature ensembles.
+
+We identify universal scaling collapses and scaling functions in both cases, utilizing a combination of conformal perturbation theory and tensor network numerics.
+
+For the finite-temperature quenches, we determine a regime in which the conformal field theory results are recovered, thereby allowing universal quantum critical data to be extracted from realistic quenches.
+
+\end{abstract}
+
+\maketitle
+
+The advent of analog quantum simulators has enabled the precision investigation of
+unitary quantum many-body dynamics.
+
+This has revealed a rich landscape of emergent behavior, from anomalously slow thermalization~\cite{smith:2016, bernien:2017, bluvstein:2021, adler:2024, wang:2025, jin:2025} to anomalously fast spin transport~\cite{jepsen:2020, joshi:2022, wei:2022b, rosenberg:2024a}.
+
+A natural regime for the exploration of such correlated phenomena is the vicinity of quantum phase transitions, where  universality dictates that systems with dramatically disparate microscopic details nevertheless exhibit the same macroscopic physics.
+
+To probe this physics, two dynamical strategies are often used: sweeping through criticality to exploit the quantum Kibble-Zurek mechanism \cite{zurek2005dynamics,keesling2019quantum,dupont2022quantum, andersen:2025} or direct preparation of the quantum critical ground state \cite{dborin:2022,anand:2023, haghshenas:2024, fang2024probing}.
+
+
+One might naturally wonder if a more straightforward strategy exists.
+
+In particular, can one simply perform quench dynamics under the critical Hamiltonian in order to extract universal properties of the critical point?
+
+In addition to being especially well-suited for near-term quantum simulators, the use of such critical quenches at \emph{high energies} has recently led to the discovery of novel dynamical phase transitions~\cite{heyl:2013, heyl:2014, heyl:2015, heyl:2016, zunkovic:2016, karrasch:2017, titum:2019, titum:2020, halimeh:2020,  rossini:2020, dag:2023, dag:2023a, robertson:2023, bandyopadhyay:2023}.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.5\textwidth]{figure1_no_lightcone.pdf}
+\caption{(a) Schematic depiction of the initial state $\ket{\psi_0}$ considered by Calabrese and Cardy~\cite{calabrese2016quantum} for a quantum critical quench, generated by deforming a conformally invariant boundary state, $\ket{\psi_0^*}$, via imaginary time evolution for time $\tau_0$.
+
+(b) Two alternative initial conditions:  a ground state (purple) and a finite-temperature ensemble (red), produced by  perturbing the Hamiltonian away from the quantum critical point, $g_c$.
+
+The orange region depicts the quantum critical fan, where quantum fluctuations  dominate the system's behavior at finite temperatures.
+
+(c) Starting from these three different initial conditions, the critical quench dynamics of a local observable, $\langle \Phi(t) \rangle$, are shown.
+
+All three initial states exhibit universal dynamics in the shallow quench limit, albeit with different scaling forms.
+
+The universal regime is bounded by early-time dynamics set by the lattice spacing, $a$, and quasiparticle velocity, $v$; and late-time dynamics arising from differences between the CFT and the lattice model~\cite{SM}.
+
+}
+
+\label{fig:schematic}
+\end{figure}
+
+The broad question of whether critical quenches at \emph{low energies} can, instead, extract the universal properties of the ground-state phase transition, was explored in a set of seminal papers by Calabrese and Cardy (Fig.~\ref{fig:schematic})~\cite{calabrese2005evolution,calabrese2006time,Calabrese_Cardy_2007,calabrese2016quantum,cardy2016furtherresults}. In addition to introducing an intuitive and widely applicable~\cite{kim:2013, bonnes:2014, cotler:2016, alba:2018, bastianello:2018, bertini:2018, cevolani:2018, vonkeyserlingk:2018a, najafi:2018, bertini:2019, cao:2019, calabrese:2020, klobas:2021, schneider:2021, rottoli:2025}  quasiparticle picture since confirmed in experiments~\cite{cheneau:2012, jurcevic:2014, kaufman:2016, kormos:2017, vovrosh:2021}, this work gave a prescription to obtain much more information about the critical theory than appears in the quantum Kibble-Zurek process.
+
+The prescription is based on quenching from a specific initial state [Fig.~\ref{fig:schematic}(a)], obtained by evolving a conformally invariant boundary state in imaginary time, which is amenable to the powerful machinery of boundary conformal field theory (CFT) in 1+1D (see Appendix~A).
+
+In this context, Calabrese and Cardy showed that, under a critical quench, primary fields exhibit a simple exponential decay. Moreover, the ratio of relaxation times for any two such primary fields is \emph{universal} and given by the ratio of their scaling dimensions. Unfortunately, the specific initial state considered is not practical to realize in experiment, as it requires imaginary time evolution to prepare~\cite{nimag}.
+
+We are thus led to ask the following: are there experimentally accessible classes of initial states for which critical quench dynamics can extract the same critical information as in the full Calabrese-Cardy prescription?  And if not, are selected critical properties still manifest in those quenches?
+
+
+\begin{table}[t]
+    \begin{tabular}{lccc}
+    \toprule
+     Initial State & Scaling & U. Ratio & Exp.  \\
+    \midrule
+    $|\psi_0\rangle \propto e^{-\tau_0 H_{\textrm{c}}}|\psi_0^*\rangle$ &$\tau_0$& \checkmark & \checkmark \\
+    $|\psi_{\textrm{GS}}\rangle \propto \lim\limits_{\tau \to \infty} e^{-\tau( H_{\textrm{c}}+g H_\Psi)} |\psi_0^*\rangle$ & $g^{-\nu}$& $\cross$ & $\cross$ \\
+    \multirow{2}{*}{ $\rho_{\beta, g_\Psi} \propto e^{-\beta(H_\mathrm{c} + g_\Psi H_\Psi)}$ } & $\beta$& $\checkmark$ & \makecell[c]{$x_\Psi =1$: $\checkmark$ \\$x_\Psi \neq 1$: $\cross$ }
+    \\
+    \bottomrule
+    \end{tabular}
+\caption{\label{tab:forms}
+
+Summarizes three key properties of the critical quench dynamics starting from  different initial states: (i) the scaling collapse parameter, (ii) whether the ratio of decay times of primary fields is universal ratio~\cite{calabrese2016quantum}, and (iii) whether the decay is generically given by a simple exponential.
+
+We consider only relevant perturbations.
+
+}
+\label{table:initial_states}
+\end{table}
+
+In this Letter, we resolve this question for two of the most physically relevant types of initial conditions (Table~\ref{table:initial_states}): ground states and finite-temperature ensembles [Fig.~\ref{fig:schematic}(b)].
+
+Using a combination of  conformal perturbation theory, free fermion analytics and large-scale tensor network numerics~\cite{hauschild:2024,barthelOptimizedLieTrotter2020,SCHOLLWOCK201196,karraschReducingNumericalEffort2013}, we explore the relaxation of local observables after instantaneous, ``shallow" global quenches to criticality, where the low-energy limit is taken before the late-time [Fig.~\ref{fig:schematic}(c)].
+
+To ensure generality, we perform an extensive investigation of three distinct models (Table~\ref{table:models}): (i) the transverse-field Ising model (TFIM), (ii) the three-state Potts model, and (iii) the axial next-nearest-neighbor Ising (ANNNI) model.
+
+
+Our main results are as follows. We begin by computing critical quench dynamics for both classes of initial conditions across all three models.
+
+One might naively expect, via renormalization group arguments, that both of these initial conditions should exhibit scaling dynamics similar to that observed for the boundary-CFT initial condition~\cite{nintegr}.
+
+Although we do observe a scaling collapse for the relaxation of the primary fields in both cases, we instead uncover a distinct scaling form for the critical quench dynamics.
+
+For the ground-state initial condition, we find that the dynamics collapse  under rescaling by the energy gap.
+
+However, the ratio of relaxation times is no longer given by the ratio of scaling dimensions (Table~\ref{table:initial_states}).
+
+
+For the finite-temperature initial condition, conformal perturbation theory allows us to explicitly determine the scaling function.
+
+Inspection then reveals that the ratio of relaxation times matches the boundary-CFT expectation at late times (Table~\ref{table:initial_states}).
+
+However, at early times, the extraction of universal quantities from the ratio of relaxation times is complicated by the presence of additional terms in the scaling function.
+
+Interestingly, these additional terms drop out in the specific case of integer scaling dimension, where one recovers the simple exponential decay predicted by the boundary-CFT analysis.
+
+Finally, we describe a pair of experimental, critical quench protocols aimed at observing the  different predicted scaling behaviors (Fig.~\ref{fig:schematic}).
+
+ \begin{table}[t]
+    \begin{tabular}{lllll}
+    \toprule
+     & $\nu$ & $\Phi$& $x_{\Phi}$ & Lattice Operator \\
+    \midrule
+    \multirow{2}{*}{Ising}
+
+    &\multirow{2}{*}{1}& $\sigma_\text{I}$ & 1/8 & $Z_i$ \\
+    && $\epsilon_\text{I}$ & 1 & $Z_i Z_{i+1} - X_i$ \\
+    \midrule
+    \multirow{4}{*}{Potts } & \multirow{4}{*}{5/6\,}& $\sigma_\text{P}$ & 2/15 \, & $s_i$\\
+    && $\epsilon_\text{P}$ & 4/5 & $(s_is_{i+1}^\dagger - \tau_i) + \mathrm{h.c.}$ \\
+    && $\psi \bar \psi \,$ & 4/3 & \makecell[l]{ $s_i^\dagger(2 - 3 \omega^2 \tau_i - 3\omega \tau_i^2)$\\ - $2(s_{i-1}s_i + s_i s_{i+1})$ }\\
+    \bottomrule
+    \end{tabular}
+\caption{\label{tab:primary} Critical exponent $\nu$, primary fields $\Phi$, and scaling dimensions $x_{\Phi}$ for the 1+1D Ising and Potts conformal field theories. In the three-state Potts model, $\omega \equiv e^{2\pi i/3}$.
+
+Note that both the TFI and ANNNI models are governed by the Ising critical point.
+
+The final column depicts the lattice-to-CFT dictionaries for the critical TFI, ANNNI, and Potts models~\cite{zou2020conformal, mong2014parafermionic,SM}.}
+\label{table:models}
+\end{table}
+
+\textit{Shallow quenches to CFTs}---Let us start with the setting.
+
+Consider a system prepared in an initial state which is close to an equilibrium state of a quantum critical Hamiltonian, $H_\textrm{c}$.
+
+Here, we study the quench dynamics at the quantum critical points of three paradigmatic spin chains.
+
+First, we consider the transverse-field Ising model,
+
+\begin{equation}
+H_{\mathrm{TFI}} = -J\sum_i Z_i Z_{i+1} + (1-g)X_i,
+\label{eqn:tfi}
+\end{equation}
+
+where $Z_i$, $X_i$ are Pauli matrices.
+
+The TFIM is a non-interacting model, which allows us to take advantage of a wealth of exact results~\cite{barouch1970statistical, li:2009, degrandi:2010,Calabrese_Essler_Fagotti_2011, calabrese2012quantum, calabrese2012quantum2, delfino:2014, Essler_Fagotti_2016,delfino:2017,das:2017, hodsagi:2018,Granet_Fagotti_Essler_2020, granet:2022}.
+
+Next, we consider the three-state Potts model, an interacting integrable spin chain,
+\begin{equation}
+H_{\mathrm{Potts}} = -J\sum_i s_i^\dagger s_{i+1} + (1-g)\tau_i + \mathrm{h.c.},
+\end{equation} where $s_i$ and $\tau_i$ are the $\mathbb{Z}_3$ clock and shift operators, respectively~\cite{SM}.
+
+Finally, we consider the self-dual ANNNI  model, a non-integrable spin chain obtained by adding integrability-breaking terms to the TFIM~\cite{surace},
+
+\begin{equation}
+H_{\mathrm{ANNNI}} = H_{\mathrm{TFI}} -J \gamma\sum_i X_iX_{i+1} + Z_i Z_{i+2}.
+\end{equation}
+
+At $g = 0$ and low energies, the TFI, Potts, and ANNNI (for $-0.3 < \gamma < 250$~\cite{rahmani2015mzm,milsted2015annni,milsted2017extraction}) models are each characterized by an emergent 1+1D conformal field theory.
+
+In order to study the critical quench dynamics of the primary fields, $\Phi$, with scaling dimensions, $x_\Phi$, we measure the corresponding local lattice operators, as shown in Table~\ref{table:models}.
+
+\begin{figure*}
+\centering
+\includegraphics[width=1.0\textwidth]{figure2_with_inset_v2.pdf}
+\caption{Scaling collapse of the critical primary-field dynamics of (a) TFI (system size $L = 500$), (b) Potts ($L = 500$, bond dimension $\chi = 512$), and (c) ANNNI ($L = 2000$, $\gamma = 0.24$, $\chi = 384$) open spin chains.
+
+The initial state for the shallow quench is a ground state in the ordered phase (perturbed away from the critical point).
+
+The analytical scaling limits are shown in
+dotted gray lines for the TFIM.
+
+For $\epsilon_\mathrm{I}(t)$ in the TFIM, an additional dynamical regime is observable: at fixed $g$, coherent oscillations $\sim (Jt)^{-3/2}\cos(8J t + \pi/4)$ dominate when the long-time limit is taken before the low-energy limit, a free-fermion lattice effect~\cite{calabrese2006time,barouch1970statistical}.
+
+Generically, this limit will be governed by non-universal physics~\cite{Essler_Fagotti_2016,SM}.
+
+When the primary fields are non-Hermitian (e.g.~$\sigma_\mathrm{P}$ in the Potts model), the real part  is plotted.
+
+Insets: Depict primary-field dynamics before rescaling.
+
+}
+\label{fig:groundstate}
+\end{figure*}
+
+\textit{Ground state critical quenches}---
+For each of the three models, we consider critical quenches starting from a nearby ground state on the ordered side of the transition ($0<g\ll 1$) (Fig.~\ref{fig:groundstate}).
+
+In each case, the $\sigma$ primary field exhibits exponential decay with a relaxation time that depends on the distance, $g$, from the critical point (insets, Fig.~\ref{fig:groundstate}).
+
+After an initial transient, the $\epsilon$ primary field also seems to exhibit exponential decay with oscillations arising at late times (insets, Fig.~\ref{fig:groundstate}).
+
+ This is suggestive of the behavior from the boundary-CFT prediction, which one might naively expect to hold, on the basis that at large length- and time-scales the dynamics should be insensitive to the details of short-range correlations. However, a careful analysis immediately reveals that the ratio of decay times for any two primary fields does not match the ratio of scaling dimensions (for any of the three models)~\cite{SM}.
+
+
+A hint of the underlying issue is provided by the analytic tractability of the TFIM.
+
+To uncover the behavior of the underlying critical point, we take the scaling limit, $g \rightarrow 0$ \cite{calabrese2012quantum}, \emph{before} the late-time limit.
+
+This yields the intermediate-time, exponentially decaying behavior seen in the inset of Fig. \ref{fig:groundstate}(a).
+
+Indeed, one finds that the exact forms of $\langle\sigma_\mathrm{I}(t)\rangle$~\cite{calabrese2012quantum} and $\langle \epsilon_\mathrm{I}(t) \rangle$~\cite{barouch1970statistical, SM} are given by:
+
+\begin{equation}
+  \langle\sigma_\mathrm{I}(t)\rangle  \simeq (2g)^{1/8}e^{-J g t}, \hspace{2mm}
+    \langle \epsilon_\mathrm{I}(t)\rangle \simeq \sqrt{\frac{g}{2\pi}}e^{-4Jgt}\frac{1}{\sqrt{Jt} }.
+     \label{eqn:gs_quench_epsilon}
+\end{equation}
+
+One immediately notes two distinctions from the boundary-CFT case: (i) the decay of the $\epsilon_\mathrm{I}$ primary field is not a simple exponential, and (ii) even asymptotically, the ratio of relaxation times is $1/4$ as opposed to $x_\sigma / x_\epsilon  = 1/8$ (Table~\ref{table:models}).
+
+
+Two remarks are in order.
+
+First, the analytic results above explicitly demonstrate that the boundary-CFT predictions do not hold in the TFIM when starting the critical quench from a ground-state initial condition.
+
+More generally, for all three models,  deviations from the boundary-CFT prediction can be understood as a consequence of the emergent integrability of the underlying CFTs~\cite{calabrese2012quantum2, calabrese2016quantum}.
+
+Crucially, this integrability naturally implies a sensitivity to the starting state of the critical quench, since the subsequent relaxation dynamics will be constrained by additional local conserved quantities beyond the energy.
+
+Indeed, for an arbitrary initial state, the system will relax to a generalized Gibbs ensemble (GGE) distinct from the critical Gibbs ensemble associated with the boundary-CFT initial condition~\cite{cardy2016furtherresults, surace:2020, robertson:2022}.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=1.\textwidth]{figure3_with_insets.pdf}
+\caption{Scaling collapse of the critical primary-field dynamics after a transverse [longitudinal] field quench from a thermal ensemble with perturbation sizes $g_\epsilon=5.62\times 10^{-3}$ and $g_\sigma = 1.78\times 10^{-3}$, respectively.
+
+(a)[(d)] Depicts the TFIM ($\chi=384$), (b)[(e)] the Potts model ($\chi=384$), and (c)[(f)] the ANNNI model ($\chi=256$).
+
+For (d-f), the rescaling factor $p_{\Phi}$ corresponds to $p_\sigma = 2 - 2x_{\sigma}$, and $p_\epsilon = 4 - 2x_\sigma - x_\epsilon$.
+
+All models have length $L=400$.
+
+ The dotted gray lines represent the comparison to conformal perturbation theory, which matches the analytical scaling limit seen in panel (a) for the TFIM~\cite{SM}.
+
+In the TFIM, the non-universal oscillations observed at late times for fixed $\beta$ are analogous to those seen in ground state quenches for fixed $g$ [Fig. \ref{fig:groundstate}(a)]~\cite{SM}.
+
+Insets: Depict primary-field dynamics before rescaling.
+
+\label{fig:finitetemp}}
+\end{figure*}
+
+
+Second, although the universal ratio of relaxation times is lost, one might hope that the dynamics of local observables nevertheless collapse onto an observable-dependent scaling function.
+
+A natural guess for the functional form of such a nonequilibrium scaling ansatz is as follows:
+\begin{equation}
+ \langle \psi_{\mathrm{GS}}|\Phi(t) |\psi_{\mathrm{GS}}\rangle \simeq  \mathcal{A}^{\Phi}_{\mathrm{GS}}g^{x_\Phi \nu} \mathcal{F}_{\Phi}^{\mathrm{GS}}(|\Delta|t).
+ \label{eqn:scaling_gs}
+\end{equation}
+
+The dependence on $g$ is based upon the scaling hypotheses for spinless energy and magnetization-like operators
+~\cite{ginsparg1988applied}, while the dynamic scaling function, $\mathcal{F}_{\Phi}^{\mathrm{GS}}$, depends on the only relevant energy scale in the protocol, namely, the gap of the initial state, $|\Delta| \sim J|g|^{\nu}$~\cite{sachdevQuantumPhaseTransitions2011}. $A_{\mathrm{GS}}^{\Phi}$ is a constant that may vanish depending on the symmetries of the ground state and $\Phi$.
+
+As depicted in Fig.~\ref{fig:groundstate}, rescaling according to the ansatz in Eqn.~\ref{eqn:scaling_gs} yields a collapse of the data across all models and all primary fields~\cite{SM}.
+
+
+\textit{Finite-temperature critical quenches}---The fact that the critical quench dynamics depend sensitively on the initial state suggests that a more careful choice is required in order to observe the universal ratios of decay times.
+
+A particularly natural setting is to consider shallow quenches from finite-temperature initial conditions perturbed slightly away from the critical Gibbs ensemble:
+\begin{equation}
+    \rho_{\beta, g} \propto e^{-\beta(H_\mathrm{c} + g H')},
+    \label{eq:initialgibbs}
+\end{equation}
+with $ g \ll 1 / (\beta J)$.
+
+Although one can consider an arbitrary perturbation, for simplicity, we will focus on perturbations, $H' =  H_\Psi$, where $H_\Psi$ is a sum of lattice operators corresponding to the primary field $\Psi$\cite{nOPE}.
+
+Specifically, we will consider two cases: (i) an $\epsilon$ field perturbation with $H_\epsilon = -J \sum_i X_i$ for the TFI/ANNNI models and $H_\epsilon = -J \sum_i ( \tau_i + \tau_{i}^\dagger$) for the Potts model;  and (ii) a $\sigma$ field perturbation with $H_\sigma = -J \sum_i Z_i$ for the TFI/ANNNI models and $H_\sigma = -J \sum_i (s_i + s_{i}^\dagger)$ for the Potts model~\cite{nsigmaquench}.
+
+
+Let us begin by considering the critical quench dynamics of a finite-temperature ensemble, $\rho_{\beta,g_\epsilon}$, perturbed by the $\epsilon$ field.
+
+Working with a series of low temperatures in the scaling limit, $\beta J  \gg 1$, we find that the relaxation dynamics of the $ \epsilon$ field seem to exhibit an exponential decay in all three models [insets, Fig. \ref{fig:finitetemp}(a-c)].
+
+Not only is this similar to the boundary-CFT prediction, but for the TFI/ANNNI models, the exponent itself matches that of the boundary-CFT quench which thermalizes to a Gibbs ensemble at the same temperature~\cite{ntau0}.
+Unfortunately, one cannot test the ratio of decay times since the $\sigma$ field is identically zero by symmetry.
+
+
+Turning to the critical quench dynamics of the finite-temperature ensemble, $\rho_{\beta,g_\sigma}$, perturbed by the $\sigma$ field [insets, Fig. \ref{fig:finitetemp}(d-f)],  one immediately observes two distinctions from the boundary-CFT prediction: first,  the relaxation dynamics of the $\sigma$ field is not exponential, and second, the relaxation dynamics of the $\epsilon$ field are significantly slower than expected for a quench thermalizing to the same temperature.
+
+This raises the following question: Despite the initial ensembles, $\{ \rho_{\beta,g_\epsilon}$, $\rho_{\beta,g_\sigma} \}$, both being \emph{perturbatively} close to the critical Gibbs state, why are the dynamics so qualitatively distinct?
+
+And indeed, how and why does the functional form of the relaxation depend on both the nature of the perturbation and the observable?
+
+
+To shed light on this discrepancy, we turn to conformal perturbation theory for analytical insight into the scaling forms of the relaxation dynamics after a finite-temperature critical quench~\cite{Zamolodchikov_1991,Mussardo_2010}.
+
+In this framework, we treat the deviation from the critical Gibbs state as a perturbation to the underlying CFT and obtain the dynamics of the primary fields via a perturbative expansion over correlation functions (see Appendix~B)~\cite{SM}.
+
+
+For a perturbing field $\Psi$ and an observable $\Phi$, the leading order, $\mathcal{O}(g)$, critical quench dynamics are given by:
+\begin{equation}
+\begin{aligned}
+    \langle\Phi (t )\rangle_{1}&\sim g \delta_{x_\Psi x_\Phi} \beta^{2-2x_\Phi}\left(A_{x_\Phi} + B_{x_\Phi}t/\beta \right)e^{-2\pi x_\Phi t/\beta},
+    \label{eqn:g^1}
+\end{aligned}
+\end{equation}
+
+with $A_{x_\Phi}\sim  1 + \frac{\sin(\pi x_\Phi)\left[x_\Phi^{-1}-\gamma_E -\pi \csc(\pi x_\Phi) -\psi^{\prime}(1-x_\Phi)\right]}{\pi}$ and $B_{x_\Phi} \sim 2\sin(\pi x_\Phi )$ universal constants~\cite{ndga,ndims}.
+
+
+We note that when $\Psi$ and $\Phi$ have different scaling dimensions, the dynamics are zero via symmetry.
+
+This necessitates going to second order, $\mathcal{O}(g^2)$, to obtain the leading behavior when $x_\Psi \neq x_\Phi$:
+
+\begin{align}
+    &\langle\Phi (t )\rangle_{2} \sim g^2 C_{\Phi\Psi\Psi} \beta^{4-2x_\Psi-x_\Phi}\Big[D_{x_{\Phi},x_\Psi} e^{-4\pi  x_\Psi t/\beta}  +\label{eqn:g^2} \\
+    & \quad \big( E_{x_{\Phi},x_\Psi} +  F_{x_{\Phi},x_\Psi}t/\beta+G_{x_{\Phi},x_\Psi}t^2/\beta^2 \big)e^{-2\pi  x_{\Phi} t/\beta}\Big]\nonumber,
+\end{align}
+where $C_{\Phi\Psi\Psi} $ is the three-point structure constant of the CFT, and $D_{x_{\Phi},x_\Psi} ,E_{x_{\Phi},x_\Psi} ,F_{x_{\Phi},x_\Psi} $, and $G_{x_{\Phi},x_\Psi} $ are universal constants.
+
+
+Remarkably, the scaling form predicted by the conformal perturbation theory immediately yields a nearly perfect collapse of the numerical data across all models, perturbations, and observables (Fig.~\ref{fig:finitetemp}).
+
+Crucially, this implies that one can use the analytics to understand the origin of the observed discrepancies from the boundary-CFT predictions.
+
+For example, the linear in $t$ term in $\langle\Phi (t)\rangle_1$ is precisely the reason why the relaxation dynamics of the $\sigma$ field are not observed to be exponential in the insets of Figs.~\ref{fig:finitetemp}(d-f).
+
+Moreover, from the functional form of $\langle\Phi (t)\rangle_2$, one sees that, when $x_\Psi \neq x_\Phi$,
+the asymptotic relaxation dynamics depends on the smaller of $2 x_\Phi$ versus $x_\Psi$; this explains our previously observed slower decay timescale for the $\epsilon$ field [insets, Fig.~\ref{fig:finitetemp}(d-f)].
+
+
+A few remarks are in order.
+
+First, we note that in the scaling limit, the relaxation timescale for our finite-temperature ensemble (Eqn.~\ref{eqn:g^1})
+matches the boundary-CFT initial condition (Eqn.~\ref{eqn:cardydecay}). This means that, in principle, at late times, one should be able to  recover the universal ratio of relaxation times by taking a finite-temperature ensemble perturbed by two primary fields and
+measuring the critical quench dynamics of the same fields.
+
+Second, in the specific case where the scaling dimension of the (relevant) observable is an integer, $x_\Phi = 1$, we find
+that $B\left(x_\Phi\right) \sim \sin \left(\pi x_\Phi \right) = 0$, implying that the linear in $t$ term drops out of the dynamics (Eqn.~\ref{eqn:g^1}).
+
+Finally, our conformal perturbation theory enables us to gain physical insight into the critical quench dynamics.
+
+For example, the two terms in $ \langle\Phi (t)\rangle_1$ arise from the horizon effect of a perturbation to the CFT.
+
+In particular, the initial thermal ensemble emits quasiparticles which are correlated over distances set by their velocity; the build-up of correlations inside this light-cone leads to the linear in $t$ term in Eqn.~\ref{eqn:g^1}, distinct from the contribution due to spatially-decaying correlations.
+
+\emph{Outlook}---Our results suggest two possible experimental protocols utilizing quantum quenches to probe universal scaling.
+
+First, adiabatically preparing ground states near the critical point at different perturbations strengths, $g$, and then quenching is sufficient to measure the critical exponent $\nu$, analogous to a Kibble-Zurek sweep.
+
+Second, and more powerfully, if one performs an initial quench in an integrability-broken model, the reduced density matrix of a subsystem should ``thermalize" to an effective Gibbs ensemble~\cite{Deutsch_1991,Srednicki_1994,Rigol_Dunjko_Olshanii_2008}.
+
+Crucially, using this ``thermalized'' initial condition for the critical quench enables one to take advantage of our finite-temperature results~\cite{nltc}.
+
+
+On the theoretical front, our work opens the door to two intriguing directions.
+
+First, in 1+1D, it would be interesting to test whether our framework generalizes to other CFTs currently out of reach of classical simulation, as well as those with continuously-varying critical exponents such as the easy-plane XXZ spin chain~\cite{bonnes:2014}.
+
+Second, a natural extension of our work is to higher dimensions, where significantly fewer exact results are available on the nature of physical conformal field theories.  Since interacting conformal field theories are no longer integrable in higher dimensions, we expect the phenomenology to be qualitatively distinct.
+
+
+\textit{Acknowledgements} We gratefully acknowledge the insights of and discussions with P. Calabrese, J. Cardy, P. Zoller, M. P. Zaletel, C. Kokail, T. Zache, S. Sachdev, M. Bintz, and S. Anand.
+
+This work was supported in part by the Air Force Office of Scientific Research via the MURI program (FA9550-21-1-0069) and by the NSF QLCI program through Grant No. OMA-2016245.
+
+J.W. acknowledges support from the Department of Energy Computational Science Graduate Fellowship under award number DE-SC0022158.
+
+Z.W. is supported by the Society of Fellows at Harvard University.
+
+J.K. acknowledges support from EPSRC Grant No. EP/V062654/1.
+
+N.Y.Y. acknowledges support from a Simons Investigator award.
+
+
+\nocite{*}
+\bibliography{sources}
+
+
+
+
+
+
+
+
+
+
+\onecolumngrid
+\section*{End Matter}
+\twocolumngrid
+
+\appendix
+\renewcommand{\theequation}{A\arabic{equation}}
+\setcounter{equation}{0}
+
+
+\begin{figure*}
+\centering
+\includegraphics[width=1.0\textwidth]{figure_endmatt_with_insets.pdf}
+\caption{Quench dynamics starting in the boundary-CFT initial state for (a) the TFI ($L=200$), (b) Potts ($L=200$), and (c) ANNNI ($L=400$) spin chains. The $x$-axis is rescaled by the initial state's extrapolation length, $\tau_0$. TEBD simulations at bond dimension $\chi = 512$ are shown. The dynamics of different primary fields are fitted to an exponential decay curve using a sliding window of $Jt = 1$, in order to extract field-dependent decay constants. The ratios of these decay constants are shown in the lower plots, where the horizontal dotted lines indicate universal ratios of the fields' scaling dimensions. The time-scale of the lower plot is truncated as the ratio diverges from boundary-CFT expectations, illustrating the onset of the nonuniversal regime. \label{fig:cc}}
+\end{figure*}
+
+\emph{Appendix A: Boundary CFT Quenches}---\label{app:bcft}In this appendix, we present supporting numerical data for the quench dynamics starting in a boundary-CFT initial state, for all three lattice models considered in the main text.
+
+In particular, Calabrese and Cardy determined the quench dynamics for a conformal field theory starting from a special initial state, $|\psi_0\rangle$~\cite{calabrese2005evolution,calabrese2016quantum}:
+
+\begin{equation}
+|\psi_0\rangle \propto e^{-\tau_0 H_{\textrm{CFT}}}|\psi_0^* \rangle,
+\label{eqn:cardystate}
+\end{equation}
+where $|\psi_0^*\rangle$ is a conformally invariant boundary state, and the extrapolation length, $\tau_0$, determines the correlation length in the initial state. For both the Ising and Potts universality classes, these conformally invariant boundary states have been calculated exactly. For example,  for the TFIM, they correspond to the two (symmetry-broken) ferromagnetic product states, or the $|{+}X\rangle$ (symmetric) paramagnetic state.
+
+After real-time evolution under the critical Hamiltonian, Calabrese and Cardy showed that this initial state thermalizes locally to a Gibbs ensemble at temperature $\beta = 4 \tau_0$. Furthermore, for $t \gg \tau_0$, the primary fields decay exponentially:
+
+\begin{align}
+\langle \psi_0| \Phi(t) |\psi_0\rangle &\simeq A_b^{\Phi}\left(\frac{\pi}{2 \tau_0}\right)^{x_\Phi} e^{-x_\Phi \pi t / 2 \tau_0}
+\label{eqn:cardydecay}
+\end{align}
+where $A_b^{\Phi}$ is a constant depending on the boundary conditions, $b$. This may vanish: for instance, if we quench from $|{+}X\rangle$, $A_X^\sigma$ is zero due to the $\mathbb{Z}_2$ symmetry.
+
+
+Crucially, because $\tau_0$ only depends on the initial state, the ratio of the decay times of two primary fields is universal: it is simply the ratio of their scaling dimensions. We confirm this prediction carries over to shallow quenches on the lattice by simulating open spin chains for the TFI, Potts, and ANNNI models. For all three models, we choose a symmetry-broken product state (corresponding to $\sigma > 0$) and simulate imaginary-time evolution for various $\tau_0$ values. We observe scaling collapse in good agreement with the asymptotic expectations. The scaling collapse improves once $J\tau_0 > 1$, so that the initial correlation length is much larger than the lattice spacing and the continuum limit may be applied. Up to $t \propto$ $2\tau_0 - 4\tau_0$ for the models, there is quantitatively good agreement with the expected ratios, shown in the lower plots of Fig.~\ref{fig:cc}. At longer times, there are deviations from the CFT prediction, particularly $\langle \psi \bar \psi(t)\rangle$ in the Potts chain. This indicates a crossover into the nonuniversal regime and the breakdown of the low-energy effective CFT.
+
+
+\renewcommand{\theequation}{B\arabic{equation}}
+\setcounter{equation}{0}
+\emph{Appendix B: Finite-Temperature Conformal Perturbation Theory}---\label{app:FT_CFT}In this appendix, we present details of  some essential aspects of the analytical technique~\cite{Zamolodchikov_1991,Mussardo_2010, Berenstein_Miller_2014} used for calculating the relaxation dynamics of primary fields after a finite-temperature critical quench, and qualitatively sketch how the quasiparticle light-cone picture manifests~\cite{calabrese2005evolution}.
+Corrections to the dynamics of a local observable, $\langle\Phi(t)\rangle$, after a quench from the finite-temperature Gibbs ensemble of
+\begin{align}
+    H = H_{\mathrm{CFT}} + \tilde{g}  \int dr \Psi\left( r \right)
+\end{align}
+can be calculated perturbatively by integrating over $n$-point finite-temperature correlation functions:
+
+\begin{equation}
+\begin{aligned}
+    &\left\langle \Phi\left(t\right)\right\rangle
+    =  \tilde{g} \int_\beta  d r d\tau  \left\langle \Psi(r,\tau) \Phi\left(t\right)\right\rangle \quad\quad\\
+    &\quad+
+    \frac{1}{2}\tilde{g}^2\int_\beta  d r d\tau d r' d\tau' \left\langle \Psi(r,\tau)\Psi(r',\tau') \Phi\left(t\right)\right\rangle + \ldots,
+
+
+    \label{eq:perteexpn}
+\end{aligned}
+\end{equation}
+where the notation $\int_\beta$ indicates that the integrals are evaluated over infinite real space, $r$, and periodic imaginary time, $\tau$, with circumference give by the inverse temperature, $\beta$ The correlators, $\langle \ldots \rangle$, can be evaluated using the operator product expansion~\cite{Di_Francesco_Mathieu_Sénéchal_1997}; for simplicity, both $\Phi$ and $\Psi$ are (real components of) primary fields. Even the first-order correction to the dynamics illustrates the light-cone picture. Here, the integrand is the two-point finite-temperature correlation function, which is given by (for $2\pi t\gg  \beta$)
+\begin{equation}
+    \left\langle \Psi(0,t)\Phi\left( r,\tau\right)\right\rangle
+    \simeq \frac{\delta_{x_\Psi x_\Phi}}{\beta^{2 x_\Phi}\left( \cosh\frac{2\pi r}{v\beta}-e^{\frac{2\pi}{\beta}(t-i\tau)}\right)^{x_\Phi}},
+    \label{eq:twopointcorrs}
+\end{equation}
+where $v$ is the propagation speed of the quasiparticles in the CFT~\cite{ cardy2016furtherresults}.
+We see from Eqn.~\ref{eq:twopointcorrs}, that for large spatial separations, $|r|\gg vt$, the spatial decay term, $\cosh\frac{2\pi r}{v\beta} \sim \frac{1}{2} e^{2\pi |r|/\beta}$, dominates, meaning that the two-point correlation function decays exponentially with distance $r$. On the other hand, for small spatial separations, $|r|\ll vt$, the exponential term $e^{2\pi(t-i\tau)/\beta}$ dominates, meaning that the two-point correlation function is constant over distance $r$. These distinct regimes of $r$, which are causally separated by the ``horizon" of the light-cone, $|r| = vt$, leads to two qualitatively different contributions to the first-order corrections of the relaxation dynamics, as in Eqn. \ref{eqn:g^1}. The horizon effect due to the causal structure of the CFT naturally extends to understanding second-
+and higher-order corrections $\mathcal{O}(g^n)$, where the interplay of $n$
+light-cones leads to more complex scaling forms~\cite{SM}.
+
+
+\onecolumngrid
+\clearpage
+
+\widetext
+
+\setcounter{equation}{0}
+\setcounter{figure}{0}
+
+\setcounter{table}{0}
+\setcounter{page}{1}
+\makeatletter
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\bibnumfmt}[1]{[S#1]}
+\renewcommand{\citenumfont}[1]{S#1}
+\renewcommand{\theHfigure}{Supplement.\thefigure}
+
+
+
+
+
+
+
+\begin{center}
+\textbf{\large Supplementary Information: \\ Universality of Shallow Global Quenches in Critical Spin Chains}
+
+\vspace{10pt}
+\thispagestyle{plain}
+Julia Wei,\textsuperscript{1,*}, Méabh Allen,\textsuperscript{2,*} Jack Kemp\textsuperscript{1,3,*}, Chenbing Wang,\textsuperscript{1} Zixia Wei,\textsuperscript{1} Joel E. Moore,\textsuperscript{2,4} and Norman Y. Yao\textsuperscript{1}
+
+\textsuperscript{1}\textit{\small Department of Physics, Harvard University, Cambridge, MA 02138 USA} \\
+\textsuperscript{2}\textit{\small Department of Physics, University of California, Berkeley, California 94720 USA} \\
+\textsuperscript{3}\textit{\small TCM Group, University of Cambridge, JJ Thomson Avenue, Cambridge, CB3 0US UK} \\
+\textsuperscript{4}\textit{\small Materials Science Division, Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA} \\
+
+\end{center}
+
+
+\section{Operators in the three-state Potts model}
+In the three-state Potts model, the $\mathbb{Z}_3$ clock and shift operators are defined as
+\begin{align}
+    s_i &= \begin{pmatrix}
+                    1 & 0 & 0\\
+                    0 & \omega & 0\\
+                    0 & 0 & \omega^2
+                    \end{pmatrix} \ \rm{ and} \\
+    \tau_i &=  \begin{pmatrix}
+                    0 & 0 & 1\\
+                    1 & 0 & 0\\
+                    0 & 1 & 0
+                \end{pmatrix},
+\end{align}
+
+where $\omega = e^{\frac{2\pi i}{3}}$~\cite{S_mong2014parafermionic}.
+
+\section{Simulation parameters and convergence}
+
+All matrix product state (MPS) simulations were performed using the \texttt{tenpy} library~\cite{S_hauschild:2024}. We use the time-evolving block decimation algorithm (TEBD) with a fourth-order Trotter decomposition, where the time step is fixed to $\delta t = 0.1$~\cite{S_barthelOptimizedLieTrotter2020}. TFI and Potts are both nearest-neighbor models, so we can immediately apply TEBD; for the ANNNI model, we first group pairs of nearest-neighbor sites together. Measurements are performed on the central sites.
+
+
+For ground state quenches, we first use the density matrix renormalization group (DMRG) method to find near-critical ground states of the Potts and ANNNI models~\cite{S_SCHOLLWOCK201196}. Since spontaneous symmetry breaking does not occur at finite system sizes~\cite{S_sachdevQuantumPhaseTransitions2011}, we run DMRG in the presence of a small symmetry-breaking field, $H_\sigma$, with field strength $g_\sigma$. This ensures that the spin field has a non-zero value at $t=0$, but the separation of scales $g \gg g_\sigma$ allows us to neglect $g_\sigma$ in the scaling collapse of the quench dynamics. For system size $L < 1000$ (Potts model), we fix $g_\sigma = 10^{-4}$, while for $L \geq 1000$ (ANNNI model), we fix $g_\sigma = 10^{-5}$.
+
+
+For finite-temperature quenches, we first use the purification method to find near-critical Gibbs ensembles. For real-time dynamics, we again use the purification method and apply the backward time-evolution disentangler, which can reduce the bond dimension~\cite{S_karraschReducingNumericalEffort2013}.
+
+
+We use the same procedure to assess convergence in the quench dynamics for boundary-CFT, ground state, and finite-temperature initial conditions. First, we choose a maximum simulation time, $Jt_{\max}$. To test convergence, we fix the scaling parameter ($\tau_0$, $g^{-\nu}$, or $\beta$, respectively) and sweep across three values of $L$ and $\chi$, summarized in Table~\ref{table:convergence_params} below. Fixing $\chi$ ($L$) to its maximum value, we compare observable values between the second-largest and largest $L$ ($\chi$) simulations, resulting in a convergence time, $t_{\rm conv}^{(L)}$ ($t_{\rm conv}^{(\chi)}$), where all observable dynamics agree up to a relative error of $5\%$. We identify the maximum convergence time, $t_{\rm conv}\equiv \min(t_{\rm conv}^{(L)},t_{\rm conv}^{(\chi)})$, which corresponds to the timescales shown in the main text.
+
+\begin{table}
+    \begin{tabular}{ccccc}
+    \toprule
+     Initial State & Model & $L$ & $\chi$ & $t_{\max}$  \\
+    \midrule
+     \multirow{3}{*}{ Boundary-CFT state} & TFIM & $\{50, 100, 200\}$ & \multirow{3}{*}{$\{128, 256, 512\}$} & \multirow{3}{*}{$20$}\\
+     & Potts & $\{50, 100, 200\}$ &   & \\
+    & ANNNI & $\{100, 200, 400\}$ &  & \\
+    \midrule
+    \multirow{2}{*}{ Ground state}
+     & Potts & $\{250, 375, 500\}$ & \{128, 256, 512\} & $20$\\
+    & ANNNI & $\{1000, 1500, 2000\}$ & \{128, 256, 384\} & $20$\\
+    \midrule
+     \multirow{3}{*}{ Finite-temperature ensemble} & TFIM & \multirow{3}{*}{$\{100, 200, 400\}$} & \{128, 256, 384\} & $12$\\
+     & Potts &  & \{128, 256, 384\} & $6$\\
+    & ANNNI & & \{128, 192, 256\} & $10$\\
+    \bottomrule
+    \end{tabular}
+\caption{Parameters used to assess the convergence of MPS quench simulations.}
+\label{table:convergence_params}
+\end{table}
+
+\section{Details about fitting procedures}
+
+\subsection{Ground state quench: Extracting decay ratios}
+
+\begin{figure*}
+\centering
+\includegraphics[width=1.0\textwidth]{suppgs_ratio.pdf}
+\caption{The ratio of decay constants in quenches starting from the symmetry-broken ground state in (a) the TFI ($L=500$), (b) Potts ($L=500$, $\chi = 512$), and (c) ANNNI ($L=2000$, $\chi=384$) models. A sliding window of $Jt=1$ is used to fit the dynamics of different primary fields to an exponential decay curve. The horizontal dotted lines indicate universal ratios of the fields' scaling dimensions. In (b), the time-scale is truncated for clarity $x_\sigma/x_{\psi\bar\psi}$ as the fitted ratio diverges from the boundary-CFT expectation of $x_\sigma/x_{\psi\bar\psi} = 1/10$.
+}
+\label{fig:gsratio}
+\end{figure*}
+
+We may fit quench dynamics to an exponential decay curve and examine the ratios of the decay constants, shown in Fig.~\ref{fig:gsratio}. Unlike the boundary-CFT initial condition, we do not observe a plateau in the decay constant that is consistent with the universal ratios in any of the three models.
+
+\subsection{Boundary-CFT quench: Varying the fitting window}
+
+\begin{figure*}
+\centering
+\includegraphics[width=1.0\textwidth]{suppbcft.pdf}
+\caption{The ratio of decay constants in quenches starting from the boundary-CFT state in (a) the TFI ($L=200$), (b) Potts ($L=200$), and (c) ANNNI ($L=400$) models at bond dimension $\chi=512$. The horizontal dotted lines indicate universal ratios of the fields' scaling dimensions. For each value of $J\tau_0$, ratios from three fitting windows are shown: $Jt = 0.5$ (dashed lines), $Jt = 1$ (solid lines), and $Jt = 2$ (dash-dotted lines).
+}
+\label{fig:bcftwindowfit}
+\end{figure*}
+
+We vary the size of the fitting window in Fig.~\ref{fig:bcftwindowfit} for the boundary-CFT quench dynamics. First, we observe that for all windows, the ratio corresponding to the initial time interval is far from the universal result, indicating an early, nonuniversal time-scale set by the lattice spacing (not shown in the main text). We also observe that the approaches toward and away from the universal ratios have a slight qualitative variation depending on the size of the fitting window. For all three windows, we can identify a plateau consistent with the universal ratios.
+
+
+\section{Additional data for three-state Potts model quenches}
+
+\begin{figure*}
+\centering
+\includegraphics[width=1.0\textwidth]{suppbdag.pdf}
+\caption{The scaling collapse of the dynamics of the parafermion bilinear field, $\psi \bar \psi$, after global quenches in the three-state Potts model, starting from (a) the boundary-CFT state ($L = 400$, $\chi=512$), (b) ground state ($L = 500$, $\chi = 512$), and (c) finite-temperature ensemble with a $\sigma$ perturbation ($L = 400$, $\chi = 384$, $g_\sigma = 1.78\times 10^{-3}$). Insets: The unscaled data.
+}
+\label{fig:psibarpsi}
+\end{figure*}
+
+In Fig.~\ref{fig:psibarpsi}, we show scaling collapses of the parafermion bilinear field, $ \psi \bar \psi$, after global quenches in the three-state Potts model, starting from the three initial conditions. (For completeness, we show the unscaled dynamics for quenches from the boundary-CFT state in App. A.)
+
+
+In the ground state quench, we again observe collapse that is consistent with critical exponent $\nu = 5/6$. After normalizing by the initial amplitude of $\langle \psi \bar \psi\rangle$ in the finite-temperature quench, we see a scaling collapse when the time axis is rescaled by $\beta$. However, in contrast to the other examples for the finite-temperature initial condition, we note that this case is not explained by the conformal perturbation theory framework for primary fields, because the three-point structure constant is zero. We hypothesize that the dynamics can still be understood via the overlap between descendant fields in the OPE of the lattice operators, and leave the analytical form for future work.
+
+
+\section{Analytics}
+
+\subsection{Free fermion scaling limit}
+In this section we discuss the origin of the analytical results for quenches to critical points for the transverse-field Ising model quoted in the main text, $H_{\mathrm{TFI}} = -J\sum_i Z_i Z_{i+1} + (1-g)X_i$. In particular, we will focus on deriving results for the $\epsilon$ field through the scaling limit of the lattice observable $Z_i Z_{i+1} - X_i$; the scaling limit of the $Z_i$ has already been calculated in \cite{S_Calabrese_Essler_Fagotti_2011}. Notice that for a transverse-field Ising model with periodic boundary conditions, this simply corresponds to computing the transverse field dynamics, because \begin{align*}
+\expct{Z_i Z_{i+1}(t) - X_i(t)}=&\expct{\left(Z_i Z_{i+1}(t) + X_i(t)\right)-2X_i(t)}\\
+    =&\expct{\text{Const}-2X_i(t)}\\
+    =&\expct{2X_i(\infty)-2X_i(t)}.
+
+\end{align*} The last line follows via the invariance of the critical point under Kramers-Wannier duality, which implies $Z_i Z_{i+1}(t) - X_i(t)$ must vanish as $t \to \infty$. For a quench to the critical point from a model prepared at equilibrium temperature $\beta$ and initial transverse-field perturbation $g$, such transverse-field dynamics have already been calculated by Barouch and McCoy~\cite{S_barouch1970statistical}
+\begin{equation}
+\expct{Z_i Z_{i+1}(t) - X_i(t)}=\frac{2}{\pi } \int_0^{\pi } \frac{g \cos ^2 \left(\frac{k}{2}\right) \cos  \left(4 J t \sqrt{2-2 \cos  k} \right) \tanh\left(\beta J \sqrt{g^2+2(1+g)(1-\cos k)} \right)}{\sqrt{g^2+2(1+g)(1-\cos k)}} dk
+\label{eqn:mccoyfull}
+\end{equation}
+They took the asymptotic late-time limit, $t\to \infty$, of this expression and found oscillatory behavior at leading order:
+\begin{equation}
+\expct{Z_i Z_{i+1}(t) - X_i(t)} \sim -\frac{g}{8  |2-g| \sqrt{\pi } }(Jt)^{-3/2} \tanh\left(\beta J |2-g|\right) \cos \left(8 J t+\frac{\pi }{4}\right),
+\label{eq:oscillation}
+\end{equation}
+as can be observed in Fig.~3 of the main text.
+
+
+Our goal is to instead calculate the scaling limit of Eqn. ~\ref{eqn:mccoyfull} in order to compare with the CFT results. This amounts to taking the limit $g\to 0$ before taking the late-time limit $t \to \infty$. Keeping only terms to first order in $g$ in Eqn.~\ref{eqn:mccoyfull}  and making the change of variables  $p=\frac{\pi \sqrt{1-\cos k}}{\sqrt{2}}$, we find
+\begin{equation}
+    \expct{Z_i Z_{i+1}(t) - X_i(t)} \sim \frac{2}{\pi } g \int_0^{\pi } \frac{ \sqrt{\pi ^2-p^2} \cos \left(\frac{ 8 J  t }{\pi } p \right) \tanh \left( \frac{2\beta J}{\pi} p \right) }{\pi \sqrt{p^2+\left(
+    \frac{\pi g}{2}\right)^2}} dp
+\end{equation}
+
+
+At late times, the cosine term in the integrand will oscillate rapidly, so we may use the method of stationary phase about $p=0$ to simplify the integrand and extend the upper limit:
+\begin{equation}
+    \expct{Z_i Z_{i+1}(t) - X_i(t)} \sim \frac{2}{\pi } g \int_0^{\infty } \frac{ \cos \left(\frac{ 8 J  t }{\pi }p\right) \tanh \left( \frac{2 \beta J}{\pi} p \right) }{ \sqrt{p^2+\left(
+    \frac{\pi g}{2}\right)^2}} dp.
+    \label{eq:statphase}
+\end{equation}
+As this integral is now in the form of a Fourier transform, it may be easily evaluated. There are two possible cases, depending on the temperature.
+
+\paragraph{Ground state quench} For the ground state quench, $\beta \to \infty$, we utilize
+\begin{equation}
+    \int_0^{\infty } \frac{1}{\sqrt{p^2+\alpha^2}} \cos (\omega p) dp=K_0\left(\alpha \omega\right),
+\end{equation}
+where $K_n(x)$ is the modified Bessel function of the second kind. The leading order term in the series expansion of $K_0(x)$ as $x\to \infty$ is $\sqrt{\frac{\pi }{2}}e^{-x}  \sqrt{\frac{1}{x}}$. Finally, we obtain
+\begin{equation} \label{eq:asymptote1}
+    \expct{\epsilon_\text{I}(t)} \sim \expct{Z_i Z_{i+1}(t) - X_i(t)}\sim{\sqrt[]{\frac{g}{2\pi}}}e^{-4 gJt}{\sqrt[]{\frac{1}{Jt}}},
+\end{equation}
+as quoted in the main text. We note that this result may also be obtained by exploiting the horizon effect to equate the one-point function squared of $X_i(t)$, decaying as a function of time, with the two-point function in equilibrium, decaying as a function of space. For ground state quenches, the generalized Gibbs ensemble equilibrium two-point function has already been calculated~\cite{S_Calabrese_Essler_Fagotti_2011}.
+
+
+\paragraph{Finite temperature}
+For finite $\beta$, we may simplify the integrand in Eqn.~\ref{eq:statphase} by neglecting the term in the denominator proportional to $g^2$, as unlike for the ground state case the integral converges without this term. Then we may evaluate the integral using the Fourier transform
+\begin{equation}
+\int_0^{\infty} \frac{\cos(\omega p)\tanh(\gamma p)}{p}dp = - \log \tanh\frac{\pi \omega}{4\gamma}.
+\end{equation}
+The leading term of the series expansion of $- \log \tanh x$ as $x \to \infty$ is $2 e^{-2x}$, so finally we recover the exponential decay \begin{equation}
+ \expct{\epsilon_\text{I}(t)}\sim\expct{Z_i Z_{i+1}(t) - X_i(t)} \sim \frac{4 g}{\pi}e^{-2\pi t/\beta},
+ \label{eq:asymptote2}
+\end{equation}
+consistent with the boundary-CFT expression under the identification $\beta = 4\tau_0$.
+
+\subsection{Lattice-to-field mapping}
+It is useful to take a closer look at the mapping between the critical lattice Hamiltonians and perturbations, which are implemented in numerical simulation, and the underlying continuum CFT Hamiltonians and field perturbations, from which a conformal perturbative analysis yields scaling forms.
+
+
+A primary field $\Phi$ scales under a conformal transformation by its scaling dimension~\cite{S_Di_Francesco_Mathieu_Sénéchal_1997}, which is denoted by $\Delta_\Phi$ throughout the supplemental material~\footnote{This notation for the scaling dimension deviates from the main text's convention, $x_\Phi$, in order to avoid confusion with the conformal space-time co-ordinates $\mathbf{x}$.}, and defined by the power-law decay of their two-point correlation functions,
+\begin{align}
+    \langle \Phi(\mathbf{x}_1)\Psi(\mathbf{x}_2) \rangle = \delta_{\Delta_\Phi,\Delta_\Psi}\left|\mathbf{x}_1-\mathbf{x}_2\right|^{-2\Delta_\Psi},
+
+\end{align}
+following customary normalization conventions. The Hamiltonian has units of inverse length $[H] = [J] = -1$. Local lattice operators $O_i$, which are dimensionless, can be written as a linear combination of fields in the CFT~\cite{S_milsted2017extraction},
+\begin{align}
+    O_i = \sum_\varphi c_{\varphi} a^{\Delta_\varphi}\varphi,
+\end{align}
+where $a$ is the lattice spacing and $c_{\varphi} $ are dimensionless constants. In the continuum limit, a sum over local lattice operators becomes an integral over fields: $\sum_i \to \frac{1}{a}\int dr$. Since any field in the CFT is either a primary field or a descendant thereof~\cite{S_Di_Francesco_Mathieu_Sénéchal_1997}, we consider then, for simplicity, the case where the lattice operator maps to just a primary field, $O_i = c_\Psi a^{\Delta_\Psi}\Psi_i  $. We have
+\begin{align}
+    H = H_{\mathrm{c}} + g J  \sum_i O_i \to H_{\mathrm{CFT}} + \tilde{g}  \int dr \Psi\left( r \right) \implies \tilde{g} = g c_\Psi J a^{\Delta_\Psi-1}.
+\end{align}
+Immediately we note that the CFT perturbation strength, $\tilde{g}$, is proportional to the dimensionless lattice perturbation strength, $g$, and, unless the primary field $\Phi$ is a marginal operator (i.e. $\Delta_\Psi = 2$), it must have dimensions, $[\tilde{g}] =  \Delta_\Psi-2$.
+
+
+The lattice-to-field mapping and corresponding constants $c_\Psi$ for the TFIM are discussed at length in the literature, see, e.g., \cite{S_sachdevQuantumPhaseTransitions2011,Calabrese_Essler_Fagotti_2011,milsted2017extraction}, and references therein. However, since we do not generically know $c_\Psi$ for arbitrary lattice operators, we do not focus on explicit calculation of the pre-factor in each term of the perturbative expansion in the main text, but instead on the scaling forms with respect to temperature and time, as well as the \emph{ratio} of the different terms for $\mathcal{O}(g)$. We set $a = 1$ from here on out unless explicitly stated.
+
+\subsection{Conformal perturbation theory asymptotics}
+\begin{figure}[tbp!]
+    \centering
+    \includegraphics[width=0.9\linewidth]{suppgeoms.pdf}
+    \caption{(a) The Euclidean geometry running over all real space $r$ and imaginary time $\tau$, providing no natural infrared (IR) regulator. (b) Considering the CFT at finite temperature is equivalent to putting the Euclidean geometry on a cylinder, where the circumference is in the imaginary time direction $\tau$ and is given by the inverse temperature $\beta \sim T^{-1}$. The finite imaginary time provides an IR regulator. In both geometries, the introduction of a cutoff $\tilde{g}$ allows for the regularization of ultraviolet (UV) divergences; if the calculation is convergent one should be able to safely take $\Lambda \to 0$. }
+    \label{fig:geometryboth}
+\end{figure}
+We are interested in the relaxation behavior of local observables following a shallow global quench to the critical point in $1+1$D, starting from a nearby thermal ensemble. Having discussed the lattice-to-field mapping above, we proceed in the language of CFT. In the conformal perturbative framework~\cite{S_Zamolodchikov_1991,Mussardo_2010}, the quench, characterized by some relevant scalar operator $\Psi$ with $\Delta_\Psi <2$, is modeled as a small deformation of the CFT action $S_{\mathrm{CFT}}$,
+\begin{align}
+    S = \int d^2\mathbf{x} \mathcal{L}(\mathbf{x}) = S_{\mathrm{CFT}} - \tilde{g}\int d^2\mathbf{x} \Psi(\mathbf{x}),
+\end{align}
+where $\mathbf{x}= (r,\tau)$ are the conformal space-time co-ordinates, and $ \mathcal{L}$ is the Lagrangian density of the system. Since the system is at finite temperature, the Euclidean geometry of the CFT is a cylinder of circumference $\beta$ in imaginary time $\tau$, and infinite in real space $r$ (Fig. \ref{fig:geometryboth}). This geometry naturally introduces an infrared (IR) regulator, and is conformally equivalent to flat space~\cite{S_Berenstein_Miller_2014}. Then:
+\begin{align}
+S=  S_{\text{CFT}}- \tilde{g} \int_{0}^{\beta}d\tau \int_{-\infty}^{\infty} dr\Psi(r,\tau).
+\end{align}
+Note that the procedure may require the introduction of an ultraviolet (UV) cutoff in imaginary time, $\Lambda$, to regularize any divergences [see Fig. \ref{fig:geometryboth}(b)]\footnote{$\Lambda $ should be distinguished from $a$, which is the UV cutoff corresponding to the lattice spacing}; UV divergences can be dealt with via standard renormalization methods and $\Lambda$ can  be taken to zero after the computation~\cite{S_Mussardo_2010}.
+
+The partition function takes the form:
+\begin{align}
+    Z_{\tilde{g}}=\left\langle\exp \left(\tilde{g} \int d^2 \mathbf{x} \Psi(\mathbf{x})\right)\right\rangle_0=\left\langle\sum_{n=0}^{\infty} \frac{1}{n!}\left(\tilde{g} \int d^2 \mathbf{x} \Psi(\mathbf{x})\right)^n\right\rangle_0= 1 +\mathcal{O}(\tilde{g}^2),
+    \label{eq:partitionfunction}
+\end{align}
+where $\langle \ldots\rangle_0 $ denotes correlation functions of the undeformed finite-temperature CFT. Corrections to local operators can then be determined via a perturbative expansion over $n$-point finite-temperature correlators,
+\begin{equation}
+\begin{aligned}
+    \left\langle O\left(\mathbf{x}\right)\right\rangle_{\tilde{g}} & = \frac{1}{Z_{\tilde{g}}} \left\langle O(\mathbf{x}) \exp \left(\tilde{g} \int d^2 \mathbf{x}' \Psi(\mathbf{x}')\right)\right\rangle_0\\
+    &= \frac{1}{Z_{\tilde{g}}}\sum_{n=1}^{\infty} \frac{1}{n!}\tilde{g}^n \int  d^2 \mathbf{x}_1 \ldots d^2 \mathbf{x}_n\left\langle \Psi(\mathbf{x}_1)\ldots \Psi(\mathbf{x}_n)O\left(\mathbf{x}\right)\right\rangle_0 \\
+    &=  \tilde{g} \int  d^2 \mathbf{x}_1 \left\langle \Psi(\mathbf{x}_1) O\left(\mathbf{x}\right)\right\rangle_0 +
+    \frac{1}{2}\tilde{g}^2\int d^2 \mathbf{x}_1 d^2 \mathbf{x}_2\left\langle \Psi(\mathbf{x}_1)\Psi(\mathbf{x}_2) O\left(\mathbf{x}\right)\right\rangle_0 +\mathcal{O}\left(\tilde{g}^3\right)\\
+    & =\left\langle O\left(\mathbf{x}\right)\right\rangle_{1}+ \left\langle O\left(\mathbf{x}\right)\right\rangle_{2} +\mathcal{O}\left(\tilde{g}^3\right),
+    \label{eq:perteexpn}
+\end{aligned}
+\end{equation}
+where the correlators can be obtained from the operator product expansions (OPE) of the observable $O$ with the quench perturbation $\Psi$, again in the undeformed finite-temperature CFT~\cite{S_Di_Francesco_Mathieu_Sénéchal_1997}. Since the one-point functions of primary fields evaluated in the undeformed CFT are zero, corrections from the renormalized partition function in Eqn.~\ref{eq:partitionfunction} do not manifest until $\mathcal{O}(\tilde{g}^3)$ (when we consider a Taylor expansion in $\tilde{g}$). Note, from Section V B, that $[\tilde{g}] = \Delta_O-2$, and the units of each term in Eqn.~\ref{eq:perteexpn} are $[O(\mathbf{x})] = -\Delta_O$. Assuming translation invariance, expectation values of deformed one-point functions are position-independent and higher-point functions depend only on the separation between fields. The decay of local observables is then obtained via analytic continuation to real time.
+
+
+For simplicity, we consider only the dynamics of quench fields and observables which are (the real components of) primary fields.
+\subsubsection{First-order perturbation theory}
+At leading order, the expectation value of the observable $\Phi(\mathbf{x})$ at space-time coordinate $\mathbf{x} = (0,\tau) \equiv \tau$, under a quench characterized by $\Psi$, takes the form
+\begin{align}
+    \langle \Phi(\tau)\rangle_1&= \tilde{g} \int d^2 \mathbf{x'} \left\langle \Psi(\mathbf{x'})\Phi\left( \tau\right)\right\rangle_0 \label{eqn:integralsetup},
+\end{align}
+where the integrand is the two-point finite-temperature correlation function which is non-zero only if $\Psi = \Phi$ by symmetry constraints, and describes pairs of left- and right-moving quasiparticles~\cite{S_Di_Francesco_Mathieu_Sénéchal_1997},
+\begin{align}
+    \left\langle \Psi(\mathbf{x'})\Phi\left( \mathbf{x}\right)\right\rangle_0  &= \delta_{\Delta_\Psi \Delta_\Phi} \left(\frac{\pi^2}{\beta^2}\right)^{\Delta_\Phi}\frac{1}{\left\{\sin \left[\frac{\pi}{\beta}(\tau' -\tau)+\frac{i \pi }{v\beta} (r'-r)\right] \sin \left[\frac{\pi}{\beta}(\tau' -\tau)-\frac{i \pi }{v\beta} (r'-r)\right]\right\}^{\Delta_\Phi}}\\
+    &= \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2\pi^2}{\beta^2}\right)^{\Delta_\Phi}\frac{1}{\left\{ \cosh\left[\frac{2\pi}{v\beta}(r-r')\right]-\cos\left[\frac{2\pi}{\beta}(\tau-\tau')\right]\right\}^{\Delta_\Phi}} \\
+    &=  \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2\pi^2}{\beta^2}\right)^{\Delta_\Phi} w\left(\mathbf{x'},\mathbf{x}\right)^{-\Delta_\Phi}
+    \label{eqn:fintempcorrelator},
+\end{align}
+where $\delta_{ij}$ denotes the Kronecker delta function, $v = \partial \epsilon_k/\partial k\vert_{k\ll 1}$ is a speed determined by the linear dispersion of the CFT, and where we have re-expressed the correlator in terms of the variable $w(\mathbf{x'},\mathbf{x})$.
+
+
+To proceed with the calculation, we firstly make use of analytic continuation to real time, $\tau\rightarrow -it$~\footnote{We point out that an equivalent formulation up until the Wick rotation was obtained by Ref.~\cite{S_Berenstein_Miller_2014}, but the following calculation is distinct.}. Secondly, in light of Ref.~\cite{S_calabrese2006time}'s result that local observables exhibit exponential decay for ``large" times $t\gg \tau_0$, we note that our primary region of interest is analogously $2\pi t\gg\beta$ (though we discuss the ``short" time regime $2\pi t\ll\beta$ later). Then, after analytic continuation, and at late times,  the cosine of $w(\mathbf{x},\tau\to-it)\equiv w(\mathbf{x},t)$ becomes exponentially suppressed,
+\begin{align}
+   w(\mathbf{x'},t) = \cosh\left[\frac{2\pi r'}{v\beta}\right] -\cos \left[\frac{2\pi}{\beta}(i t +\tau')\right] \xrightarrow{2\pi t\gg\beta}  \cosh\left(\frac{2\pi r'}{v\beta}\right)-\frac{1}{2}e^{2\pi (t-i\tau')/\beta},
+   \label{eq:w}
+\end{align}
+so that the first-order correction to the local observable at late times after a quench takes the form,
+\begin{equation}
+\begin{aligned}
+\langle \Phi(t)\rangle_{1} & \simeq \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi^2}{\beta^2}\right)^{\Delta_\Phi}  \int_{-\infty}^\infty  d r' \int_0^\beta d\tau' \frac{1}{\left\{\cosh \left[\frac{2 \pi r' }{ v \beta}\right]-\frac{1}{2}\exp \left[\frac{2 \pi } {\beta}\left(t-i \tau'\right)\right]\right\}^{\Delta_\Phi}},
+\end{aligned}
+\end{equation}
+which is even over real space. We now make the observation that the first term in Eqn.~\ref{eq:w} dominates when $|r'|\gg v t$, and the second term dominates when $|r'| \ll v t$. That is, we can split the real-space integral into two regions which are separated by a ``horizon" $|r'| = vt$ [see Fig. \ref{fig:lightcone}(a)],
+
+\begin{equation}
+\begin{aligned}
+\int_{0}^{\infty} d r' &= \int_{0}^{vt} d r'+ \int_{vt}^{\infty} d r' \implies \langle \Phi(t)\rangle = \langle \Phi(t)\rangle_{ \text{LC}}+\langle \Phi(t)\rangle_{ \text{\sout{LC}}}
+\end{aligned}
+\end{equation}
+Physically, this reflects the light-cone (LC) structure of a relativistic CFT: the perturbing field acts as a source of quasiparticles which propagate through space-time at speed $v$~\cite{S_calabrese2005evolution,cardy2016furtherresults}. The form of the correlator $w(\mathbf{x}',t)$ can be approximated accordingly.
+Outside the light cone, where $|r^{\prime}|\gg vt $, the correlations decay exponentially with distance, $\cosh\left(\frac{2 \pi r' }{ v \beta}\right) \sim \frac{1}{2}\exp \left(\frac{2 \pi r' }{ v \beta}\right)$, and the \emph{spatial decay} term in Eqn. \ref{eq:w} dominates:
+\begin{equation}
+    w(\mathbf{x^{\prime}},t)^{-\Delta_\Phi}\xrightarrow{|r^{\prime}|\gg vt}
+    2^{\Delta_\Phi}e^{-\frac{2\pi r'   }{v\beta}\Delta_\Phi} \left[1 -\left(e^{\frac{2\pi}{\beta} (t-i\tau') -\frac{2\pi r'}{v\beta}}-e^{-\frac{4\pi r'}{v\beta}} \right)\right]^{-\Delta_\Phi}.
+\label{eq:LCapproxlarger}
+\end{equation}
+The spatial decay term, $\exp({-2\pi\Delta_\Phi r'/ v\beta})$, is explicitly taken out of the parentheses as the leading contribution. The binomial $(1+y)^{-\Delta_\Phi}$ in Eqn.~\ref{eq:LCapproxlarger} can then be expressed as an algebraic expansion of the sub-leading terms $y$ over an infinite series,
+\begin{equation}
+    \left[1 -\left(e^{\frac{2\pi}{\beta} (t-i\tau') -\frac{2\pi r'}{v\beta}}-e^{-\frac{4\pi r'}{v\beta}} \right)\right]^{-\Delta_\Phi}=
+    1 +\sum_{k=1}^{\infty}{\Delta_\Phi+k -1\choose k}\left(e^{\frac{2\pi}{\beta} (t-i\tau') -\frac{2\pi r'}{v\beta}}-e^{-\frac{4\pi r'}{v\beta}} \right)^k.
+    \label{eq:binomialexp}
+\end{equation}
+The leading contribution to the behavior of the primary field from outside the light cone comes from the spatial decay term:
+\begin{align}
+\langle \Phi(t)\rangle_{ 1_\text{\sout{LC},pure decay}}
+&\simeq 2 \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi}  \int_{vt}^\infty  d r' \int_\Lambda^{\beta-\Lambda} d\tau' e^{- 2 \pi r'\Delta_\Phi/ v \beta}\bigg|_{\Lambda\to 0}\nonumber\\
+&\simeq  \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi}   \frac{v\beta^2}{\pi \Delta_\Phi}e^{-2\pi t \Delta_\Phi/\beta}.
+\label{eq:decay1}
+\end{align}
+
+The $\tau'$-dependent terms in the binomial expansion around $e^{- 2 \pi r'\Delta_\Phi/ v \beta}$ in Eqn.~\ref{eq:LCapproxlarger} vanish, since only positive integer powers of $e^{- 2 \pi i\tau'/\beta}$ appear (see Eqn.~\ref{eq:binomialexp}) and therefore cancel out over the closed imaginary time loop. The first $\tau'$-independent correction term in the binomial expansion is integrated to obtain a sub-leading term of order $\mathcal{O}(e^{-2\pi(2+\Delta_\Phi)t/\beta})$.
+
+
+On the other hand, inside the light cone where $|r^{\prime}|\ll vt$, the correlations can be expanded around the dominant time decay term that is \emph{spatially constant}:
+\begin{equation}
+    w(\mathbf{x^{\prime}},t)^{-\Delta_\Phi}\xrightarrow{|r^{\prime}|\ll vt}
+    2^{\Delta_\Phi}\left(-1\right)^{-\Delta_\Phi}e^{-\frac{2\pi}{\beta}(t-i\tau^{\prime})\Delta_\Phi}\left[ 1-2\cosh\left(\frac{2\pi r'}{v\beta}\right)e^{-\frac{2\pi}{\beta}(t-i\tau^{\prime})}\right]^{-\Delta_\Phi} ,
+\label{eq:LCapproxsmallr}
+\end{equation}
+where, again, the correction terms can be calculated via a binomial expansion. We see that this spatially constant integrand leads to exponentially damped operator growth (a linear-times-exponential-in-t behavior) which we denote``peak decay", in contrast to ``pure (exponential) decay":
+\begin{align}
+\langle \Phi(t)\rangle_{1_ \text{LC,peak decay}}&\simeq 2 \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi}  \int_{0}^{vt}  d r' \int_\Lambda^{\beta-\Lambda} d\tau' \left(-1\right)^{-\Delta_\Phi} e^{-2 \pi \left(t-i \tau'\right)\Delta_\Phi/  \beta}\bigg|_{\Lambda\to 0}\nonumber\\
+&\simeq  \tilde{g}\delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi}  \frac{v\beta}{\pi \Delta_\Phi} 2t\sin (\pi \Delta_\Phi)e^{-2\pi t\Delta_\Phi /\beta}.
+\label{eq:cumulativeterm}
+\end{align}
+Here, introducing the cutoff $\Lambda$ is crucial for regularizing the branch cut singularities that exist for non-integer scaling dimensions $\Delta_\Phi \neq 1$, since the integrand is a multi-valued function in such cases. In this case, the contribution of the binomial expansion around $e^{- 2 \pi (t-i\tau')\Delta_\Phi/ \beta}$ due to subleading spatially decaying corrections does not vanish around the imaginary time contour, also due to the branch cut for $\Delta_\Phi \neq 1$. We have
+\begin{align}
+\langle \Phi(t)\rangle_{1_ \text{LC,pure decay}}&\simeq 2\tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi} \sum_{k=1}^{\infty}{\Delta_\Phi\choose k} \frac{2^{k}}{k!} (-1)^{-\Delta_\Phi}  \int_\Lambda d r^{\prime}d \tau^{\prime}  \cosh^k\left(\frac{2\pi r'}{v\beta}\right) e^{-2\pi (\Delta_\Phi+k) (t-i \tau^{\prime})/ \beta }\bigg|_{\Lambda\to0}\nonumber\\
+&\simeq \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi}\frac{ \sin(\pi \Delta_\Phi) }{ 2\pi^2 } v\beta^2 e^{-2\pi \Delta_\Phi t/\beta } \sum_{k=1}^{\infty}{\Delta_\Phi\choose k} \frac{1 }{(\Delta_\Phi+k) k!}\frac{\Gamma\left(-{1\over2} + \frac{1+k}{2}\right)}{\Gamma\left(-{1\over2} + \frac{3+k}{2}\right)}\nonumber \\
+&\simeq \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\left(\frac{2 \pi}{\beta}\right)^{2\Delta_\Phi}\frac{v\beta^2}{\pi\Delta_\Phi }  \frac{\sin (\pi \Delta_\Phi)}{\pi }\left[  \frac{1}{\Delta_\Phi} - \gamma_E -\pi \csc(\pi \Delta_\Phi) -\frac{\Gamma^{\prime}(1-\Delta_\Phi)}{\Gamma(1-\Delta_\Phi)}\right]e^{-2\pi \Delta_\Phi t/\beta },
+\label{eq:decay2}
+\end{align}
+with corrections again of order $\mathcal{O}(e^{-2\pi(2+\Delta_\Phi)t/\beta})$.
+
+
+We see that spatial correlations grow within the light cone where space-time points are causally connected. Constant correlations accumulate over the light cone and lead to exponentially damped operator growth, or ``peak decay" (Eqn. \ref{eq:cumulativeterm}), while spatially decaying correlations lead to purely exponential decay in time (Eqns. \ref{eq:decay1} and \ref{eq:decay2}),
+\begin{equation}
+\begin{aligned}
+\langle \Phi(t)\rangle_{ 1_\text{peak decay}} \sim  \frac{t}{\beta} e^{-2\pi \Delta_\Phi t/\beta },\quad \quad
+\langle \Phi(t)\rangle_{ 1_\text{pure decay}}\sim  e^{-2\pi t \Delta_\Phi/\beta}
+\end{aligned}
+\end{equation}
+Altogether, we have two distinct regimes of behavior,
+\begin{align}
+\langle \Phi(t)\rangle_1
+ &\simeq \tilde{g} \delta_{\Delta_\Psi \Delta_\Phi}\beta^{2-2\Delta_\Phi}
+ \left(A_{\Delta_\Phi} + B_{\Delta_\Phi}\frac{t}{\beta}\right)e^{-2\pi t \Delta_\Phi/\beta}\label{eqn:(A+Bt)}\\
+ B_{\Delta_\Phi}&\simeq   v (2\pi)^{2\Delta_\Phi}\frac{2\sin(\pi \Delta_\Phi )}{ \pi \Delta_\Phi}\nonumber\\
+ \frac{A_{\Delta_\Phi}}{B_{\Delta_\Phi} }&\simeq\frac{1}{2 \sin(\pi\Delta_\Phi)}\left\{1 + \frac{\sin(\pi\Delta_\Phi)}{\pi}\left[\frac{1}{\Delta_\Phi}-\gamma_E -\pi \csc(\pi \Delta_\Phi) -\frac{\Gamma^{\prime}(1-\Delta_\Phi)}{\Gamma(1-\Delta_\Phi)}\right]\right\},
+\label{eqn:scalingorderg}
+\end{align}
+with corrections of order $\mathcal{O}(e^{-2\pi(2+\Delta_\Phi)t/\beta})$.
+
+A few remarks are in order. Firstly, both contributions coming from within the light cone are proportional to $\sin (\pi \Delta_\Phi) $. Then, since $\sin (\pi \Delta_\Phi) =0$ for integer-valued scaling dimensions, there are no contributions from within the light cone, and the decay is purely exponential. This explains the relaxation dynamics of $\epsilon_\text{I}$ under a finite-temperature $\epsilon_\text{I}$ quench in the main text. Further, since $\sin (\pi \Delta_\Phi) < 0 $ for $1< \Delta_\Phi <2$, the contributions from either side of the horizon have opposite sign: the two competing decay terms will eventually cancel out and the one-point function will cross the $t$-axis before becoming negative, though the amplitude still eventually decays to zero. Finally, we see that a term $\sim( t/\beta) e^{-2\pi \Delta_\Phi t/\beta}$  arises for $\Delta_\Phi \neq 1$. It follows from the causal structure of CFTs: the initial thermal ensemble acts as a source of left- and right-moving pairs of quasiparticles, which are correlated and entangled over lengths $\sim \mathcal{O}\left( vt \right)$. At time $t$, the perturbation of the initial state is felt only from regions within $|r'| < vt$. In this region, the integrand has a term that is spatially constant, leading to a contribution $\sim t/\beta$.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=.9\linewidth]{suppLC.pdf}
+  \caption{The horizon effect of the forward-spreading light cone(s) of a perturbation in CFT to (a) first order and (b) second order. The initial thermal ensemble acts as a source of quasiparticles which propagate at velocity $v$. Spatially decaying correlations lead to exponential decay of observables with time both inside (yellow) and outside (gray) the (intersecting) light cone(s). Constant spatial correlations can build up within the (intersecting) light cone(s) where space-time points are causally connected, leading to maximal exponentially-damped polynomial growth terms of the form $t^n e^{-2\pi t \Delta_\Phi /\beta}$, for $n$ intersecting light cones. These regimes lead to two qualitatively different scaling forms in the perturbation theory as in Eqns.~\ref{eqn:(A+Bt)} and \ref{eqn:scalingorderg2}. In the first-order correction, both contributions from within the light cone are zero for integer scaling dimension, leading to the purely exponential decay of $\epsilon_\text{I}$ under an $\epsilon_\text{I}$ quench.}
+  \label{fig:lightcone}
+\end{figure}
+\subsubsection{Second-order perturbation theory}
+When the scaling dimensions of the observable and the quench primary fields are not the same, the first order dynamics, $\mathcal{O}(\tilde{g})$, are zero. In that case, we must consider the corrections to second order, for a primary field $\Phi$ under a different primary field $\Psi$ quench:
+\begin{equation}
+\begin{aligned}
+\left\langle \Phi \left( t\right)\right\rangle_{2} &=  \frac{1}{2}\tilde{g}^2 \int d^2 \mathbf{x'} d^2 \mathbf{x''} \left\langle \Psi(\mathbf{x'})\Psi(\mathbf{x''}) \Phi\left( t\right)\right\rangle_0   \\
+&= \frac{1}{2}\tilde{g}^2 \frac{C_{\Psi\Psi\Phi}}{\beta^{\Delta_\Phi+2\Delta_\Psi}} \int d^2 \mathbf{x'} d^2 \mathbf{x''}\frac{w\left(\mathbf{x'},\mathbf{x''}\right)^{\frac{1}{2}\Delta_\Phi-\Delta_\Psi}}{w\left(\mathbf{x'},t\right)^{\frac{1}{2}\Delta_\Phi}w\left(\mathbf{x''},t\right) ^{\frac{1}{2}\Delta_\Phi}}
+\label{eq:secondordersetup}
+\end{aligned}
+\end{equation}
+where $C_{\Psi\Psi\Phi}$ is the three-point structure factor of the CFT. Again, we are interested in the $2\pi t\gg \beta$ regime.
+
+
+There are now two intersecting light cones with respect to  $r'$ and  $r''$, see Fig.~\ref{fig:lightcone}(b). Qualitatively speaking, the regions outside both light cones lead to two distinct rates of exponential relaxation, characterized by the scaling dimensions of twice the quench field $\sim  e^{-4\pi t \Delta_\Psi/\beta} $, and the observable $\sim e^{-2\pi t \Delta_\Phi/\beta}$. Within the two intersecting light cones, in addition to this purely exponential decay, the accumulation of constant spatial correlations result in damped $t$ or $t^2$ terms, with the damping associated only with the scaling dimension of the observable $\sim e^{-2\pi t \Delta_\Phi/\beta}$.
+
+While the calculation is more involved for intersecting light cones, the procedure follows that of the first-order perturbation. We are primarily focused on the general scaling ansatz with real time $t$ and temperature $\beta^{-1}$; to that end, we focus on the functional form of the polynomial and exponential behavior with real time, and omit explicit calculation of constants.
+
+
+We split the spatial integrals up along the horizons $|r^{\prime(\prime)}| = v t$ (without loss of generality taking $r'>0$ and considering $r'' \in (-\infty,\infty)$) and consider the following overlapping regions: (i) outside both light cones, (ii) inside one light cone, and (iii) inside both light cones. We make use of the light-cone approximations for $w(\mathbf{x^{\prime}},t)$ from Eqn.~\ref{eq:LCapproxlarger} and Eqn.~\ref{eq:LCapproxsmallr}, but ignore the contribution of the subleading terms in the binomial expansion, since we assume these will not change the overall functional form (as we saw in the first-order calculation), and only add corrections of order $\mathcal{O}\left(e^{-4\pi (1+\Delta_\Psi)t/\beta},e^{-2\pi (2+\Delta_\Phi)t/\beta}\right)$.
+
+Furthermore, it is useful to consider the approximations for $w(\mathbf{x'},\mathbf{x''})$ when the \emph{quench fields} are spatially ``close" or ``far" apart, meaning:
+\begin{align}
+    w(\mathbf{x'},\mathbf{x''})=\cosh \left[\frac{2\pi}{v\beta}(r'-r'')\right] -\cos\left[\frac{2\pi}{\beta}(\tau^{\prime}-\tau^{\prime\prime})\right]\to\begin{cases}
+        \frac{1}{2}e^{\frac{2\pi}{v\beta}|r'-r''|} \quad &\text{ for }\quad |r'-r''|\gg \frac{\beta}{2\pi}\\
+        1 -\cos\left[\frac{2\pi}{\beta}(\tau^{\prime}-\tau^{\prime\prime})\right]\quad &\text{ for }\quad |r'-r''|\ll \frac{\beta}{2\pi}
+    \end{cases}
+\end{align}
+Outside both or one of the light cones, the contributions are from the following spatial integrals:
+\begin{align}
+    I_{\text{0LC}}&\sim \int_{vt}^{\infty} dr' \left(\int_{-\infty}^{-vt} dr''  +\int_{vt}^{r'} dr''+ \int_{r'}^{\infty} dr''\right)\label{eq:0LC}\\
+    I_{\text{1LC}}&\sim \int_{vt}^{\infty} dr' \int_{-vt}^{vt}dr''+\int_{0}^{vt} dr' \left(\int_{-\infty}^{-vt} dr''  +\int_{vt}^{\infty} dr'' \right)
+\end{align}
+
+For instance, the explicit calculation of the quadruple integral in Eqn.~\ref{eq:secondordersetup}, for the first region in Eqn.~\ref{eq:0LC}, is:
+\begin{equation}
+\begin{aligned}
+
+    &\tilde{g}^2 \frac{C_{\Psi\Psi\Phi}}{\beta^{\Delta_\Phi+2\Delta_\Psi}}2^{\frac{1}{2}\Delta_{\Phi}+\Delta_{\Psi}-1} \int  d\tau' d\tau'' \int_{vt}^{\infty} dr' \int_{-\infty}^{-vt} dr'' \frac{\left(e^{\frac{2\pi}{v\beta}|r'-r''|}\right)^{\frac{1}{2}\Delta_{\Phi}-\Delta_{\Psi}}}{\left(e^{\frac{2\pi}{v\beta}|r'|}\right)^{\frac{1}{2}\Delta_{\Phi}}\left(e^{\frac{2\pi}{v\beta} |r''|}\right)^{\frac{1}{2}\Delta_{\Phi}}}\\
+    \simeq &\tilde{g}^2 C_{\Psi\Psi\Phi} \beta^{4- \Delta_\Phi-2\Delta_\Psi}\left(\frac{v }{2\pi\Delta_{\Psi}}\right)^2 2^{\frac{1}{2}\Delta_{\Phi}+\Delta_{\Psi}-1} e^{-4\pi \Delta_{\Psi}t/\beta }.
+\end{aligned}
+\end{equation}
+The correlations outside both or one of the light-cones lead to a scaling form comprising \emph{two} purely exponential decays,
+\begin{align}
+    \left\langle \Phi \left( t\right)\right\rangle_{2_\text{\sout{2LC}}} \simeq \tilde{g}^2 C_{\Psi\Psi\Phi} \beta^{4-\Delta_\Phi-2\Delta_\Psi} \left(D_{{\Delta_\Phi,\Delta_\Psi}_\text{\sout{2LC}}}e^{-4\pi \Delta_{\Psi} t/\beta}+E_{{\Delta_\Phi,\Delta_\Psi}_\text{\sout{2LC}}}e^{-2\pi \Delta_{\Phi} t/\beta}\right),
+\end{align}
+where the decay exponents are that of twice the quench field, $2\Delta_\Psi$, and the observable field, $\Delta_\Phi$.
+
+
+Even though one would naively think that spatial correlations would accumulate inside even just one of the light cones, because of the more complex form of the three-point correlator --- i.e., due to the term $\cosh(2\pi/v\beta(r'-r''))$ in $w(\mathbf{x'},\mathbf{x''})$ --- the three-point spatial correlations are not constant inside only one light cone. This is because the quench fields must be (approximately) far apart for one field to be inside its light cone and another to be outside; $w(\mathbf{x'},\mathbf{x''})$ still spatially decays and the integral is not constant over either spatial coordinate. Indeed, causality does not necessitate constant correlations but rather facilitates them; a further condition is the proximity of fields. We already saw this in the first-order correction, where there were still purely exponential contributions inside the (single) light cone.
+
+
+To meet this condition for two intersecting light cones, one needs to be inside \emph{both} light cones to see (damped) operator growth (i.e. linear or quadratic ``peaked decay"):
+\begin{align}
+    I_{\text{2LC}}&\sim \int_{0}^{vt} dr' \left(\int_{-vt}^{r'} dr'' +\int_{r'}^{vt} dr'' \right) +\int_{0}^{vt} dr' \int_{0}^{vt} dr''\\
+\left\langle \Phi \left( t\right)\right\rangle_{2_\text{2LC}} &\simeq \tilde{g}^2 C_{\Psi\Psi\Phi} \beta^{4-\Delta_\Phi-2\Delta_\Psi} \Bigg[D_{{\Delta_\Phi,\Delta_\Psi}_\text{2LC}}e^{-4\pi  \Delta_\Psi t/\beta} +\Bigg(E_{{\Delta_\Phi,\Delta_\Psi}_\text{2LC}} + F_{\Delta_\Phi,\Delta_\Psi} \frac{t}{\beta} + G_{\Delta_\Phi,\Delta_\Psi}\frac{t^2}{\beta^2}\Bigg)e^{-2\pi  \Delta_\Phi t/\beta}\Bigg].
+\end{align}
+In this case, there are relaxation terms associated with the observable field $\sim e^{-2\pi t \Delta_\Phi/\beta}$, for which the correlations are constant across one or both spatial integrals. This leads to exponentially damped linear and quadratic operator growth $\sim t, t^2$. The damping term associated with the quench operator $\sim e^{-4\pi t \Delta_\Psi/\beta}$ only arises when the integrand is some exponential function of \emph{both} space directions, and so is purely exponential in time.
+
+Generically, the scaling form at second order in $\tilde{g}$ is
+\begin{equation}
+    \langle\Phi (t)\rangle_2 \simeq \tilde{g}^2 C_{\Psi\Psi\Phi} \beta^{4-\Delta_\Phi-2\Delta_\Psi} \Bigg[D_{\Delta_\Phi,\Delta_\Psi} e^{-4\pi  \Delta_\Psi t/\beta}+ \Bigg(E_{\Delta_\Phi,\Delta_\Psi} + F_{\Delta_\Phi,\Delta_\Psi} \frac{t}{\beta} + G_{\Delta_\Phi,\Delta_\Psi}\frac{t^2}{\beta^2}\Bigg)e^{-2\pi  \Delta_\Phi t/\beta}\Bigg],
+    \label{eqn:scalingorderg2}
+\end{equation}
+
+
+with corrections of order $\mathcal{O}\left(e^{-4\pi (1+\Delta_\Psi)t/\beta},e^{-2\pi (2+\Delta_\Phi)t/\beta}\right)$. Then, so long as $\Delta_\Psi < \Delta_\Phi/2$, the second order correction is dominated by a purely exponential term set by the scaling dimension of the quench operator --- this is the case for the relaxation dynamics of $\epsilon_\text{I}$ after a finite-temperature $\sigma_\text{I} $ quench.
+
+
+The picture of $n$-intersecting light cones naturally extends to arbitrary order $\mathcal{O}(\tilde{g}^n)$, with each order contributing up to $\sim \tilde{g}^n (t/\beta)^n e^{-2\pi t\Delta_\Phi/\beta}$ in the scaling function.
+
+\subsubsection{Ground state conformal perturbation theory and the finite temperature $2\pi t \ll \beta $ regime}
+Thus far, we have only considered the finite-temperature quench perturbatively in the --- we discuss now why this is so.  If we instead consider a quench to the critical point from a ``nearby" ground state, the equivalent action is now on the infinite Euclidean plane rather than the cylinder [see Fig.~\ref{fig:geometryboth}(a)]. The relaxation dynamics of the primary field $\Phi$ that constitutes the quench perturbation are now calculated to first order from the integral of the two-point correlation function of the primary field on the plane. This takes the form:
+\begin{equation}
+\langle \Phi(\tau)\rangle_{\tilde{g}}  = \tilde{g} \int d^2 \mathbf{x}' \left[ \frac{1}{(\tau-\tau' )^2+ r^{\prime 2}}\right]^{ \Delta_\Phi} +\mathcal{O}(\tilde{g}^2),
+\label{eq:zerotempcorrs}
+\end{equation}
+where imaginary time may still be regularized by a UV cutoff $\tilde{g}$: $\int d\tau \sim \int_{-\infty}^{-\Lambda} + \int_{\Lambda}^{\infty}$. Considering, for example, $\epsilon$ in the TFIM, we obtain, after rotation back to Minkowski space:
+\begin{equation}
+    \langle \epsilon_\text{I}(t)\rangle  \simeq \tilde{g}  \lim_{\tau'\to\infty}  \log \frac{\tau'}{ t}.
+\end{equation}
+We see that, while the UV divergences can be dealt with via standard renormalization methods, the lack of a natural IR cutoff $\mu $ leads to divergences at zero temperature which are of a different type: they cannot be absorbed in the redefinition of the local quantities and so give rise to non-analytic expressions in the coupling constants~\cite{S_Mussardo_2010}.
+
+
+Indeed, since the vacuum state of the deformed theory is not adiabatically related to the vacuum states of the conformal theory, the ``nearby" ground state is not so nearby after all. The introduction of a natural IR regulator therefore plays a crucial role in adiabatically connecting the two theories, whether that's by introducing a boundary to the CFT to obtain a slab geometry~\cite{S_calabrese2006time, Calabrese_Cardy_2007, cardy2016furtherresults}, such that $\mu \sim \tau_0$, or by putting the CFT on a cylinder, such that $\mu \sim \beta$.
+
+
+Moreover, let us consider the relaxation of $\Phi$ under its own quench at finite temperature (see Eqn.~\ref{eqn:integralsetup}), but this time in the $2\pi t \ll \beta$ regime. For $\epsilon$ in the TFIM, we obtain
+\begin{equation}
+    \langle \epsilon_\text{I}(t)\rangle \simeq \tilde{g}   \log \frac{\beta}{\pi t},
+\end{equation}
+analogous to Eqn.~\ref{eq:zerotempcorrs}. As $\beta \to \infty$, the quench depth correspondingly must vanish, $\tilde{g} \sim g \to 0$, in order for the integral to converge; such ground state quenches cannot be treated via a conformal perturbative analysis, as the quench cannot be ``shallow" enough.
+
+
+Regardless, while the one-point functions should always be universal in the case of the boundary-CFT quench, it's only in the late time region, $t \gg \tau_0$, that the exponential decay functional form appears generically for all primary fields such that we can extract a universal ratio of scaling dimensions in the ratio of their relaxation rates. It is natural to extend this notion to the finite temperature quench: observables will not ``relax" until they ``notice" the finite cutoff $\mu$ of the geometry they live on. Even at finite $\beta$ with sufficiently shallow quenches, the $2\pi t\ll \beta$ regime does not appear to generically give an exponential or an exponential-times-polynomial decay from which we can extract a universal ratio of scaling dimensions.
+
+\section{Lattice crossover: emergent conformal symmetry and non-linear dispersion}
+When quenching to the critical point of a quantum spin chain, local observables generally exhibit scaling behavior that reflects both universal critical behavior (at least in the scaling limit) as well as non-universal lattice effects. The low-lying degrees of freedom are described by a continuum field theory with emergent conformal symmetry, and therefore have linear dispersion,
+\begin{align}
+    \epsilon_{k\ll 1} \sim v k \implies
+    v_g\left(k\ll 1 \right) = \frac{\partial}{\partial k} \epsilon_k\bigg|_{k\ll 1} \sim v .
+\end{align}
+These modes travel at the same group velocity $v_g \sim v$ and give rise to ballistic, coherent transport and a sharp light-cone effect.
+
+This light-cone picture relies on Lorentz invariance; however, most 1+1D critical spin chains are not microscopically relativistic, but rather exhibit an emergent Lorentz symmetry only at low energies near criticality. High-energy modes in the lattice may break this emergent symmetry, having some nonlinear dispersion $\epsilon_{k\sim 1} \sim v k + \delta \epsilon(k) $.
+High-energy quasiparticles still move ballistically (since the system is integrable) but with momentum-dependent velocities which decrease away from the linear regime. These modes are dispersive: the wave packet will spread out and lose shape over time due to these components traveling at different speeds.
+
+
+Many different modes can contribute to observable behavior, depending on the model, the nature of the initial state, and the observable itself. In particular, in the case of a global quench, the initial state is highly excited in terms of the post-quench Hamiltonian — it populates many $k$-modes, not just low-energy ones. Then the post-quench operator wavefront will be initially dominated by a coherent light-cone picture with $v_{g,\text{max}}\sim v$, while high-energy modes can lead to oscillatory, dispersive dephasing and velocity spread at long times. Consequently, there may exist a regime in which the universal critical contributions decay faster than the non-universal oscillations, leading to a crossover at a time $t^*$ beyond which the dispersive effects become dominant.
+A general scaling ansatz is
+\begin{equation}
+    \langle  O(t) \rangle \sim \langle  O(t) \rangle_{\text{univ}} + \langle  O(t) \rangle_{\text{latt}}
+\end{equation}
+where the regime $ a/v \ll t \ll t^*$ is governed by universal scaling, and the lattice crossover time $t^*$ occurs when this universal contribution has decayed to the same magnitude as the underlying lattice effects --- see Fig.~\ref{fig:gsgenericcrossover},
+\begin{equation}
+    \langle  O(t^{*}) \rangle_{\text{univ}} \sim \langle  O(t^{*}) \rangle_{\text{latt}}.
+    \label{eq:crossovertime1}
+\end{equation}
+
+
+Determining $t^*$ requires knowledge of universal scaling as well as dispersive corrections from the underlying lattice dynamics. A quench between integrable Hamiltonians presents the challenge of translating between eigenbases of the two integrable theories, which can have complicated structures described by the Bethe Ansatz. This is a difficult undertaking analytically, with no general formalism currently known~\cite{S_Essler_Fagotti_2016}. Even in the non-interacting (TFIM) case, this proves to be an ambitious undertaking both analytically~\cite{S_Calabrese_Essler_Fagotti_2011,calabrese2012quantum, Granet_Fagotti_Essler_2020} and numerically, as shown in this work. Extensions to interacting integrable models are an area of current research.
+
+
+The extent of this work is namely to propose universal scaling ansätze for ground state and finite-temperature critical quenches in these quantum spin chains, and leave parametric determination of crossover times from universal to lattice-dominated behavior to future work. That said, since the behavior of the transverse magnetization has already been obtained~\cite{S_barouch1970statistical}, we can at least calculate these crossover times in that case.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.4\linewidth]{supplattice.pdf}
+    \caption{Schematic of the crossover time (black dot) between universal scaling behavior and dispersive lattice effects. The former is governed by the low-energy modes of the model which have emergent conformal symmetry, while the latter are determined by the full energy spectrum of the underlying lattice model, including high-energy modes, which eventually break the conformal invariance.}
+    \label{fig:gsgenericcrossover}
+\end{figure}
+For the ground state quench, we can equate the scaling limit in Eqn.~\ref{eq:asymptote1} to the power-law lattice tail without the oscillation in Eqn.~\ref{eq:oscillation} with $\beta \to \infty$, to obtain the crossover time $Jg t^*$ which scales polynomially in $g$,
+\begin{equation}
+    Jg t^* \sim -\frac{1}{4}W_{-1}\left(-\frac{g^{3/2}}{|2-g| \sqrt{2}}\right)
+\sim a g^{-p},
+\end{equation}
+where $W_{-1}$ is the product log function, $a \approx 1.37$, and $ p \approx 0.14$. Similarly, equating the scaling limit in Eqn.~\ref{eq:asymptote2} with the power-law tail in Eqn.~\ref{eq:oscillation}, we obtain the crossover time $t^*/\beta $ for the finite-temperature critical TFI quench which scales logarithmically with $\beta J $,
+\begin{equation}
+
+    \frac{t^*}{\beta} \sim -\frac{3  }{4 \pi }W_{-1}\left\{-\frac{1}{6\beta J} \left[\frac{\pi^{2}  \tanh (|2-g| \beta J)}{|2-g|\sqrt{2}}\right]^{2/3}\right\}\sim a' \log (b'\beta J),
+\end{equation}
+with $a' \approx 0.26$, and $ b' \approx 9.88$.
+
+One may observe that operators $O$ which are more relevant than $\epsilon_\text{I}$ --- that is, more governed by low-lying modes and less sensitive to high-energy corrections --- may have a later lattice crossover,
+\begin{align}
+    \Delta_O < 1 \implies t^*_O > \beta \log \beta,
+\end{align}
+while, conversely, there may exist less relevant operators such that $t^*_{O}\leq \beta/2\pi $, for which lattice effects obfuscate the asymptotic universal relaxation regime entirely.
+
+\section{Integrability breaking, thermalization, and the dual quench protocol}
+To demonstrate the broader applicability of our results, we show that strict Bethe-Ansatz solubility on the lattice is not a requirement for observing the dynamical scaling forms we derive. We support this claim by considering critical quenches in the ANNNI model, which includes (weak) integrability-breaking perturbations. Crucially, although the model is not fully integrable, it remains governed by the underlying integrable Ising CFT for the regime of $\gamma$ and $t$ considered. More generally, we expect integrability-breaking terms to eventually induce a crossover to diffusive dynamics, thereby limiting the window in which universal scaling behavior appears. This ``thermalization" time $t_{\text{therm}}$ should take the form:
+\begin{equation}
+    t_{\text{therm}} \sim \Delta E^{-a} \gamma^{-2l},
+    \label{eqn:thermtime}
+\end{equation}
+where $\Delta E = E - E_0(g)$ is the energy density injected into the system by the quench, and $a,l$ are positive integers --- see Ref.~\cite{S_Mori_Ikeda_Kaminishi_Ueda_2018} and references therein. Though Fermi's Golden Rule arguments would yield $l = 1$, Ref.~\cite{S_Surace_Motrunich_2023} identifies the self-dual ANNNI as a special case where $l = 2$. The universal regime on the lattice is generally a limited window either way; whether thermalization of the subsystem occurs before or after the crossover to dispersive lattice corrections merely determines which phenomenon constitutes the greatest limiting factor. Then, since $t_{\text{therm}}$ implicitly depends on the integrability-breaking strength, $\gamma$ could be chosen such that thermalization effects were not observed on the timescales we considered. Indeed, our scaling results would still hold even for models that thermalize in a more typical fashion (when $l = 1$).
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.4\linewidth]{suppdoublequench.pdf}
+    \caption{The proposed ``dual quench" protocol for implementing effective finite-temperature critical quenches on a quantum simulator. First, one quenches from a ground state with off-critical tuning $g_0$, which is close to the critical point, to an ensemble at $g_1$, even closer to the critical point. This injects the state with some small amount of energy density $\Delta E=E- E_0(g)$, which, when the Hamiltonian has integrability-breaking terms, should locally ``thermalize", becoming an effective finite temperature ensemble $ \beta^{-1} \sim E- E_0(g)$ for the subsystem after some thermalization time $t_{\text{therm}}$. Finally, the thermalized subsystem ensemble can be used as the initial condition for the finite-temperature quench; the decay of local observables after this second quench should then follow the scaling laws derived from the finite-temperature conformal perturbation theory as in Eqns. \ref{eqn:scalingorderg} and \ref{eqn:scalingorderg2}, for some regime of $\gamma$,
+$t$.}
+    \label{fig:dualquench}
+\end{figure}
+On the other hand, the fact that integrability-breaking lattice terms induce thermalization actually facilitate the simulation of critical quenches from effective ``finite temperature" initial states in isolated quantum simulators. Such a ``dual quench" protocol is outlined in Fig.~\ref{fig:dualquench}.
+
+
+
+
+
+
+
+
+
+\begin{thebibliography}{25}
+\makeatletter
+\providecommand \@ifxundefined [1]{
+ \@ifx{#1\undefined}
+}
+\providecommand \@ifnum [1]{
+ \ifnum #1\expandafter \@firstoftwo
+ \else \expandafter \@secondoftwo
+ \fi
+}
+\providecommand \@ifx [1]{
+ \ifx #1\expandafter \@firstoftwo
+ \else \expandafter \@secondoftwo
+ \fi
+}
+\providecommand \natexlab [1]{#1}
+\providecommand \enquote  [1]{``#1''}
+\providecommand \bibnamefont  [1]{#1}
+\providecommand \bibfnamefont [1]{#1}
+\providecommand \citenamefont [1]{#1}
+\providecommand \href@noop [0]{\@secondoftwo}
+\providecommand \href [0]{\begingroup \@sanitize@url \@href}
+\providecommand \@href[1]{\@@startlink{#1}\@@href}
+\providecommand \@@href[1]{\endgroup#1\@@endlink}
+\providecommand \@sanitize@url [0]{\catcode `\\12\catcode `\$12\catcode `\&12\catcode `\#12\catcode `\^12\catcode `\_12\catcode `\%12\relax}
+\providecommand \@@startlink[1]{}
+\providecommand \@@endlink[0]{}
+\providecommand \url  [0]{\begingroup\@sanitize@url \@url }
+\providecommand \@url [1]{\endgroup\@href {#1}{\urlprefix }}
+\providecommand \urlprefix  [0]{URL }
+\providecommand \Eprint [0]{\href }
+\providecommand \doibase [0]{http://dx.doi.org/}
+\providecommand \selectlanguage [0]{\@gobble}
+\providecommand \bibinfo  [0]{\@secondoftwo}
+\providecommand \bibfield  [0]{\@secondoftwo}
+\providecommand \translation [1]{[#1]}
+\providecommand \BibitemOpen [0]{}
+\providecommand \bibitemStop [0]{}
+\providecommand \bibitemNoStop [0]{.\EOS\space}
+\providecommand \EOS [0]{\spacefactor3000\relax}
+\providecommand \BibitemShut  [1]{\csname bibitem#1\endcsname}
+\let\auto@bib@innerbib\@empty
+
+\bibitem [{\citenamefont {Mong}\ \emph {et~al.}(2014)\citenamefont {Mong}, \citenamefont {Clarke}, \citenamefont {Alicea}, \citenamefont {Lindner},\ and\ \citenamefont {Fendley}}]{S_mong2014parafermionic}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.~S.~K.}\ \bibnamefont {Mong}}, \bibinfo {author} {\bibfnamefont {D.~J.}\ \bibnamefont {Clarke}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Alicea}}, \bibinfo {author} {\bibfnamefont {N.~H.}\ \bibnamefont {Lindner}}, \ and\ \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Fendley}},\ }\href {\doibase 10.1088/1751-8113/47/45/452001} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Physics A: Mathematical and Theoretical}\ }\textbf {\bibinfo {volume} {47}},\ \bibinfo {pages} {452001} (\bibinfo {year} {2014})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Hauschild}\ \emph {et~al.}(2024)\citenamefont {Hauschild}, \citenamefont {Unfried}, \citenamefont {Anand}, \citenamefont {Andrews}, \citenamefont {Bintz}, \citenamefont {Borla}, \citenamefont {Divic}, \citenamefont {Drescher}, \citenamefont {Geiger}, \citenamefont {Hefel}, \citenamefont {H{\'e}mery}, \citenamefont {Kadow}, \citenamefont {Kemp}, \citenamefont {Kirchner}, \citenamefont {Liu}, \citenamefont {Moller}, \citenamefont {Parker}, \citenamefont {Rader}, \citenamefont {Romen}, \citenamefont {Scalet}, \citenamefont {Schoonderwoerd}, \citenamefont {Schulz}, \citenamefont {Soejima}, \citenamefont {Thoma}, \citenamefont {Wu}, \citenamefont {Zechmann}, \citenamefont {Zweng}, \citenamefont {Mong}, \citenamefont {Zaletel},\ and\ \citenamefont {Pollmann}}]{S_hauschild:2024}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Hauschild}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Unfried}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Anand}}, \bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Andrews}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Bintz}}, \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Borla}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Divic}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Drescher}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Geiger}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Hefel}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {H{\'e}mery}}, \bibinfo {author} {\bibfnamefont {W.}~\bibnamefont {Kadow}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Kemp}}, \bibinfo {author} {\bibfnamefont {N.}~\bibnamefont {Kirchner}}, \bibinfo {author} {\bibfnamefont {V.~S.}\ \bibnamefont {Liu}}, \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Moller}},
+  \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Parker}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Rader}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Romen}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Scalet}}, \bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Schoonderwoerd}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Schulz}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Soejima}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Thoma}}, \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Wu}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Zechmann}}, \bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Zweng}}, \bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Mong}}, \bibinfo {author} {\bibfnamefont {M.~P.}\ \bibnamefont {Zaletel}}, \ and\ \bibinfo {author} {\bibfnamefont {F.}~\bibnamefont {Pollmann}},\ }\href {\doibase 10.21468/SciPostPhysCodeb.41} {\bibfield  {journal} {\bibinfo  {journal} {SciPost Physics Codebases}\ ,\ \bibinfo {pages}
+  {041}} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Barthel}\ and\ \citenamefont {Zhang}(2020)}]{S_barthelOptimizedLieTrotter2020}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Barthel}}\ and\ \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Zhang}},\ }\href {\doibase 10.1016/j.aop.2020.168165} {\bibfield  {journal} {\bibinfo  {journal} {Annals of Physics}\ }\textbf {\bibinfo {volume} {418}},\ \bibinfo {pages} {168165} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Schollw{\"o}ck}(2011)}]{S_SCHOLLWOCK201196}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Schollw{\"o}ck}},\ }\href {\doibase 10.1016/j.aop.2010.09.012} {\bibfield  {journal} {\bibinfo  {journal} {Annals of Physics}\ }\textbf {\bibinfo {volume} {326}},\ \bibinfo {pages} {96} (\bibinfo {year} {2011})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Sachdev}(2011)}]{S_sachdevQuantumPhaseTransitions2011}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Sachdev}},\ }\href {\doibase 10.1017/CBO9780511973765} {\emph {\bibinfo {title} {Quantum {{Phase Transitions}}}}},\ \bibinfo {edition} {2nd}\ ed.\ (\bibinfo  {publisher} {Cambridge University Press},\ \bibinfo {address} {Cambridge},\ \bibinfo {year} {2011})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Karrasch}\ \emph {et~al.}(2013)\citenamefont {Karrasch}, \citenamefont {Bardarson},\ and\ \citenamefont {Moore}}]{S_karraschReducingNumericalEffort2013}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Karrasch}}, \bibinfo {author} {\bibfnamefont {J.~H.}\ \bibnamefont {Bardarson}}, \ and\ \bibinfo {author} {\bibfnamefont {J.~E.}\ \bibnamefont {Moore}},\ }\href {\doibase 10.1088/1367-2630/15/8/083031} {\bibfield  {journal} {\bibinfo  {journal} {New Journal of Physics}\ }\textbf {\bibinfo {volume} {15}},\ \bibinfo {pages} {083031} (\bibinfo {year} {2013})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Calabrese}\ \emph {et~al.}(2011)\citenamefont {Calabrese}, \citenamefont {Essler},\ and\ \citenamefont {Fagotti}}]{S_Calabrese_Essler_Fagotti_2011}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Calabrese}}, \bibinfo {author} {\bibfnamefont {F.~H.~L.}\ \bibnamefont {Essler}}, \ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Fagotti}},\ }\href {\doibase 10.1103/PhysRevLett.106.227203} {\bibfield  {journal} {\bibinfo  {journal} {Physical Review Letters}\ }\textbf {\bibinfo {volume} {106}},\ \bibinfo {pages} {227203} (\bibinfo {year} {2011})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Barouch}\ \emph {et~al.}(1970)\citenamefont {Barouch}, \citenamefont {McCoy},\ and\ \citenamefont {Dresden}}]{S_barouch1970statistical}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Barouch}}, \bibinfo {author} {\bibfnamefont {B.~M.}\ \bibnamefont {McCoy}}, \ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Dresden}},\ }\href {\doibase 10.1103/PhysRevA.2.1075} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. A}\ }\textbf {\bibinfo {volume} {2}},\ \bibinfo {pages} {1075} (\bibinfo {year} {1970})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Di~Francesco}\ \emph {et~al.}(1997)\citenamefont {Di~Francesco}, \citenamefont {Mathieu},\ and\ \citenamefont {Sénéchal}}]{S_Di_Francesco_Mathieu_Sénéchal_1997}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Di~Francesco}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Mathieu}}, \ and\ \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Sénéchal}},\ }\href {\doibase 10.1007/978-1-4612-2256-9} {\emph {\bibinfo {title} {Conformal Field Theory}}},\ Graduate Texts in Contemporary Physics\ (\bibinfo  {publisher} {Springer},\ \bibinfo {address} {New York, NY},\ \bibinfo {year} {1997})\BibitemShut {NoStop}
+\bibitem [{Note1()}]{Note1}
+  \BibitemOpen
+  \bibinfo {note} {This notation for the scaling dimension deviates from the main text's convention, $x_\Phi $, in order to avoid confusion with the conformal space-time co-ordinates $\protect \mathbf {x}$.}\BibitemShut {Stop}
+\bibitem [{\citenamefont {Milsted}\ and\ \citenamefont {Vidal}(2017)}]{S_milsted2017extraction}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Milsted}}\ and\ \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Vidal}},\ }\href {\doibase 10.1103/PhysRevB.96.245105} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. B}\ }\textbf {\bibinfo {volume} {96}},\ \bibinfo {pages} {245105} (\bibinfo {year} {2017})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Zamolodchikov}(1991)}]{S_Zamolodchikov_1991}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.~B.}\ \bibnamefont {Zamolodchikov}},\ }\href {\doibase 10.1016/0550-3213(91)90207-E} {\bibfield  {journal} {\bibinfo  {journal} {Nuclear Physics B}\ }\textbf {\bibinfo {volume} {348}},\ \bibinfo {pages} {619–641} (\bibinfo {year} {1991})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Mussardo}(2020)}]{S_Mussardo_2010}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Mussardo}},\ }\href@noop {} {\emph {\bibinfo {title} {Statistical {{Field Theory}}: {{An Introduction}} to {{Exactly Solved Models}} in {{Statistical Physics}}}}},\ \bibinfo {edition} {2nd}\ ed.,\ Oxford {{Graduate Texts}}\ (\bibinfo  {publisher} {Oxford University Press},\ \bibinfo {address} {Oxford, New York},\ \bibinfo {year} {2020})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Berenstein}\ and\ \citenamefont {Miller}(2014)}]{S_Berenstein_Miller_2014}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Berenstein}}\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Miller}},\ }\href {\doibase 10.1103/PhysRevD.90.086011} {\bibfield  {journal} {\bibinfo  {journal} {Physical Review D}\ }\textbf {\bibinfo {volume} {90}},\ \bibinfo {pages} {086011} (\bibinfo {year} {2014})}\BibitemShut {NoStop}
+\bibitem [{Note2()}]{S_Note2}
+  \BibitemOpen
+  \bibinfo {note} {$\Lambda $ should be distinguished from $a$, which is the UV cutoff corresponding to the lattice spacing}\BibitemShut {NoStop}
+\bibitem [{Note3()}]{S_Note3}
+  \BibitemOpen
+  \bibinfo {note} {We point out that an equivalent formulation up until the Wick rotation was obtained by Ref.~\cite {Berenstein_Miller_2014}, but the following calculation is distinct.}\BibitemShut {Stop}
+\bibitem [{\citenamefont {Calabrese}\ and\ \citenamefont {Cardy}(2006)}]{S_calabrese2006time}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Calabrese}}\ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Cardy}},\ }\href {\doibase 10.1103/PhysRevLett.96.136801} {\bibfield  {journal} {\bibinfo  {journal} {Physical Review Letters}\ }\textbf {\bibinfo {volume} {96}},\ \bibinfo {pages} {136801} (\bibinfo {year} {2006})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Calabrese}\ and\ \citenamefont {Cardy}(2005)}]{S_calabrese2005evolution}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Calabrese}}\ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Cardy}},\ }\href {\doibase 10.1088/1742-5468/2005/04/P04010} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\ }\textbf {\bibinfo {volume} {2005}},\ \bibinfo {pages} {P04010} (\bibinfo {year} {2005})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Cardy}(2016)}]{S_cardy2016furtherresults}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Cardy}},\ }\href {\doibase 10.1088/1742-5468/2016/02/023103} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\ }\textbf {\bibinfo {volume} {2016}},\ \bibinfo {pages} {023103} (\bibinfo {year} {2016})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Calabrese}\ and\ \citenamefont {Cardy}(2007)}]{S_Calabrese_Cardy_2007}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Calabrese}}\ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Cardy}},\ }\href {\doibase 10.1088/1742-5468/2007/06/P06008} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\ }\textbf {\bibinfo {volume} {2007}},\ \bibinfo {pages} {P06008–P06008} (\bibinfo {year} {2007})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Essler}\ and\ \citenamefont {Fagotti}(2016)}]{S_Essler_Fagotti_2016}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {F.~H.~L.}\ \bibnamefont {Essler}}\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Fagotti}},\ }\href {\doibase 10.1088/1742-5468/2016/06/064002} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\ }\textbf {\bibinfo {volume} {2016}},\ \bibinfo {pages} {064002} (\bibinfo {year} {2016})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Calabrese}\ \emph {et~al.}(2012)\citenamefont {Calabrese}, \citenamefont {Essler},\ and\ \citenamefont {Fagotti}}]{S_calabrese2012quantum}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Calabrese}}, \bibinfo {author} {\bibfnamefont {F.~H.~L.}\ \bibnamefont {Essler}}, \ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Fagotti}},\ }\href {\doibase 10.1088/1742-5468/2012/07/P07016} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Statistical Mechanics: Theory and Experiment}\ }\textbf {\bibinfo {volume} {2012}},\ \bibinfo {pages} {P07016} (\bibinfo {year} {2012})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Granet}\ \emph {et~al.}(2020)\citenamefont {Granet}, \citenamefont {Fagotti},\ and\ \citenamefont {Essler}}]{S_Granet_Fagotti_Essler_2020}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Granet}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Fagotti}}, \ and\ \bibinfo {author} {\bibfnamefont {F.~H.~L.}\ \bibnamefont {Essler}},\ }\href {\doibase 10.21468/SciPostPhys.9.3.033} {\bibfield  {journal} {\bibinfo  {journal} {SciPost Physics}\ }\textbf {\bibinfo {volume} {9}},\ \bibinfo {pages} {033} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Mori}\ \emph {et~al.}(2018)\citenamefont {Mori}, \citenamefont {Ikeda}, \citenamefont {Kaminishi},\ and\ \citenamefont {Ueda}}]{S_Mori_Ikeda_Kaminishi_Ueda_2018}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Mori}}, \bibinfo {author} {\bibfnamefont {T.~N.}\ \bibnamefont {Ikeda}}, \bibinfo {author} {\bibfnamefont {E.}~\bibnamefont {Kaminishi}}, \ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Ueda}},\ }\href {\doibase 10.1088/1361-6455/aabcdf} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Physics B: Atomic, Molecular and Optical Physics}\ }\textbf {\bibinfo {volume} {51}},\ \bibinfo {pages} {112001} (\bibinfo {year} {2018})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Surace}\ and\ \citenamefont {Motrunich}(2023)}]{S_Surace_Motrunich_2023}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {F.~M.}\ \bibnamefont {Surace}}\ and\ \bibinfo {author} {\bibfnamefont {O.}~\bibnamefont {Motrunich}},\ }\href {\doibase 10.1103/PhysRevResearch.5.043019} {\bibfield  {journal} {\bibinfo  {journal} {Physical Review Research}\ }\textbf {\bibinfo {volume} {5}},\ \bibinfo {pages} {043019} (\bibinfo {year} {2023})}\BibitemShut {NoStop}
+\end{thebibliography}
+\end{document}
+===== END FILE: main.tex =====

@@ -1,0 +1,949 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific benchmark case author. You receive one private, source-grounded science card. You do not receive the paper and must not add facts from memory.\nReturn exactly one JSON object matching the supplied CaseDraftBatch schema, without Markdown or extra text.\nUse only science-card mechanisms, claims, controls, readouts, fixed conditions, numeric values, domains, statistics, uncertainty statements, and exact line anchors.\nPrefer one coherent family that groups linked claims sharing a mechanism, rather than one isolated fitted equation. Use one or two readouts only when the card supports them.\nEvery shared Player fact, identification-only fact, and Oracle-only fact must be listed separately in information_boundary and cite existing card IDs and exact card line ranges. shared_player is field-level: provide exactly one trace named title, background, apparatus, control.NAME, readout.NAME, initial_observation.INDEX, fixed_condition.ID, or note.INDEX for every corresponding public field. A line range must belong to the specific cited card fact; do not attach an unrelated anchor merely because it exists elsewhere in the card. Each public control/readout trace must cite a supporting claim from both selected branches. A control trace must include the public control anchor and both branches' claim-specific domain anchors; a readout trace must include its definition anchor and, only when the card supplies one, its resolution anchor.\nThe user message supplies an immutable machine_interface_mapping from the ScienceCard's original control/readout symbols to lower_snake_case CaseDraft machine IDs. Preserve the ScienceCard, all ScienceCard IDs, and all locators exactly as supplied; the mapping applies only to the generated CaseDraft interface. Use mapped control/readout IDs everywhere in candidate.controls[].name, candidate.readouts[].name, relationship_targets[].control/readout, candidate.oracle.outputs keys and every oracle {\"var\": ...} leaf, diagnostic_conditions and hidden_conditions keys, and control.NAME/readout.NAME shared_player field suffixes. Never emit an original ScienceCard control/readout symbol in one of those machine-interface positions when it differs from its mapped ID. Do not alter, extend, or reinterpret machine_interface_mapping.\nShared Player information gives only the minimum system, protocol, actual controls, operational readouts, and common fixed conditions needed to experiment. Do not reveal a fitted equation, coefficient, exponent, numeric outcome, hidden regime, source identity, or answer direction.\nInitial observations must be qualitative and contain no digits or precomputed measurements. They may state that the phenomenon and readouts exist, but not how a readout changes with a control.\nIdentification may expose a source-defined response skeleton and named parameter slots but no true values. Discovery receives only the generic expression language through the existing runtime.\nOracle domains must be traceable to the card. A science-card readout's statistic and uncertainty describe the source data and remain private provenance; they are not the semantics of a fresh benchmark query. For structured ScienceClaim oracle_outputs, set candidate.readout.statistic exactly to \"Deterministic central value of the source-reported quantitative relation.\" and candidate.readout.uncertainty exactly to \"Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.\" Never call a deterministic expression result a newly sampled measurement, ensemble, or replicate, and never attach source data-point error bars or fit-parameter uncertainty to an individual query value. The deterministic binder enforces these two phrases after parsing. The legacy compatibility path without structured oracle_outputs alone copies the source readout statistic and uncertainty. When the card supplies a resolution, copy its value and kind exactly; when resolution=null, emit resolution=null and resolution_kind=null, and the Oracle returns an unquantized deterministic central value. Do not invent single-realization noise or imply that an exact simulator output is a claim of infinite experimental precision. candidate.relative_tolerance is a benchmark scoring convention, not paper-reported measurement uncertainty. The current Oracle is deterministic, so candidate.max_replicates must be exactly 1.\nUnder strict source-contained authoring, the alternate world must select another regime or branch that the same paper explicitly reports. Set counterfactual_derivation.kind to reported_regime_selection. Partition source_claim_ids into non-empty disjoint paper_claim_ids and counterfactual_claim_ids. Copy their applicability statements and branch-only fixed conditions into the corresponding private Oracle fields; copy their shared fixed conditions into candidate.common_fixed_conditions. Treat a complete source-reported apparatus or regime configuration as a descriptive branch, even when several physical settings differ; do not make a single-factor causal claim unless the source does. A Player control must be executable in both branches: use either a nonzero candidate interval wholly contained in every selected claim's continuous_interval, or at least two candidate allowed_values contained in every selected numeric_values/continuous_interval domain. The benchmark query set may be a source-supported subset; it need not equal the paper's full applicability intersection. Do not compile fixed_value, symbolic, or unreported domains as Player controls. Do not invent z=1, a new exponent, a new coefficient, a new equation, or any other unreported scientific value. A numeric selector may choose between two fully reported branches, but it is benchmark machinery rather than a paper claim.\nKeep the paper-defined branch equations unchanged. Choose a single selector parameter and assign the two branches the values zero and one. When the supplied ScienceClaims contain oracle_outputs, the response schema requires candidate.oracle.outputs, paper_parameters, and counterfactual_parameters to be empty objects. Emit exactly {} for those three fields: deterministic code will compile the reviewed claim programs with the selector and insert the exact source parameters after parsing. Do not transcribe, simplify, or regenerate those formulas. The compatibility path for an older card without structured oracle_outputs retains the previous full Oracle fields.\nWhen the user message supplies a reviewer-selected branch partition, paper_claim_ids and counterfactual_claim_ids must use those two complete groups. You may swap the two groups as wholes; never move an individual claim between groups.\nIf a paper reports only isolated values of a regime condition, such as two temperatures, use that condition as the hidden world selector. Do not expose it as a continuous Player control and do not interpolate between its reported values. Public controls are quantities for which both reported branch equations support arbitrary in-domain queries.\ncandidate.notes are Player-visible. They may state common source-supported fixed conditions only; they must not mention historical/counterfactual worlds, a selector, private regime values, branch equations, answer directions, or source identity.\nIf the card has no source-reported alternative regime that yields a meaningful relationship-level difference under the same public controls and readouts, return status=not_authorable and drafts=[].\nFor every readout, provide a relationship target. Worlds must differ in their executable control-response relation, not merely in prose labels or by an additive constant; declared directions must agree with the executable Oracle. Diagnostic conditions should distinguish the worlds within the Player budget. Hidden conditions must be disjoint and spread across the source-supported interior domain.\nUse source-derived reporting precision only as interface rounding; never present it as measurement resolution unless the card says so.\nThe Young double-slit exemplar is useful because its public observations are qualitative, its controls have independent experimental meaning, and one hidden mechanism change propagates predictively. The Brownian exemplar is useful because it defines an ensemble readout precisely and separates time and particle-size relationships. Copy these design principles, not their physics or numbers.\nThe generated candidate remains a draft. A deterministic filter and human source review decide acceptance.\n\nCaseDraftBatch JSON Schema:\n{\"$defs\":{\"expression_template\":{\"anyOf\":[{\"type\":\"number\"},{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/expression_template\"},\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"subtract\",\"multiply\",\"divide\",\"power\",\"negate\",\"exp\",\"log\",\"sin\",\"maximum\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]},\"temporal_case_candidate\":{\"additionalProperties\":false,\"properties\":{\"apparatus\":{\"additionalProperties\":false,\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"name\",\"description\"],\"type\":\"object\"},\"background\":{\"minLength\":1,\"type\":\"string\"},\"budget\":{\"minimum\":1,\"type\":\"integer\"},\"claim\":{\"minLength\":1,\"type\":\"string\"},\"common_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"type\":\"array\"},\"confidence_threshold\":{\"exclusiveMinimum\":0,\"maximum\":1,\"type\":\"number\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"oneOf\":[{\"properties\":{\"allowed_values\":{\"maxItems\":0,\"type\":\"array\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"}}},{\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"minItems\":2,\"type\":\"array\",\"uniqueItems\":true},\"maximum\":{\"type\":\"null\"},\"minimum\":{\"type\":\"null\"}}}],\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"description\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"minimum\",\"maximum\",\"allowed_values\"],\"type\":\"object\"},\"maxItems\":5,\"minItems\":1,\"type\":\"array\"},\"counterfactual_change\":{\"minLength\":1,\"type\":\"string\"},\"diagnostic_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"family\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"hidden_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"initial_observations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"max_replicates\":{\"minimum\":1,\"type\":\"integer\"},\"notes\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\"},\"oracle\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_applicability\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\",\"uniqueItems\":true},\"counterfactual_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"type\":\"array\"},\"counterfactual_parameters\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"},\"kind\":{\"const\":\"closed_form\"},\"outputs\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"},\"paper_applicability\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\",\"uniqueItems\":true},\"paper_fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"condition_id\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_parameters\":{\"additionalProperties\":false,\"maxProperties\":0,\"type\":\"object\"}},\"required\":[\"kind\",\"outputs\",\"paper_parameters\",\"counterfactual_parameters\",\"paper_applicability\",\"counterfactual_applicability\",\"paper_fixed_conditions\",\"counterfactual_fixed_conditions\"],\"type\":\"object\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"oneOf\":[{\"properties\":{\"resolution\":{\"exclusiveMinimum\":0,\"type\":\"number\"},\"resolution_kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"}}},{\"properties\":{\"resolution\":{\"type\":\"null\"},\"resolution_kind\":{\"type\":\"null\"}}}],\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"exclusiveMinimum\":0,\"type\":\"number\"},{\"type\":\"null\"}]},\"resolution_kind\":{\"anyOf\":[{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},{\"type\":\"null\"}]},\"statistic\":{\"enum\":[\"Deterministic central value of the source-reported quantitative relation.\"],\"type\":\"string\"},\"uncertainty\":{\"enum\":[\"Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.\"],\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"resolution_kind\"],\"type\":\"object\"},\"maxItems\":2,\"minItems\":1,\"type\":\"array\"},\"relative_tolerance\":{\"exclusiveMaximum\":1,\"exclusiveMinimum\":0,\"type\":\"number\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"},\"locator\":{\"minLength\":1,\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\",\"locator\",\"role\"],\"type\":\"object\"},\"title\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"family\",\"title\",\"claim\",\"source\",\"apparatus\",\"background\",\"initial_observations\",\"common_fixed_conditions\",\"controls\",\"readouts\",\"oracle\",\"diagnostic_conditions\",\"hidden_conditions\",\"budget\",\"max_replicates\",\"confidence_threshold\",\"relative_tolerance\",\"notes\",\"counterfactual_change\"],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"drafts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"candidate\":{\"$ref\":\"#/$defs/temporal_case_candidate\"},\"counterfactual_derivation\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"counterfactual_value\":{\"type\":\"number\"},\"description\":{\"minLength\":1,\"type\":\"string\"},\"historical_value\":{\"type\":\"number\"},\"kind\":{\"enum\":[\"benchmark_authored_parameter_substitution\",\"reported_regime_selection\"],\"type\":\"string\"},\"paper_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"paper_defined_equations_unchanged\":{\"type\":\"boolean\"},\"selector_parameter\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"source_mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"kind\",\"description\",\"source_claim_ids\",\"paper_claim_ids\",\"counterfactual_claim_ids\",\"source_mechanism_ids\",\"selector_parameter\",\"historical_value\",\"counterfactual_value\",\"paper_defined_equations_unchanged\"],\"type\":\"object\"},\"design_summary\":{\"minLength\":1,\"type\":\"string\"},\"information_boundary\":{\"additionalProperties\":false,\"properties\":{\"identification_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"oracle_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"shared_player\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"field\":{\"minLength\":1,\"type\":\"string\"},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"field\",\"claim_ids\",\"mechanism_ids\",\"fixed_condition_ids\",\"line_ranges\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"shared_player\",\"identification_only\",\"oracle_only\"],\"type\":\"object\"},\"relationship_targets\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"control\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"counterfactual_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"counterfactual_shape\":{\"minLength\":1,\"type\":\"string\"},\"historical_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"historical_shape\":{\"minLength\":1,\"type\":\"string\"},\"readout\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"control\",\"readout\",\"historical_direction\",\"counterfactual_direction\",\"historical_shape\",\"counterfactual_shape\",\"source_claim_ids\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"design_summary\",\"information_boundary\",\"counterfactual_derivation\",\"relationship_targets\",\"candidate\"],\"type\":\"object\"},\"maxItems\":1,\"type\":\"array\"},\"status\":{\"enum\":[\"authored\",\"not_authorable\"],\"type\":\"string\"}},\"required\":[\"assessment\",\"status\",\"drafts\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Private science card; this is the only scientific authority:\n{\"assessment\":\"The source supports the normalized-friction fits for the viscous-inertial transition. The public control St ranges from 0.01 to 300. The common fixed condition K_phi = J + 0.1 I^2 = 0.065 is a constructed slice through both source global fits, not two simulation runs from the two matched mu_f branches. The St=0.65 and 206.5 points are provenance for how the reference slice was chosen, not paired direct samples. The derived relations J(St)=0.065/(1+0.1 St), K_mu(St)=0.065*(1+alpha_mu St)/(1+0.1 St), and r(St)=1+a_mu*sqrt(K_mu(St)) are consistent with the source equations and fits. The private branch mu_f=0.15 uses a_mu=14.3 and alpha_mu=0.029; the alternate branch mu_f=0.80 uses a_mu=26.5 and alpha_mu=0.00875. All constants are anchored. The case is authoring-ready.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"inset provides mu/mu_c vs K_mu with a single fit mu = mu_c (1 + a_mu K_mu^{1/2}) with a_mu=14.3\"},{\"line_end\":252,\"line_start\":252,\"support\":\"K_mu = J + alpha_mu I^2 with alpha_mu = 0.029\"},{\"line_end\":276,\"line_start\":274,\"support\":\"two simulation runs with the same K-value (K=0.065) and St=0.65, 206.5\"},{\"line_end\":358,\"line_start\":358,\"support\":\"Table: mu_f=0.15, a_mu=14.3, alpha_mu=0.029\"}],\"applicability\":\"Valid for the reference interparticle friction mu_f=0.15 and for St in the range 0.01-300.\",\"claim_id\":\"r_vs_St_muf015\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":238,\"line_start\":238,\"support\":\"The range of St numbers in this study is 0.01-300.\"}],\"control_name\":\"St\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The range of St numbers in this study is 0.01-300.\",\"maximum\":300.0,\"minimum\":0.01}],\"control_names\":[\"St\"],\"depends_on\":[],\"fixed_condition_ids\":[\"K_phi_common\",\"mu_f_reference\"],\"mechanism_ids\":[\"viscous_inertial_rheology\"],\"oracle_outputs\":{\"r\":{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"a_mu_muf015\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"K_phi_common\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_mu_muf015\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"multiply\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_phi\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"divide\"},{\"param\":\"half\"}],\"op\":\"power\"}],\"op\":\"multiply\"}],\"op\":\"add\"}},\"quantitative_form\":\"r(St) = 1 + 14.3 * sqrt(0.065 * (1 + 0.029 * St) / (1 + 0.1 * St))\",\"readout_names\":[\"r\"],\"statement\":\"For the reference interparticle friction mu_f=0.15, the normalized friction r = mu/mu_c as a function of Stokes number St is given by r(St) = 1 + a_mu * sqrt(K_mu(St)), where K_mu(St) = K_phi * (1 + alpha_mu * St) / (1 + 0.1 * St) with K_phi = 0.065, a_mu = 14.3, and alpha_mu = 0.029.\",\"statistical_basis\":\"Central value implied by the reported fits at constructed K_phi=0.065; coefficients a_mu and alpha_mu from Table 1.\",\"uncertainty\":\"mu_c has uncertainty ±0.02 with convention source_unspecified; no uncertainty reported for a_mu or alpha_mu; no pointwise uncertainty for the derived r(St) curve.\"},{\"anchors\":[{\"line_end\":375,\"line_start\":340,\"support\":\"Figure 6 caption and surrounding text: mu/mu_c versus K_mu with fit mu = mu_c(1 + a_mu K_mu^{1/2}) for changed friction; curves collapse against K_mu with alpha_mu decreasing with increasing mu_f.\"},{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80, a_mu=26.5, alpha_mu=0.00875\"}],\"applicability\":\"Valid for the alternate interparticle friction mu_f=0.80 and for St in the range 0.01-300.\",\"claim_id\":\"r_vs_St_muf080\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":238,\"line_start\":238,\"support\":\"The range of St numbers in this study is 0.01-300.\"}],\"control_name\":\"St\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The range of St numbers in this study is 0.01-300.\",\"maximum\":300.0,\"minimum\":0.01}],\"control_names\":[\"St\"],\"depends_on\":[],\"fixed_condition_ids\":[\"K_phi_common\",\"mu_f_alternate\"],\"mechanism_ids\":[\"viscous_inertial_rheology\"],\"oracle_outputs\":{\"r\":{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"a_mu_muf080\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"K_phi_common\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_mu_muf080\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"multiply\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"param\":\"alpha_phi\"},{\"var\":\"St\"}],\"op\":\"multiply\"}],\"op\":\"add\"}],\"op\":\"divide\"},{\"param\":\"half\"}],\"op\":\"power\"}],\"op\":\"multiply\"}],\"op\":\"add\"}},\"quantitative_form\":\"r(St) = 1 + 26.5 * sqrt(0.065 * (1 + 0.00875 * St) / (1 + 0.1 * St))\",\"readout_names\":[\"r\"],\"statement\":\"For the alternate interparticle friction mu_f=0.80, the normalized friction r = mu/mu_c as a function of Stokes number St is given by r(St) = 1 + a_mu * sqrt(K_mu(St)), where K_mu(St) = K_phi * (1 + alpha_mu * St) / (1 + 0.1 * St) with K_phi = 0.065, a_mu = 26.5, and alpha_mu = 0.00875.\",\"statistical_basis\":\"Central value implied by the reported fits at constructed K_phi=0.065; coefficients a_mu and alpha_mu from Table 1.\",\"uncertainty\":\"mu_c has uncertainty ±0.08 with convention source_unspecified; no uncertainty reported for a_mu or alpha_mu; no pointwise uncertainty for the derived r(St) curve.\"}],\"controls\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":238,\"line_start\":238,\"support\":\"The range of St numbers in this study is 0.01-300.\"}],\"definition\":\"Stokes number, defined as the ratio of inertial to viscous stress scales I^2/J.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The range of St numbers in this study is 0.01-300.\",\"maximum\":300.0,\"minimum\":0.01,\"name\":\"St\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":276,\"line_start\":274,\"support\":\"two simulation runs with the same K-value (K=0.065) and St=0.65, 206.5\"}],\"condition_id\":\"K_phi_common\",\"statement\":\"For both private mu_f branches, the Oracle evaluates the source-reported K_phi/K_mu fit laws on the constructed slice K_phi=J+0.1 I^2=0.065; the source directly reports this K_phi at St=0.65 and 206.5 in the reference analysis.\"},{\"anchors\":[{\"line_end\":193,\"line_start\":193,\"support\":\"mu_f=0.15 (which is our reference mu_f)\"}],\"condition_id\":\"mu_f_reference\",\"statement\":\"The reference interparticle friction coefficient is mu_f = 0.15.\"},{\"anchors\":[{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80\"}],\"condition_id\":\"mu_f_alternate\",\"statement\":\"An alternate interparticle friction coefficient is mu_f = 0.80.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":123,\"line_start\":123,\"support\":\"K = J + alpha I^2 with alpha = 1/St_{v->i}\"},{\"line_end\":177,\"line_start\":177,\"support\":\"Fits mu = mu_c(1 + a_mu K_mu^{1/2}) with a_mu=14.3\"},{\"line_end\":252,\"line_start\":246,\"support\":\"Definitions of K_phi and K_mu with alpha_phi=0.1 and alpha_mu=0.029\"},{\"line_end\":360,\"line_start\":358,\"support\":\"Table of fit coefficients for mu_f=0.15, 0.5, 0.8\"}],\"equations\":[\"K_phi = J + alpha_phi I^2, alpha_phi = 0.1\",\"K_mu = J + alpha_mu I^2\",\"r = mu/mu_c = 1 + a_mu * sqrt(K_mu)\",\"phi = phi_c (1 - a_phi sqrt(K_phi))\"],\"mechanism_id\":\"viscous_inertial_rheology\",\"parameters\":[{\"anchors\":[{\"line_end\":246,\"line_start\":246,\"support\":\"K=K_phi=J+alpha_phi I^2, where alpha_phi=1/St_{v->i}=0.1\"}],\"name\":\"alpha_phi\",\"role\":\"coefficient in K_phi definition\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.1},{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"inset provides mu/mu_c vs K_mu with a single fit mu = mu_c (1 + a_mu K_mu^{1/2}) with a_mu=14.3\"},{\"line_end\":358,\"line_start\":358,\"support\":\"Table: mu_f=0.15, a_mu=14.3\"}],\"name\":\"a_mu_muf015\",\"role\":\"fit coefficient in r = 1 + a_mu sqrt(K_mu) for mu_f=0.15\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":14.3},{\"anchors\":[{\"line_end\":252,\"line_start\":252,\"support\":\"K_mu = J + alpha_mu I^2 with alpha_mu = 0.029\"},{\"line_end\":358,\"line_start\":358,\"support\":\"Table: mu_f=0.15, alpha_mu=0.029\"}],\"name\":\"alpha_mu_muf015\",\"role\":\"coefficient in K_mu for mu_f=0.15\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.029},{\"anchors\":[{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80, a_mu=26.5\"}],\"name\":\"a_mu_muf080\",\"role\":\"fit coefficient in r = 1 + a_mu sqrt(K_mu) for mu_f=0.80\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":26.5},{\"anchors\":[{\"line_end\":360,\"line_start\":360,\"support\":\"Table: mu_f=0.80, alpha_mu=0.00875\"}],\"name\":\"alpha_mu_muf080\",\"role\":\"coefficient in K_mu for mu_f=0.80\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.00875},{\"anchors\":[{\"line_end\":248,\"line_start\":248,\"support\":\"mu_c = 0.30 ± 0.02 at jamming\"},{\"line_end\":360,\"line_start\":358,\"support\":\"Table: mu_c values for different mu_f\"}],\"name\":\"mu_c\",\"role\":\"critical macroscopic friction at jamming\",\"uncertainty\":\"±0.02 for mu_f=0.15, ±0.05 for mu_f=0.5, ±0.08 for mu_f=0.8; convention source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.3},{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"mu = mu_c (1 + a_mu K_mu^{1/2})\"}],\"name\":\"one\",\"role\":\"additive constant in r = 1 + a_mu sqrt(K_mu)\",\"uncertainty\":\"none\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"mu = mu_c (1 + a_mu K_mu^{1/2})\"}],\"name\":\"half\",\"role\":\"exponent in sqrt(K_mu)\",\"uncertainty\":\"none\",\"unit\":\"dimensionless\",\"value\":0.5},{\"anchors\":[{\"line_end\":276,\"line_start\":274,\"support\":\"two simulation runs with the same K-value (K=0.065) and St=0.65, 206.5\"}],\"name\":\"K_phi_common\",\"role\":\"constructed slice through both source global fits: K_phi = J + 0.1 I^2 = 0.065\",\"uncertainty\":\"none reported\",\"unit\":\"dimensionless\",\"value\":0.065}],\"statement\":\"The macroscopic friction coefficient mu is governed by a single dimensionless number K_mu = J + alpha_mu I^2, with alpha_mu = 1/St_{v->i}^mu, and the normalized friction r = mu/mu_c follows r = 1 + a_mu * sqrt(K_mu). The packing fraction phi follows phi = phi_c (1 - a_phi sqrt(K_phi)) with K_phi = J + alpha_phi I^2 and alpha_phi = 0.1.\",\"variable_names\":[\"St\",\"J\",\"I\",\"K_phi\",\"K_mu\",\"mu\",\"mu_c\",\"r\",\"a_mu\",\"alpha_mu\",\"phi\",\"phi_c\",\"a_phi\",\"alpha_phi\"]}],\"paper_scope\":\"Particle-resolved simulations of dense frictional suspensions undergoing the viscous-inertial transition using pressure-imposed rheology. The study varies fluid viscosity, shear rate, and granular pressure, and examines the effect of interparticle friction on the transition. The key findings are the distinct scalings of packing fraction phi and macroscopic friction mu, governed by different alpha values, and the role of tangential contact and lubrication forces.\",\"readouts\":[{\"anchors\":[{\"line_end\":177,\"line_start\":177,\"support\":\"mu/mu_c vs K_mu with fit mu = mu_c (1 + a_mu K_mu^{1/2})\"},{\"line_end\":248,\"line_start\":248,\"support\":\"mu_c = 0.30 ± 0.02 at jamming\"}],\"definition\":\"Normalized macroscopic friction coefficient, r = mu/mu_c.\",\"name\":\"r\",\"resolution\":null,\"statistic\":\"Central value implied by the reported fits at constructed K_phi=0.065; not a table of raw means at every St and mu_f.\",\"uncertainty\":\"mu_c has uncertainty ±0.02 for mu_f=0.15, ±0.05 for mu_f=0.5, ±0.08 for mu_f=0.8, with convention source_unspecified; no uncertainty reported for a_mu or alpha_mu; no pointwise uncertainty for the derived r(St) curve.\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2505.04242v1\",\"citation\":\"Sudarshan Konidena, Tangential Forces Govern the Viscous-Inertial Transition in Dense Frictional Suspensions, Physical Review Letters (2026), DOI:10.1103/66pp-4rdj\",\"journal_doi\":\"10.1103/66pp-4rdj\"},\"source_ambiguities\":[]}\nImmutable CaseDraft machine interface; use mapped values in every generated machine-interface position while leaving the ScienceCard above unchanged:\n{\"machine_interface_mapping\":{\"controls\":{\"St\":\"st\"},\"immutable\":true,\"readouts\":{\"r\":\"r\"}}}\nReviewer-selected branch partition; preserve each group intact, though the two complete groups may swap world labels:\n{\"branch_a_claim_ids\":[\"r_vs_St_muf015\"],\"branch_b_claim_ids\":[\"r_vs_St_muf080\"]}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_case_authoring",
+    "source_mode": "science_card_only"
+  },
+  "response_schema": {
+    "$defs": {
+      "expression_template": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/expression_template"
+                },
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "subtract",
+                  "multiply",
+                  "divide",
+                  "power",
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "maximum",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "temporal_case_candidate": {
+        "additionalProperties": false,
+        "properties": {
+          "apparatus": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "description"
+            ],
+            "type": "object"
+          },
+          "background": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "budget": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "claim": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "common_fixed_conditions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "condition_id": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "statement": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "condition_id",
+                "statement"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "confidence_threshold": {
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "type": "number"
+          },
+          "controls": {
+            "items": {
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "properties": {
+                    "allowed_values": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "maximum": {
+                      "type": "number"
+                    },
+                    "minimum": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "allowed_values": {
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "maximum": {
+                      "type": "null"
+                    },
+                    "minimum": {
+                      "type": "null"
+                    }
+                  }
+                }
+              ],
+              "properties": {
+                "allowed_values": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maximum": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "minimum": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "unit": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "unit",
+                "minimum",
+                "maximum",
+                "allowed_values"
+              ],
+              "type": "object"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array"
+          },
+          "counterfactual_change": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "diagnostic_conditions": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "family": {
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "hidden_conditions": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "initial_observations": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "max_replicates": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "oracle": {
+            "additionalProperties": false,
+            "properties": {
+              "counterfactual_applicability": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "counterfactual_fixed_conditions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition_id": {
+                      "pattern": "^[a-z][a-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "statement": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition_id",
+                    "statement"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "counterfactual_parameters": {
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "type": "object"
+              },
+              "kind": {
+                "const": "closed_form"
+              },
+              "outputs": {
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "type": "object"
+              },
+              "paper_applicability": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "paper_fixed_conditions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition_id": {
+                      "pattern": "^[a-z][a-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "statement": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition_id",
+                    "statement"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "paper_parameters": {
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "type": "object"
+              }
+            },
+            "required": [
+              "kind",
+              "outputs",
+              "paper_parameters",
+              "counterfactual_parameters",
+              "paper_applicability",
+              "counterfactual_applicability",
+              "paper_fixed_conditions",
+              "counterfactual_fixed_conditions"
+            ],
+            "type": "object"
+          },
+          "readouts": {
+            "items": {
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "properties": {
+                    "resolution": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    },
+                    "resolution_kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resolution": {
+                      "type": "null"
+                    },
+                    "resolution_kind": {
+                      "type": "null"
+                    }
+                  }
+                }
+              ],
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "resolution": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "resolution_kind": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "statistic": {
+                  "enum": [
+                    "Deterministic central value of the source-reported quantitative relation."
+                  ],
+                  "type": "string"
+                },
+                "uncertainty": {
+                  "enum": [
+                    "Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query."
+                  ],
+                  "type": "string"
+                },
+                "unit": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "unit",
+                "statistic",
+                "uncertainty",
+                "resolution",
+                "resolution_kind"
+              ],
+              "type": "object"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "type": "array"
+          },
+          "relative_tolerance": {
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "source": {
+            "additionalProperties": false,
+            "properties": {
+              "arxiv_versioned_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "citation": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "journal_doi": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "locator": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "role": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "citation",
+              "journal_doi",
+              "arxiv_versioned_id",
+              "locator",
+              "role"
+            ],
+            "type": "object"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "title",
+          "claim",
+          "source",
+          "apparatus",
+          "background",
+          "initial_observations",
+          "common_fixed_conditions",
+          "controls",
+          "readouts",
+          "oracle",
+          "diagnostic_conditions",
+          "hidden_conditions",
+          "budget",
+          "max_replicates",
+          "confidence_threshold",
+          "relative_tolerance",
+          "notes",
+          "counterfactual_change"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "drafts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "candidate": {
+              "$ref": "#/$defs/temporal_case_candidate"
+            },
+            "counterfactual_derivation": {
+              "additionalProperties": false,
+              "properties": {
+                "counterfactual_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "counterfactual_value": {
+                  "type": "number"
+                },
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "historical_value": {
+                  "type": "number"
+                },
+                "kind": {
+                  "enum": [
+                    "benchmark_authored_parameter_substitution",
+                    "reported_regime_selection"
+                  ],
+                  "type": "string"
+                },
+                "paper_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "paper_defined_equations_unchanged": {
+                  "type": "boolean"
+                },
+                "selector_parameter": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "source_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "source_mechanism_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "kind",
+                "description",
+                "source_claim_ids",
+                "paper_claim_ids",
+                "counterfactual_claim_ids",
+                "source_mechanism_ids",
+                "selector_parameter",
+                "historical_value",
+                "counterfactual_value",
+                "paper_defined_equations_unchanged"
+              ],
+              "type": "object"
+            },
+            "design_summary": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "information_boundary": {
+              "additionalProperties": false,
+              "properties": {
+                "identification_only": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "fixed_condition_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "fixed_condition_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                },
+                "oracle_only": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "fixed_condition_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "fixed_condition_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                },
+                "shared_player": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claim_ids": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "field": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "fixed_condition_ids": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "line_ranges": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "line_end": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "line_start": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "line_start",
+                            "line_end"
+                          ],
+                          "type": "object"
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "mechanism_ids": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "claim_ids",
+                      "mechanism_ids",
+                      "fixed_condition_ids",
+                      "line_ranges"
+                    ],
+                    "type": "object"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "shared_player",
+                "identification_only",
+                "oracle_only"
+              ],
+              "type": "object"
+            },
+            "relationship_targets": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "control": {
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "counterfactual_direction": {
+                    "enum": [
+                      "approximately_invariant",
+                      "decreasing",
+                      "increasing",
+                      "non_monotonic",
+                      "source_defined"
+                    ],
+                    "type": "string"
+                  },
+                  "counterfactual_shape": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "historical_direction": {
+                    "enum": [
+                      "approximately_invariant",
+                      "decreasing",
+                      "increasing",
+                      "non_monotonic",
+                      "source_defined"
+                    ],
+                    "type": "string"
+                  },
+                  "historical_shape": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "readout": {
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "source_claim_ids": {
+                    "items": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "control",
+                  "readout",
+                  "historical_direction",
+                  "counterfactual_direction",
+                  "historical_shape",
+                  "counterfactual_shape",
+                  "source_claim_ids"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "design_summary",
+            "information_boundary",
+            "counterfactual_derivation",
+            "relationship_targets",
+            "candidate"
+          ],
+          "type": "object"
+        },
+        "maxItems": 1,
+        "type": "array"
+      },
+      "status": {
+        "enum": [
+          "authored",
+          "not_authorable"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "assessment",
+      "status",
+      "drafts"
+    ],
+    "type": "object"
+  }
+}

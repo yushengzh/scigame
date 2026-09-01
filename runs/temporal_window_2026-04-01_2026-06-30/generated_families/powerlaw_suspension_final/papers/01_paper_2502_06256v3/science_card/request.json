@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2502.06256v3\", \"citation\": \"Ido Fanto, Dynamical Spreading and Memory Retention of Particle Suspensions under Power Law Potential, Physical Review Letters (2026), DOI:10.1103/v1nk-pfzj\", \"journal_doi\": \"10.1103/v1nk-pfzj\"}\n\nSource-grounded routing hint from pre-screening:\nPreserve the verified family exactly: normalized leading self-similar radius Y(q)=q^(1/(k+2)), public q [1,10] interface, private k=3 experiment exponent1/5 and k=1 deterministic simulation exponent1/3, identical AST and source-anchored branch conditions. Apply the one remaining provenance fix: the historical k=3 claim applicability and experiment-private condition must explicitly cite source line102 for high Peclet Pe approximately100-300 and negligible regular thermal diffusion. Do not apply that experimental condition to k=1; its simulation condition is grounded only in deterministic force equations/integration. Keep common d=2 overdamped free spreading/self-similar leading law, source_ambiguities empty, no other changes or claims.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nRevision context from an independent review of a prior ScienceCard:\n{\"issues\":[{\"code\":\"locator.experiment_diffusion_scope_missing\",\"detail\":\"The historical k=3 claim says it applies with negligible diffusion, but its anchors are lines 85 and 105 and no selected fixed condition cites the explicit high-Peclet evidence at line 102. Add line 102 to a source locator for that applicability (or encode an experiment-only branch condition) and do not generalize it to the k=1 simulation branch.\",\"line_ranges\":[{\"line_end\":102,\"line_start\":102}]}],\"previous_science_card\":{\"assessment\":\"The source supports the self-similar spreading radius ratio Y=R(t)/R(t_ref)=(t/t_ref)^(1/(k+2)) for k=3 (experiment and simulation) and k=1 (simulation), with common conditions d=2, overdamped free spreading, and self-similar regime. The exponent beta=1/(k+2) is explicitly derived and confirmed. The control q=t/t_ref is a finite benchmark interval [1,10] within the positive self-similar variable, not a source physical boundary. The unknown amplitudes A and B are not set to 1; the ratio cancels them. The raw noisy radius is not claimed. The cluster is complete and case_authoring_ready is true.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":105,\"line_start\":105,\"support\":\"STD(t) proportional to R(t) proportional to t^{1/5} for k=3\"},{\"line_end\":85,\"line_start\":85,\"support\":\"radius grows as t^{1/5} as predicted by Eq. self-similar ansatz\"}],\"applicability\":\"Applies to k=3 in 2D, in the self-similar spreading regime with negligible diffusion, for positive time ratios.\",\"claim_id\":\"radius_ratio_k3\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"Self-similar variable t^beta with beta=1/(k+2); ratio t/t_ref is positive and dimensionless.\"},{\"line_end\":154,\"line_start\":154,\"support\":\"Radius versus time for k=1 along theoretical scaling t^{1/(k+2)}; time is positive.\"}],\"control_name\":\"q\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Conservative finite benchmark query interval [1,10] within the positive self-similar variable; this is an interface range, not a source physical boundary.\",\"maximum\":10.0,\"minimum\":1.0}],\"control_names\":[\"q\"],\"depends_on\":[],\"fixed_condition_ids\":[\"d_equals_2\",\"overdamped_free_spreading\",\"self_similar_regime\",\"k_equals_3_experiment\"],\"mechanism_ids\":[\"self_similar_spreading\"],\"oracle_outputs\":{\"Y\":{\"args\":[{\"var\":\"q\"},{\"param\":\"beta_k3\"}],\"op\":\"power\"}},\"quantitative_form\":\"Y = (t/t_ref)^(1/5)\",\"readout_names\":[\"Y\"],\"statement\":\"For k=3 in 2D, the normalized spreading radius ratio Y = R(t)/R(t_ref) equals (t/t_ref)^(1/5), as predicted by the self-similar scaling beta=1/(k+2).\",\"statistical_basis\":\"Experimental STD(t) proportional to R(t) ~ t^{1/5} (Fig. 1F); simulation radius follows t^{1/5}.\",\"uncertainty\":\"source_unspecified\"},{\"anchors\":[{\"line_end\":154,\"line_start\":154,\"support\":\"radius as a function of time for simulations with k=(-1,0,1) along the theoretical predictions t^{1/(k+2)}\"}],\"applicability\":\"Applies to k=1 in 2D, in the self-similar spreading regime with negligible diffusion, for positive time ratios.\",\"claim_id\":\"radius_ratio_k1\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"Self-similar variable t^beta with beta=1/(k+2); ratio t/t_ref is positive and dimensionless.\"},{\"line_end\":154,\"line_start\":154,\"support\":\"Radius versus time for k=1 along theoretical scaling t^{1/(k+2)}; time is positive.\"}],\"control_name\":\"q\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Conservative finite benchmark query interval [1,10] within the positive self-similar variable; this is an interface range, not a source physical boundary.\",\"maximum\":10.0,\"minimum\":1.0}],\"control_names\":[\"q\"],\"depends_on\":[],\"fixed_condition_ids\":[\"d_equals_2\",\"overdamped_free_spreading\",\"self_similar_regime\",\"k_equals_1_simulation\"],\"mechanism_ids\":[\"self_similar_spreading\"],\"oracle_outputs\":{\"Y\":{\"args\":[{\"var\":\"q\"},{\"param\":\"beta_k1\"}],\"op\":\"power\"}},\"quantitative_form\":\"Y = (t/t_ref)^(1/3)\",\"readout_names\":[\"Y\"],\"statement\":\"For k=1 in 2D, the normalized spreading radius ratio Y = R(t)/R(t_ref) equals (t/t_ref)^(1/3), as predicted by the self-similar scaling beta=1/(k+2).\",\"statistical_basis\":\"Simulation radius versus time for k=1 follows theoretical scaling t^{1/(k+2)} (Fig. 2A).\",\"uncertainty\":\"source_unspecified\"}],\"controls\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"Self-similar variable t^beta with beta=1/(k+2); ratio t/t_ref is positive and dimensionless.\"},{\"line_end\":154,\"line_start\":154,\"support\":\"Radius versus time for k=1 along theoretical scaling t^{1/(k+2)}; time is positive.\"}],\"definition\":\"Time ratio t/t_ref, where t is the current time and t_ref is a reference time in the self-similar regime.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Conservative finite benchmark query interval [1,10] within the positive self-similar variable; this is an interface range, not a source physical boundary.\",\"maximum\":10.0,\"minimum\":1.0,\"name\":\"q\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":85,\"line_start\":85,\"support\":\"observing experimentally the two-dimensional (2D) spreading\"},{\"line_end\":86,\"line_start\":86,\"support\":\"study the density profiles for different power laws in 2D\"}],\"condition_id\":\"d_equals_2\",\"statement\":\"Spatial dimension d=2 for both experiment and simulations.\"},{\"anchors\":[{\"line_end\":68,\"line_start\":68,\"support\":\"deterministic dynamics of an initially concentrated suspension as it spreads in free space due to power law repulsive potentials\"},{\"line_end\":88,\"line_start\":88,\"support\":\"systems in the overdamped regime, velocity directly proportional to force\"}],\"condition_id\":\"overdamped_free_spreading\",\"statement\":\"System is overdamped with velocity proportional to force, and spreading occurs in free space without external confinement.\"},{\"anchors\":[{\"line_end\":78,\"line_start\":78,\"support\":\"density has a self-similar solution of the form rho(r,t)=At^gamma f(Br/t^beta)\"},{\"line_end\":111,\"line_start\":111,\"support\":\"By re-plotting the snapshots while rescaling the radius according to Eq. self-similar ansatz, they completely overlap\"}],\"condition_id\":\"self_similar_regime\",\"statement\":\"The system is in the self-similar spreading regime where the radius grows as t^{1/(k+2)} and density profiles collapse.\"},{\"anchors\":[{\"line_end\":85,\"line_start\":85,\"support\":\"perpendicularly magnetized colloids interacting by dipole-dipole repulsion scaling as 1/r^3\"}],\"condition_id\":\"k_equals_3_experiment\",\"statement\":\"Power law exponent k=3 for the experimental branch (dipolar repulsion).\"},{\"anchors\":[{\"line_end\":154,\"line_start\":154,\"support\":\"radius as a function of time for simulations with k=(-1,0,1) along the theoretical predictions t^{1/(k+2)}\"}],\"condition_id\":\"k_equals_1_simulation\",\"statement\":\"Power law exponent k=1 for the simulation branch.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"beta = 1/(k+2) in self-similar ansatz\"},{\"line_end\":117,\"line_start\":117,\"support\":\"pair separation grows as r ~ t^{1/(k+2)}\"},{\"line_end\":154,\"line_start\":154,\"support\":\"radius versus time for k=(-1,0,1) along theoretical scaling t^{1/(k+2)}\"}],\"equations\":[\"R(t) = A t^{1/(k+2)} (with unknown amplitude A)\",\"beta = 1/(k+2)\"],\"mechanism_id\":\"self_similar_spreading\",\"parameters\":[{\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"beta = 1/(k+2) with k=3 gives 1/5\"}],\"name\":\"beta_k3\",\"role\":\"exponent for k=3\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.2},{\"anchors\":[{\"line_end\":154,\"line_start\":154,\"support\":\"radius versus time for k=1 along theoretical scaling t^{1/(k+2)}\"}],\"name\":\"beta_k1\",\"role\":\"exponent for k=1\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.3333333333333333}],\"statement\":\"The suspension spreads self-similarly with radius R(t) ~ t^{1/(k+2)} for power law repulsion U ~ 1/r^k in overdamped free spreading, independent of dimension d.\",\"variable_names\":[\"R\",\"t\",\"k\",\"beta\",\"A\"]}],\"paper_scope\":\"The paper studies overdamped spreading of particle suspensions under repulsive power law potentials U ~ 1/r^k, deriving self-similar density profiles and radius growth R(t) ~ t^{1/(k+2)}. It includes experiments with magnetized colloids (k=3) and molecular dynamics simulations for various k, focusing on density profiles and memory retention. The selected cluster is the self-similar free-spreading radius ratio for k=3 and k=1 in 2D.\",\"readouts\":[{\"anchors\":[{\"line_end\":105,\"line_start\":105,\"support\":\"STD(t) proportional to R(t) proportional to t^{1/5} for k=3\"},{\"line_end\":154,\"line_start\":154,\"support\":\"Radius versus time for k=1 along theoretical scaling t^{1/(k+2)}\"}],\"definition\":\"Normalized spreading radius ratio Y = R(t)/R(t_ref), where R(t) is the radius of the suspension at time t and R(t_ref) is the radius at a reference time t_ref.\",\"name\":\"Y\",\"resolution\":null,\"statistic\":\"The ratio is derived from the self-similar scaling R(t) ~ t^{1/(k+2)}; the unknown amplitude cancels.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2502.06256v3\",\"citation\":\"Ido Fanto, Dynamical Spreading and Memory Retention of Particle Suspensions under Power Law Potential, Physical Review Letters (2026), DOI:10.1103/v1nk-pfzj\",\"journal_doi\":\"10.1103/v1nk-pfzj\"},\"source_ambiguities\":[]}}\nThe previous ScienceCard is an editable rejected draft, not a source of new scientific facts. Use it as the baseline so supported content is not lost, but recheck every retained field against the supplied source. Address every listed issue by inspecting its line ranges, remove or revise unsupported content, and do not assume the review or prior draft is correct. The supplied source remains the sole authority. Return one complete revised ScienceCard for a new independent review.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: Main_arxiv.tex =====\nL000002\t\\documentclass[aps,prl,twocolumn,superscriptaddress]{revtex4-1}\nL000003\t\\raggedbottom\nL000004\t\\usepackage{amsmath,amssymb,amsfonts}\nL000005\t\\usepackage[most]{tcolorbox}\nL000006\t\nL000007\t\\usepackage[dvipsnames]{xcolor}\nL000008\t\\usepackage{comment}\nL000009\t\\usepackage[overload]{empheq}\nL000010\t\\usepackage{upgreek}\nL000011\t\\usepackage{lmodern,pdftexcmds}\nL000012\t\nL000013\t\\usepackage{hyperref}\nL000014\t\nL000015\t\\usepackage{lineno}\nL000016\t\\usepackage[margin=1in]{geometry}\nL000017\t\nL000018\t\nL000019\t\\newcommand{\\blue}[1]{\\textcolor{blue}{#1}}\nL000020\t\\newcommand{\\red}[1]{\\textcolor{red}{#1}}\nL000021\t\nL000022\t\\usepackage{graphicx}\nL000023\t\nL000024\t\\usepackage{float}\nL000025\t\\raggedbottom\nL000026\t\nL000027\t\\newcommand{\\radboud}{Department of Artificial Intelligence, Donders Center for Cognition, Radboud University, Nijmegen, The Netherlands}\nL000028\t\nL000029\t\\newcommand{\\tauphys}{School of Physics and Astronomy and the Center for Physics and Chemistry of Living Systems, Tel Aviv University, Tel Aviv 6997801, Israel}\nL000030\t\nL000031\t\\begin{document}\nL000032\t\nL000033\t\\graphicspath{{figures/}}\nL000034\t\\title{Dynamical Spreading and Memory Retention of Particle Suspensions under\nL000035\t    Power Law Potential}\nL000036\t\\author{Ido Fanto}\nL000037\t\\email{idofanto@mail.tau.ac.il}\nL000038\t\\affiliation{\\tauphys}\nL000039\t\nL000040\t\nL000041\t\\author{Yuval Rosenblum }\nL000042\t\\affiliation{\\tauphys}\nL000043\t\nL000044\t\\author{Ori Harel}\nL000045\t\\affiliation{\\tauphys}\nL000046\t\nL000047\t\\author{Matan Yah Ben Zion}\nL000048\t\\affiliation{\\radboud}\nL000049\t\nL000050\t\\author{Naomi Oppenheimer}\nL000051\t\\email{naomiop@gmail.com}\nL000052\t\\affiliation{\\tauphys}\nL000053\t\nL000054\t\nL000055\t\\date{\\today}\nL000056\t\nL000057\t\\begin{abstract}\nL000058\tWe study the overdamped dynamic spreading of a suspension of particles under a repulsive power law potential.  We predict that the suspension spreads in a self-similar form, with its radius growing in time with a power independent of the dimension. We confirm this prediction experimentally using magnetized colloids with dipolar repulsion. Numerical simulations corroborate the experiments and further predict a categorically different behavior at a critical power, below which the initial distribution is no longer concentrated at the origin. Instead, particles accumulate at the perimeter and retain a long-lived memory of their original pattern. Below this threshold, the initial distribution seeds the resulting pattern, encoding the future structure of a dynamically evolving system.\nL000059\t\nL000060\t\nL000061\t\\end{abstract}\nL000062\t\nL000063\t\\maketitle\nL000064\t\nL000065\t\nL000066\tPower law potentials influence many phenomena governing our lives \\cite{french2010long}. They are the reason the Earth orbits the sun and what causes our hair to stand on end on a dry winter day; they are how charged particles interact with each other and why a compass points to the north \\cite{purcell2013electricity}. As such, it is no wonder that power law potentials have been the subject of numerous studies. Usually, the focus is on equilibrium configurations \\cite{leble2017large,Agarwal2019Harmonic, dandekar2023dynamical, irvine2010pleats, guerra2018freezing}, or on phase transitions \\cite{zahn2000dynamic, dillmann2013two}. Far less attention has been given to their dynamics \\cite{ispolatov1996annihilation, ginzburg1997self, marcos2017formation, flack2023out,HelenaMassanaCid2019,PhysRevE.89.012306,EbertMaretKeim}, usually with respect to relaxation to equilibrium \\cite{bouchet2010thermodynamics}. However,  both living and engineered colloidal systems are hardly ever static --- they grow and evolve out of equilibrium.\nL000067\t\nL000068\tIn this Letter, we analyze the deterministic dynamics of an initially concentrated suspension of particles as it spreads in free space due to power law repulsive potentials, $U \\propto 1/r^k$ (known as Riesz gases \\cite{lewin2022coulomb,serfaty2024lecturescoulombrieszgases} for Newtonian particles). Here, we assume that the system is overdamped. The exponent, $k$, and the dimension, $d$, classify the interaction: for $k>d$ the interaction is short-ranged, as particles interact with their nearest neighbors. Common examples are magnetic dipoles \\cite{baranov2008theoretical, landau2013electrodynamics}, or Rydberg interactions \\cite{gallagher1988rydberg}; for $k\\leq d$, the interaction is long-ranged and spans the system size~\\cite{binney1992theory, campa2009statistical}, as in, e.g.,  plasmas \\cite{nicholson1983introduction}, superfluids \\cite{kosterlitz2018ordering}, and cold atoms \\cite{zhang2017observation}, and is commonly used in random matrices \\cite{dyson1962brownian}. As we will show, the dynamical evolution of the density profile is captured by three regimes: (i) origin centered for $k> d-2$, (ii) constant for $k = d-2$, and (iii) boundary centered for $k<d-2$ (resembling the coffee-ring effect \\cite{deegan1997capillary}). These regimes exhibit vastly different relaxation times when two suspensions collide. Namely, for strongly long-ranged potentials with $k<d-2$ we observe a power law retention of the initial conditions, relaxing extremely slowly toward an isotropic absorbing state. Such memory retention and slow relaxation were observed in other systems of long-range interactions, such as in sheared suspensions \\cite{keim2011generic, keim2019memory}, crumpled paper \\cite{shohat2023logarithmic}, or globally coupled spin systems \\cite{mukamel2005breaking, gupta2010slow}.\nL000069\t\nL000070\t\\begin{figure*}[htbp!]\nL000071\t\\centering\nL000072\t\\includegraphics[width = 0.9\\linewidth]{figures/fig1newcrop.pdf}\nL000073\t\\caption{Experiments and simulations of particles spreading under a $1/r^3$ pair-potential. (A) Schematics of the experimental setup. The inset shows the sample with a $\\times20$ magnification. Triangular organization of the particles can be seen.  (B-D) Snapshots at three different times with $\\times 4$ magnification: (B) Initially, (C) after 20 minutes, and (D) after one hour. (E) Density from four different experiments, at three different times. Rescaled with respect to $t^{2/5}$ as a function of the self-similarity parameter $r/t^{1/5}$. Rigid dark blue line is an average of all plots, and black dots are the theoretical prediction, faded  lines of the same color scheme correspond to the same experiment at different times. (F) The STD as a function of time showing ${\\rm STD} \\sim t^{1/5}$. Inset shows the maximal radius $R_{\\rm max}\\sim t^{1/5}$, averaged over the 50 most distant particles from the center of mass. (G-I) Results from molecular dynamics simulations of 3000 particles with a $1/r^3$ potential. (G)  Snapshots of the simulation at three different times ($t = 0.002, 10, 4800$). (H) The same snapshots from but rescaled according to Eq.~\\ref{self-similar ansatz}. (I) Rescaled angular averaged density of the same densities showing a collapse to a single curve and a fit to the theoretical prediction given by Eq.~\\ref{f in thesis}. }\nL000074\t\\label{fig1}\nL000075\t\\end{figure*}\nL000076\t\nL000077\t\nL000078\tIn what follows, we derive the scaling dynamics of the suspension and show that since power law interactions lack a typical length or time scale, the density has a self-similar solution of the form \\cite{PhysRevLett.52.1669}\nL000079\t\nL000080\t\\begin{equation}\nL000081\t\\label{self-similar ansatz}\nL000082\t\\rho(r,t) = At^{\\gamma}f\\left(\\frac{Br}{t^{\\beta}}\\right) \\ ; \\ \\gamma = -\\beta d \\ ; \\ \\beta = \\frac{1}{k+2},\nL000083\t\\end{equation}\nL000084\tMore details on $A$ and $B$ are provided in End Matter. The exponent $\\beta$ controls the density distribution and is independent of spatial dimension, which only affects the density amplitude.\nL000085\tWe will verify this result by observing experimentally the two-dimensional (2D) spreading of perpendicularly magnetized colloids interacting by dipole-dipole repulsion scaling as $1/r^3$ \\cite{zahn1999two, zahn2000dynamic}. We observe that the radius grows as $t^{1/5}$ as predicted by Eq.~\\ref{self-similar ansatz}. The density profiles at different times collapse to a single curve given by Eq.~\\ref{self-similar ansatz}. We further verify our results using molecular dynamics simulations of thousands of particles.\nL000086\tWe go on to study the density profiles for different power laws in 2D (1D in End Matter).\nL000087\t\nL000088\tWe focus on systems in the overdamped regime, such that velocity is directly proportional to force through the mobility $\\mu$, $\\textbf{v} = \\mu {\\textbf{F}}  \\sim 1/r^{k+1}$. The velocity of each particle is given by the force acting on it from all other particles. For a system of $N$ particles, the velocity of the $i^{\\rm th}$ particle is given by\nL000089\t\\begin{equation}\nL000090\t\\label{discrete velocity}\nL000091\t\\mathbf{v_{i}(r_{i})}=v_0 l^{k+1}\\sum_{j\\neq i}^{N}\\left|\\mathbf{r_{i}-r_{j}} \\right|^{-(k+1)}\\mathbf{\\hat{r}_{ij}},\nL000092\t\\end{equation}\nL000093\twith $v_0 = \\mu F_0$ being the typical magnitude of the velocity, $F_0$ the typical magnitude of the force, and $l$ is a dimensionality constant.\nL000094\t\nL000095\t\\textbf{Experiments.}\nL000096\tTo test the collective dynamics experimentally, we used superparamagnetic particles of varying size and composition---$10\\, \\mu$m polystyrene (PS, density $1.5-2 \\,{\\rm g/cm^3}$) as seen in Fig.~\\ref{fig1}, and $5\\, \\mu$m silicon dioxide ($\\mathrm{SiO_{2}}$, density $1.6-1.8 \\,{\\rm gr/cm^3}$) in Fig.~\\ref{fig:Sio expriment} in End Matter, both embedded with nanoparticles of iron oxide---we estimate the volumetric susceptibility to be between $ 0.04\\leq\\chi \\leq0.4$. The dense particles are charge-stabilized and suspended in deionized water with $0.1\\%w/v$ of Pluronic F-127 to improve particle stability, forming a quasi-2D arrangement at the bottom. Particles are then magnetized perpendicularly to the plane using Helmholtz coils (see Fig.~\\ref{fig1}A). The induced dipole-dipole magnetic repulsion is of the form $U(r) \\propto 1/r^{3}$. More precisely, for each two particles\nL000097\t\nL000098\t\nL000099\t$    U = \\mu_0 r^{-3}\\left[\\textbf{m}_1\\cdot \\textbf{m}_2 - 3\\left(\\textbf{m}_1\\cdot\\hat{\\textbf{r}}\\right)\nL000100\t    \\left(\\textbf{m}_2\\cdot\\hat{\\textbf{r}}\\right)\nL000101\t    \\right]/4\\pi$,\nL000102\twhere $\\mathbf{m}_1$ ($\\mathbf{m}_2$) are the magnetic moments of the first (second) particle, $\\hat{r}$ is in the direction of separation, and $\\mu_0$ is the magnetic permeability of vacuum. Here, particle moments are along the magnetic field, $\\hat{z}$, such that only the first term contributes. Regular thermal diffusion is negligible in our experiments due to the high P\\'eclet number (${\\rm Pe}\\sim 100-300$, see End Matter), which quantifies advective motion relative to diffusion, ${\\rm Pe} = v a/D$. Here, $a$ is the particle size, $D = 0.02\\, \\mu {\\rm m}^2/s$ is the measured diffusion constant of the particles, and $v$ is the time averaged velocity of 300 particles.\nL000103\t\nL000104\tThe resulting expanding drop is very different from a drop of passive thermal particles --- for thermal particles, the boundary of a drop becomes diffused over time and has an unbounded tail (see Figs.~\\ref{fig:brownian_motion_stuck_density}B and E in End Matter); here,  the profile is compact, and the boundary is sharp---the concentration is zero beyond a certain point [see Figs.~\\ref{fig1}B--E and Supplemental Material video].\nL000105\tParticle positions were extracted  \\cite{allan_2024_12708864} and the standard deviation (STD) of the positions was found to be ${\\rm STD}(t)\\propto R(t) \\propto t^{\\frac{1}{5}}$, where $R$ is the radius of the drop (Fig.~\\ref{fig1}F).\nL000106\tFigure~\\ref{fig1}E shows the rescaled radial average of the distribution as a function of distance, taken from four different experiments at three different times each (faded lines). The rigid dark blue line represents the average of all plots; the dots indicate the theoretical prediction.\nL000107\t\nL000108\t\\textbf{Numerical simulations.} To further validate the results, we numerically propagate the velocity using an eighth-order Runge-Kutta scheme with an adaptive time step.\nL000109\tAn initial random distribution of thousands of pointlike particles in a disk ($R_0 = 1$) interact through dipolar repulsion ($k=3$).\nL000110\tFig~\\ref{fig1}G  is an overlay of three snapshots from a simulation.\nL000111\tBy re-plotting the snapshots while rescaling the radius according to Eq.~\\ref{self-similar ansatz}, they completely overlap; see Fig.~\\ref{fig1}H. The self-similarity is further evident in Fig.~\\ref{fig1}I, where the radially averaged rescaled densities fall on the same curve.\nL000112\tParticles in both experiment and simulation show the formation of a triangular Wigner lattice\\cite{PhysRev.46.1002}; see, e.g., the inset in Fig.~\\ref{fig1}A. A measure of the local bond orientation parameter, $\\Psi_6 = N^{-1}\\sum_{i,j} e^{i 6 \\theta_{ij}}$, gives $\\Psi_6 \\sim 0.9$ in simulations and $\\Psi_6 \\sim  0.7$ in  experiment.\nL000113\tSince in our system, the distance between lattice sites varies, defects emerge to alleviate stress resulting from a mismatch in lattice spacing \\cite{soni2018emergent,anderson2017theory,irvine2010pleats, Kelleher2015}.\nL000114\t\nL000115\t\nL000116\t\\textbf{Continuum model.}\nL000117\tLet us examine the ensemble behavior, starting with pair interactions. For two particles repelled by $U \\sim 1/r^k$ in the overdamped case, their separation grows as $r \\propto t^{\\frac{1}{k+2}}$. We show that this scaling also holds for the ensemble. At first glance, this scaling resembles thermal diffusion, where both a single Brownian particle and an ensemble spread as $\\sqrt{t}$. However, Brownian particles are non-interacting, whereas power law repulsion involves many-body interactions. Such interactions could have altered the scaling, as indeed they do when the repulsion is not a power law \\cite{ben2024compact}.\nL000118\t\nL000119\t\nL000120\t\\begin{figure}[htbp!]\nL000121\t\\centering\nL000122\t\\includegraphics[width = \\linewidth]{figJournal02.pdf}\nL000123\t\\caption{Simulations in the long-range limit $k< d$. (A) Radius versus time for $k = (-1,0,1)$ in a simulation of 10000 particles, along with the theoretical scaling, $R(t) \\propto t^{\\frac{1}{k+2}}$, shown as a dashed line. (B) Snapshots of the distribution at the final time step, with color coding according to the density for k = 1 (top left), k = 0 (bottom), and k = -1 (top right). (C--E) Rescaled density according to $\\rho t^{2\\beta}$ as a function of the self-similar variable $\\eta = r/t^{\\beta}$. Bright blue dots give the theoretical predictions given in Eq.~\\ref{f in thesis}. A single curve can be seen, but it is, in fact, ten plots at different times that collapse to a single curve. The insets show the separate, unscaled densities as a function of radius, with color going from light blue at early times to dark blue at later ones. }\nL000124\t\\label{fig2}\nL000125\t\\end{figure}\nL000126\t\nL000127\t\\begin{figure}[htbp!]\nL000128\t\\centering\nL000129\t\\includegraphics[width=0.95\\linewidth]{figures/fig3March26cropped.pdf}\nL000130\t\\caption{Memory retention in suspensions. (A, E) Collision of two suspensions of $N=2000$ particles each, for $k=3$ (in A) and $k=-1$ (in E). The final configuration is at $t=2.5\\cdot 10^5$, showing an isotropic final state for $k=3$ and a memory of the initial condition for $k=-1$, with a visible corridor void of particles, $d_{\\rm void}$. (B) and (F) plots of  $d_{\\rm void}$ in time (B) For $k=3$, on a semi-log scale, and (F) for $k=-1$, on a log-log scale. The diagram in E shows two soap bubbles with a similar interface. (C) Experiment of two populations with $k=3$ reaching a merged state. Frames shown at ($t = 0, 10,200, 6600$\\,s). (D) Plot of $d_{\\rm void}$ in the experiment. (G) Time to reach an isotropic state, as a function of the power law exponent $k$. (H) Merging of 4 populations. (I,J) Memory of the initial conditions is quickly lost for $k=3$ (in I), and is maintained for $k=-1$ (in J). }\nL000131\t\\label{fig3}\nL000132\t\\end{figure}\nL000133\t\nL000134\tTo derive the self-similarity scaling, we will coarse-grain the dynamical equations. Considering $N$ particles that follow a power law potential, the continuity equation reads\nL000135\t\nL000136\t\nL000137\t$\\frac{\\partial \\rho }{\\partial t}+\\nabla \\cdot(\\rho \\textbf{v})=0$,\nL000138\t\nL000139\twhere $\\textbf{v}$ is the velocity, and $\\rho$, the density, defined by $\\rho(\\mathbf{r}) = \\sum_{j}^{N} \\delta(\\boldsymbol{r_j} - \\boldsymbol{r})$. Let us work with dimensionless variables such that $v\\rightarrow v/v_0$, $ \\mathbf{r} \\rightarrow \\mathbf{r}/R_0$, $R(t) \\rightarrow R/R_0$, and $\\rho \\rightarrow \\rho/\\rho_0$, with $R_0$ being the initial radius of the suspension, and $\\rho_0 = N/R_0^d$ is  the initial density.\nL000140\tThe number of particles is constant, giving a constraint: $N =\\Omega_{d} \\int_{0}^{\\infty}\\rho(r,t)r^{d-1}dr$,\nL000141\t\nL000142\t\nL000143\t\nL000144\twhere $\\Omega_{d}$ is the spherical surface of the unit sphere in d-dimensions. Plugging the self-similar ansatz, $\\rho(r,t)=At^{\\gamma}f\\left(\\frac{Br}{t^{\\beta}}\\right)$, and requiring that the solution must not depend explicitly on time, gives $\\gamma = -\\beta d$.\nL000145\tThe value of $\\beta$ is derived from the potential $U(r)\\propto 1/r^{k}$, by taking the velocity (Eq.~\\ref{discrete velocity}) to the continuum limit.\nL000146\tUsing a non-dimensional variable $\\eta = Br/t^{\\beta}$, we arrive at $\\beta = 1/(k+2)$, and an integral equation for $f$, the rescaled density,\nL000147\t\\begin{equation}\nL000148\t\\label{eqEta}\nL000149\t    \\eta =\\Gamma  \\int_{0}^{\\eta_{B}}\\frac{\\boldsymbol{\\eta-\\eta'}}{\\left|\\boldsymbol{\\eta-\\eta'} \\right|^{k+2}}f(\\eta')d^d\\eta'\\cdot \\hat{r},\nL000150\t\\end{equation}\nL000151\twhere $\\eta_{B}=(BR/t^{\\beta})$ and we defined $\\Gamma= B^{k+2-d}A(k+2)$, for more on Eq.~\\ref{eqEta}; see End Matter.\nL000152\tNote that $k$ can take values from $(-2,\\infty]$.\nL000153\tWith $\\beta$ and $\\gamma$, the density of the suspension can be renormalized according to Eq.~\\ref{self-similar ansatz}, i.e., $\\rho(r,t)=At^{-d/(k+2)}f\\left(\\frac{Br}{t^{1/(k+2)}}\\right)$.\nL000154\tWe have shown this solution to be true in Fig.~\\ref{fig1}, for both experiments and simulations with $k=3$. To further support this result, Fig.~\\ref{fig2}A shows the radius as a function of time for simulations with $k = (-1,0,1)$ along the theoretical predictions $t^{1/(k+2)}$ \\cite{krapivsky2024expansion}.\nL000155\t\nL000156\t\nL000157\t\nL000158\tWe now describe the density profiles of the self-similar states. Figure~\\ref{fig1} shows an example for a short-range power law $k=3$ in 2D, while Fig.~\\ref{fig2}B presents simulations for long-range interactions ($k \\leq d$) with $k = (-1,0,1)$. The angular averages over time, and rescaled densities via Eq.~\\ref{self-similar ansatz} are presented as well. Notably, both the short-range case ($k=3$, Fig.~\\ref{fig1}) and a long-range potential ($k=1$, Fig.~\\ref{fig2}B, top left) lead to origin-centered densities, whereas other long-range cases ($ k=0,-1$, Fig.~\\ref{fig2}B, bottom and top right) do not.\nL000159\tWe have tested simulations in 1D and 2D and can divide the profiles into three categories: (i) origin centered for $k>d-2$ with a hexagonal arrangement, (ii) constant profile at $k=d-2$ (apparently hyperuniform, see Fig. 5d in End Matter), and (iii) boundary centered for $k<d-2$.\nL000160\tSystems that interact via $k=d-2$ are termed a ``Coulomb gas\" or a log-gas in 2D \\cite{Minnhagen1987TheTC, leble2017large}. The boundary-centered density profile for strongly long ranged potentials ($k<d-2$), is referred to as the ``evaporation catastrophe\" \\cite{gallavotti1999statistical} and is attributed to the potential being too repulsive at infinity.\nL000161\tIt is interesting to note (see Eq.~\\ref{eqEta}) that the dynamical solution is similar to the equilibrium distribution when a harmonic potential confines the particles (see, e.g., \\cite{Vieira2016Repuslive, Moreira2018PowerLaw, Agarwal2019Harmonic, krapivsky2024expansion}). For $d-2<k<d$, it has the same solution as for a nonlocal porous media equation \\cite{biler2011barenblatt}. In End Matter, we briefly review the known results and give intuition for their derivation. The density profile is:\nL000162\t\\begin{align}\nL000163\t     \\label{f in thesis}\nL000164\t     f(\\eta)=\nL000165\t    \\begin{cases}\nL000166\t     (1-\\eta^{2})^{\\frac{d}{k}}, & \\text{if } k > d, \\\\\nL000167\t     (1-\\eta^{2})^{\\frac{k+2-d}{2}},  & \\text{if } -2 < k < d.\nL000168\t    \\end{cases}\nL000169\t\\end{align}\nL000170\tFigures \\ref{fig1}E and ~\\ref{fig1}I show an excellent agreement between the experiment, the simulation, and the analytic solution for $k=3$ in 2D, and Fig.~\\ref{fig2}C--E presents results for $k=(-1, 0, 1)$ in 2D.\nL000171\t\nL000172\t\nL000173\t\\textbf{Memory retention.}\nL000174\tWe find that long-term memory of the initial distribution can be encoded in a system with strongly long-range repulsion when $k<d-2$.\nL000175\tFor that, we simulate collisions of two populations by initially placing two or more suspensions at a sufficient distance to prevent overlap, and measure $d_{void}$ defined as the distance between the two closest particles in each suspension. The merged isotropic state is universal (absorbing) and does not depend on initial conditions, but the relaxation rate differs dramatically with $k$: when $k\nL000176\t\\geq d-2$, convergence to an isotropic state that is indistinguishable from a single ensemble is exponential, whereas for $k < d-2$, the system retains a power law memory of its initial state. Figure \\ref{fig3} compares $k=3$, which quickly forms an isotropic state (in both simulations and experiments), with $k=-1$, where a particle‐free zone grows over time. Ultimately, even for $k=-1$, the suspensions merge into a single drop at very long times. We plot the time to reach a merged isotropic state in Fig.~\\ref{fig3}G as a function of the power-law exponent $k$. This time approaches infinity as $k\\rightarrow -2$. Collisions involving four populations are presented in Fig.~\\ref{fig3}H, where an H-shaped particle-free zone is formed. The resulting shapes for both two and four populations are reminiscent of soap bubbles (see Fig.~\\ref{fig3}E and H); however, in soap bubbles \\cite{MorganFrankSoap}, the interaction is attractive, leading to the aggregation of particles at the boundary. Whereas in Fig.~\\ref{fig3}E and H, the interaction is repulsive, and the boundary between the suspensions is particle-free. In Fig.~\\ref{fig3}I and J, we further show the long-term memory retention for $k<d-2$. Fig.~\\ref{fig3}I and J show an initial condition of particles with a word written by the absence of particles. Using a short-range potential with $k=3$, the word ``HELLO\" quickly vanishes as the system evolves until all that is left is an isotropic suspension. Using a potential with $k=-1$, the written ``WORLD\" remains as the system expands and evolves. Note also the change in scale between beginning and end.\nL000177\t\nL000178\t\nL000179\t\nL000180\t\\textbf{Discussion.}\nL000181\t\nL000182\t\nL000183\t\nL000184\tWe observed self-similar spreading of a dense ensemble of particles interacting by power law potentials, with a decay of $t^{-d/(k+2)}$. The density profile is compact, and takes the form of a semi-circle $(1-\\eta^2)^\\delta$, with (i) $\\delta = d/k$ for short-ranged potentials ($k>d$) \\cite{Agarwal2019Harmonic,Moreira2018PowerLaw} and (ii) $\\delta = (k+2-d)/2$ for long-ranged potentials ($k<d$).\nL000185\tFor strongly long-ranged interactions, $k<d-2$ ,\\cite{biler2011barenblatt}, relaxation is anomalously slow ---  collisions between suspensions generate persistent particle-free regions,  paralleling slow relaxation of jammed and glassy materials \\cite{liu2010jamming}.\nL000186\tSuch interaction-driven memory effects may be relevant for phoresis in synthetic microswimmers ~\\cite{Jin2018,Gompper2020} and communication in robotic swarms~\\cite{Hamann2018,BenZion2023}.\nL000187\t\nL000188\t\\textit{Acknowledgments ---} The authors are grateful for discussions with Paul Krapibski, Kirone Mallick, Thomas Bickel, Yoav Lahini and Haim Diamant. This work was supported by an NSF-BSF grant number 2023624.\nL000189\t\nL000190\t\nL000191\t\nL000192\t\nL000193\t\nL000194\t\nL000195\t\nL000196\t\nL000197\t\nL000198\t\nL000199\t\\bibliographystyle{apsrev4-1}\nL000200\t\\bibliography{Main_text}\nL000201\t\nL000202\t\\section{End Matter}\nL000203\tHere, we provide information on the derivation of the density distribution in the various limits, give more details on the experimental procedure and results for 5 ${\\mu}$m ${\\rm SiO}_2$ particles, show results from the 1D simulations, and include effects of diffusion.\nL000204\t\nL000205\t\\begin{figure*}[htbp!]\nL000206\t        \\includegraphics[width=0.8\\linewidth]{figExpEndNoteCropped.pdf}\nL000207\t        \\caption{(A) STD of the ${\\rm SiO}_2$ 5$\\mu m$ particles as a function of time. (B) Normalized density of the ${\\rm SiO}_2$ 5$\\mu m$ particles according to the self-similar ansatz (Eq.1 in the main text). (C) Density of the ${\\rm SiO}_2$ 5$\\mu m$ particles at four different times. (D) Number of ${\\rm SiO}_2$ particles as a function of time. (E) P\\'eclet number of the PS 10$\\mu$m particles throughout the experiment. (F) Drift of the center of mass. (G) Diffusion measurements. Ensemble average of the MSD versus leg time in a dilute suspension of PS particles with no magnetic field}\nL000208\t        \\label{fig:Sio expriment}\nL000209\t\\end{figure*}\nL000210\t\nL000211\t\\textbf{Derivation of Eq. (3):} For the isotropic initial conditions that we consider, the mass conservation equation becomes,\nL000212\t\nL000213\t$    \\frac{\\partial \\rho}{\\partial t} + \\frac{1}{r^{d-1}}\\frac{\\partial (\\rho r^{d-1}v)}{\\partial r}=0$,\nL000214\t\nL000215\twhere $v$ is the radial velocity. Plugging the self-similar ansatz, Eq.~\\ref{self-similar ansatz}, and requiring that the solution must not depend explicitly on time, gives $\\gamma = -\\beta d$.\nL000216\t\nL000217\t\nL000218\t\nL000219\tTaking Eq.~\\ref{discrete velocity} to the continuum limit gives\nL000220\t\nL000221\t\nL000222\t$    \\mathbf{v(r)}=  \\int_{0}^{R}\\frac{\\mathbf{r-r'}}{\\left|\\mathbf{r-r'} \\right|^{k+2}}\\rho(\\boldsymbol{r'})d^{d}r'$.\nL000223\t\nL000224\tUsing the non-dimensional variable $\\eta=\\frac{Br}{t^{\\beta}}$, gives an integral equation for $f$, the rescaled density, which depends only on the self-similar variable $\\eta$. This happens for\nL000225\t$\\beta = 1/(k+2)$ and produces Eq.~\\ref{eqEta}.\nL000226\t\nL000227\t\nL000228\t\nL000229\t\nL000230\t\nL000231\t\nL000232\t\nL000233\t\nL000234\t\\textbf{Density for short-range interactions:}\nL000235\tFor short-range interactions, i.e., in the limit $k>d$, we follow Ref.~\\cite{Vieira2016Repuslive} but taking a slightly different route.\nL000236\tIn the short-range limit, faraway particles will have negligible contributions to the density at $\\mathbf{\\eta}$. Thus, we perform a Taylor expansion of the rescaled density $f(\\boldsymbol{\\eta}')$ around $\\boldsymbol{\\eta}$, $f(\\boldsymbol{\\eta'})=f(\\boldsymbol{\\eta}+\\boldsymbol{s})\\approx f(\\boldsymbol{\\eta})+\\boldsymbol{s}\\cdot \\vec{\\nabla} f(\\boldsymbol{\\eta}) + \\cdots$,\nL000237\twhere $\\mathbf{s} = \\boldsymbol{\\eta'}-\\boldsymbol{\\eta}$.\nL000238\tThis results in,\nL000239\t$\\eta \\approx -\\Gamma \\int_0^{\\infty} \\frac{\\mathbf{s}}{s^{k+2}}\\left[ f(\\boldsymbol{\\eta})+\\mathbf{s} \\cdot \\nabla f(\\boldsymbol{\\eta})\\right]d^ds \\cdot \\hat{r}$.\nL000240\tThe first term vanishes after integration from symmetry considerations. The angular integral in the resulting term can be performed using the identity $\\int \\hat{s}\\hat{s} d\\Omega_d = \\mathbf{I} \\Omega_{d}/d$, on the surface of a sphere where $\\hat{s} = \\mathbf{s}/s$, and $\\mathbf{I}$ is the identity tensor.\nL000241\tThe radial part of the integral is of the form $\\int^{\\infty}_0 s^{d-1-k} ds$. The divergence at the lower boundary is resolved by taking it to be proportional to the mean distance between particles, $r_{\\rm exc}=\\alpha f^{-\\frac{1}{d}}$ (see \\cite{Vieira2016Repuslive}~\\cite{Moreira2018PowerLaw}) since it is highly unlikely for two repulsive particles in a dissipative medium to collide. The integration gives\nL000242\t$   \\eta = -\\frac{k}{2d} {f^{k/d-1}}\\frac{df}{d\\eta}$,\nL000243\t\nL000244\twhere we defined $B^{k-d+2}=[k(k-d)]/[2d(k+2)\\Omega_{d}  A \\alpha^{d-k}]$, with $A=(N/\\Omega_DI)B^d$ where $I=\\int_{o}^{\\infty}f(\\eta)\\eta^{d-1}d\\eta$ is the constraint that the number of particles $N$ in the system is constant. This equation, in fact, also results from a nonlinear diffusion equation \\cite{barenblatt1952porous, stone2002thinFilms,leal2007advanced, ben2024compact}.\nL000245\tThe solution is,\nL000246\t\nL000247\t\nL000248\t$f(\\eta)=(1-\\eta^{2})^{\\frac{d}{k}}$.\nL000249\t\nL000250\t\nL000251\t\nL000252\t\\textbf{Density for long-range interactions:}\nL000253\tThe density profiles for 2D in Fig.~\\ref{fig2}D and Fig.~\\ref{fig:density_for_k=-1_2_-15}B for 1D, indicate that for $k=d-2$, the density is constant. A formal proof is given in Ref.~\\cite{krapivsky2024expansion}. Here, let us give some intuition. For any solution to be self-similar, the velocity must be proportional to the distance from the center, $r$. That is $v \\propto r$ (see Fig.\\ref{fig:density_for_k=-1_2_-15}F for an example). Assuming a constant density in Eq.~\\ref{eqEta}, the integral scales as $r^{-k-1+d}$. Equating this to $r$, gives $k=d-2$. Thus, for a potential of $U \\sim 1/r^{d-2}$, the density profile is spatially constant.\nL000254\tA solution for 1D is given in \\cite{Agarwal2019Harmonic, krapivsky2024expansion}, and for D dimensions in \\cite{biler2011barenblatt}.\nL000255\t\nL000256\t\\textbf{Experimental procedure:}\nL000257\tThe experiment is conducted as follows: Capillary tubes (0.2mm x 6mm x 50mm) are loaded with colloidal particles and concentrated using a bar magnet. Particles are magnetized by a uniform magnetic field of 3-5 mT,  generated using custom-built Helmholtz coils (see Fig.~\\ref{fig1}). Contributions from induced dipole moments are negligible compared to the applied field. The sample is viewed using bright field illumination (Nikon Eclipse Ti2, $\\times4$ magnification) and recorded at one frame every two seconds (Nikon-kinetix-m-c). With the magnetic field turned on, colloids mutually repel, and the suspension spreads (see Fig.~\\ref{fig1}B--D).\nL000258\tThe density of the suspension was calculated using Voronoi tessellation, taking the density of particle $i$ positioned at $\\mathbf{r}$ to be the inverse of its Voronoi area, $\\rho(\\mathbf{r}_i) = 1/A_{\\rm cell}^i$.\nL000259\t\nL000260\t\\begin{figure*}[htbp!]\nL000261\t\\centering\nL000262\t\\includegraphics[width=0.95\\linewidth]{figSimEndNoteCropped.pdf}\nL000263\t\\caption{\\label{fig:density_for_k=-1_2_-15} Additional simulation results (A--C) Rescaled self similar density profiles from 1D simulations. (A) $k=-1.5$. (B) $k=-1$. (C) $k=2$. The inset shows the separate, unscaled\nL000264\tdensities as a function of radius, with color going from\nL000265\tdark blue at early times to light blue at later ones. (D) Structure factor calculated from a 2D simulation with $k=0$ showing apparent hyperuniformity. (E) Velocity is linear with distance, measured from a 2D simulation with $k=0$.}\nL000266\t\\end{figure*}\nL000267\t\nL000268\t\\textbf{Results for ${\\rm SiO}_2$:}\nL000269\t\nL000270\tHere, we present additional results for ${\\rm SiO}_2$ particles of diameter 5$\\mu$m. The ${\\rm SiO}_2$ particles seemed to chain more than the PS particles in the same magnetic field (5 mT), we found that at a lower magnetic field (0.5 mT) the ${\\rm SiO}_2$ particles chained less. Fig~\\ref{fig:Sio expriment}A shows agreement between theory and practice, but only after a long time because of the weak magnetic field. The STD of the particles aligns with $R\\propto t^\\frac{1}{5}$ after about two hours. Fig~\\ref{fig:Sio expriment}B shows the density of the suspension at a few different times, and Fig~\\ref{fig:Sio expriment}C shows the rescaled density collapse to the same master curve given by Eq.~1.\nL000271\t\nL000272\t\nL000273\t\\textbf{Chaining:}\nL000274\tThe magnetic field of the Helmholtz coil induces magnetic dipoles in the particles in the $\\hat{z}$ direction, resulting in positive potential energy and thus repulsion. However, due to different particle heights or non-uniformity of the field, magnetic dipoles can be induced with a component in the $\\hat{\\textbf{r}}$ direction \\cite{C3SM00132F}. Turning the field off and on resets the induced dipoles and gives the particles time to distance each other, thus making some chains break apart. Fig~\\ref{fig:Sio expriment}D shows the number of particles detected by the code in each frame.\nL000275\tThe number saturates after a few times we perform this procedure. In order to further reduce chaining, the particles were coated with $0.1\\%w/v$ of Pluronic F-127. In order to conceptualize the chaining seen in experiments, we performed simulation with  $5\\%$ of the particles with  $\\times 3$ the susceptibility. Fig.~\\ref{fig:brownian_motion_stuck_density}D shows an excellent agreement with theoretical predictions.\nL000276\t\nL000277\t\\textbf{Drift:}\nL000278\tDrift in the sample can be observed in Fig.~\\ref{fig:Sio expriment}F.\nL000279\t\nL000280\tThe drift is relatively small, but became noticeable a couple of hours into the experiment. We reduced drift by degassing the suspension and a careful sample preparation.\nL000281\t\nL000282\t\nL000283\t\nL000284\t\\begin{figure*}[htbp!]\nL000285\t\\centering\nL000286\t\\includegraphics[width=0.95\\linewidth]{figures/endmatter_addcrop.pdf}\nL000287\t\\caption{\\label{fig:brownian_motion_stuck_density} (A-C) Simulations of dipolar repulsion plus diffusion.  Snapshots of 300 particles taken at: (A) $t \\sim 10^{3}$, where magnetic repulsion is dominant.  (B) $t \\sim 10^{8}$, where diffusion is dominant. (C) The STD in the simulation, showing a transition from $t^{1/5}$ at short times to $t^{1/2}$ at long times. (D) Density of $10000$ particles interacting by $U\\propto \\frac{1}{r^3}$ where $5\\%$ of particles have $\\times 3$ the susceptibility than the other $95\\%$.  (E) Density of $4000$ non-interacting Brownian particles. Insets show particles' spatial configuration corresponding to the density shown.}\nL000288\t\\end{figure*}\nL000289\t\nL000290\t\\textbf{P\\'eclet number:}\nL000291\tDiffusion measurement is presented in Fig.~\\ref{fig:Sio expriment}G. Diffusion was measured for a dilute suspension of PS particles without an external magnetic field. Diffusion was extracted from the slope and is $D = 0.02 \\mu{\\rm m}^2/s$.\nL000292\tFig~\\ref{fig:Sio expriment}E, shows the P\\'eclet number of the PS 10$\\mu$m particles along the experiment, it is evident that $P_e\\gg1$ throughout the experiment, which means that advection dominates.  To illustrate, a particle would diffuse its diameter over 21 min, and a comparable expansion, would take about a year. Fig.~\\ref{fig:brownian_motion_stuck_density}C shows the STD of a simulation of $300$ particles interacting with dipolar magnetic repulsion and subjected to Brownian motion, $d \\mathbf{x_{\\rm tot} }= \\mathbf{v} dt + \\sqrt{2 dt D} \\boldsymbol{\\xi}$, where $\\boldsymbol{\\xi}$ is a random variable with a variance of 1, and we chose $D=0.02\\mu{\\rm m}^2/$s, and $v_0 l^{4} = 4.6 \\cdot 10^4 \\mu{\\rm m}^{5}/{\\rm s}$, as estimated experimentally. They show a transition from  spreading as $t^{\\frac{1}{5}}$ (advection dominates) at short times to $t^{\\frac{1}{2}}$ (Diffusion dominates) at long times. The transition occurs roughly at $t\\sim 10^7 s$ which is roughly a year.\nL000293\t\nL000294\t\nL000295\t\\textbf{1D simulation results:}\nL000296\tThe initial configuration in 1D is that the particles are uniformly distributed on a line centered around the origin.\nL000297\tThe density in 1D is calculated in the same manner as in 2D, except for using the distance between particles instead of a Voronoi area. The density of each particle is defined as half the distance from each of its neighbors.\nL000298\tFig.~\\ref{fig:density_for_k=-1_2_-15}A Fig.~\\ref{fig:density_for_k=-1_2_-15}B Shows the density profile for long-range potentials in 1D ($k=-1.5$ and $k=-1$ respectively) rescaled by Eq.~\\ref{self-similar ansatz}, along with the analytical solution given by Eq.~\\ref{f in thesis}, which shows excellent agreement between the two. Fig.~\\ref{fig:density_for_k=-1_2_-15}C Shows the density of the short ranged potential ($k=2$) resacled by Eq.~\\ref{self-similar ansatz}, along with the analytical solution given by Eq.~\\ref{f in thesis}, which again shows excellent agreement between the two. The inset in each figure shows the unscaled density at three different times going from early times (dark blue) to later times (light blue).\nL000299\t\nL000300\t\nL000301\t\nL000302\t\nL000303\t\\end{document}\nL000304\t===== END FILE: Main_arxiv.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

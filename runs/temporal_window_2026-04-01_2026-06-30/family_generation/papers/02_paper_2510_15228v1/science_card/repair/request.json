@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2510.15228v1\", \"citation\": \"Andreas Dechant, Finite-Frequency Fluctuation-Response Inequality, Physical Review Letters (2026), DOI:10.1103/3hs9-dz3d\", \"journal_doi\": \"10.1103/3hs9-dz3d\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: fffri-arXiv.tex =====\nL000002\t\\documentclass[aps,pre,twocolumn,superscriptaddress,notitlepage]{revtex4-2}\nL000003\t\\usepackage{amsmath}\nL000004\t\\usepackage{amsfonts}\nL000005\t\\usepackage{amssymb}\nL000006\t\\usepackage{lmodern,dsfont}\nL000007\t\\usepackage{graphicx}\nL000008\t\\usepackage[usenames,dvipsnames]{xcolor}\nL000009\t\\usepackage{bm}\nL000010\t\\usepackage[english=american]{csquotes}\nL000011\t\\usepackage{xr}\nL000012\t\nL000013\t\nL000014\t\\newcommand{\\kb}{k_\\text{B}}\nL000015\t\\newcommand{\\av}[1]{\\langle #1 \\rangle}\nL000016\t\\newcommand{\\Av}[1]{\\left\\langle #1 \\right\\rangle}\nL000017\t\\newcommand{\\nn}{\\nonumber \\\\}\nL000018\t\\newcommand{\\n}{\\nonumber}\nL000019\t\\newcommand{\\mb}{\\bm}\nL000020\t\\newcommand{\\grad}{\\bm{\\nabla}}\nL000021\t\\newcommand{\\se}[1]{\\begin{subequations} #1 \\end{subequations}}\nL000022\t\\newcommand{\\bmc}[1]{\\bm{\\mathcal{#1}}}\nL000023\t\\newcommand{\\sectionprl}[1]{{\\par\\it #1.---}}\nL000024\t\\renewcommand{\\eqref}[1]{Eq.~(\\ref{#1})}\nL000025\t\nL000026\t\nL000027\t\nL000028\t\nL000029\t\nL000030\t\nL000031\t\\begin{document}\nL000032\t\nL000033\t\\author{Andreas Dechant}\nL000034\t\\affiliation{Department of Physics \\#1, Graduate School of Science, Kyoto University, Kyoto 606-8502, Japan}\nL000035\t\\title{Finite-frequency fluctuation-response inequality}\nL000036\t\\date{\\today}\nL000037\t\nL000038\t\\begin{abstract}\nL000039\tWe derive an inequality relating the finite-frequency linear response and fluctuations of an observable in a physical system.\nL000040\tThe relation holds for arbitrary observables and perturbations in general Markovian dynamics, including over- and underdamped Langevin systems and jump processes, both in and out of equilibrium.\nL000041\tAs a consequence, we obtain a universal upper bound on the broad-band signal-to-noise ratio of noisy dynamics, which only depends on the damping constant and temperature.\nL000042\tWe further show that the inequality reduces to an equality for appropriately chosen observables or perturbations in linear systems, both overdamped and underdamped and both in and out of equilibrium.\nL000043\t\\end{abstract}\nL000044\t\nL000045\t\\maketitle\nL000046\t\nL000047\tFluctuations and response are equally important for measurements of small noisy systems:\nL000048\tOn the one hand, when probing a system by measuring its response to an external perturbation, the accuracy of the measurement is limited by the fluctuations of the system due to environmental noise.\nL000049\tWhen the system acts as a sensor, the ratio of response and fluctuations corresponds to the signal-to-noise ratio.\nL000050\tOn the other hand, a measurement of the fluctuations themselves can also reveal information about the dynamics of the system.\nL000051\tThis connection is most prominent in equilibrium systems, where response and fluctuations are directly proportional and related by the fluctuation-dissipation theorem \\cite{Kubo1966,Kubo2012}.\nL000052\t\nL000053\tOut of equilibrium, this intimate connection between response and fluctuations is lost.\nL000054\tA phenomenological fluctuation-dissipation theorem may be formulated by introducing an effective temperature \\cite{Cugliandolo1997,Loi2008,Cugliandolo2011,Szamel2014,Lippiello2014}, however, the latter depends on the type of measurement \\cite{Fielding2002}.\nL000055\tA non-equilibrium fluctuation-dissipation theorem may also be derived from the underlying dynamics \\cite{Agarwal1972,Haenggi1982a,Marconi2008,Baiesi2009,Seifert2010a}, expressing the response as fluctuations of the unperturbed system.\nL000056\tHowever, these fluctuations are expressed using formal conjugate observables that are not directly measurable, thus limiting practical applications.\nL000057\t\nL000058\tMore recent results establish relations between response and fluctuations even for out-of-equilibrium systems \\cite{Dechant2020,Owen2020,FernandesMartins2023,Gao2024,Aslyamov2024,Ptaszynski2024,Liu2025,VanVu2025}, whose common feature is that they are formulated in the form of inequalities rather than equalities like the fluctuation-dissipation theorem.\nL000059\tHowever, from the point of view of applications, these results suffer from two drawbacks:\nL000060\tFirst, most results are formulated for discrete systems \\cite{Owen2020,FernandesMartins2023,Aslyamov2024,Ptaszynski2024,VanVu2025} and not straightforward to extend to continuous systems.\nL000061\tBy contrast, experiments are frequently performed in continuous systems, be it active matter \\cite{Loi2011a,Fodor2016}, granular materials \\cite{Song2005}, biological systems \\cite{Sato2003,Chen2007,Mizuno2008} or levitated nano-particles \\cite{Hempston2017,GonzalezBallestero2021}.\nL000062\t\nL000063\tSecond, and more seriously, existing results only apply to the static response of a system, where the perturbation is constant in time.\nL000064\tConversely, in experiments, it is more common to work with time-periodic perturbations and to characterize response and fluctuations in frequency space \\cite{Lau2003,Brau2007,Wilhelm2008,BenIsaac2011,Loi2011a}.\nL000065\tThis has practical reasons, as observing the static response can be challenging in small systems---a tracer particle inside a biological cell subjected to a constant force will eventually collide with the cell wall.\nL000066\tBut measuring response at different frequencies also yields additional information about the dynamics and structure of the system that is not contained in the static, zero-frequency response.\nL000067\t\nL000068\tIn this work, we derive a fluctuation-response inequality (FRI) relating the finite-frequency response and fluctuations of general observables, applicable to both discrete and continuous systems.\nL000069\tThe ratio between the magnitude of the linear response function and the power spectral density of an arbitrary observable at any frequency is upper bounded by a frequency-independent constant, depending on the temperature and friction coefficient of the environment.\nL000070\tAs a corollary, we obtain a universal upper bound on the frequency-integrated signal-to-noise ratio of noisy sensors.\nL000071\tMoreover, we show that equality in the FRI is attained for linear dynamics, both in and out of equilibrium, which indicates\nL000072\t\nL000073\t\nL000074\t\nL000075\t\\textit{Setup.}\nL000076\tIn this work, we focus on Langevin dynamics \\cite{Risken1986,Coffey2017} describing the noisy time-evolution of a set of $D$ continuous degrees of freedom $\\bm{x}(t) = (x_1(t),\\ldots,x_D(t))$.\nL000077\tThe dynamics can be overdamped, in which case\nL000078\t\\begin{align}\nL000079\t\\dot{\\bm{x}}(t) = \\frac{1}{\\gamma} \\big(\\bm{f}(\\bm{x}(t)) + \\epsilon \\bm{h}(\\bm{x}(t),t) \\big) + \\sqrt{\\frac{2 \\bm{T}}{\\gamma}} \\bm{\\xi}(t) \\label{langevin-over},\nL000080\t\\end{align}\nL000081\tor underdamped, in which case\nL000082\t\\begin{align}\nL000083\tm \\dot{\\bm{v}}(t) = - \\gamma \\bm{v}(t) + \\bm{f}(\\bm{x}(t)) + \\epsilon \\bm{h}(\\bm{x}(t),t) + \\sqrt{2 \\gamma \\bm{T}} \\bm{\\xi}(t) \\label{langevin-under}.\nL000084\t\\end{align}\nL000085\tHere, $\\bm{v}(t) = \\dot{\\bm{x}}(t)$ is the velocity, $\\bm{f}(\\bm{x})$ are coordinate-dependent forces (interactions or conservative and non-conservative external forces), and $\\bm{\\xi}(t)$ is a vector of uncorrelated white Gaussian noises.\nL000086\tAll degrees of freedom have the same mass $m$ and friction coefficient $\\gamma$ and are in contact with equilibrium environments, whose temperatures are the entries of the diagonal matrix $\\bm{T}$.\nL000087\tMore general situations, including non-thermal environments, velocity-dependent forces and jump processes on a discrete state space are discussed in Appendix A.\nL000088\t$\\bm{h}(\\bm{x},t)$ is a perturbation force; we focus on the linear response regime $\\epsilon \\ll 1$.\nL000089\tWe assume that, for $\\epsilon = 0$, the dynamics described by \\eqref{langevin-over} or \\eqref{langevin-under} is in a steady state with probability density $p_\\text{st}(\\bm{x})$ or $p_\\text{st}(\\bm{x},\\bm{v})$.\nL000090\t\nL000091\tWe measure a set of $K$ observables $z_k(t) = z_k(\\bm{x}(t))$, $k = 1,\\ldots,K$, which are functions of the coordinates of the system.\nL000092\tWe quantify the fluctuations of the observables using the spectral-density matrix $\\bmc{S}(\\omega)$, defined as the Fourier transform of the steady-state covariance \\cite{Stratonovich1963}\nL000093\t\\begin{align}\nL000094\t\\mathcal{S}_{kl}(\\omega) = \\int_{-\\infty}^\\infty dt \\ e^{i \\omega t} \\text{Cov}(z_k(t),z_l(0)) \\label{psd} .\nL000095\t\\end{align}\nL000096\t\nL000097\tWe further consider a set of $Q$ time-dependent perturbations to \\eqref{langevin-over} or \\eqref{langevin-under},\nL000098\t\\begin{align}\nL000099\t\\bm{h}(\\bm{x},t) = \\sum_{q=1}^Q \\bm{g}_q(\\bm{x}) \\phi_q(t) \\label{langevin-perturbed} .\nL000100\t\\end{align}\nL000101\tHere, $\\bm{g}_q(\\bm{x})$ are coordinate-dependent forces and $\\phi_q(t)$ are time-dependent functions.\nL000102\tIn the limit $\\epsilon \\rightarrow 0$, the response of the observables to the perturbations can to leading order be expressed using the linear-response matrix $\\bm{R}(t)$ \\cite{Haenggi1982a},\nL000103\t\\begin{align}\nL000104\t\\lim_{\\epsilon \\rightarrow 0} \\frac{\\Av{z_k}_{t,\\epsilon} - \\Av{z_k}_\\text{st}}{\\epsilon} = \\sum_{q = 1}^{Q} \\int_0^t dt' \\ R_{k q}(t-t') \\phi_q(t') \\label{response} ,\nL000105\t\\end{align}\nL000106\twhere we assume that the system is initially in the steady state with average $\\av{z_k}_\\text{st}$.\nL000107\t$\\Av{z_k}_{t,\\epsilon}$ denotes the average value of $z_k(t)$ when applying the perturbation.\nL000108\t$R_{kq}(t-t')$ expresses the impact of the perturbation $q$ at time $t'$ on the average of the observable $k$ at the later time $t$.\nL000109\tEquivalently, we have in Fourier space,\nL000110\t\\begin{align}\nL000111\t\\bmc{R}(\\omega) = \\int_0^\\infty dt \\ e^{i \\omega t} \\bm{R}(t),\nL000112\t\\end{align}\nL000113\twhere we used that $\\bm{R}(t) = 0$ for $t < 0$.\nL000114\t\nL000115\t\\textit{Fluctuation-response inequality.}\nL000116\t\\begin{figure}\nL000117\t\\includegraphics[width=0.49\\textwidth]{perpot-fffri.pdf}\nL000118\t\\caption{Power spectral density (dashed lines) and magnitude of the response (solid lines) of the velocity of an underdampled particle in a periodic potential, \\eqref{langevin-perpot}.\nL000119\tThe black lines are for vanishing tilt $f_0 = 0$, where the system is in equilibrium.\nL000120\tThe orange lines are for a non-equilibrium steady state with $f_0 = 0.175 \\cdot 2 \\pi$.\nL000121\tOther parameter values are $m = 1, \\gamma = 1/3, T = 1/2, U_0 = 1$ and $L = 1$.\nL000122\tBoth in and out of equilibrium, the power spectral density upper bounds the response, as predicted by \\eqref{fffri-1D}.}\nL000123\t\\label{fig-perpot}\nL000124\t\\end{figure}\nL000125\tThe first main result is the inequality between the response- and spectral-density matrices,\nL000126\t\\begin{gather}\nL000127\t\\bmc{R}^\\text{H}(\\omega) \\bmc{S}^{-1}(\\omega) \\bmc{R}(\\omega) \\leq \\bmc{A}  \\label{fffri}, \\\\\nL000128\t\\text{with} \\qquad \\mathcal{A}_{qr} = \\frac{1}{2 \\gamma} \\Av{ \\bm{g}_q \\cdot \\bm{T}^{-1} \\bm{g}_r}_\\text{st} \\n .\nL000129\t\\end{gather}\nL000130\twhere H denotes the Hermitian conjugate.\nL000131\tThe matrix inequality \\eqref{fffri} means that the difference of the right-hand and left-hand side is positive semi-definite.\nL000132\tSince the right-hand side is independent of frequency and the choice of the observables, this relation yields a strong constraint between the response and fluctuations of observables in Markovian systems, irrespective of whether the system is in or out of equilibrium.\nL000133\tThis generalizes the linear fluctuation-response inequality (FRI) derived in Ref.~\\cite{Dechant2020} to more general observables and finite frequencies; we therefore refer to \\eqref{fffri} as the finite-frequency FRI.\nL000134\tFor a single perturbation $\\bm{g}(\\bm{x}) \\phi(t)$, the response matrix reduces to the vector of response functions and the matrix $\\bmc{A}$ to the scalar $\\mathcal{A} = \\av{\\bm{g}\\cdot \\bm{T} \\bm{g}}_\\text{st}/(2\\gamma)$.\nL000135\tIn this case, we definite the response efficiency\nL000136\t\\begin{align}\nL000137\t\\eta^R(\\omega) = \\frac{\\bmc{R}^*(\\omega) \\cdot \\bmc{S}^{-1}(\\omega) \\bmc{R}(\\omega)}{\\mathcal{A}} \\leq 1 \\label{response-efficiency},\nL000138\t\\end{align}\nL000139\twhere $*$ denotes complex conjugation.\nL000140\tThe response efficiency satisfies $0 \\leq \\eta^R(\\omega) \\leq 1$ and quantifies the magnitude of the observed response in relation to the fluctuations of the observables.\nL000141\tIt allows characterizing the sensitivity to perturbations in a unified manner, enabling comparisons between different systems, observables and perturbations.\nL000142\tFor example, a weakly trapped particle is susceptible to perturbations and exhibits a large response, however, it is also susceptible to fluctuations and its measurement does necessarily not yield more information about the perturbation than a strongly trapped particle with small response and small fluctuations.\nL000143\tFor a single observable and a single perturbation ($K = Q = 1$), \\eqref{fffri} and \\eqref{response-efficiency} simplify to\nL000144\t\\begin{align}\nL000145\t\\big\\vert \\mathcal{R}(\\omega) \\big\\vert^2 \\leq \\mathcal{A} S(\\omega), \\qquad \\eta^R(\\omega) = \\frac{\\vert \\mathcal{R}(\\omega) \\vert^2}{\\mathcal{S}(\\omega) \\mathcal{A}} \\label{fffri-1D}.\nL000146\t\\end{align}\nL000147\tThus, the response of any observable to a perturbation with frequency $\\omega$ is bounded by the fluctuations of the observable at the same frequency times a constant.\nL000148\tIf the functional form of the perturbation is known, then the right hand side can be evaluated from the steady-state statistics of the system.\nL000149\tTherefore, \\eqref{fffri-1D} allows us to infer a bound on the response from a passive measurement of the system.\nL000150\t\nL000151\t\\textit{Response and fluctuations in and out of equilibrium.}\nL000152\tTo demonstrate this bound, we consider an underdamped particle in a tilted periodic potential\nL000153\t\\begin{align}\nL000154\tm \\dot{v}(t) &= - \\gamma v(t) - U'(x(t)) + f_0  + \\epsilon g_0 \\phi(t) + \\sqrt{2 \\gamma T} \\xi(t) \\label{langevin-perpot} ,\nL000155\t\\end{align}\nL000156\twhere $U(x) = U_0 (1-\\cos(2 \\pi x/L))$.\nL000157\tThe constant force $f_0$ tilts the potential and drives the system into a non-equilibrium steady state with a finite average velocity $\\av{v}_\\text{st}$ at long times.\nL000158\tWe remark that, despite the apparent simplicity of \\eqref{langevin-perpot}, underdamped diffusion in periodic potentials is not completely understood from a theoretical point of view and possesses a rich structure of interacting dynamical effects \\cite{Vollmer1983,Lindenberg2005,Marchenko2012,Lindner2016,Fischer2018,Fischer2020,Spiechowicz2023}.\nL000159\tWe focus on the fluctuations and response of the velocity and compute the power spectrum $\\mathcal{S}_v(\\omega)$ and response $\\mathcal{R}_v(\\omega)$ from numerical simulations (see Appendix D for details).\nL000160\tThe results are shown in Fig.~\\ref{fig-perpot}.\nL000161\tIn equilibrium, the velocity power spectrum (black dashed line) shows a pronounced peak at $\\omega \\approx 2 \\pi$, corresponding to oscillations of a trapped particle.\nL000162\tSince the particle can escape from the potential by thermal fluctuations, at low frequencies, the velocity spectrum saturates at the long-time diffusion coefficient of the particle,\nL000163\t\\begin{align}\nL000164\tD_x = \\frac{1}{2} \\lim_{\\tau \\rightarrow \\infty} \\frac{\\text{Var}(x)}{\\tau} = \\frac{1}{2} \\lim_{\\omega \\rightarrow 0} S_v(\\omega) .\nL000165\t\\end{align}\nL000166\tAt high frequencies, the velocity spectrum decays as $S_v(\\omega) \\simeq 2 \\gamma T/(m^2 \\omega^2)$.\nL000167\tThe response spectrum (black solid line) likewise exhibits a peak near the oscillation frequency of the particle, whose height, in agreement with \\eqref{fffri-1D}, is reduced compared to the one in the power spectrum.\nL000168\tWe remark that this effect stems from the non-linearity of the trapping force---for a linear oscillator, \\eqref{fffri-1D} turns onto an equality.\nL000169\tEquality in \\eqref{fffri-1D} is observed at high frequencies, where fluctuations and response are dominated by the properties of the environment.\nL000170\tDriving the system out of equilibrium by tilting the potential decreases the effective barrier height, allowing the particle to more easily escape from a minimum of the potential.\nL000171\tThis reduces the power spectrum at the oscillation frequency, while an additional peak appears at the frequency at which the particle traverses the potential.\nL000172\tTilting is known to greatly increase the diffusion coefficient \\cite{Reimann2001,Lindner2016}, leading to a significant increase in the low-frequency spectrum.\nL000173\tBoth the reduction in the power spectrum at the oscillation frequency and the increased low-frequency fluctuations are mirrored in the behavior of the response.\nL000174\tIn particular, the value of non-equilibrium power spectrum near the oscillation frequency is lower than the response in equilibrium, and thus \\eqref{fffri-1D} predicts a reduction of the non-equilibrium response from a passive measurement of the fluctuations.\nL000175\t\nL000176\t\\textit{Bound on signal-to-noise ratio.}\nL000177\tThe second main result is a consequence of \\eqref{fffri-1D} for a single observable $z(t)$ and an equilibrium environment $\\bm{T} = T \\bm{I}$.\nL000178\tIn this case, the relation\nL000179\t\\begin{align}\nL000180\t\\frac{1}{\\pi} \\int_0^\\infty d\\omega \\ \\mathcal{S}(\\omega) = \\text{Var}_\\text{st}(z)\nL000181\t\\end{align}\nL000182\tholds, where $\\text{Var}_\\text{st}(z)$ denotes the steady-state fluctuations of $z(t)$.\nL000183\tIntegrating \\eqref{fffri-1D} over frequency yields\nL000184\t\\begin{align}\nL000185\t\\frac{1}{\\pi} \\int_0^\\infty d\\omega \\ \\big\\vert \\mathcal{R}(\\omega) \\big\\vert^2 \\leq \\frac{1}{2 \\gamma T} \\Av{\\Vert \\bm{g} \\Vert^2}_\\text{st} \\text{Var}_\\text{st}(z) .\nL000186\t\\end{align}\nL000187\tThe ratio between the magnitude of the response and the fluctuations is commonly referred to as the signal-to-noise ratio (SNR) \\cite{Fraden2010},\nL000188\t\\begin{align}\nL000189\t\\text{SNR}(\\omega) = \\frac{\\big\\vert \\mathcal{R}(\\omega) \\big\\vert}{\\sqrt{\\text{Var}_\\text{st}(z)}} ,\nL000190\t\\end{align}\nL000191\twhich allows rewriting the above inequality as\nL000192\t\\begin{align}\nL000193\t\\int_0^\\infty d\\omega \\ \\big(\\text{SNR}(\\omega)\\big)^2 \\leq \\frac{\\pi \\av{\\Vert \\bm{g} \\Vert^2}_\\text{st}}{2 \\gamma T} \\label{snr-bound} .\nL000194\t\\end{align}\nL000195\tThus, the frequency-integral of the SNR is bounded by the friction coefficient and temperature of the environment, and the overall magnitude of the perturbation, independent of the precise details of the system.\nL000196\tThe left-hand side of \\eqref{snr-bound} quantifies the broad-band SNR of the system over all frequencies.\nL000197\tAs we show below, equality is attained when the system consists of a single particle in a harmonic confinement.\nL000198\tIn that sense, a harmonically trapped particle in equilibrium is the best possible broad-band sensor, achieving the largest possible frequency-integrated SNR.\nL000199\tIn practice, however, one is often more interested in the SNR at specific frequencies, which may be substantially enhanced out of equilibrium \\cite{Dechant2024}.\nL000200\tIn such a case, \\eqref{snr-bound} states that enhancing the SNR beyond the single particle value in a given frequency range necessarily leads to a suppression of the SNR at other frequencies.\nL000201\t\nL000202\t\\textit{Conservation of response in linear networks.}\nL000203\tThe third main result is that equality in \\eqref{fffri} is attained for linear forces, $\\bm{f}(\\bm{x}) = - \\bm{K}(\\bm{x} - \\bm{x}_\\text{eq})$, where $\\bm{K}$ is a matrix and $\\bm{x}_\\text{eq}$ is the equilibrium position.\nL000204\tIn that case, when the observables are the $D$ positions $\\bm{x}(t)$ of the particles and the perturbation is a spatially constant force $\\bm{g}(\\bm{x}) = \\bm{g}_0$, we obtain\nL000205\t\\begin{align}\nL000206\t\\bmc{R}_x^*(\\omega) \\cdot \\bmc{S}_x^{-1}(\\omega) \\bmc{R}_x(\\omega) = \\mathcal{A} = \\frac{1}{2 \\gamma} \\bm{g} \\cdot \\bm{T}^{-1} \\bm{g} \\label{fffri-linear} .\nL000207\t\\end{align}\nL000208\tThis relation is shown below for overdamped systems and in Appendix B for underdamped systems.\nL000209\tImportantly, this identity holds irrespective of whether the dynamics is in or out of equilibrium.\nL000210\tFor general perturbations, equality only holds when all degrees of freedom of the system are observed.\nL000211\tMoreover, since \\eqref{fffri-linear} is an inequality for systems with non-linear forces, it implies that, for the a given magnitude of the response, non-linear systems exhibit larger fluctuations.\nL000212\t\nL000213\tAs an example, we consider a linear network of coupled oscillators, depicted in Fig.~\\ref{fig-network}.\nL000214\tWhen applying a perturbation to one or several oscillators, its effect spreads across the network and we can measure the corresponding response of each oscillator.\nL000215\t\\eqref{fffri-linear} states that the overall response of all oscillators, weighted by their fluctuations, is a conserved quantity.\nL000216\tIn other words, measuring the response and fluctuations of all oscillators allows recovering the magnitude of an arbitrary perturbation; measuring a subset of oscillators generally only results in a lower bound.\nL000217\tThe portion of the perturbation that can be recovered from the measurement is quantified by the response efficiency \\eqref{response-efficiency}.\nL000218\tFig.~\\ref{fig-network-response} shows the response efficiency of the perturbed oscillator (red) and another oscillator in the network (blue).\nL000219\tWe observe that, in the high-frequency limit, the response efficiency of the perturbed oscillator approaches unity; at high frequencies, response and fluctuations are determined by the local properties of the environment.\nL000220\tAt intermediate frequencies, the perturbation excites collective modes in the network and causes a non-vanishing response of other oscillators.\nL000221\tInterestingly, the response efficiency can be larger for oscillators other than the perturbed one, indicating that a non-local measurement can yield more information about the perturbation.\nL000222\t\nL000223\tMeasuring more than one oscillator simultaneously provides additional information about the perturbation.\nL000224\tMeasuring the neighboring (light blue) oscillators in addition to the blue one results in increased response efficiency (light blue line in Fig.~\\ref{fig-network-response}).\nL000225\tStrikingly, when measuring the perturbed (red) oscillator and its neighbors (light red) simultaneously, we find an response efficiency of unity for all frequencies (light red line in Fig.~\\ref{fig-network-response}).\nL000226\tAs we prove in Appendix C, this finding is generic: In linear networks, the magnitude of the perturbation can always be inferred from a measurement of the perturbed oscillators and their neighbors.\nL000227\t\nL000228\t\\begin{figure}\nL000229\t\\includegraphics[width=.35\\textwidth]{response-efficiency-net.pdf}\nL000230\t\\caption{A network consisting of 21 oscillators (disks), coupled to each other by springs with spring constant $\\kappa = 0.75$; the outermost ring is attached to the black points by springs with spring constant $k = 2$.\nL000231\tThe mass of each oscillator is $m = 1$, the damping constant is $\\gamma = 0.01$ and the temperature $T = 1$.\nL000232\tThe perturbation is applied to the red oscillator.}\nL000233\t\\label{fig-network}\nL000234\t\\end{figure}\nL000235\t\nL000236\t\\begin{figure}\nL000237\t\\includegraphics[width=.49\\textwidth]{response-efficiency-only.pdf}\nL000238\t\\caption{Response efficiency of a linear network.\nL000239\tThe response efficiency \\eqref{response-efficiency} of the perturbed oscillator (red line) approaches $1$ in the high-frequency limit, where the perturbation is localized.\nL000240\tAt intermediate frequencies, the response efficiency in other parts of the network (blue) can be larger.\nL000241\tAlso measuring the response of the neighbors (light blue) yields additional information about the perturbation and increases the response efficiency.\nL000242\tIn particular, measuring the perturbed oscillator and its neighbors (light red) results in a response efficiency of unity at all frequencies. }\nL000243\t\\label{fig-network-response}\nL000244\t\\end{figure}\nL000245\t\nL000246\t\\textit{Proof of the FRI for overdamped dynamics.}\nL000247\tIn the interest of conciseness, we focus on the overdamped case \\eqref{langevin-over} here; the derivation for more general overdamped dynamics, as well as underdamped Langevin and Markov jump dynamics is provided in SM A.\nL000248\t\nL000249\t\nL000250\t\nL000251\t\nL000252\t\nL000253\t\nL000254\tWe consider a set of $K$ observables of the form\nL000255\t\\begin{align}\nL000256\tr_k(t) = z_k(\\bm{x}(t)) + \\bm{w}_k(\\bm{x}(t)) \\circ \\dot{\\bm{x}}(t) \\label{observable-current} .\nL000257\t\\end{align}\nL000258\tThis is slightly more general than the form discussed above, since it also contains a current-like contribution, where $\\circ$ denotes the Stratonovich product.\nL000259\tWe denote the steady-state average of $r_k(t)$ by $\\Av{r_k}_\\text{st}$.\nL000260\tNext, the response of the observables is calculated.\nL000261\tA central result of non-equilibrium linear response theory \\cite{Agarwal1972,Haenggi1982a,Marconi2008,Baiesi2009,Seifert2010a} is that the response function can be formally expressed as a steady-state correlation function\nL000262\t\\begin{align}\nL000263\tR_{k q}(t) = \\Av{r_k(t) \\psi_q(0)} .\nL000264\t\\end{align}\nL000265\tThe first crucial insight is that the quantity $\\psi_q(t)$ has the same form as the observables \\eqref{observable-current}; specifically,\nL000266\t\\begin{align}\nL000267\t\\psi_q(t) &= \\tilde{z}_q(\\bm{x}(t)) + \\tilde{\\bm{w}}_q(\\bm{x}(t)) \\circ \\dot{\\bm{x}}(t) \\\\\nL000268\t\\tilde{z}_q(\\bm{x}) &= - \\frac{1}{2 \\gamma^2} \\bm{g}_q(\\bm{x}) \\cdot \\bm{T}^{-1} \\bm{f}(\\bm{x}) - \\frac{1}{2 \\gamma} \\grad_x \\cdot \\bm{g}_q(\\bm{x}) \\nn\nL000269\t\\tilde{\\bm{w}}_q(\\bm{x}) &= -\\frac{1}{2 \\gamma^2} \\bm{T}^{-1} \\bm{g}_q(\\bm{x}) \\n .\nL000270\t\\end{align}\nL000271\tThe second crucial insight is that the correlation function of the \\enquote{response observables} $\\psi_q(t)$ is given by\nL000272\t\\begin{align}\nL000273\t\\Av{\\psi_q(t) \\psi_r(t')} = \\frac{1}{2 \\gamma} \\Av{\\bm{g}_q \\cdot \\bm{T}^{-1} \\bm{g}_r}_\\text{st} \\delta(t-t') ,\nL000274\t\\end{align}\nL000275\twhich can be obtained by direct calculation, see Appendix A.\nL000276\tThis result allows writing the joint spectral density matrix $\\mathbb{S}(\\omega)$ of the $K+Q$ observables $(r_1(t),\\ldots,r_k(t),\\psi_1(t),\\ldots,\\psi_Q(t))$ in block-wise form\nL000277\t\\begin{align}\nL000278\t\\mathbb{S}(\\omega) = \\begin{pmatrix} \\bmc{S}(\\omega) & \\bmc{R}(\\omega) \\\\ \\bmc{R}^\\text{H}(\\omega) & \\bmc{A} \\end{pmatrix},\nL000279\t\\end{align}\nL000280\twhere the symmetric, positive definite matrix $\\bmc{A}$ is defined as\nL000281\t\\begin{align}\nL000282\t\\mathcal{A}_{q r} = \\int_{-\\infty}^\\infty dt \\ e^{i \\omega t} \\Av{\\psi_q(t) \\psi_r(0)} = \\frac{1}{2 \\gamma} \\Av{\\bm{g}_q \\cdot \\bm{T}^{-1} \\bm{g}_r}_\\text{st} .\nL000283\t\\end{align}\nL000284\tSince $\\mathbb{S}(\\omega)$ is a positive definite matrix, its blocks have to satisfy the conditions\nL000285\t\\begin{subequations}\nL000286\t\\begin{gather}\nL000287\t\\bmc{R}^\\text{H}(\\omega) \\bmc{S}^{-1}(\\omega) \\bmc{R}(\\omega) \\leq \\bmc{A}, \\label{response-tradeoff-1} \\\\\nL000288\t\\bmc{R}(\\omega) \\bmc{A}^{-1} \\bmc{R}^\\text{H}(\\omega) \\leq \\bmc{S}(\\omega) \\label{response-tradeoff-2} .\nL000289\t\\end{gather} \\label{response-tradeoff}\nL000290\t\\end{subequations}\nL000291\tThe first condition is precisely the first main result, \\eqref{fffri}.\nL000292\tThe second condition provides an alternative trade-off relation between the fluctuations and the response.\nL000293\tIntegrating the second condition with respect to frequency yields, for configuration-dependent observables with $\\bm{w}_q = 0$,\nL000294\t\\begin{align}\nL000295\t\\frac{1}{\\pi} \\int_{0}^\\infty d\\omega \\ \\bmc{R}(\\omega) \\bmc{A}^{-1} \\bmc{R}^\\text{H}(\\omega) \\leq \\bm{\\Xi}_\\text{st}.\nL000296\t\\end{align}\nL000297\tThat is, the frequency-integral of the squared response matrix is bounded by the steady-state covariance matrix of the observables.\nL000298\tThis generalizes \\eqref{snr-bound} to the case of several observables and perturbations.\nL000299\t\nL000300\t\\textit{Linear dynamics.}\nL000301\tNext, the above results are applied to a system of particles with linear interactions and perturbations that are constant in space.\nL000302\tIn this case, \\eqref{langevin-perturbed} is written as\nL000303\t\\begin{align}\nL000304\t\\dot{\\bm{x}}(t) = \\frac{1}{\\gamma} \\Big(-\\bm{K} \\big(\\bm{x}(t) - \\bm{x}_\\text{eq} \\big) + \\epsilon \\bmc{G} \\bm{\\phi}(t) \\Big)  + \\sqrt{\\frac{2 \\bm{T}}{\\gamma}} \\bm{\\xi}(t) \\label{langevin-linear} .\nL000305\t\\end{align}\nL000306\tThe matrix $\\bmc{G} \\in \\mathbb{R}^{D \\times Q}$ has the constant force $\\bm{g}_q$ as its $q$-th column and $\\bm{\\phi}(t) = (\\phi_1(t),\\ldots,\\phi_Q(t))$.\nL000307\t$\\bm{K}$ is a matrix of spring constants, whose eigenvalues have positive real parts, so that the system has a stable steady state.\nL000308\tIf $\\bm{K}$ is symmetric, the resulting steady state is in equilibrium; if $\\bm{K}$ is not symmetric, then non-reciprocal interactions drive the system into a non-equilibrium steady state.\nL000309\tSince both the dynamics and the perturbation in \\eqref{langevin-linear} are linear, the linear response matrix \\eqref{response} fully describes the response of the system for arbitrary magnitude $\\epsilon$ of the perturbation.\nL000310\tThe observables are likewise linear combinations of the coordinates of the particles, i.~e.~$\\bm{z}(t) = \\bmc{Z} \\bm{x}(t)$ with $\\bmc{Z} \\in \\mathbb{R}^{K \\times D}$.\nL000311\tSince the system is linear, explicit expressions for the spectral density and response matrices are obtained (see Appendix B),\nL000312\t\\begin{align}\nL000313\t\\bmc{S}(\\omega) &= \\gamma \\bmc{Z} \\Big( \\big( \\bm{K} - i \\omega \\gamma \\bm{I} \\big)^{-1} \\bm{\\Xi}_{\\text{st}} + [\\text{h.c.}] \\Big) \\bmc{Z}^\\text{T}, \\nn\nL000314\t\\bmc{R}(\\omega) &= \\bmc{Z} \\big( \\bm{K} - i\\omega \\gamma \\bm{I} \\big)^{-1} \\bmc{G} , \\\\\nL000315\t\\bmc{A} &= \\frac{1}{2 \\gamma} \\bmc{G}^\\text{T} \\bm{T}^{-1} \\bmc{G} \\n .\nL000316\t\\end{align}\nL000317\tHere, [h.c.] represents the Hermitian conjugate of the first matrix and $\\bm{\\Xi}_\\text{st}$ denotes the steady-state covariance matrix of the coordinates.\nL000318\tWith these expressions, it is a matter of straightforward linear algebra (see Appendix B) to verify the relations\nL000319\t\\begin{subequations}\nL000320\t\\begin{align}\nL000321\t\\bmc{R}^\\text{H}(\\omega) \\bmc{S}^{-1}(\\omega) \\bmc{R}(\\omega) = \\bmc{A} \\quad &\\text{if} \\; \\text{rank}(\\bmc{Z}) = D \\label{linear-identity-1} \\\\\nL000322\t\\bmc{R}(\\omega) \\bmc{A}^{-1} \\bmc{R}^\\text{H}(\\omega) = \\bmc{S}(\\omega) \\quad &\\text{if} \\; \\text{rank}(\\bmc{G}) = D \\label{linear-identity-2}.\nL000323\t\\end{align}\\label{linear-identity}\nL000324\t\\end{subequations}\nL000325\tIf the observables provide the complete information about the coordinates of the particles ($\\bmc{Z}$ is an invertible matrix), then \\eqref{response-tradeoff-1} is an equality.\nL000326\tConversely, if the perturbations can reproduce any constant-in-space force ($\\bmc{G}$ is an invertible matrix), then \\eqref{response-tradeoff-2} is an equality.\nL000327\tEquality holds for both equilibrium and out-of-equilibrium situations, as long as the dynamics is linear.\nL000328\t\nL000329\t\nL000330\t\\textit{Discussion.}\nL000331\tIn this work, we derived a universal trade-off relation between the frequency response and the frequency-resolved fluctuations of discrete and continuous Markovian dynamics.\nL000332\tThis fluctuation-response inequality quantifies the intuition that response and fluctuations are related even out of equilibrium, since they are both properties of the same underlying physical system.\nL000333\tWe stress that \\eqref{fffri} does not reduce to an equality in equilibrium and is thus distinct from the fluctuation-dissipation theorem.\nL000334\tInstead, we found that equality is attained for linear dynamics, independent of whether they are in or out of equilibrium.\nL000335\tWhether and how \\eqref{fffri} can be related to the fluctuation-dissipation theorem and to the computation of dissipation from its violation \\cite{Harada2005,Harada2006} is an open question.\nL000336\t\nL000337\tThe derivation of \\eqref{fffri} only requires the response to be represented as a correlation function of the unperturbed system.\nL000338\tSince this relation holds for general Markovian dynamics and possibly beyond, we expect that the result can be readily generalized to other dynamics, such as open quantum systems, where the corresponding zero-frequency result was recently obtained in Ref.~\\cite{VanVu2025}.\nL000339\tA more challenging generalization is to derive similar bounds on non-linear response.\nL000340\tRecently, a relation between static non-linear response and first passage times was derived in Ref.~\\cite{Bao2025}, but whether a similar result also applies to time-periodic perturbations is unclear.\nL000341\tAnother approach is to characterize the system in the presence of a finite-strength periodic perturbation using Floquet theory and then apply the non-linear FRI derived in Ref.~\\cite{Dechant2020}.\nL000342\t\nL000343\tThe finite-frequency FRI \\eqref{fffri} does not distinguish between systems that are in or out of equilibrium.\nL000344\tHowever, the relation between response and fluctuations is clearly different out of equilibrium, where the fluctuation-dissipation theorem does not hold.\nL000345\tTherefore, an important question is whether there are bounds on the response that explicitly take into account the non-equilibrium nature of the system.\nL000346\tOne such relation was derived for the static response of currents in Ref.~\\cite{Ptaszynski2024}, which is bounded by the entropy production rate.\nL000347\tSimilar relations for the finite-frequency response might be obtained starting from the variational formula for the power-spectral density derived in Refs.~\\cite{Dechant2023a,Vo2025}, which provides a formal identity between response the power spectrum, from which bounds can be derived.\nL000348\t\nL000349\t\nL000350\t\nL000351\t\nL000352\t\\widetext\nL000353\t\nL000354\t\\appendix\nL000355\t\nL000356\t\\section{Generalized fluctuation-dissipation theorem and fluctuation-response inequality in frequency space} \\label{sec-fffri}\nL000357\t\nL000358\t\nL000359\t\nL000360\t\nL000361\t\\subsection{Overdamped Langevin dynamics} \\label{sec-fffri-over}\nL000362\tWe consider the overdamped Ito-Langevin equations for $\\bm{x} \\in \\mathbb{R}^D$,\nL000363\t\\begin{align}\nL000364\t\\dot{\\bm{x}}(t) = \\bm{a}(\\bm{x}(t)) + \\epsilon \\sum_{q = 1}^{Q} \\bm{y}_q(\\bm{x}(t)) \\phi_q(t) + \\sqrt{2 \\bm{B}(\\bm{x}(t))} \\cdot \\bm{\\xi}(t) \\label{langevin} .\nL000365\t\\end{align}\nL000366\tHere $\\bm{a}(\\bm{x})$ is the drift vector and $\\bm{B}(\\bm{x})$ is the positive definite diffusion matrix; $\\sqrt{\\bm{B}(\\bm{x})}$ denotes its unique positive definite matrix square root.\nL000367\t$\\odot$ denotes the combination of matrix- and Ito-product, and $\\bm{\\xi}(t)$ is a vector of mutually uncorrelated, Gaussian white noises, $\\Av{\\xi_h(t) \\xi_j(t')} = \\delta_{h j} \\delta(t-t')$.\nL000368\tThe vectors $\\bm{y}_q(\\bm{x})$ represent small perturbations ($\\epsilon \\ll 1$) to the drift vector, whose time-dependence is encoded by the functions $\\phi_q(t)$.\nL000369\t\\eqref{langevin-over} of the main text is recovered for $\\bm{a}(\\bm{x}) = \\frac{1}{\\gamma} \\bm{f}(\\bm{x})$, $\\bm{y}_q(\\bm{x}) = \\frac{1}{\\gamma} \\bm{g}_q(\\bm{x})$ and $\\bm{B}(\\bm{x}) = T/\\gamma \\bm{I}$ with $\\bm{I}$ the identity matrix.\nL000370\tWe assume that, without the perturbation, the system is in a steady state characterized by the probability density $p_\\text{st}(\\bm{x})$, which obeys the steady-state Fokker-Planck equation \\cite{Risken1986}\nL000371\t\\begin{align}\nL000372\t0 &= - \\grad_x \\big( \\bm{\\nu}_\\text{st}(\\bm{x}) p_\\text{st}(\\bm{x}) \\big) \\quad \\text{with} \\label{fpe-steady} \\\\\nL000373\t\\bm{\\nu}_\\text{st}(\\bm{x}) &= \\bm{a}(\\bm{x}) - \\grad \\bm{B}(\\bm{x}) - \\bm{B}(\\bm{x}) \\grad \\ln p_\\text{st}(\\bm{x}) \\n ,\nL000374\t\\end{align}\nL000375\twhere $\\bm{\\nu}_\\text{st}(\\bm{x})$ is called the steady-state local mean velocity \\cite{Seifert2010a}, which quantifies the magnitude of flows in the (generally) non-equilibrium steady state.\nL000376\tHere, we defined the vector-valued divergence of a matrix by $(\\grad \\bm{B}(\\bm{x}))_{j} = \\sum_{h} \\partial_{x_h} B_{h j}(\\bm{x})$.\nL000377\tIn order to avoid confusion with the Ito-product, we omit the scalar product in denoting the divergence; any product between two vector-valued quantities is implicitly assumed to be a scalar product unless noted otherwise.\nL000378\tNote that the steady state is in equilibrium (satisfied detailed balance) if and only if the local mean velocity vanishes identically; the steady-state entropy production rate is\nL000379\t\\begin{align}\nL000380\t\\sigma_\\text{st} = \\Av{\\bm{\\nu}_\\text{st} \\bm{B}^{-1} \\bm{\\nu}_\\text{st}}_\\text{st},\nL000381\t\\end{align}\nL000382\twhich is strictly positive for any non-zero $\\bm{\\nu}_\\text{st}(\\bm{x})$ as $\\bm{B}(\\bm{x})$ is assumed to be positive definite.\nL000383\t\nL000384\t\\subsubsection{Observables and power-spectral density}\nL000385\tWe focus on $K$ scalar observables that each consist of a configuration-dependent contribution $z_k(\\bm{x}(t))$ and a current-like contribution $\\bm{w}_k(\\bm{x}(t)) \\circ \\dot{\\bm{x}}(t)$, where $\\circ$ is the Stratonovich-product,\nL000386\t\\begin{align}\nL000387\tr_k(t) = z_k(\\bm{x}(t)) + \\bm{w}_k(\\bm{x}(t)) \\circ \\dot{\\bm{x}}(t) \\label{observable} .\nL000388\t\\end{align}\nL000389\tThe steady-state average of $r_k(t)$ is given by\nL000390\t\\begin{align}\nL000391\t\\Av{r_k}_\\text{st} = \\int d\\bm{x} \\ \\Big( z_k(\\bm{x}) + \\bm{w}_k(\\bm{x}) \\bm{\\nu}_\\text{st}(\\bm{x}) \\Big) p_\\text{st}(\\bm{x}) =  \\Av{z_k}_\\text{st} + \\Av{\\bm{w}_k \\bm{\\nu}_\\text{st}}_\\text{st} .\nL000392\t\\end{align}\nL000393\tWe characterize the fluctuations of the observables in the steady state using their covariances,\nL000394\t\\begin{align}\nL000395\tC_{kl}(t) = \\text{Cov}_\\text{st}(r_k(t),r_l(0)) = \\Av{r_k(t) r_l(0)}_\\text{st} - \\Av{r_k}_\\text{st} \\Av{r_l}_\\text{st} ,\nL000396\t\\end{align}\nL000397\twhere the subscript st indicates that the average is taken with respect to the unperturbed steady state for $\\epsilon = 0$.\nL000398\tDue to time-translation invariance, the covariance matrix $\\bm{C}(t)$ only depends on the time-lag $t$.\nL000399\tHowever, since the system described by \\eqref{langevin} is generally out of equilibrium even in the steady state, $\\bm{C}(t)$ is not a symmetric matrix; rather we have $\\bm{C}^\\text{T}(t) = \\bm{C}(-t)$.\nL000400\tEquivalently, we can characterize the correlations by the power-spectral density matrix, which is the Fourier-transform of the covariance matrix $\\bm{C}(t)$,\nL000401\t\\begin{align}\nL000402\t\\bmc{S}(\\omega) = \\int_{-\\infty}^\\infty dt \\ e^{i \\omega t} \\bm{C}(t) \\label{power-spectral-density} .\nL000403\t\\end{align}\nL000404\tThe power-spectral density $\\bmc{S}(\\omega)$ is a Hermitian, positive definite matrix.\nL000405\tIt is real and symmetric when $\\bm{C}(t)$ is symmetric, that is, when the system \\eqref{langevin} is in equilibrium and thus time-reversal symmetric.\nL000406\tNote that the power spectrum can equivalently be defined by introducing the finite-time Fourier transform of the observables,\nL000407\t\\begin{align}\nL000408\t\\hat{r}_k(\\omega,\\tau) = \\int_0^\\tau dt \\ e^{i \\omega t} r_k(t).\nL000409\t\\end{align}\nL000410\tBy the Wiener-Khinchine theorem, we then obtain\nL000411\t\\begin{align}\nL000412\t\\mathcal{S}_{kl}(\\omega) = \\lim_{\\tau \\rightarrow \\infty} \\frac{1}{\\tau} \\text{Cov}_\\text{st}\\big(\\hat{r}_k(\\omega,\\tau),\\hat{r}_l^*(\\omega,\\tau) \\big),\nL000413\t\\end{align}\nL000414\twhere $*$ denotes complex conjugation.\nL000415\tThis identity shows that $\\bmc{S}(\\omega)$ is itself a covariance matrix of complex observables, which implies its positive-definiteness.\nL000416\t\nL000417\t\\subsubsection{Response and fluctuation-dissipation theorem}\nL000418\tNext, we want to characterize the response of the observables to the perturbations.\nL000419\tThe change in the average value of an observable is\nL000420\t\\begin{align}\nL000421\t\\Delta \\Av{r_k(t)} = \\Av{r_k(t)}_\\epsilon - \\Av{r_k}_\\text{st} ,\nL000422\t\\end{align}\nL000423\twhere $\\Av{r_k}_\\epsilon$ denotes the average of the observable for $\\epsilon > 0$.\nL000424\tWe focus on the linear response regime $\\epsilon \\rightarrow 0$, where we have\nL000425\t\\begin{align}\nL000426\t\\lim_{\\epsilon \\rightarrow 0} \\frac{\\Delta \\Av{r_k(t)}}{\\epsilon} = \\partial_\\epsilon \\Av{r_k(t)}_\\epsilon \\Big\\vert_{\\epsilon = 0} .\nL000427\t\\end{align}\nL000428\tSuppose that the perturbation vanishes, that is $\\phi_q(t) = 0$ for all $q$, for $t < 0$.\nL000429\tThen, we can formally write\nL000430\t\\begin{align}\nL000431\t\\Av{r_k(t)}_\\epsilon = \\int d\\Gamma \\ r_k(t) \\mathbb{P}_\\epsilon(\\Gamma) .\nL000432\t\\end{align}\nL000433\tHere, $\\Gamma = \\lbrace\\bm{x}(t')\\rbrace_{t' \\in [0,t]}$ is a trajectory of the system during the time-interval $[0,t]$ and $\\mathbb{P}_\\epsilon(\\Gamma)$ is the probability of the trajectory in the perturbed system, starting from the steady state at $t = 0$.\nL000434\tSince the trajectory probability is positive, we can write\nL000435\t\\begin{align}\nL000436\t\\partial_\\epsilon \\Av{r_k(t)}_\\epsilon \\Big\\vert_{\\epsilon = 0} &= \\int d\\Gamma \\ r_k(t) \\partial_\\epsilon \\mathbb{P}_\\epsilon(\\Gamma) \\Big\\vert_{\\epsilon = 0} = \\int d\\Gamma \\ r_k(t) \\partial_\\epsilon \\big(\\ln \\mathbb{P}_\\epsilon(\\Gamma) \\big) \\mathbb{P}_\\epsilon(\\Gamma) \\Big\\vert_{\\epsilon = 0} \\nn\nL000437\t& = \\int d\\Gamma \\ r_k(t) \\partial_\\epsilon \\big(\\ln \\mathbb{P}_\\epsilon(\\Gamma) \\big) \\Big\\vert_{\\epsilon = 0} \\mathbb{P}_0(\\Gamma) .\nL000438\t\\end{align}\nL000439\tWe define the trajectory-dependent quantity\nL000440\t\\begin{align}\nL000441\t\\partial_\\epsilon \\big(\\ln \\mathbb{P}_\\epsilon(\\Gamma) \\big) \\Big\\vert_{\\epsilon = 0} = Q(\\Gamma) .\nL000442\t\\end{align}\nL000443\tSince $\\mathbb{P}_0(\\Gamma)$ is the trajectory probability of the unperturbed steady-state system, we can write\nL000444\t\\begin{align}\nL000445\t\\partial_\\epsilon \\Av{r_k(t)}_\\epsilon \\Big\\vert_{\\epsilon = 0} = \\Av{r_k(t) Q(\\Gamma)}_\\text{st} .\nL000446\t\\end{align}\nL000447\tAs shown in Ref.~\\cite{Dechant2020}, the derivative of the logarithm of the path probability is given by\nL000448\t\\begin{align}\nL000449\t\\partial_\\epsilon \\big(\\ln \\mathbb{P}_\\epsilon(\\Gamma) \\big) \\Big\\vert_{\\epsilon = 0} = \\frac{1}{2} \\int_0^t dt' \\ \\sum_{q = 1}^Q \\phi_q(t') \\bm{y}_q(\\bm{x}(t')) \\bm{B}(\\bm{x}(t'))^{-1} \\sqrt{2 \\bm{B}(\\bm{x}(t'))} \\cdot \\bm{\\xi}(t') \\equiv \\int_0^t dt' \\ \\sum_{q=1}^Q \\psi_q(t') \\phi_q(t'), \\label{path-log}\nL000450\t\\end{align}\nL000451\twhich defines the \\enquote{response observable}\nL000452\t\\begin{align}\nL000453\t\\psi_q(t) = \\frac{1}{2} \\bm{y}_q(\\bm{x}(t)) \\bm{B}(\\bm{x}(t))^{-1} \\sqrt{2 \\bm{B}(\\bm{x}(t))} \\cdot \\bm{\\xi}(t) \\label{response-observable} .\nL000454\t\\end{align}\nL000455\tThis allows us to express the linear response as\nL000456\t\\begin{align}\nL000457\t\\partial_\\epsilon \\Av{r_k(t)}_\\epsilon \\Big\\vert_{\\epsilon = 0} = \\sum_{q = 1}^Q \\int_0^t dt' \\ \\Av{r_k(t) \\psi_q(t')}_\\text{st} \\phi_q(t') .\nL000458\t\\end{align}\nL000459\tSince the steady state is time-translation invariant, we can define the response matrix\nL000460\t\\begin{align}\nL000461\tR_{kq}(t-t') = \\Av{r_k(t) \\psi_q(t')}_\\text{st} \\label{response-correlation},\nL000462\t\\end{align}\nL000463\twhich results in the expression for the response\nL000464\t\\begin{align}\nL000465\t\\partial_\\epsilon \\Av{r_k(t)}_\\epsilon \\Big\\vert_{\\epsilon = 0} = \\int_0^t dt' \\ \\sum_{q = 1}^Q R_{kq}(t-t') \\phi_q(t') .\nL000466\t\\end{align}\nL000467\tThus, the response matrix quantifies the response of observable $k$ at time $t$ to perturbation $q$ at the earlier time $t'$.\nL000468\t\\eqref{response-correlation} is the generalized fluctuation-dissipation theorem discussed in Refs.~\\cite{Agarwal1972,Haenggi1982a,Marconi2008,Baiesi2009,Seifert2010a}.\nL000469\tIt expresses the response in terms of a correlation function in the unperturbed steady state, at the expense that it involves the correlation of the observable $r_k(t)$ with the quantity $\\psi_q(t)$, which is generally not directly measurable.\nL000470\tSince $\\psi_q(t)$ involves an Ito-product with the noise, we obtain $R_{kq}(t-t') = 0$ for $t' > t$ due to the non-anticipating property of white noise, i.~e.~the noise at time $t'$ is independent of the dynamics at any earlier time $t$.\nL000471\tUsing that, in the unperturbed system, we have from \\eqref{langevin}\nL000472\t\\begin{align}\nL000473\t\\sqrt{2 \\bm{B}(\\bm{x}(t))} \\cdot \\bm{\\xi}(t) = \\dot{\\bm{x}}(t) - \\bm{a}(\\bm{x}(t)),\nL000474\t\\end{align}\nL000475\twe can further write the response observable as\nL000476\t\\begin{align}\nL000477\t\\psi_q(t) = \\frac{1}{2} \\bm{y}_q(\\bm{x}(t)) \\bm{B}(\\bm{x}(t))^{-1} \\cdot \\big(\\dot{\\bm{x}}(t) - \\bm{a}(\\bm{x}(t))\\big) .\nL000478\t\\end{align}\nL000479\tUsing Ito's lemma to transform the Ito-product into a Stratonovich product, this can be written as\nL000480\t\\begin{align}\nL000481\t\\psi_q(t) = - \\frac{1}{2} \\bm{y}_q(\\bm{x}(t)) \\bm{B}(\\bm{x})^{-1} \\bm{a}(\\bm{x}(t)) + \\frac{1}{2} \\bm{y}_q(\\bm{x}(t)) \\bm{B}^{-1}(\\bm{x}) \\circ \\dot{\\bm{x}}(t) - \\frac{1}{2} \\text{tr} \\Big( \\bm{B}(\\bm{x}(t)) \\bm{J}_{\\bm{B}^{-1} \\bm{y}_q}(\\bm{x}(t)) \\Big) ,\nL000482\t\\end{align}\nL000483\twhere tr denotes the trace and $\\bm{J}_{\\bm{B}^{-1} \\bm{y}_q}(\\bm{x})$ is the Jacobian matrix of the vector field $\\bm{B}(\\bm{x})^{-1} \\bm{y}_q(\\bm{x})$.\nL000484\tWriting the last term explicitly in index notation, he have\nL000485\t\\begin{align}\nL000486\t\\text{tr} \\Big( \\bm{B}(\\bm{x}) \\bm{J}_{\\bm{B}^{-1} \\bm{y}_q}(\\bm{x}) \\Big)  = B_{jk}(\\bm{x}) \\partial_{x_j} \\Big( \\big(\\bm{B}(\\bm{x})^{-1} \\big)_{k l} y_{q,l}(\\bm{x}) \\Big) ,\nL000487\t\\end{align}\nL000488\twhere the sum over repeated indices is implied.\nL000489\tUsing the formula for the derivative of an inverse matrix,\nL000490\t\\begin{align}\nL000491\t\\partial_{x_j} \\bm{B}(\\bm{x})^{-1} = - \\bm{B}(\\bm{x})^{-1} \\partial_{x_j} \\bm{B}(\\bm{x}) \\bm{B}(\\bm{x})^{-1},\nL000492\t\\end{align}\nL000493\twe obtain\nL000494\t\\begin{align}\nL000495\t\\text{tr} \\Big( \\bm{B}(\\bm{x}) \\bm{J}_{\\bm{B}^{-1} \\bm{y}_q}(\\bm{x}) \\Big)  = B_{jk}(\\bm{x}) \\big(\\bm{B}(\\bm{x})^{-1} \\big)_{kl} \\partial_{x_j} y_{q,l} - B_{jk}(\\bm{x}) \\big(\\bm{B}(\\bm{x})^{-1} \\big)_{km} \\partial_{x_j} B_{mn}(\\bm{x}) \\big(\\bm{B}(\\bm{x})^{-1} \\big)_{nl} y_{q,l}(\\bm{x}) .\nL000496\t\\end{align}\nL000497\tCanceling the matrix $\\bm{B}(\\bm{x})$ and its inverse, this simplifies to\nL000498\t\\begin{align}\nL000499\t\\text{tr} \\Big( \\bm{B}(\\bm{x}) \\bm{J}_{\\bm{B}^{-1} \\bm{y}_q}(\\bm{x}) \\Big) = \\grad \\bm{y}_q(\\bm{x}) - \\grad \\bm{B}(\\bm{x}) \\bm{B}(\\bm{x})^{-1} \\bm{y}_q(\\bm{x}) .\nL000500\t\\end{align}\nL000501\tRecalling the definition of the steady-state local mean velocity \\eqref{fpe-steady}, we obtain\nL000502\t\\begin{align}\nL000503\t\\psi_q(t) = - \\frac{1}{2} \\bigg( \\bm{y}_q(\\bm{x}(t)) \\bm{B}(\\bm{x}(t))^{-1} \\bm{\\nu}_\\text{st}(\\bm{x}(t)) + \\frac{\\grad \\big(\\bm{y}_q(\\bm{x}(t)) p_\\text{st}(\\bm{x}(t)) \\big)}{p_\\text{st}(\\bm{x}(t))} \\bigg) + \\frac{1}{2} \\bm{y}_q(\\bm{x}(t)) \\bm{B}(\\bm{x}(t))^{-1} \\circ \\dot{\\bm{x}}(t) .\nL000504\t\\end{align}\nL000505\tWe see that this is of the same form as the observables $r_k(t)$ defined in \\eqref{observable},\nL000506\t\\begin{gather}\nL000507\t\\psi_q(t) = \\tilde{z}_q(\\bm{x}(t)) + \\tilde{\\bm{w}}_q(\\bm{x}(t)) \\circ \\dot{\\bm{x}}(t) \\qquad \\text{with} \\label{response-observable-2} \\\\\nL000508\t\\tilde{z}_q(\\bm{x}) = - \\frac{1}{2} \\bigg( \\bm{y}_q(\\bm{x}) \\bm{B}(\\bm{x})^{-1} \\bm{\\nu}_\\text{st}(\\bm{x}) + \\frac{\\grad \\big(\\bm{y}_q(\\bm{x}) p_\\text{st}(\\bm{x}) \\big)}{p_\\text{st}(\\bm{x})} \\bigg) \\qquad \\text{and} \\qquad \\tilde{\\bm{w}}_q(\\bm{x}) = \\frac{1}{2} \\bm{B}(\\bm{x})^{-1} \\bm{y}_q(\\bm{x}) . \\n\nL000509\t\\end{gather}\nL000510\tThus, the \\enquote{response observable}, while not directly measurable, as it requires knowledge about the diffusion matrix, steady-state probability density, and local mean velocity, is mathematically an observable of the same type as $r_k(t)$.\nL000511\t\nL000512\t\\subsubsection{Fluctuation-response inequality}\nL000513\tWe define the frequency-response matrix as the Fourier transform of the response matrix \\eqref{response-correlation},\nL000514\t\\begin{align}\nL000515\t\\bmc{R}(\\omega) = \\int_0^\\infty dt \\ e^{i \\omega t} \\bm{R}(t),\nL000516\t\\end{align}\nL000517\twhere we used that the response matrix vanishes for $t < 0$.\nL000518\tSince, from \\eqref{response-observable-2}, the quantities $\\psi_q(t)$ are of the same type as $r_k(t)$, we can consider the power-spectral density matrix of the extended set ob observables $\\lbrace r_1(t), \\ldots, r_K(t), \\psi_1(t), \\ldots, \\psi_Q(t) \\rbrace$,\nL000519\t\\begin{align}\nL000520\t\\big(\\mathbb{S}(\\omega) \\big)_{k,l} = \\int_{-\\infty}^\\infty dt \\ e^{i \\omega t} \\times \\left\\lbrace \\begin{array}{ll}\nL000521\t\\text{Cov}_\\text{st}(r_k(t),z_l(0)) &\\text{if} \\; k,l \\leq K \\\\[1ex]\nL000522\t\\text{Cov}_\\text{st}(r_k(t),\\psi_l(0)) &\\text{if} \\; k \\leq K, l \\geq K+1 \\\\[1ex]\nL000523\t\\text{Cov}_\\text{st}(\\psi_k(t),r_l(0)) &\\text{if} \\; l \\leq K, k \\geq K+1 \\\\[1ex]\nL000524\t\\text{Cov}_\\text{st}(\\psi_k(t),\\psi_l(0)) &\\text{if} \\; k,l \\geq K+1 .\nL000525\t\\end{array} \\right.\nL000526\t\\end{align}\nL000527\tFrom \\eqref{response-correlation}, we identify the covariance between $r_k(t)$ and $\\psi_q(0)$ as the $(k,q)$ entry of the response matrix and can thus write\nL000528\t\\begin{align}\nL000529\t\\mathbb{S}(\\omega) = \\begin{pmatrix} \\bmc{S}(\\omega) & \\bmc{R}(\\omega) \\\\ \\bmc{R}(\\omega)^\\text{H} & \\bm{\\Psi}(\\omega) \\end{pmatrix} ,\nL000530\t\\end{align}\nL000531\twhere $\\bm{\\Psi}(\\omega)$ is the Fourier transform of the covariance of the observables $\\psi_q(t)$ and H denotes the Hermitian conjugate.\nL000532\tNote that $\\Av{\\psi_q}_\\text{st} = 0$, which is apparent from \\eqref{response-observable}.\nL000533\tFrom the latter, we also find\nL000534\t\\begin{align}\nL000535\t\\text{Cov}_\\text{st}(\\psi_q(t),\\psi_r(0)) &= \\Av{\\psi_q(t) \\psi_r(0)}_\\text{st} \\label{response-observable-correlation} \\\\\nL000536\t&= \\frac{1}{4} \\Av{\\Big(\\bm{y}_q(\\bm{x}(t)) \\bm{B}(\\bm{x}(t))^{-1} \\sqrt{2 \\bm{B}(\\bm{x}(t))} \\cdot \\bm{\\xi}(t) \\Big) \\Big( \\bm{y}_r(\\bm{x}(0)) \\bm{B}(\\bm{x}(0))^{-1} \\sqrt{2 \\bm{B}(\\bm{x}(0))} \\cdot \\bm{\\xi}(0) \\Big)}_\\text{st}\\nn\nL000537\t& = \\frac{1}{2} \\Av{\\bm{y}_q \\bm{B}^{-1} \\bm{y}_r}_\\text{st} \\delta(t) \\n,\nL000538\t\\end{align}\nL000539\twhich follows from the delta-correlated white noise.\nL000540\tThus, the matrix $\\bm{\\Psi}(\\omega)$ is independent of frequency,\nL000541\t\\begin{align}\nL000542\t\\Psi_{qr}(\\omega) = \\frac{1}{2} \\Av{\\bm{y}_q \\bm{B}^{-1} \\bm{y}_r}_\\text{st}  = \\mathcal{A}_{qr},\nL000543\t\\end{align}\nL000544\tand we obtain\nL000545\t\\begin{align}\nL000546\t\\mathbb{S}(\\omega) = \\begin{pmatrix} \\bmc{S}(\\omega) & \\bmc{R}(\\omega) \\\\ \\bmc{R}(\\omega)^\\text{H} & \\bmc{A} \\end{pmatrix} .\nL000547\t\\end{align}\nL000548\tSince $\\mathbb{S}(\\omega)$ is a power spectral density matrix and thus Hermitian and positive definite, this implies that the Schur complements of its diagonal blocks are likewise positive definite,\nL000549\t\\begin{align}\nL000550\t\\bmc{S}(\\omega) - \\bmc{R}(\\omega) \\bmc{A}^{-1} \\bmc{R}(\\omega)^\\text{H} \\geq 0 \\qquad \\text{and} \\qquad \\bmc{A} - \\bmc{R}(\\omega)^\\text{H} \\bmc{S}(\\omega)^{-1} \\bmc{R}(\\omega) \\geq 0 . \\label{fffri-2}\nL000551\t\\end{align}\nL000552\tThe second relation is precisely the fluctuation-response inequality (FRI), \\eqref{fffri} of the main text,\nL000553\t\\begin{align}\nL000554\t\\bmc{R}(\\omega)^\\text{H} \\bmc{S}(\\omega)^{-1} \\bmc{R}(\\omega) \\leq \\bmc{A} . \\label{app-fffri}\nL000555\t\\end{align}\nL000556\tNote that the above derivation shows that this result is more general, in the sense that it also applies to Langevin equations with arbitrary, position-dependent diffusion matrices, e.~g.~for heat baths with different temperatures or spatial temperature profiles.\nL000557\t\nL000558\t\nL000559\t\nL000560\t\nL000561\t\nL000562\t\nL000563\t\nL000564\t\nL000565\t\nL000566\t\nL000567\t\nL000568\t\nL000569\t\nL000570\t\nL000571\t\nL000572\t\nL000573\t\nL000574\t\nL000575\t\nL000576\t\nL000577\t\\subsection{Underdamped Langevin dynamics} \\label{sec-fffri-under}\nL000578\tWe consider the underdamped Langevin equations for the positions $\\bm{x}(t) \\in \\mathbb{R}^d$ and velocities $\\bm{v}(t) \\in \\mathbb{R}^d$,\nL000579\t\\begin{align}\nL000580\t\\dot{\\bm{x}}(t) = \\bm{v}(t), \\qquad \\bm{m} \\bm{v}(t) = - \\bm{\\gamma}(\\bm{x}(t)) \\bm{v}(t) + \\bm{f}(\\bm{x}(t),\\bm{v}(t)) + \\epsilon \\sum_{q = 1}^Q \\bm{g}_q(\\bm{x}(t),\\bm{v}(t)) \\phi_q(t) + \\sqrt{2 \\bm{\\gamma}(\\bm{x}(t)) \\bm{T}(\\bm{x}(t))} \\bm{\\xi}(t) \\label{app-langevin-under} .\nL000581\t\\end{align}\nL000582\tCompared to \\eqref{langevin-under}, we also allow for different mass, as well as non-isotropic and non-uniform friction and temperature.\nL000583\tSpecifically, we assume that $\\bm{m}$, $\\bm{\\gamma}(\\bm{x})$ and $\\bm{T}(\\bm{x})$ are diagonal matrices with positive entries; since they are diagonal, they mutually commute.\nL000584\tWe also allow the steady-state force, as well as the perturbation force, to depend on velocity, as in the case of magnetic fields.\nL000585\tFormally, we can write this as an equation of the form \\eqref{langevin} by defining the phase-space coordinate $\\bm{u}(t) = (\\bm{x}(t),\\bm{v}(t))$,\nL000586\t\\begin{align}\nL000587\t\\dot{\\bm{u}}(t) = \\bm{a}_u(\\bm{u}(t)) + \\epsilon \\sum_{q = 1}^Q \\bm{y}_u(\\bm{u}(t)) \\phi_q(t) + \\sqrt{2 \\bm{B}_u(\\bm{u}(t))} \\cdot \\bm{\\xi}_u(t) .\nL000588\t\\end{align}\nL000589\tHowever, the specific form of \\eqref{app-langevin-under} leads to two crucial differences:\nL000590\tFirst, the diffusion matrix\nL000591\t\\begin{align}\nL000592\t\\bm{B}_u(\\bm{u}) = \\begin{pmatrix} \\bm{0} & \\bm{0} \\\\ \\bm{0} & \\bm{m}^{-2} \\bm{\\gamma}(\\bm{x}) \\bm{T}(\\bm{x}) \\end{pmatrix}\nL000593\t\\end{align}\nL000594\tis singular.\nL000595\tAt first glance, this means that the change in the path probability \\eqref{path-log}, which involves the inverse of the diffusion matrix, is ill-defined.\nL000596\tHowever, the second difference is that the perturbation force only acts on the equations for the velocity, which are associated with the non-singular components of the diffusion matrix.\nL000597\tAs a consequence, the expression \\eqref{path-log} remains valid when replacing the inverse of the diffusion matrix with the inverse of the velocity-block of the diffusion matrix.\nL000598\t\nL000599\tThe remaining derivation proceeds then in the same way as in the overdamped case.\nL000600\tWe define the observables,\nL000601\t\\begin{align}\nL000602\tr_k(t) = z_k(\\bm{x}(t),\\bm{v}(t)) + \\bm{w}_k(\\bm{x}(t),\\bm{v}(t)) \\circ \\dot{\\bm{v}}(t) . \\label{observable-under}\nL000603\t\\end{align}\nL000604\tSince the velocities are now explicit configuration variables, it is sufficient to consider configuration-dependent observables with $\\bm{w}_k = 0$ to reproduce \\eqref{observable}.\nL000605\tThe definition of the power-spectral density $\\bmc{S}(\\omega)$ \\eqref{power-spectral-density} is completely analog to the overdamped case.\nL000606\tFor the response of the observables, we obtain in analogy to \\eqref{response-correlation}\nL000607\t\\begin{align}\nL000608\tR_{kq}(t-t') = \\Av{r_k(t) \\psi_q(t')}_\\text{st},\nL000609\t\\end{align}\nL000610\twhere the quantity $\\psi_q(t)$ is now given by\nL000611\t\\begin{align}\nL000612\t\\psi_q(t) &= \\frac{1}{2} \\bm{g}_q(\\bm{x}(t),\\bm{v}(t)) \\bm{\\gamma}(\\bm{x}(t))^{-1} \\bm{T}(\\bm{x}(t))^{-1}  \\sqrt{2 \\bm{\\gamma}(\\bm{x}(t)) \\bm{T}(\\bm{x}(t))} \\cdot \\bm{\\xi}(t) \\\\\nL000613\t&= \\frac{1}{2} \\bm{g}_q(\\bm{x}(t),\\bm{v}(t)) \\bm{\\gamma}(\\bm{x}(t))^{-1} \\bm{T}(\\bm{x}(t))^{-1} \\cdot \\Big( \\bm{m} \\dot{\\bm{v}}(t) + \\bm{\\gamma}(\\bm{x}(t)) \\bm{v}(t) - \\bm{f}(\\bm{x}(t),\\bm{v}(t))  \\Big) . \\n\nL000614\t\\end{align}\nL000615\tSince the diffusion matrix is independent of $\\bm{v}$, converting from the Ito- to the Stratonovich product now simply yields\nL000616\t\\begin{align}\nL000617\t\\psi_q(t) = \\frac{1}{2} \\bigg( \\bm{g}_q(\\bm{x}(t),\\bm{v}(t)) & \\bm{\\gamma}(\\bm{x}(t))^{-1} \\bm{T}(\\bm{x}(t))^{-1} \\Big( \\bm{\\gamma}(\\bm{x}(t)) \\bm{v}(t) - \\bm{f}(\\bm{x}(t),\\bm{v}(t)) \\Big) - \\bm{m}^{-1} \\grad_v \\bm{g}_q(\\bm{x}(t),\\bm{v}(t)) \\bigg) \\\\\nL000618\t& + \\frac{1}{2} \\bm{g}_q(\\bm{x}(t),\\bm{v}(t)) \\bm{\\gamma}(\\bm{x}(t))^{-1} \\bm{T}(\\bm{x}(t))^{-1} \\circ \\dot{\\bm{v}}(t) \\n .\nL000619\t\\end{align}\nL000620\tThis is again of the same type as \\eqref{observable-under} and we can write the joint spectral density matrix of the observables $r_k(t)$ and the perturbation observables $\\psi_q(t)$ as\nL000621\t\\begin{align}\nL000622\t\\mathbb{S}(\\omega) = \\begin{pmatrix} \\bmc{S}(\\omega) & \\bmc{R}(\\omega) \\\\ \\bmc{R}(\\omega)^\\text{H} & \\bmc{A} \\end{pmatrix},\nL000623\t\\end{align}\nL000624\twhere the matrix $\\bmc{A}$ is now given by\nL000625\t\\begin{align}\nL000626\t\\mathcal{A}_{qr} = \\frac{1}{2} \\Av{\\bm{g}_q \\bm{\\gamma}^{-1} \\bm{T}^{-1} \\bm{g}_r}_\\text{st} ,\nL000627\t\\end{align}\nL000628\tSince \\eqref{fffri-2} only depends on the positive-definiteness of the power spectrum, it also applies in the underdamped case and we still have \\eqref{app-fffri},\nL000629\t\\begin{align}\nL000630\t\\bmc{R}(\\omega)^\\text{H} \\bmc{S}(\\omega)^{-1} \\bmc{R}(\\omega) \\leq \\bmc{A} \\label{fffri-under} .\nL000631\t\\end{align}\nL000632\tInterestingly, while the dynamics and thus the response and fluctuations depend on the masses, the matrix $\\bmc{A}$ and thus the upper bound in the FRI are independent of $\\bm{m}$.\nL000633\t\nL000634\t\nL000635\t\nL000636\t\\subsection{Markov jump dynamics}  \\label{sec-fffri-jump}\nL000637\tWhereas in the previous cases, the configuration of the system was determined by a set of continuous real-valued variables, we now consider the case of a discrete set of configurations $\\alpha(t) \\in \\lbrace 1,\\ldots,N \\rbrace$.\nL000638\tThe transitions between different configurations are described by non-negative rates $\\Omega(\\alpha \\vert \\beta,t)$; the probability of observing a transition to configuration $\\alpha$ during the time-interval $[t,t+dt]$, provided that the system was in configuration $\\beta$ at time $t$ is $\\Omega(\\alpha \\vert \\beta,t) dt$.\nL000639\tThe conditional probability $p(\\alpha,t \\vert \\gamma,0)$ of observing configuration $\\alpha$ at time $t$ conditioned on being in configuration $\\gamma$ at time $0$ is then determined by the master equation\nL000640\t\\begin{align}\nL000641\td_t p(\\alpha,t \\vert \\gamma,0) = \\sum_{\\beta = 1}^N \\Big( \\Omega(\\alpha \\vert \\beta,t) p(\\beta,t \\vert \\gamma,0) - \\Omega(\\beta \\vert \\alpha,t) p(\\alpha,t \\vert \\gamma,0) \\Big) . \\label{master}\nL000642\t\\end{align}\nL000643\tWe write the rates as ($\\alpha \\neq \\beta$)\nL000644\t\\begin{align}\nL000645\t\\Omega_\\epsilon(\\alpha \\vert \\beta,t) = \\Omega_0(\\alpha \\vert \\beta) \\exp \\bigg( \\epsilon \\sum_{q = 1}^Q Y_q(\\alpha \\vert \\beta) \\phi_q(t) \\bigg) \\label{rates} ,\nL000646\t\\end{align}\nL000647\twith the unperturbed rates $\\Omega_0(\\alpha \\vert \\beta) \\geq 0$, which ensures that the rates remain positive in the presence of the perturbation.\nL000648\tFor $\\epsilon = 0$, the rates are time-independent and we assume that the probability relaxes to a steady state $p_\\text{st}(\\alpha)$, determined by\nL000649\t\\begin{align}\nL000650\t0 = \\sum_{\\beta = 1}^N \\Big( \\Omega_0(\\alpha \\vert \\beta) p_\\text{st}(\\beta) - \\Omega_0(\\beta \\vert \\alpha) p_\\text{st}(\\alpha) \\Big).\nL000651\t\\end{align}\nL000652\tWe define the observables as\nL000653\t\\begin{align}\nL000654\tr_k(t) = z_k(\\alpha(t)) + \\frac{1}{dt} w_k(\\alpha(t+dt) \\vert \\alpha(t)) \\label{observable-jump} ,\nL000655\t\\end{align}\nL000656\twhere $z_k(\\alpha)$ is a configuration-dependent function and the transition-dependent term $w_k(\\alpha \\vert \\beta)$ is non-zero only if $\\alpha \\neq \\beta$.\nL000657\tThe steady-state average of the observable is\nL000658\t\\begin{align}\nL000659\t\\Av{r_k}_\\text{st} = \\sum_\\alpha z_k(\\alpha) p_\\text{st}(\\alpha) + \\sum_{\\alpha,\\beta; \\alpha \\neq \\beta} w_k(\\alpha \\vert \\beta) \\Omega_0(\\alpha \\vert \\beta) p_\\text{st}(\\beta) .\nL000660\t\\end{align}\nL000661\t\nL000662\tThe probability of a discretized trajectory during a time interval $[0,t]$, $\\bar{\\Gamma} = \\lbrace \\alpha(\\theta dt) \\rbrace_{\\theta \\in \\lbrace 0,\\ldots,M \\rbrace}$, where $t = M dt$ can we written as\nL000663\t\\begin{align}\nL000664\t\\mathbb{P}_\\epsilon(\\bar{\\Gamma}) = \\prod_{\\theta = 1}^M p_\\epsilon\\big(\\alpha_\\theta, \\theta dt \\vert \\alpha_{\\theta-1}, (\\theta-1)dt \\big) p_\\text{st}(\\alpha_0) ,\nL000665\t\\end{align}\nL000666\twhere we assume that the system is initially in the unperturbed steady state.\nL000667\tThe logarithm of the path probability is then\nL000668\t\\begin{align}\nL000669\t\\ln \\mathbb{P}_\\epsilon(\\bar{\\Gamma}) = \\sum_{\\theta = 1}^M \\ln p_\\epsilon\\big(\\alpha_\\theta, \\theta dt \\vert \\alpha_{\\theta-1}, (\\theta-1)dt \\big) + \\ln p_\\text{st}(\\alpha_0) .\nL000670\t\\end{align}\nL000671\tFor a sufficiently short time-interval $dt$, the short-time transition is given by\nL000672\t\\begin{align}\nL000673\tp_\\epsilon\\big(\\alpha_\\theta, \\theta dt \\vert \\alpha_{\\theta-1}, (\\theta-1)dt \\big) = \\left\\lbrace \\begin{array}{ll}\nL000674\t1 - \\sum_{\\beta \\neq \\alpha_{\\theta-1}} \\Omega_\\epsilon(\\beta \\vert \\alpha_{\\theta-1},(\\theta - 1)dt) dt &\\text{if} \\; \\alpha_\\theta = \\alpha_{\\theta-1} \\\\[2ex]\nL000675\t\\Omega_{\\epsilon}(\\alpha_\\theta \\vert \\alpha_{\\theta-1},(\\theta - 1)dt) dt &\\text{if} \\; \\alpha_\\theta \\neq \\alpha_{\\theta-1} .\nL000676\t\\end{array}  \\right.\nL000677\t\\end{align}\nL000678\tThe expression in the first line follows from the second line by conservation of probability.\nL000679\tTaking the logarithm and the derivative with respect to $\\epsilon$ at $\\epsilon = 0$, we obtain\nL000680\t\\begin{align}\nL000681\t\\partial_\\epsilon \\ln p_\\epsilon\\big(\\alpha_\\theta, \\theta dt \\vert \\alpha_{\\theta-1}, (\\theta-1)dt \\big) \\Big\\vert_{\\epsilon = 0} = \\left\\lbrace \\begin{array}{ll}\nL000682\t- \\frac{ \\sum_{\\beta \\neq \\alpha_{\\theta-1}} \\Omega_0(\\beta \\vert \\alpha_{\\theta-1}) \\sum_{q = 1}^Q Y_q(\\beta \\vert \\alpha_{\\theta-1}) \\phi_q((\\theta-1)dt) dt}{1 - \\sum_{\\beta \\neq \\alpha_{\\theta-1}} \\Omega_0(\\beta \\vert \\alpha_{\\theta-1},(\\theta - 1)dt) dt} &\\text{if} \\; \\alpha_\\theta = \\alpha_{\\theta-1} \\\\[2ex]\nL000683\t\\sum_{q = 1}^Q Y_q(\\alpha_\\theta \\vert \\alpha_{\\theta-1}) \\phi_q((\\theta-1)dt) &\\text{if} \\; \\alpha_\\theta \\neq \\alpha_{\\theta-1} .\nL000684\t\\end{array}  \\right.\nL000685\t\\end{align}\nL000686\tSetting $Y_q(\\alpha \\vert \\alpha) = 0$ and expanding for small $dt$, we can write the derivative of the trajectory probability as\nL000687\t\\begin{gather}\nL000688\t\\partial_\\epsilon \\ln \\mathbb{P}_\\epsilon(\\bar{\\Gamma}) \\Big\\vert_{\\epsilon = 0} = \\sum_{q = 1}^Q \\sum_{\\theta = 1}^M \\bigg(\\tilde{z}_q(\\alpha_{\\theta-1}) + \\frac{1}{dt} \\tilde{w}_q(\\alpha_\\theta \\vert \\alpha_{\\theta-1})\\bigg) \\phi_q((\\theta-1)dt) dt  \\\\\nL000689\t\\text{with} \\qquad \\tilde{z}_q(\\alpha) = - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha) Y_q(\\beta \\vert \\alpha), \\qquad \\tilde{w}_k(\\alpha \\vert \\beta) = Y_q(\\alpha \\vert \\beta) \\n .\nL000690\t\\end{gather}\nL000691\tIn the continuous-time limit, we obtain\nL000692\t\\begin{align}\nL000693\t\\partial_\\epsilon \\ln \\mathbb{P}_\\epsilon(\\bar{\\Gamma}) \\Big\\vert_{\\epsilon = 0} = \\sum_{q=1}^Q \\int_0^t dt' \\ \\psi_q(t') \\phi_q(t') \\qquad\nL000694\t\\text{with} \\qquad \\psi_q(t) = \\tilde{z}_q(\\alpha(t)) + \\frac{1}{dt} \\tilde{w}_q(\\alpha(t+dt) \\vert \\alpha(t)) .\nL000695\t\\end{align}\nL000696\tJust as in the Langevin case, we can thus define a set of response observables $\\psi_q(t)$ of the same type as \\eqref{observable-jump}, in terms of which we can write\nL000697\t\\begin{align}\nL000698\t\\partial_\\epsilon \\Av{r_k(t)}_\\epsilon \\Big\\vert_{\\epsilon = 0} = \\sum_{q = 1}^Q \\int_0^t dt' \\ R_{kq}(t-t') \\phi_q(t') \\qquad \\text{with} \\qquad R_{kq}(t-t') = \\Av{r_k(t) \\psi_q(t')}_\\text{st} .\nL000699\t\\end{align}\nL000700\tMoreover, we have for the correlation between the response observables\nL000701\t\\begin{align}\nL000702\t\\Av{\\psi_q(t) \\psi_r(t')}_\\text{st} = \\Bigg\\langle \\bigg(\\frac{1}{dt} &Y_q(\\alpha(t+dt)\\vert \\alpha(t)) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha(t)) Y_q(\\beta \\vert \\alpha(t)) \\bigg) \\\\\nL000703\t&\\times \\bigg(\\frac{1}{dt} Y_r(\\alpha(t'+dt)\\vert \\alpha(t')) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha(t')) Y_r(\\beta \\vert \\alpha(t')) \\bigg) \\Bigg\\rangle_\\text{st} \\n .\nL000704\t\\end{align}\nL000705\tSuppose that $t > t'+dt$,\nL000706\tIn that case, since the dynamics is Markovian, the probability of being in configuration $\\alpha(t)$ at time $t$ only depends on the last observed configuration $\\alpha(t'+dt)$.\nL000707\tWe can then consider the conditional average\nL000708\t\\begin{align}\nL000709\t\\Bigg\\langle \\bigg(\\frac{1}{dt} &Y_q(\\alpha(t+dt)\\vert \\alpha(t)) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha(t)) Y_q(\\beta \\vert \\alpha(t)) \\bigg) \\bigg\\vert \\alpha(t'+dt) = \\tilde{\\alpha} \\Bigg\\rangle_\\text{st} \\\\\nL000710\t& = \\sum_{\\alpha_2,\\alpha_1} \\bigg( \\frac{1}{dt} Y_q(\\alpha_2 \\vert \\alpha_1) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha_1) Y_q(\\beta \\vert \\alpha_1) \\bigg) p_0(\\alpha_2, t+dt; \\alpha_1,t \\vert \\tilde{\\alpha}, t'+dt)  \\nn\nL000711\t& = \\sum_{\\alpha_2,\\alpha_1} \\bigg( \\frac{1}{dt} Y_q(\\alpha_2 \\vert \\alpha_1) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha_1) Y_q(\\beta \\vert \\alpha_1) \\bigg) p_0(\\alpha_2, t+dt \\vert \\alpha_1,t) p_0(\\alpha_1,t \\vert \\tilde{\\alpha}, t'+dt) \\n ,\nL000712\t\\end{align}\nL000713\twhere we once again used that the probability at time $t+dt$ only depends on the configuration at time $t$.\nL000714\tSince $Y_q(\\alpha_2 \\vert \\alpha_1)$ is non-zero only for $\\alpha_2 \\neq \\alpha_1$, we have  $p_0(\\alpha_2, t+dt \\vert \\alpha_1,t) = \\Omega_0(\\alpha_2 \\vert \\alpha_1) dt$ and thus,\nL000715\t\\begin{align}\nL000716\t\\Bigg\\langle \\bigg(\\frac{1}{dt} &Y_q(\\alpha(t+dt)\\vert \\alpha(t)) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha(t)) Y_q(\\beta \\vert \\alpha(t)) \\bigg) \\bigg\\vert \\alpha(t'+dt) = \\tilde{\\alpha} \\Bigg\\rangle_\\text{st} \\\\\nL000717\t& = \\sum_{\\alpha_1} \\bigg( \\sum_{\\alpha_2} \\Omega_0(\\alpha_2 \\vert \\alpha_1) Y_q(\\alpha_2 \\vert \\alpha_1)  - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha_1) Y_q(\\beta \\vert \\alpha_1) \\bigg) p_0(\\alpha_1,t \\vert \\tilde{\\alpha}, t'+dt) = 0 \\n .\nL000718\t\\end{align}\nL000719\tThus, $\\Av{\\psi_q(t) \\psi_r(t')}_\\text{st} = 0$ for $t > t'$, and analogously for $t < t'$, and the only non-zero value is obtained for $t = t'$,\nL000720\t\\begin{align}\nL000721\t\\Av{\\psi_q(t) \\psi_r(t')}_\\text{st} &= \\Bigg\\langle \\bigg(\\frac{1}{dt} Y_q(\\alpha(t+dt)\\vert \\alpha(t)) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha(t)) Y_q(\\beta \\vert \\alpha(t)) \\bigg) \\\\\nL000722\t&\\hspace{2cm} \\times \\bigg(\\frac{1}{dt} Y_r(\\alpha(t+dt)\\vert \\alpha(t)) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha(t)) Y_r(\\beta \\vert \\alpha(t)) \\bigg) \\Bigg\\rangle_\\text{st} \\nn\nL000723\t&= \\sum_{\\alpha_2} \\sum_{\\alpha_1} \\bigg( \\frac{1}{dt} Y_q(\\alpha_2 \\vert \\alpha_1) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha_1) Y_q(\\beta \\vert \\alpha_1) \\bigg) \\bigg( \\frac{1}{dt} Y_r(\\alpha_2 \\vert \\alpha_1) - \\sum_{\\beta} \\Omega_0(\\beta \\vert \\alpha_1) Y_r(\\beta \\vert \\alpha_1) \\bigg)  \\nn\nL000724\t&\\hspace{3cm} \\times p_0(\\alpha_2, t+dt \\vert \\alpha_1,t) p_\\text{st}(\\alpha_1) \\nn\nL000725\t&\\simeq \\frac{1}{dt} \\sum_{\\alpha_2} \\sum_{\\alpha_1} Y_q(\\alpha_2 \\vert \\alpha_1) Y_r(\\alpha_2 \\vert \\alpha_1) \\Omega_0(\\alpha_2 \\vert \\alpha_1) p_\\text{st}(\\alpha_1) + O(dt^0) , \\n\nL000726\t\\end{align}\nL000727\twhere in the last line we only keep the leading-order term in $dt$.\nL000728\tIn the continuous-time limit, we thus have\nL000729\t\\begin{align}\nL000730\t\\Av{\\psi_q(t) \\psi_r(t')}_\\text{st} = \\sum_{\\alpha_2} \\sum_{\\alpha_1} Y_q(\\alpha_2 \\vert \\alpha_1) Y_r(\\alpha_2 \\vert \\alpha_1) \\Omega_0(\\alpha_2 \\vert \\alpha_1) p_\\text{st}(\\alpha_1) \\delta(t-t') ,\nL000731\t\\end{align}\nL000732\tin analogy to \\eqref{response-observable-correlation}.\nL000733\tThe delta-correlations of the response observable are a direct consequence of the Markovianity of the dynamics---white Gaussian noise in the Langevin case and white Poisson noise in the jump case.\nL000734\t\nL000735\tThe remainder of the derivation proceeds analog to the Langevin case and we obtain\nL000736\t\\begin{align}\nL000737\t\\bmc{R}(\\omega)^\\text{H} \\bmc{S}(\\omega)^{-1} \\bmc{R}(\\omega) \\leq \\bmc{A} \\qquad \\text{with} \\qquad \\mathcal{A}_{qr} = \\sum_{\\alpha,\\beta} Y_q(\\alpha \\vert \\beta) Y_r(\\alpha \\vert \\beta) \\Omega_0(\\alpha \\vert \\beta) p_\\text{st}(\\beta) . \\label{fffri-jump}\nL000738\t\\end{align}\nL000739\tNote that if the perturbations are either even or odd under time-reversal, $Y_q(\\alpha \\vert \\beta) = \\pm Y_q(\\beta \\vert \\alpha)$, we can write the matrix $\\bmc{A}$ as\nL000740\t\\begin{align}\nL000741\t\\mathcal{A}_{qr} = \\sum_{\\alpha,\\beta} Y_q(\\alpha \\vert \\beta) Y_r(\\alpha \\vert \\beta) \\mathcal{T}(\\alpha, \\beta)  \\qquad \\text{with} \\qquad \\mathcal{T}_\\text{st}(\\alpha, \\beta) = \\frac{1}{2} \\big( \\Omega_0(\\alpha \\vert \\beta) p_\\text{st}(\\beta) + \\Omega_0(\\beta \\vert \\alpha) p_\\text{st}(\\alpha) \\big) .\nL000742\t\\end{align}\nL000743\tThe quantity $\\mathcal{T}_\\text{st}(\\alpha, \\beta)$ is called the (steady-state) traffic between $\\alpha$ and $\\beta$; it measures the average rate of transitions between the configurations in either direction.\nL000744\tThe sum of the traffic over all pairs of configurations is called the activity; thus, $\\bmc{A}$ measures the activity in the unperturbed system weighted by the perturbations.\nL000745\t\nL000746\tA particular case of \\eqref{rates} which assigns an energetic interpretation to the rates is\nL000747\t\\begin{align}\nL000748\t\\Omega_\\epsilon(\\alpha \\vert \\beta) = \\Omega_0 \\exp \\bigg( - \\frac{\\beta}{2} \\Big( B(\\alpha,\\beta) + U(\\alpha) - U(\\beta) - A(\\alpha,\\beta) + \\epsilon G(\\alpha,\\beta) \\phi(t) \\Big) \\bigg) .\nL000749\t\\end{align}\nL000750\tHere, $\\Omega_0$ is an overall rate and $\\beta = 1/T$ is the inverse temperature.\nL000751\tThe symmetric energy $B(\\alpha,\\beta) = B(\\beta,\\alpha)$ corresponds to an energy barrier between configurations $\\alpha$ and $\\beta$.\nL000752\t$U(\\alpha)$ is the energy assigned to configuration $\\alpha$ and $A(\\alpha,\\beta) = -A(\\beta,\\alpha)$ measures the energy supplied to the system by an external, non-conservative force in the transition from $\\beta$ to $\\alpha$.\nL000753\tIn this case, the perturbation $G(\\alpha,\\beta)$ corresponds to changing either the heights of the barriers (if $G(\\alpha,\\beta) = G(\\beta,\\alpha)$), the energies of the configurations (if $G(\\alpha,\\beta) = V(\\alpha) - V(\\beta)$) or the energy supplied by the non-conservative force (if $G(\\alpha,\\beta)$ is antisymmetric but cannot be written as an energy difference).\nL000754\t\nL000755\t\\section{Linear Langevin dynamics} \\label{sec-linear}\nL000756\t\nL000757\t\\subsection{Overdamped} \\label{sec-linear-over}\nL000758\tLet us consider the special case of \\eqref{langevin}\nL000759\t\\begin{align}\nL000760\t\\dot{\\bm{x}}(t) = -\\bm{A} \\big(\\bm{x}(t) - \\bm{a} \\big) + \\epsilon \\sum_{q=1}^Q \\bm{y}_q \\phi_q(t) + \\sqrt{2 \\bm{B}} \\bm{\\xi}(t). \\label{langevin-linear-over}\nL000761\t\\end{align}\nL000762\tHere, the force is linear in the coordinates, with a matrix $\\bm{A}$ that has eigenvalues with positive real part to ensure that the steady state is stable.\nL000763\tThe diffusion matrix $\\bm{B}$ is constant and positive definite and the perturbations are constant vectors $\\bm{y}_q$.\nL000764\tSince this equation is linear, the steady state probability density is Gaussian,\nL000765\t\\begin{align}\nL000766\tp_\\text{st}(\\bm{x}) = \\frac{1}{ \\sqrt{(2 \\pi)^D \\det(\\bm{\\Xi}_\\text{st})}} \\exp \\bigg( - \\frac{1}{2} \\big( \\bm{x} - \\bm{a} \\big) \\bm{\\Xi}_\\text{st}^{-1} \\big( \\bm{x} - \\bm{a} \\big) \\bigg) ,\nL000767\t\\end{align}\nL000768\twhere the steady-state covariance matrix $(\\bm{\\Xi}_\\text{st})_{jh} = \\text{Cov}_\\text{st}(x_j,x_h)$ is determined from the Lyapunov equation\nL000769\t\\begin{align}\nL000770\t\\bm{A} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\bm{A}^\\text{T} = 2 \\bm{B} . \\label{lyapunov}\nL000771\t\\end{align}\nL000772\tThe system is in equilibrium if $\\bm{A} \\bm{B} = \\bm{B} \\bm{A}^\\text{T}$, in which case $\\bm{\\Xi}_\\text{st} = \\bm{A}^{-1} \\bm{B}$.\nL000773\tFor given $\\bm{x}(t')$, we can calculate the conditional average for $t > t'$ in the unperturbed system,\nL000774\t\\begin{align}\nL000775\t\\Av{\\bm{x}(t) \\vert \\bm{x}(t')} = \\bm{a} + e^{-\\bm{A}(t-t')} \\big( \\bm{x}(t') - \\bm{a} \\big) .\nL000776\t\\end{align}\nL000777\tMultiplying by $\\bm{x}(t') - \\bm{a}$ and averaging with respect to the steady-state density, we find\nL000778\t\\begin{align}\nL000779\t\\bm{C}(t-t') = \\text{Cov}_\\text{st}\\big(\\bm{x}(t),\\bm{x}(t') \\big) = \\left\\lbrace \\begin{array}{ll}\nL000780\te^{-\\bm{A}(t-t')} \\bm{\\Xi}_\\text{st} &\\text{for} \\; t \\geq t' \\\\[1 ex]\nL000781\t\\bm{\\Xi}_\\text{st} e^{-\\bm{A}^\\text{T}(t'-t)} & \\text{for} \\; t' > t .\nL000782\t\\end{array}  \\right.\nL000783\t\\end{align}\nL000784\tTaking the Fourier transform, we obtain the power-spectral density matrix\nL000785\t\\begin{align}\nL000786\t\\bmc{S}(\\omega) &= \\big( \\bm{A} - i \\omega \\bm{I}\\big)^{-1} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\big( \\bm{A}^\\text{T} + i \\omega \\bm{I}\\big)^{-1} \\label{spectrum-linear-over} \\\\\nL000787\t&= \\big( \\bm{A}^2 + \\omega^2 \\bm{I}\\big)^{-1} \\bm{A} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\bm{A}^\\text{T} \\big( \\bm{A}^{2,\\text{T}} + \\omega^2 \\bm{I}\\big)^{-1} + i \\omega \\Big( \\big( \\bm{A}^2 + \\omega^2 \\bm{I}\\big)^{-1} \\bm{\\Xi}_\\text{st} - \\bm{\\Xi}_\\text{st} \\big( \\bm{A}^{2,\\text{T}} + \\omega^2 \\bm{I}\\big)^{-1} \\Big) . \\n\nL000788\t\\end{align}\nL000789\tIn equilibrium, the imaginary part vanishes, while the real part is the symmetric matrix\nL000790\t\\begin{align}\nL000791\t\\bmc{S}(\\omega) &= \\big( \\bm{A}^2 + \\omega^2 \\bm{I}\\big)^{-1} \\bm{B} + \\bm{B} \\big( \\bm{A}^{2} + \\omega^2 \\bm{I}\\big)^{-1,\\text{T}} .\nL000792\t\\end{align}\nL000793\tIn the presence of the perturbation, the average of $\\bm{x}(t)$ is given by\nL000794\t\\begin{align}\nL000795\t\\Av{\\bm{x}(t)}_\\epsilon - \\Av{\\bm{x}}_\\text{st} = \\epsilon \\sum_{q=1}^Q \\int_0^t dt' \\ e^{-\\bm{A}(t-t')} \\bm{y}_q \\phi_q(t'),\nL000796\t\\end{align}\nL000797\tand we can identify the response matrix of the positions for $t \\geq 0$\nL000798\t\\begin{align}\nL000799\tR_{jq}(t) = \\big(e^{-\\bm{A} t} \\bm{y}_q \\big)_j .\nL000800\t\\end{align}\nL000801\tWe choose $\\bm{y}_q = y_0 \\hat{\\bm{e}}_q$ where $\\hat{\\bm{e}}_q$ is the unit vector in the direction of $x_q$ for $q = 1,\\ldots,D$, which yields\nL000802\t\\begin{align}\nL000803\t\\bm{R}(t) = y_0 e^{-\\bm{A} t} \\qquad \\Leftrightarrow \\qquad \\bmc{R}(\\omega) = y_0 \\big(\\bm{A} - i \\omega \\bm{I} \\big)^{-1} \\label{response-linear-over} .\nL000804\t\\end{align}\nL000805\tCombining \\eqref{spectrum-linear-over} and \\eqref{response-linear-over}, we find\nL000806\t\\begin{align}\nL000807\t\\bmc{R}(\\omega)^\\text{H} \\bmc{S}(\\omega)^{-1} \\bmc{R}(\\omega) &= y_0^2 \\big(\\bm{A}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\Big( \\big( \\bm{A} - i \\omega \\bm{I}\\big)^{-1} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\big( \\bm{A}^\\text{T} + i \\omega \\bm{I}\\big)^{-1} \\Big)^{-1} \\big(\\bm{A} - i \\omega \\bm{I} \\big)^{-1} \\\\\nL000808\t&= y_0^2 \\Big( \\bm{\\Xi}_\\text{st} \\big( \\bm{A}^\\text{T} + i \\omega \\bm{I}\\big) + \\big( \\bm{A} - i \\omega \\bm{I}\\big) \\bm{\\Xi}_\\text{st} \\Big)^{-1} \\nn\nL000809\t&= \\frac{1}{2} y_0^2 \\bm{B}^{-1} \\n ,\nL000810\t\\end{align}\nL000811\twhere we used \\eqref{lyapunov}.\nL000812\tThis is precisely the matrix $\\bmc{A}$ on the right-hand side of \\eqref{app-fffri} for the perturbations $\\bm{y}_q = y_0 \\hat{\\bm{e}}_q$,\nL000813\t\\begin{align}\nL000814\t\\mathcal{A}_{qr} = \\frac{1}{2} y_0^2 \\hat{\\bm{e}}_q \\bm{B}^{-1} \\hat{\\bm{e}}_r = \\frac{1}{2} y_0^2 \\big(\\bm{B}^{-1}\\big)_{qr} .\nL000815\t\\end{align}\nL000816\tThus, for linear dynamics, the inequality \\eqref{app-fffri} turns into an equality, provided that we choose the degrees of freedom of the Langevin equation as the observables and that the perturbations are constant forces in the respective direction.\nL000817\tWe also obtain\nL000818\t\\begin{align}\nL000819\t\\bmc{R}(\\omega) \\bmc{A}^{-1} \\bmc{R}(\\omega)^\\text{H} &= 2 \\big(\\bm{A} - i \\omega \\bm{I} \\big)^{-1} \\bm{B} \\big(\\bm{A}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\label{response-equality-3} \\\\\nL000820\t&= \\big(\\bm{A} - i \\omega \\bm{I} \\big)^{-1} \\big( \\bm{A} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\bm{A}^\\text{T} \\big) \\big(\\bm{A}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\nn\nL000821\t&= \\big(\\bm{A} - i \\omega \\bm{I} \\big)^{-1} \\Big( \\big(\\bm{A} - i \\omega \\bm{I} \\big) \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\big(\\bm{A}^\\text{T} + i \\omega \\bm{I} \\big) \\Big) \\big(\\bm{A}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\nn\nL000822\t&= \\big( \\bm{A} - i \\omega \\bm{I}\\big)^{-1} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\big( \\bm{A}^\\text{T} + i \\omega \\bm{I}\\big)^{-1} = \\bmc{S}(\\omega) \\n ,\nL000823\t\\end{align}\nL000824\tso that the first inequality in \\eqref{fffri-2} is likewise an equality.\nL000825\tMore generally, we consider observables that are linear combinations of the positions, $\\bm{z}(t) = \\bmc{Z} \\bm{x}(t)$, where $\\bmc{Z} \\in \\mathbb{R}^{K \\times D}$.\nL000826\tFor general perturbations $\\bm{y}_q$, we also define the matrix $\\bmc{Y} \\in \\mathbb{R}^{D \\times Q}$ that has $\\bm{y}_q$ as its $q$-th column.\nL000827\tThen, the corresponding power-spectral and response matrices are given by\nL000828\t\\begin{align}\nL000829\t\\bmc{S}(\\omega) = \\bmc{Z} \\big( \\bm{A} - i \\omega \\bm{I}\\big)^{-1} \\bm{\\Xi}_\\text{st} + \\bm{\\Xi}_\\text{st} \\big( \\bm{A}^\\text{T} + i \\omega \\bm{I}\\big)^{-1} \\bmc{Z}^\\text{T}, \\qquad \\bmc{R}(\\omega) = \\bmc{Z} \\big(\\bm{A} - i \\omega \\bm{I} \\big)^{-1} \\bmc{Y}, \\qquad \\bmc{A} = \\frac{1}{2} \\bmc{Y}^\\text{T} \\bm{B}^{-1} \\bmc{Y} .\nL000830\t\\end{align}\nL000831\tComparing this to the above, we find that, if $K = D$ and $\\bmc{Z}$ is invertible, then\nL000832\t\\begin{align}\nL000833\t\\bmc{R}(\\omega)^\\text{H} \\bmc{S}(\\omega)^{-1} \\bmc{R}(\\omega) = \\bmc{A},\nL000834\t\\end{align}\nL000835\twhile if $Q = D$ and $\\bmc{Y}$ is invertible, then\nL000836\t\\begin{align}\nL000837\t\\bmc{R}(\\omega) \\bmc{A}^{-1} \\bmc{R}(\\omega)^\\text{H} = \\bmc{S}(\\omega) .\nL000838\t\\end{align}\nL000839\tIntuitively, if $\\bmc{Z}$ is invertible, this means that the observables contain all information about the positions of the system, and measuring their responses and joint fluctuations can recover the magnitude of arbitrary perturbations that is characterized by the matrix $\\bmc{A}$.\nL000840\tOn the other hand, if $\\bmc{Y}$ is invertible, the perturbations can reproduce any constant-in-space force and we can use them to reconstruct the fluctuations of arbitrary observables.\nL000841\tWe stress that these results are valid independent of whether the system is in equilibrium or not; rather, they only rely on the linearity of the dynamics.\nL000842\t\\eqref{linear-identity} of the main text is recovered for $\\bm{A} = \\frac{1}{\\gamma} \\bm{K}$, $\\bm{B} = \\frac{T}{\\gamma} \\bm{I}$ and $\\bmc{Y} = \\frac{1}{\\gamma} \\bmc{G}$, where $\\bm{K}$ has the dimensions of a spring constant and $\\bmc{G}$ of a force.\nL000843\t\nL000844\t\\subsection{Underdamped} \\label{sec-linear-under}\nL000845\tNext, we consider the linear underdamped equations\nL000846\t\\begin{align}\nL000847\t\\dot{\\bm{x}}(t) = \\bm{v}(t), \\qquad \\bm{m} \\dot{\\bm{v}}(t) = - \\bm{\\gamma} \\bm{v}(t) - \\bm{K} \\big(\\bm{x}(t) - \\bm{a} \\big) + \\epsilon \\sum_{q=1}^Q \\bm{y}_q \\phi_q(t) + \\sqrt{2 \\bm{\\gamma} \\bm{T}} \\bm{\\xi}(t),\nL000848\t\\end{align}\nL000849\twhere $\\bm{m}$, $\\bm{\\gamma}$ and $\\bm{T}$ are diagonal matrices with positive entries and $\\bm{K}$ is a matrix whose eigenvalues have positive real parts.\nL000850\tAs in Section \\ref{sec-fffri-under}, we can formally write this as a linear overdamped equation with singular diffusion matrix by introducing the phase-space variable $\\bm{u}(t) = (\\bm{x}(t),\\bm{v}(t))$,\nL000851\t\\begin{gather}\nL000852\t\\dot{\\bm{u}}(t) = - \\bm{A}_u \\big( \\bm{u}(t) - \\bm{a}_u \\big) + \\epsilon \\sum_{q=1}^Q \\bm{y}_{u,q} \\phi_q(t) + \\sqrt{2 \\bm{B}_u} \\bm{\\xi}(t) \\qquad \\text{with} \\\\\nL000853\t\\bm{A}_u = \\begin{pmatrix} \\bm{0} & - \\bm{I} \\\\ \\bm{m}^{-1} \\bm{K} & \\bm{m}^{-1} \\bm{\\gamma} \\end{pmatrix}, \\qquad \\bm{B}_u = \\begin{pmatrix} \\bm{0} & \\bm{0} \\\\ \\bm{0} & \\bm{m}^{-2} \\bm{\\gamma} \\bm{T} \\end{pmatrix}, \\qquad \\bm{a}_u = \\begin{pmatrix} \\bm{a} \\\\ \\bm{0} \\end{pmatrix}, \\qquad \\bm{y}_{u,q} = \\begin{pmatrix} \\bm{0} \\\\ \\bm{m}^{-1} \\bm{y}_q \\end{pmatrix} \\n .\nL000854\t\\end{gather}\nL000855\tIn analogy to \\eqref{spectrum-linear-over}, the power-spectral density matrix of the phase-space variables is given by\nL000856\t\\begin{align}\nL000857\t\\bmc{S}_u(\\omega) = \\big( \\bm{A}_u - i \\omega \\bm{I}\\big)^{-1} \\bm{\\Xi}_{u,\\text{st}} + \\bm{\\Xi}_{u,\\text{st}} \\big( \\bm{A}_u^\\text{T} + i \\omega \\bm{I}\\big)^{-1} \\label{spectral-linear-under}.\nL000858\t\\end{align}\nL000859\tFrom this, we can obtain the power-spectral density of the position degrees of freedom as the upper left block,\nL000860\t\\begin{align}\nL000861\t\\bmc{S}_x(\\omega) = \\big(\\bmc{S}_u(\\omega) \\big)_{xx}\nL000862\t\\end{align}\nL000863\tSince the perturbations only act on the equation for $\\bm{v}$, we further have\nL000864\t\\begin{align}\nL000865\t\\bmc{R}_u(\\omega) = \\begin{pmatrix} \\big(( \\bm{A}_u - i \\omega \\bm{I})^{-1} \\big)_{xv} \\bm{m}^{-1} \\bmc{Y} \\\\ \\big(( \\bm{A}_u - i \\omega \\bm{I})^{-1} \\big)_{vv} \\bm{m}^{-1} \\bmc{Y}  \\end{pmatrix}, \\label{response-linear-under}\nL000866\t\\end{align}\nL000867\twhere, as in the overdamped case the matrix $\\bmc{Y}$ has $\\bm{y}_q$ as its $q$-th column.\nL000868\tThe first component is the response $\\bmc{R}_x(\\omega)$ of the position degrees of freedom.\nL000869\tTo proceed, we note that, due to the deterministic relation $\\dot{\\bm{x}}(t) = \\bm{v}(t)$, which, in the Fourier domain becomes $-i \\omega \\hat{\\bm{x}}(\\omega) = \\hat{\\bm{v}}(\\omega)$, the velocity and position components of $\\bmc{S}_u(\\omega)$ and $\\bmc{R}_u(\\omega)$ are related to each other by\nL000870\t\\begin{align}\nL000871\t\\big(\\bmc{S}_u(\\omega) \\big)_{vv} = \\omega^2 \\big(\\bmc{S}_u(\\omega) \\big)_{xx}, \\qquad \\big(\\bmc{S}_u(\\omega) \\big)_{vx} = -i \\omega \\big(\\bmc{S}_u(\\omega) \\big)_{xx},   \\qquad \\big( \\bmc{R}_u(\\omega) \\big)_v = - i \\omega \\big( \\bmc{R}_u(\\omega) \\big)_x .\nL000872\t\\end{align}\nL000873\tThus, it is sufficient to determine the fluctuations and response of either the position or the velocity; in the following, we will focus on the velocity.\nL000874\tWe can evaluate this further by expressing the inverse of the matrix $\\bm{A}_u - i \\omega \\bm{I}$ in terms of its blocks,\nL000875\t\\begin{align}\nL000876\t\\big(\\bm{A}_u - i \\omega \\bm{I} \\big)^{-1} = \\begin{pmatrix}\nL000877\t\\big( ( \\bm{\\gamma} - i \\omega \\bm{m} )^{-1} \\bm{K} - i \\omega \\bm{I} \\big)^{-1}\nL000878\t& \\big( \\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1} (\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\\\\nL000879\t- \\frac{i}{\\omega} \\big( -(i \\omega \\bm{m})^{-1} \\bm{K} + \\bm{m}^{-1}(\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\bm{m}^{-1} \\bm{K}\nL000880\t& \\big( -(i \\omega \\bm{m})^{-1} \\bm{K} + \\bm{m}^{-1}(\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1}  \\end{pmatrix},\nL000881\t\\end{align}\nL000882\twhich results in\nL000883\t\\begin{align}\nL000884\t\\bmc{R}_v(\\omega) = - i \\omega \\big( \\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1} (\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\bm{m}^{-1} \\bmc{Y} .\nL000885\t\\end{align}\nL000886\tThe matrix $\\bmc{A}$ follows directly from \\eqref{fffri-under},\nL000887\t\\begin{align}\nL000888\t\\bmc{A} = \\frac{1}{2} \\bmc{Y}^\\text{T} \\big(\\bm{\\gamma} \\bm{T}\\big)^{-1} \\bmc{Y} .\nL000889\t\\end{align}\nL000890\tIf $\\bmc{Y}$ is invertible, then\nL000891\t\\begin{align}\nL000892\t\\bmc{R}_v(\\omega) \\bmc{A}^{-1} \\bmc{R}_v(\\omega)^\\text{H} = 2 \\omega^2 \\big( \\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1} (\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\bm{m}^{-1} \\bm{\\gamma} \\bm{T} \\bm{m}^{-1} \\big(  \\bm{K}^\\text{T} \\bm{m}^{-1} + i \\omega \\bm{m}^{-1} (\\bm{\\gamma} + i \\omega \\bm{m}) \\big)^{-1} \\label{response-equality-1} .\nL000893\t\\end{align}\nL000894\tWe want to show that this is the same as the velocity component of the spectral density matrix,\nL000895\t\\begin{align}\nL000896\t\\bmc{S}_v(\\omega) &= \\big(\\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1}(\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\big( - i \\omega \\bm{\\Xi}_{vv,\\text{st}} - \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv,\\text{st}} \\big) \\label{response-equality-2} \\\\\nL000897\t&\\qquad + \\big(i \\omega \\bm{\\Xi}_{vv,\\text{st}} - \\bm{\\Xi}_{vx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} \\big) \\big( \\bm{K}^\\text{T} \\bm{m}^{-1}  + i \\omega \\bm{m}^{-1}(\\bm{\\gamma} + i \\omega \\bm{m}) \\big)^{-1} \\nn\nL000898\t&= \\big(\\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1}(\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\nn\nL000899\t&\\qquad \\times \\bigg[ \\big( - i \\omega \\bm{\\Xi}_{vv,\\text{st}} - \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv,\\text{st}} \\big) \\big( \\bm{K}^\\text{T} \\bm{m}^{-1}  + i \\omega \\bm{m}^{-1}(\\bm{\\gamma} + i \\omega \\bm{m}) \\big) \\nn\nL000900\t&\\qquad \\qquad + \\big(\\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1}(\\bm{\\gamma} - i \\omega \\bm{m}) \\big) \\big(i \\omega \\bm{\\Xi}_{vv,\\text{st}} - \\bm{\\Xi}_{vx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} \\big) \\bigg] \\nn\nL000901\t&\\qquad \\times \\big( \\bm{K}^\\text{T} \\bm{m}^{-1}  + i \\omega \\bm{m}^{-1}(\\bm{\\gamma} + i \\omega \\bm{m}) \\big)^{-1} . \\n\nL000902\t\\end{align}\nL000903\tEvaluating the term in square brackets, we find\nL000904\t\\begin{align}\nL000905\t\\bigg[ \\ldots \\bigg] &= -i \\omega \\Big( \\bm{m}^{-1} \\bm{K} \\big( -\\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{xv} \\bm{m}^{-1} \\bm{\\gamma} \\big) - \\big( -\\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\gamma}  \\bm{m}^{-1} \\bm{\\Xi}_{xv} \\big) \\bm{K}^\\text{T} \\bm{m}^{-1} \\Big) \\label{brackets-term} \\\\\nL000906\t& \\qquad + \\omega^2 \\Big( \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{vv,\\text{st}} \\bm{\\gamma} \\bm{m}^{-1} + \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv} + \\bm{\\Xi}_{vx,\\text{st}} \\bm{m}^{-1} \\Big) - \\bm{m}^{-1} \\bm{K} \\big( \\bm{\\Xi}_{xv,\\text{st}} + \\bm{\\Xi}_{vx,\\text{st}} \\big) \\bm{K}^\\text{T} \\bm{m}^{-1} \\n .\nL000907\t\\end{align}\nL000908\t\nL000909\t\nL000910\t\nL000911\t\nL000912\tWe note that the phase-space covariance matrix $\\bm{\\Xi}_{u,\\text{st}}$ is determined from the Lyapunov equation\nL000913\t\\begin{align}\nL000914\t\\bm{A}_u \\bm{\\Xi}_{u,\\text{st}} + \\bm{\\Xi}_{u,\\text{st}} \\bm{A}_u^\\text{T} = 2 \\bm{B}_u ,\nL000915\t\\end{align}\nL000916\twhich we can write in block-wise form as\nL000917\t\\begin{align}\nL000918\t&\\begin{pmatrix}\nL000919\t- \\bm{\\Xi}_{vx,\\text{st}} - \\bm{\\Xi}_{xv,\\text{st}} & - \\bm{\\Xi}_{vv,\\text{st}}  + \\bm{\\Xi}_{xv,\\text{st}} \\bm{m}^{-1} \\bm{\\gamma} + \\bm{\\Xi}_{xx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} \\\\\nL000920\t- \\bm{\\Xi}_{vv,\\text{st}} + \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vx,\\text{st}} + \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xx,\\text{st}}  & \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv,\\text{st}} + \\bm{\\Xi}_{vx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} + \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{vv,\\text{st}} \\bm{\\gamma} \\bm{m}^{-1}\nL000921\t\\end{pmatrix}  \\nn\nL000922\t&\\hspace{2cm} = \\begin{pmatrix}\nL000923\t\\bm{0} & \\bm{0} \\\\ \\bm{0} & 2 \\bm{m}^{-2} \\bm{\\gamma} \\bm{T}\nL000924\t\\end{pmatrix} . \\label{lyapunov-under}\nL000925\t\\end{align}\nL000926\tFrom the $xx$-component, we find $\\bm{\\Xi}_{vx,\\text{st}} = - \\bm{\\Xi}_{xv,\\text{st}}$.\nL000927\tInserting the $xv$ and $vx$ components into \\eqref{brackets-term}, we obtain\nL000928\t\\begin{align}\nL000929\t\\bigg[ \\ldots \\bigg] &= i \\omega \\Big( \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} - \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} \\Big) \\label{brackets-term-2} \\\\\nL000930\t& \\qquad + \\omega^2 \\Big( \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{vv,\\text{st}} \\bm{\\gamma} \\bm{m}^{-1} + \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv} + \\bm{\\Xi}_{vx,\\text{st}} \\bm{m}^{-1} \\Big) \\nn\nL000931\t&= \\omega^2 \\Big( \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{vv,\\text{st}} \\bm{\\gamma} \\bm{m}^{-1} + \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv} + \\bm{\\Xi}_{vx,\\text{st}} \\bm{m}^{-1} \\Big) \\n  .\nL000932\t\\end{align}\nL000933\tInserting the $vv$-component into \\eqref{response-equality-1}, we obtain\nL000934\t\\begin{align}\nL000935\t\\bmc{R}_v(\\omega) &\\bmc{A}^{-1} \\bmc{R}_v(\\omega)^\\text{H} = \\omega^2 \\big( \\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1} (\\bm{\\gamma} - i \\omega \\bm{m})^{-1} \\big)^{-1} \\\\\nL000936\t&\\times \\big( \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv,\\text{st}} + \\bm{\\Xi}_{vx,\\text{st}} \\bm{K}^\\text{T} \\bm{m}^{-1} + \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{vv,\\text{st}} \\bm{\\gamma} \\bm{m}^{-1} \\big) \\big(  \\bm{K}^\\text{T} \\bm{m}^{-1} + i \\omega \\bm{m}^{-1} (\\bm{\\gamma} + i \\omega \\bm{m})^{-1} \\big)^{-1} . \\n\nL000937\t\\end{align}\nL000938\tComparing this to \\eqref{response-equality-2}, we indeed find\nL000939\t\\begin{align}\nL000940\t\\bmc{R}_v(\\omega) \\bmc{A}^{-1} \\bmc{R}_v(\\omega)^\\text{H} = \\bmc{S}_v(\\omega) ,\nL000941\t\\end{align}\nL000942\tand thus equality in the first equation of \\eqref{fffri-2}.\nL000943\tDue to the one-to-one relation between $\\bm{x}(t)$ and $\\bm{v}(t)$, this translates into the same relation for the position degrees of freedom,\nL000944\t\\begin{align}\nL000945\t\\bmc{R}_x(\\omega) \\bmc{A}^{-1} \\bmc{R}_x(\\omega)^\\text{H} = \\bmc{S}_x(\\omega) .\nL000946\t\\end{align}\nL000947\tFinally, let us compute\nL000948\t\\begin{align}\nL000949\t\\bmc{R}_v&(\\omega)^\\text{H} \\bmc{S}_v(\\omega)^{-1} \\bmc{R}_v(\\omega) = \\omega^2 \\bmc{Y}^\\text{T} \\bm{m}^{-1} \\big(  \\bm{K}^\\text{T} \\bm{m}^{-1} + i \\omega \\bm{m}^{-1} (\\bm{\\gamma} + i \\omega \\bm{m}) \\big)^{-1} \\\\\nL000950\t&\\times \\bigg( \\omega^2 \\big(\\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1}(\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1}  \\Big( \\bm{m}^{-1} \\bm{\\gamma} \\bm{\\Xi}_{vv,\\text{st}} + \\bm{\\Xi}_{vv,\\text{st}} \\bm{\\gamma} \\bm{m}^{-1} + \\bm{m}^{-1} \\bm{K} \\bm{\\Xi}_{xv} + \\bm{\\Xi}_{vx,\\text{st}} \\bm{m}^{-1} \\Big) \\nn\nL000951\t&\\qquad \\times \\big( \\bm{K}^\\text{T} \\bm{m}^{-1}  + i \\omega \\bm{m}^{-1}(\\bm{\\gamma} + i \\omega \\bm{m}) \\big)^{-1} \\bigg)^{-1} \\big( \\bm{m}^{-1} \\bm{K} - i \\omega \\bm{m}^{-1} (\\bm{\\gamma} - i \\omega \\bm{m}) \\big)^{-1} \\bm{m}^{-1} \\bmc{Y} \\n,\nL000952\t\\end{align}\nL000953\twhere we used \\eqref{response-equality-2} and \\eqref{brackets-term-2} to express the spectral density matrix.\nL000954\tAgain using the $vv$-component of \\eqref{lyapunov-under}, we obtain\nL000955\t\\begin{align}\nL000956\t\\bmc{R}_v(\\omega)^\\text{H} \\bmc{S}_v(\\omega)^{-1} \\bmc{R}_v(\\omega) = \\bmc{Y}^\\text{T} \\bm{m}^{-1} \\big( 2 \\bm{m}^{-2} \\bm{\\gamma} \\bm{T} \\big)^{-1} \\bm{m}^{-1} \\bmc{Y} = \\frac{1}{2} \\bmc{Y}^\\text{T} \\big( \\bm{\\gamma} \\bm{T} \\big)^{-1} \\bmc{Y} = \\bmc{A},\nL000957\t\\end{align}\nL000958\tand thus equality in the second equation of \\eqref{fffri-2}.\nL000959\tThis implies the same relation for the position degrees of freedom\nL000960\t\\begin{align}\nL000961\t\\bmc{R}_x(\\omega)^\\text{H} \\bmc{S}_x(\\omega)^{-1} \\bmc{R}_x(\\omega) = \\bmc{A} .\nL000962\t\\end{align}\nL000963\tFor more general linear observables $\\bm{z} = \\bmc{Z} \\bm{x}$ or $\\bm{z} = \\bmc{Z} \\bm{v}$, the same relation holds if $\\bmc{Z}$ is invertible.\nL000964\t\nL000965\t\\section{Local perturbations}\nL000966\t\nL000967\t\nL000968\tLet us return to the overdamped equation \\eqref{langevin-linear-over} and divide the degrees of freedom into two disjoint subsets $\\bm{x}(t) = (\\bm{x}_a(t),\\bm{x}_p(t))$.\nL000969\tWe assume that the diffusion matrix is block-diagonal\nL000970\t\\begin{align}\nL000971\t\\bm{B} = \\begin{pmatrix} \\bm{B}_a & \\bm{0} \\\\ \\bm{0} & \\bm{B}_p \\end{pmatrix}\nL000972\t\\end{align}\nL000973\tWe consider the case where the perturbation only acts on the \\enquote{active} degrees of freedom $\\bm{x}_a$, that is, $\\bm{y}_q$ has non-zero entries only on the $\\bm{x}_a$ directions.\nL000974\tWe also measure the response and fluctuations of the active degrees of freedom.\nL000975\tWriting the coupling matrix in block form\nL000976\t\\begin{align}\nL000977\t\\bm{A} = \\begin{pmatrix} \\bm{A}_{aa} & \\bm{A}_{ap} \\\\ \\bm{A}_{pa} & \\bm{A}_{pp} \\end{pmatrix},\nL000978\t\\end{align}\nL000979\twe can write the response matrix as\nL000980\t\\begin{align}\nL000981\t\\bmc{R}_{a}(\\omega) = \\Big( \\bm{A}_{aa} - i \\omega \\bm{I} - \\bm{A}_{ap} \\big( \\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{pa} \\Big)^{-1} \\bmc{Y} \\equiv \\bmc{Q}_{aa}(\\omega) \\bmc{Y}  \\label{response-block-inverse}.\nL000982\t\\end{align}\nL000983\tOn the other hand, the $aa$ component of the power-spectral density matrix can be written as (see \\eqref{response-equality-3})\nL000984\t\\begin{align}\nL000985\t\\bmc{S}_{aa}(\\omega) &= 2 \\big(( \\bm{A} - i \\omega \\bm{I} )^{-1} \\big)_{aa} \\bm{B}_a \\big(( \\bm{A}^\\text{T} + i \\omega \\bm{I} )^{-1} \\big)_{aa} + 2 \\big(( \\bm{A} - i \\omega \\bm{I} )^{-1} \\big)_{ap} \\bm{B}_p \\big(( \\bm{A}^\\text{T} + i \\omega \\bm{I} )^{-1} \\big)_{pa} \\\\\nL000986\t&= 2 \\bmc{Q}_{aa}(\\omega) \\Big( \\bm{B}_a + \\bm{A}_{ap} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\bm{B}_p \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\Big) \\bmc{Q}_{aa}(\\omega)^\\text{H} \\n .\nL000987\t\\end{align}\nL000988\tWe then obtain\nL000989\t\\begin{align}\nL000990\t\\bmc{R}_a(\\omega)^\\text{H} \\bmc{S}_{aa}(\\omega)^{-1} \\bmc{R}_a(\\omega) = \\frac{1}{2} \\bmc{Y}^\\text{T} \\Big( \\bm{B}_a + \\bm{A}_{ap} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\bm{B}_p \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\Big)^{-1} \\bmc{Y} \\label{response-equality-4} .\nL000991\t\\end{align}\nL000992\tThe inequality \\eqref{app-fffri} follows by noting that the second term in the expression in parentheses is positive definite and thus\nL000993\t\\begin{align}\nL000994\t\\frac{1}{2} \\bmc{Y}^\\text{T} \\Big( \\bm{B}_a + \\bm{A}_{ap} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\bm{B}_p \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\Big)^{-1} \\bmc{Y} \\leq \\frac{1}{2} \\bmc{Y}^\\text{T} \\bm{B}_a^{-1} \\bmc{Y} = \\bmc{A} .\nL000995\t\\end{align}\nL000996\tMore explicitly, we have from the Woodbury matrix identity\nL000997\t\\begin{align}\nL000998\t\\Big( &\\bm{B}_a + \\bm{A}_{ap} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\bm{B}_p \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\Big)^{-1} \\label{woodbury} \\\\\nL000999\t&= \\bm{B}_a^{-1} - \\bm{B}_a^{-1} \\bm{A}_{ap} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\Big( \\bm{B}_p^{-1} + \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\bm{B}_a^{-1} \\bm{A}_{ap}\\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\Big)^{-1} \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\bm{B}_a^{-1} \\nn\nL001000\t&= \\bm{B}_a^{-1} - \\bm{B}_a^{-1} \\bm{A}_{ap} \\Big( \\bm{A}_{ap}^\\text{T} \\bm{B}_a^{-1} \\bm{A}_{ap} + \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big) \\bm{B}_p^{-1} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big) \\Big)^{-1}  \\bm{A}_{ap}^\\text{T} \\bm{B}_a^{-1}  . \\n\nL001001\t\\end{align}\nL001002\t\nL001003\t\\begin{figure*}\nL001004\t\\includegraphics[width=0.4\\textwidth]{a-partition.png}\nL001005\t\\hspace{1cm}\nL001006\t\\includegraphics[width=0.4\\textwidth]{b-partition.png}\nL001007\t\\caption{The structure of the coupling matrix $\\bm{A}$ (left) and diffusion matrix $\\bm{B}$ (right). The perturbed degrees of freedom $a^*$ (red) and their neighbors $N(a^*)$ (yellow) are the measured degrees of freedom $a$ (green). Since all other degrees of freedom $p$ (white) are not connected to $a^*$, the corresponding elements of the coupling matrix $\\bm{A}$ are zero. For the diffusion matrix, we assume a block-diagonal structure between the perturbed degrees of freedom $a^*$, their neighbors $N(a^*)$ and the remaining degrees of freedom $p$.}\nL001008\t\\label{fig-partition}\nL001009\t\\end{figure*}\nL001010\tNext, we define the connectivity of the system as follows:\nL001011\tWe say that two degrees of freedom $x_j$ and $x_h$ are connected if $A_{jh} \\neq 0$ or $A_{hj} \\neq 0$, i.~e.~if $x_j$ and $x_h$ are not connected then $A_{jh} = A_{hj} = 0$.\nL001012\tWe choose a set $a^* \\subset \\lbrace 1,\\ldots,D \\rbrace$ of degrees of freedom to which we apply the perturbation and define the set of neighbors $N(a^*)$ as all degrees of freedom that are connected to any degree of freedom in $a^*$ but not themselves contained in $a^*$, i.~e.\nL001013\t\\begin{align}\nL001014\tN(a^*) = \\lbrace j \\vert h \\in a^* \\ \\text{and} \\ x_j \\ \\text{connected to} \\ x_h \\rbrace/a^* .\nL001015\t\\end{align}\nL001016\tWe now take $a = a^* \\cup N(a^*)$, that is the perturbed degrees of freedom and their neighbors, as the \\enquote{active} degrees of freedom.\nL001017\tIn addition, we assume that the diffusion matrix $B_a$ is block-diagonal in $a^*$ and $N(a^*)$,\nL001018\t\\begin{align}\nL001019\t\\bm{B}_a = \\begin{pmatrix} \\bm{B}_{a^*} & \\bm{0} \\\\ \\bm{0} & \\bm{B}_{N(a^*)} \\end{pmatrix} ,\nL001020\t\\end{align}\nL001021\tsee Fig.~\\ref{fig-partition} for an illustration.\nL001022\tCompared to the above, the difference is that we only apply the perturbation to a subset of degrees of freedom in $a$.\nL001023\tSince, by definition, $a$ includes all degrees of freedom connected to any degree of freedom in $a^*$, $\\bm{A}_{a^*p} = \\bm{A}_{p a^*} = 0$, allowing us to partition the coupling matrix as illustrated in Fig.~\\ref{fig-partition}.\nL001024\tSince the perturbation is only acting on $a^*$, that is, only the rows of $\\bmc{Y}$ corresponding to $\\bm{a}^*$ are non-zero, which we indicate by writing $\\bmc{Y}_{a^*}$, we find by combining \\eqref{response-equality-4} and \\eqref{woodbury},\nL001025\t\\begin{align}\nL001026\t\\bmc{R}_a(\\omega)^\\text{H} &\\bmc{S}_{aa}(\\omega)^{-1} \\bmc{R}_a(\\omega) = \\frac{1}{2} \\bmc{Y}_{a^*}^\\text{T} \\bigg( \\Big( \\bm{B}_a + \\bm{A}_{ap} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big)^{-1} \\bm{B}_p \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big)^{-1} \\bm{A}_{ap}^\\text{T} \\Big)^{-1} \\bigg)_{a^* a^*} \\bmc{Y}_{a^*} \\\\\nL001027\t&= \\frac{1}{2} \\bmc{Y}_{a^*}^\\text{T} \\Big( \\bm{B}_{a^*}^{-1} - \\bm{B}_{a^*}^{-1} \\bm{A}_{a^*p} \\Big( \\bm{A}_{ap}^\\text{T} \\bm{B}_a^{-1} \\bm{A}_{ap} + \\big(\\bm{A}_{pp}^\\text{T} + i \\omega \\bm{I} \\big) \\bm{B}_p^{-1} \\big(\\bm{A}_{pp} - i \\omega \\bm{I} \\big) \\Big)^{-1}  \\bm{A}_{a^*p}^\\text{T} \\bm{B}_{a^*}^{-1} \\Big) \\bmc{Y}_{a^*}  \\nn\nL001028\t&= \\frac{1}{2} \\bmc{Y}_{a^*}^\\text{T} \\bm{B}_{a^*}^{-1} \\bmc{Y}_{a^*} = \\bmc{A} \\n .\nL001029\t\\end{align}\nL001030\tThe above result implies that, under the assumption of a block-diagonal diffusion matrix (in particular for a diagonal diffusion matrix), it is sufficient to measure the perturbed degrees of freedom and their neighbors, i.~e.~degrees of freedom that directly interact with the perturbed ones, to realize equality in the finite-frequency FRI \\eqref{app-fffri}.\nL001031\tThis result can potentially be used to localize perturbations in linear networks:\nL001032\tIf a measured set of degrees of freedom yields equality in \\eqref{app-fffri}, this implies that the perturbation is localized in the interior of the set.\nL001033\tBy dropping degrees of freedom from the measurement one by one and checking whether the equality is still satisfied, the degrees of freedom directly affected by the perturbation can be identified.\nL001034\t\nL001035\tThe above argument can also be applied to the underdamped case, since, by assumption, the matrices $\\bm{m}$, $\\bm{\\gamma}$ and $\\bm{T}$ are diagonal.\nL001036\tThus, the only off-diagonal contributions stem from the coupling matrix $\\bm{K}$, which has the same structure as the matrix $\\bm{A}$ above.\nL001037\tWhen computing the block-inverse to obtain the response function of the phase-space observables as in \\eqref{response-block-inverse}, the only non-trivial contribution arises from the these non-diagonal parts of the coupling matrix.\nL001038\t\nL001039\t\\section{Response and fluctuations from Langevin simulations}\nL001040\tIn the main text, we consider the diffusion of an underdamped particle in a tilted periodic potential, \\eqref{langevin-perpot}.\nL001041\tWe simulate this Langevin equation using the stochastic integrator developed in Ref.~\\cite{Bussi2007}.\nL001042\tThe velocity power-spectral density is calculated by computing the Fourier transform of the obtained time-discrete trajectories,\nL001043\t\\begin{align}\nL001044\t\\hat{v}_j = \\Delta t \\sum_{k = 1}^{N} e^{i \\omega_j k \\Delta t} v_k \\quad \\text{with} \\quad \\omega_j = \\frac{2 \\pi j}{\\Delta t},\nL001045\t\\end{align}\nL001046\twhere $\\Delta t$ is the time-step size and $v_k$, $k = 1,\\ldots,N$, are the velocity values.\nL001047\tAn estimate of the power-spectral density at $\\omega_j$ is obtained as\nL001048\t\\begin{align}\nL001049\tS_v(\\omega_j) = \\frac{1}{N \\Delta t} \\Av{\\Vert \\hat{v}_j \\Vert^2},\nL001050\t\\end{align}\nL001051\twhere the average is taken over sample trajectories.\nL001052\tIn order to account for aliasing due to the finite time-step \\cite{Smith1999}, the power-spectral density shown in Fig.~\\ref{fig-perpot} of the main text is the corrected spectral density,\nL001053\t\\begin{align}\nL001054\t\\bar{S}_v(\\omega_j) = S_v(\\omega_j) \\frac{\\sin\\big(\\frac{1}{2} \\omega_j \\Delta t\\big)^2}{\\big(\\frac{1}{2} \\omega_j \\Delta t\\big)^2 },\nL001055\t\\end{align}\nL001056\twhich corresponds to applying a lowpass filter to the signal.\nL001057\tIn order to measure the frequency response, we apply a perturbation of the form $\\epsilon g_0 \\sin(\\omega t)$ to the system.\nL001058\tWe then fit the resulting average velocity with the function\nL001059\t\\begin{align}\nL001060\tv_0 + \\delta v \\sin(\\omega t + \\phi) ,\nL001061\t\\end{align}\nL001062\twhere $v_0$, $\\delta v$ and $\\phi$ are fit parameters.\nL001063\tSince the real and imaginary parts of the response function correspond to the in-phase and out-of-phase response, respectively, they are related to the fit parameters as\nL001064\t\\begin{align}\nL001065\t\\Av{v}_\\text{st} = v_0, \\qquad \\vert \\bmc{R}_v(\\omega) \\vert = \\frac{\\delta v}{\\epsilon}, \\qquad \\frac{\\bmc{R}_v''(\\omega)}{\\bmc{R}_v'(\\omega)} = \\tan(\\phi) ,\nL001066\t\\end{align}\nL001067\twhich, in particular, allows us to obtain the magnitude of the response $\\vert \\bmc{R}_v(\\omega) \\vert$ from the magnitude of the time-periodic part of the response.\nL001068\t\nL001069\t\\bibliography{../../../JabRef/JabRef_main.bib}\nL001070\t\nL001071\t\nL001072\t\\end{document}\nL001073\t===== END FILE: fffri-arXiv.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source derives a finite-frequency fluctuation-response inequality (FRI) for Markovian dynamics, with a single-observable single-perturbation scalar form |R(omega)|^2 <= A S(omega) and a response efficiency eta^R(omega) = |R(omega)|^2/(S(omega) A). The paper provides a numerical demonstration for an underdamped particle in a tilted periodic potential, with explicit parameter values and a reported regime distinction (equilibrium f0=0 vs non-equilibrium f0=0.175*2*pi). The response and power spectral density are computed from simulations, and the inequality is stated to hold. The source supports a quantitative cluster with frequency as a control, the velocity power spectral density and response magnitude as readouts, and the FRI inequality as the mechanism. The case is authoring-ready because there is at least one numeric control (frequency), numeric readouts, a quantitative mechanism, and an objective source-grounded response within an explicit domain.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Andreas Dechant, Finite-Frequency Fluctuation-Response Inequality, Physical Review Letters (2026), DOI:10.1103/3hs9-dz3d\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/3hs9-dz3d\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2510.15228v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper derives a finite-frequency fluctuation-response inequality (FRI) relating the linear response and power spectral density of observables in Markovian dynamics, and demonstrates it numerically for an underdamped particle in a tilted periodic potential. The main results include the FRI, a bound on the signal-to-noise ratio, and equality conditions for linear dynamics.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"fffri_1d\\\",\\n      \\\"statement\\\": \\\"For a single observable and a single perturbation, the magnitude squared of the response is bounded by the product of the power spectral density and a constant A, i.e., |R(omega)|^2 <= A S(omega). The response efficiency is defined as eta^R(omega) = |R(omega)|^2/(S(omega) A) and satisfies 0 <= eta^R(omega) <= 1.\\\",\\n      \\\"equations\\\": [\\n        \\\"|R(omega)|^2 <= A S(omega)\\\",\\n        \\\"eta^R(omega) = |R(omega)|^2 / (S(omega) A)\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"R(omega)\\\",\\n        \\\"S(omega)\\\",\\n        \\\"A\\\",\\n        \\\"eta^R(omega)\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"A_fffri_1d\\\",\\n          \\\"value\\\": 1.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"The constant A in the FRI, defined as A = <g^2>_st/(2 gamma T) for a single perturbation in an equilibrium environment. The paper does not provide a numeric value for A in the demonstration; the inequality is stated symbolically.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 143,\\n              \\\"line_end\\\": 146,\\n              \\\"support\\\": \\\"For a single observable and a single perturbation (K=Q=1), the FRI simplifies to |R(omega)|^2 <= A S(omega) and eta^R(omega) = |R(omega)|^2/(S(omega) A).\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 143,\\n          \\\"line_end\\\": 146,\\n          \\\"support\\\": \\\"The FRI for a single observable and perturbation is given as |R(omega)|^2 <= A S(omega) and the response efficiency as eta^R(omega) = |R(omega)|^2/(S(omega) A).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 140,\\n          \\\"line_end\\\": 140,\\n          \\\"support\\\": \\\"The response efficiency satisfies 0 <= eta^R(omega) <= 1.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"perpot_equilibrium\\\",\\n      \\\"statement\\\": \\\"Underdamped particle in a periodic potential with tilt f0 = 0 (equilibrium). Other parameters: m = 1, gamma = 1/3, T = 1/2, U0 = 1, L = 1.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 118,\\n          \\\"line_end\\\": 121,\\n          \\\"support\\\": \\\"The black lines are for vanishing tilt f0 = 0, where the system is in equilibrium. Other parameter values are m = 1, gamma = 1/3, T = 1/2, U0 = 1 and L = 1.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"perpot_nonequilibrium\\\",\\n      \\\"statement\\\": \\\"Underdamped particle in a periodic potential with tilt f0 = 0.175 * 2*pi (non-equilibrium steady state). Other parameters: m = 1, gamma = 1/3, T = 1/2, U0 = 1, L = 1.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 120,\\n          \\\"line_end\\\": 121,\\n          \\\"support\\\": \\\"The orange lines are for a non-equilibrium steady state with f0 = 0.175 * 2*pi. Other parameter values are m = 1, gamma = 1/3, T = 1/2, U0 = 1 and L = 1.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"frequency\\\",\\n      \\\"definition\\\": \\\"Angular frequency omega at which the power spectral density and response are evaluated.\\\",\\n      \\\"unit\\\": \\\"rad/s\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 0.0,\\n      \\\"maximum\\\": 10.0,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The frequency range is not explicitly stated, but the figure shows spectra over a range of frequencies; the source reports a peak near omega ~ 2*pi and high-frequency decay. The domain is inferred as a continuous interval from the figure description.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 161,\\n          \\\"line_end\\\": 166,\\n          \\\"support\\\": \\\"The velocity power spectrum shows a peak at omega ~ 2*pi and decays at high frequencies as S_v(omega) ~ 2 gamma T/(m^2 omega^2).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"velocity_power_spectral_density\\\",\\n      \\\"definition\\\": \\\"Power spectral density of the velocity, S_v(omega), computed from the Fourier transform of the velocity trajectories.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Average over sample trajectories; the estimate is S_v(omega_j) = (1/(N Delta t)) <|hat{v}_j|^2>.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1042,\\n          \\\"line_end\\\": 1051,\\n          \\\"support\\\": \\\"The velocity power-spectral density is calculated by computing the Fourier transform of the obtained time-discrete trajectories, with estimate S_v(omega_j) = (1/(N Delta t)) <|hat{v}_j|^2>.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"velocity_response_magnitude\\\",\\n      \\\"definition\\\": \\\"Magnitude of the linear response function of the velocity, |R_v(omega)|, obtained from fitting the average velocity to v0 + delta v sin(omega t + phi) and using |R_v(omega)| = delta v / epsilon.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Fit parameters v0, delta v, phi from fitting the average velocity.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1057,\\n          \\\"line_end\\\": 1067,\\n          \\\"support\\\": \\\"The frequency response is measured by applying a perturbation epsilon g0 sin(omega t) and fitting the average velocity with v0 + delta v sin(omega t + phi); the magnitude of the response is |R_v(omega)| = delta v / epsilon.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"fffri_1d_inequality\\\",\\n      \\\"statement\\\": \\\"For the underdamped particle in a periodic potential, the magnitude squared of the velocity response is bounded by the product of the velocity power spectral density and the constant A, i.e., |R_v(omega)|^2 <= A S_v(omega). This holds both in equilibrium (f0=0) and out of equilibrium (f0=0.175*2*pi).\\\",\\n      \\\"quantitative_form\\\": \\\"|R_v(omega)|^2 <= A * S_v(omega)\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"velocity_response_magnitude\\\": {\\n          \\\"op\\\": \\\"power\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"multiply\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"param\\\": \\\"A_fffri_1d\\\"\\n                },\\n                {\\n                  \\\"var\\\": \\\"velocity_power_spectral_density\\\"\\n                }\\n              ]\\n            },\\n            {\\n              \\\"op\\\": \\\"divide\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"power\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"var\\\": \\\"velocity_response_magnitude\\\"\\n                    },\\n                    {\\n                      \\\"param\\\": \\\"two_fffri_1d\\\"\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"op\\\": \\\"power\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"var\\\": \\\"velocity_response_magnitude\\\"\\n                    },\\n                    {\\n                      \\\"param\\\": \\\"two_fffri_1d\\\"\\n                    }\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"fffri_1d\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"frequency\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"frequency\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 0.0,\\n          \\\"maximum\\\": 10.0,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The frequency range is not explicitly stated, but the figure shows spectra over a range of frequencies; the source reports a peak near omega ~ 2*pi and high-frequency decay. The domain is inferred as a continuous interval from the figure description.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 161,\\n              \\\"line_end\\\": 166,\\n              \\\"support\\\": \\\"The velocity power spectrum shows a peak at omega ~ 2*pi and decays at high frequencies as S_v(omega) ~ 2 gamma T/(m^2 omega^2).\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"velocity_response_magnitude\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"perpot_equilibrium\\\",\\n        \\\"perpot_nonequilibrium\\\"\\n      ],\\n      \\\"applicability\\\": \\\"The inequality holds for the underdamped particle in a periodic potential, both in equilibrium (f0=0) and out of equilibrium (f0=0.175*2*pi), as shown in Fig. 1. The parameters are m=1, gamma=1/3, T=1/2, U0=1, L=1.\\\",\\n      \\\"statistical_basis\\\": \\\"The power spectral density and response are computed from numerical simulations; the power spectral density is averaged over sample trajectories.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 122,\\n          \\\"line_end\\\": 122,\\n          \\\"support\\\": \\\"Both in and out of equilibrium, the power spectral density upper bounds the response, as predicted by the FRI.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 145,\\n          \\\"line_end\\\": 146,\\n          \\\"support\\\": \\\"The FRI for a single observable and perturbation is |R(omega)|^2 <= A S(omega).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"A_value_unspecified\\\",\\n      \\\"statement\\\": \\\"The constant A in the FRI is defined symbolically as A = <g^2>_st/(2 gamma T) for a single perturbation, but no numeric value is provided for the demonstration. The inequality is stated symbolically.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"fffri_1d_inequality\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"fffri_1d\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"frequency\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"velocity_response_magnitude\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"perpot_equilibrium\\\",\\n        \\\"perpot_nonequilibrium\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 134,\\n          \\\"line_end\\\": 134,\\n          \\\"support\\\": \\\"For a single perturbation, the matrix A reduces to the scalar A = <g^2>_st/(2 gamma T).\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"parameters.outputs.velocity_response_magnitude.args[0].args[1].var is not a public control\",\"path\":\"$.claims[0].oracle_outputs\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

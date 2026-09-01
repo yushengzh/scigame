@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2506.10067v2\", \"citation\": \"Andrew A. Allocca, Universality of Stochastic Control of Quantum Chaos with Measurement and Feedback, Physical Review Letters (2026), DOI:10.1103/xgfv-p42g\", \"journal_doi\": \"10.1103/xgfv-p42g\"}\n\nSource-grounded routing hint from pre-screening:\nPreserve exact reviewed p_n_star family, public kappa/gamma [.02,.42], private n1/n2, identical AST, no unused parameter/ambiguity. Add exactly one branch-neutral source-anchored common fixed condition iho_stochastic_channel: the inverted-harmonic-oscillator stochastic channel T=(1-p)S_kappa+p C_gamma with source definitions lines130-158 and eigenoperator threshold derivation247-260. Cite it in both claims and applicability; Player apparatus must describe this source-defined channel, not generic quantum control. No numeric/formula/domain changes or extra claims.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nRevision context from an independent review of a prior ScienceCard:\n{\"issues\":[{\"code\":\"card.iho_channel_scope_missing\",\"detail\":\"The exact p_n_star theorem is derived for the source-defined IHO stochastic channel, not for an unconstrained generic quantum controller. Add one branch-neutral common fixed condition, for example iho_stochastic_channel, stating that evolution uses T=(1-p)S_kappa+p C_gamma, with S_kappa the inverted-harmonic-oscillator squeezing/evolution channel and C_gamma the ancilla measurement-and-reset attenuation channel. Anchor it to lines 130-158, include it in fixed_condition_ids for both claims, and include the same scope in both claim applicability statements. The downstream Player apparatus/background must preserve this exact scope and must not generalize the theorem to arbitrary quantum control. Do not alter the n=1/n=2 private branch conditions, ASTs, parameters, control ranges, readout, or numeric truth.\",\"line_ranges\":[{\"line_end\":158,\"line_start\":130},{\"line_end\":260,\"line_start\":247}]}],\"previous_science_card\":{\"assessment\":\"The source provides the exact quantum stochastic-control threshold p_n_star = (exp(n*kappa)-1)/(exp(n*kappa)-exp(-n*gamma)) in Eq. (pstar) at lines 258-260, with the general condition kappa>0, gamma>0 stated at line 74. The routing hint specifies two public controls kappa and gamma on the conservative finite benchmark interval [0.02, 0.42], which lies inside the source-supported positive domain. The private branch parameters n_order_one=1 and n_order_two=2 are supported by the source's statement that p_n_star applies for all n>0 (line 259) and the monotonic sequence p_{n+1}^* > p_n^* (line 262). The readout is the critical intervention probability p_n_star, an exact deterministic theorem. The extraction is faithful to the source; no classical p_c is used as a control. The case is authoring-ready with two claims sharing the same mechanism and readout, differing only in the private n parameter. The previously identified unused parameter pstar_denominator_offset has been removed.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":260,\"line_start\":258,\"support\":\"Equation (pstar) gives p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}) for all n>0.\"},{\"line_end\":259,\"line_start\":259,\"support\":\"States p_n^* > p_c for all n>0.\"}],\"applicability\":\"Valid for all kappa, gamma > 0 and n>0; here n=1.\",\"claim_id\":\"pstar_n1\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":74,\"line_start\":74,\"support\":\"States kappa > 0 parameterizes the strength of the chaotic map.\"}],\"control_name\":\"kappa\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Benchmark interval [0.02, 0.42] inside the source general condition kappa > 0.\",\"maximum\":0.42,\"minimum\":0.02},{\"allowed_values\":[],\"anchors\":[{\"line_end\":74,\"line_start\":74,\"support\":\"States gamma > 0 parameterizes the strength of the control map.\"}],\"control_name\":\"gamma\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Benchmark interval [0.02, 0.42] inside the source general condition gamma > 0.\",\"maximum\":0.42,\"minimum\":0.02}],\"control_names\":[\"kappa\",\"gamma\"],\"depends_on\":[],\"fixed_condition_ids\":[\"n_order_one\"],\"mechanism_ids\":[\"exact_quantum_control_threshold\"],\"oracle_outputs\":{\"p_n_star\":{\"args\":[{\"args\":[{\"args\":[{\"args\":[{\"param\":\"n_order_one\"},{\"var\":\"kappa\"}],\"op\":\"multiply\"}],\"op\":\"exp\"},{\"param\":\"pstar_numerator_offset\"}],\"op\":\"subtract\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"n_order_one\"},{\"var\":\"kappa\"}],\"op\":\"multiply\"}],\"op\":\"exp\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"n_order_one\"},{\"var\":\"gamma\"}],\"op\":\"multiply\"}],\"op\":\"negate\"}],\"op\":\"exp\"}],\"op\":\"subtract\"}],\"op\":\"divide\"}},\"quantitative_form\":\"p_1^* = (exp(kappa) - 1) / (exp(kappa) - exp(-gamma))\",\"readout_names\":[\"p_n_star\"],\"statement\":\"For operator order n=1, the critical control probability is p_1^* = (e^{kappa} - 1)/(e^{kappa} - e^{-gamma}), valid for kappa, gamma > 0.\",\"statistical_basis\":\"Exact deterministic theorem; no statistical aggregation.\",\"uncertainty\":\"None; exact result.\"},{\"anchors\":[{\"line_end\":260,\"line_start\":258,\"support\":\"Equation (pstar) gives p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}) for all n>0.\"},{\"line_end\":262,\"line_start\":262,\"support\":\"States p_{n+1}^* > p_n^* for n>0, implying distinct values for n=1 and n=2.\"}],\"applicability\":\"Valid for all kappa, gamma > 0 and n>0; here n=2.\",\"claim_id\":\"pstar_n2\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":74,\"line_start\":74,\"support\":\"States kappa > 0 parameterizes the strength of the chaotic map.\"}],\"control_name\":\"kappa\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Benchmark interval [0.02, 0.42] inside the source general condition kappa > 0.\",\"maximum\":0.42,\"minimum\":0.02},{\"allowed_values\":[],\"anchors\":[{\"line_end\":74,\"line_start\":74,\"support\":\"States gamma > 0 parameterizes the strength of the control map.\"}],\"control_name\":\"gamma\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Benchmark interval [0.02, 0.42] inside the source general condition gamma > 0.\",\"maximum\":0.42,\"minimum\":0.02}],\"control_names\":[\"kappa\",\"gamma\"],\"depends_on\":[],\"fixed_condition_ids\":[\"n_order_two\"],\"mechanism_ids\":[\"exact_quantum_control_threshold\"],\"oracle_outputs\":{\"p_n_star\":{\"args\":[{\"args\":[{\"args\":[{\"args\":[{\"param\":\"n_order_two\"},{\"var\":\"kappa\"}],\"op\":\"multiply\"}],\"op\":\"exp\"},{\"param\":\"pstar_numerator_offset\"}],\"op\":\"subtract\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"n_order_two\"},{\"var\":\"kappa\"}],\"op\":\"multiply\"}],\"op\":\"exp\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"n_order_two\"},{\"var\":\"gamma\"}],\"op\":\"multiply\"}],\"op\":\"negate\"}],\"op\":\"exp\"}],\"op\":\"subtract\"}],\"op\":\"divide\"}},\"quantitative_form\":\"p_2^* = (exp(2*kappa) - 1) / (exp(2*kappa) - exp(-2*gamma))\",\"readout_names\":[\"p_n_star\"],\"statement\":\"For operator order n=2, the critical control probability is p_2^* = (e^{2 kappa} - 1)/(e^{2 kappa} - e^{-2 gamma}), valid for kappa, gamma > 0.\",\"statistical_basis\":\"Exact deterministic theorem; no statistical aggregation.\",\"uncertainty\":\"None; exact result.\"}],\"controls\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":74,\"line_start\":74,\"support\":\"States kappa > 0 parameterizes the strength of the chaotic map.\"}],\"definition\":\"Strength of the chaotic (squeezing) channel, appearing as e^{kappa} in the amplification factor.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Benchmark interval [0.02, 0.42] inside the source general condition kappa > 0.\",\"maximum\":0.42,\"minimum\":0.02,\"name\":\"kappa\",\"unit\":\"dimensionless\"},{\"allowed_values\":[],\"anchors\":[{\"line_end\":74,\"line_start\":74,\"support\":\"States gamma > 0 parameterizes the strength of the control map.\"}],\"definition\":\"Strength of the control channel, appearing as e^{-gamma} in the contraction factor.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"Benchmark interval [0.02, 0.42] inside the source general condition gamma > 0.\",\"maximum\":0.42,\"minimum\":0.02,\"name\":\"gamma\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":259,\"line_start\":259,\"support\":\"The formula p_n^* applies for all n>0; n=1 is a specific order.\"}],\"condition_id\":\"n_order_one\",\"statement\":\"Operator order n = 1 for the first claim.\"},{\"anchors\":[{\"line_end\":262,\"line_start\":262,\"support\":\"States p_{n+1}^* > p_n^* for n>0, implying distinct values for n=1 and n=2.\"}],\"condition_id\":\"n_order_two\",\"statement\":\"Operator order n = 2 for the second claim.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":260,\"line_start\":258,\"support\":\"Equation (pstar) gives p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}) as the control probability for all order-n operators.\"},{\"line_end\":74,\"line_start\":74,\"support\":\"States kappa, gamma > 0 parameterize the strengths of chaotic and control maps.\"},{\"line_end\":259,\"line_start\":259,\"support\":\"States p_n^* > p_c for all n>0, and lim_{n->0} p_n^* = p_c.\"}],\"equations\":[\"p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma})\"],\"mechanism_id\":\"exact_quantum_control_threshold\",\"parameters\":[{\"anchors\":[{\"line_end\":260,\"line_start\":258,\"support\":\"Equation (pstar) defines p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}).\"}],\"name\":\"pstar_numerator_offset\",\"role\":\"Constant offset in the numerator of p_n^*.\",\"uncertainty\":\"Exact; no uncertainty reported.\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":259,\"line_start\":259,\"support\":\"The formula p_n^* applies for all n>0; n=1 is a specific order.\"}],\"name\":\"n_order_one\",\"role\":\"Private branch parameter: operator order n=1.\",\"uncertainty\":\"Exact; no uncertainty reported.\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":262,\"line_start\":262,\"support\":\"States p_{n+1}^* > p_n^* for n>0, implying distinct values for n=1 and n=2.\"}],\"name\":\"n_order_two\",\"role\":\"Private branch parameter: operator order n=2.\",\"uncertainty\":\"Exact; no uncertainty reported.\",\"unit\":\"dimensionless\",\"value\":2.0}],\"statement\":\"For the inverted harmonic oscillator under stochastic control, the critical control probability for all order-n operators is p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}), valid for all n>0 and kappa, gamma > 0.\",\"variable_names\":[\"p_n^*\",\"kappa\",\"gamma\",\"n\"]}],\"paper_scope\":\"The paper studies stochastic measurement-and-feedback control of quantum chaotic dynamics, focusing on the quantum Arnold cat map and an inverted harmonic oscillator (IHO) effective model. It derives exact quantum results for the IHO, including a sequence of critical control probabilities p_n^* for operators of order n, given by p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}). The extraction focuses on this exact threshold formula and its dependence on the control strengths kappa and gamma.\",\"readouts\":[{\"anchors\":[{\"line_end\":260,\"line_start\":258,\"support\":\"Equation (pstar) defines p_n^* as the control probability for all order-n operators.\"}],\"definition\":\"Critical control probability for all order-n operators, defined by p_n^* = (e^{n kappa} - 1)/(e^{n kappa} - e^{-n gamma}).\",\"name\":\"p_n_star\",\"resolution\":null,\"statistic\":\"Exact deterministic theorem; no statistical aggregation.\",\"uncertainty\":\"None; exact result.\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2506.10067v2\",\"citation\":\"Andrew A. Allocca, Universality of Stochastic Control of Quantum Chaos with Measurement and Feedback, Physical Review Letters (2026), DOI:10.1103/xgfv-p42g\",\"journal_doi\":\"10.1103/xgfv-p42g\"},\"source_ambiguities\":[]}}\nThe previous ScienceCard is an editable rejected draft, not a source of new scientific facts. Use it as the baseline so supported content is not lost, but recheck every retained field against the supplied source. Address every listed issue by inspecting its line ranges, remove or revise unsupported content, and do not assume the review or prior draft is correct. The supplied source remains the sole authority. Return one complete revised ScienceCard for a new independent review.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main.tex =====\nL000002\t\\documentclass[aps, prl, reprint, superscriptaddress, floatfix]{revtex4-2}\nL000003\t\nL000004\t\nL000005\t\nL000006\t\\usepackage{graphicx}\nL000007\t\\usepackage{braket}\nL000008\t\\usepackage{physics}\nL000009\t\\usepackage{amsmath}\nL000010\t\\usepackage{amssymb}\nL000011\t\\usepackage{mathtools}\nL000012\t\\usepackage{hyperref}\nL000013\t\\usepackage[capitalize]{cleveref}\nL000014\t\\usepackage{xcolor}\nL000015\t\\usepackage{bm}\nL000016\t\nL000017\t\\newcommand{\\note}[1]{\\textcolor{red}{#1}}\nL000018\t\nL000019\t\\DeclarePairedDelimiter\\ceil{\\lceil}{\\rceil}\nL000020\t\\DeclarePairedDelimiter\\floor{\\lfloor}{\\rfloor}\nL000021\t\\DeclareMathOperator{\\statvar}{var}\nL000022\t\nL000023\t\\begin{document}\nL000024\t\nL000025\t\\title{Universality of stochastic control of quantum chaos with measurement and feedback}\nL000026\t\nL000027\t\\author{Andrew A. Allocca}\nL000028\t\\affiliation{Department of Physics and Astronomy, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000029\t\\affiliation{Center for Computation and Technology, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000030\t\nL000031\t\\author{Devesh K. Verma}\nL000032\t\\affiliation{Department of Physics and Astronomy, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000033\t\nL000034\t\\author{Sriram Ganeshan}\nL000035\t\\affiliation{Department of Physics, City College, City University of New York, New York, New York 10031, USA}\nL000036\t\\affiliation{CUNY Graduate Center, New York, New York 10031, USA}\nL000037\t\nL000038\t\\author{Justin H. Wilson}\nL000039\t\\affiliation{Department of Physics and Astronomy, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000040\t\\affiliation{Center for Computation and Technology, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000041\t\nL000042\t\\begin{abstract}\nL000043\tWe investigate universal features of measurement-and-feedback control of quantum chaotic dynamics by examining the quantum Arnold cat map, a paradigmatic model of quantum chaos.\nL000044\tInspired by probabilistic control of classical chaos, our protocol stochastically alternates between intrinsic instability and engineered control operations that steer trajectories toward a target point.\nL000045\tSimulation of exact quantum dynamics and a semiclassical truncated Wigner approximation reveal universal properties of the cat map's control transition.\nL000046\tTo further characterize this universality, we introduce the inverted harmonic oscillator as an analytically tractable effective model of instability.\nL000047\tBy integrating numerical simulations, a semiclassical Fokker-Planck description, and a direct spectral analysis of the stochastic quantum channel, we identify quantum signatures absent in classical limits.\nL000048\tThe close agreement between quantum simulation, truncated Wigner approximation, and inverted oscillator analysis shows that universal features of the transition are set by uncertainty-limited quantum fluctuations and are insensitive to genuine quantum interference.\nL000049\t\\end{abstract}\nL000050\t\nL000051\t\\maketitle\nL000052\t\nL000053\t\\textit{Introduction}---Order emerges from chaotic dynamics across a range of scales, from microscopic quantum systems to macroscopic classical, and even socio-economic, processes.\nL000054\tIn many-body systems, local interactions are sufficient to induce ordering.\nL000055\tBird flocks and fish schools provide familiar classical examples~\\cite{vicsek1995novel, toner1995long}, superconductivity and superfluidity represent analogous quantum phenomena, and within statistical mechanics, ordered states emerge through phase transitions.\nL000056\t\nL000057\tBeyond passive emergence, order can be engineered from chaotic dynamics using both deterministic procedures, e.g. the Ott–Grebogi–Yorke method~\\cite{Ott1990}, and probabilistic approaches, involving the stochastic intervention of a control map with probability $p$ into chaotic dynamics~\\cite{Antoniou1996,Antoniou1997,Antoniou1998}.\nL000058\tIn this scheme the control map and chaotic dynamics share a periodic orbit, unstable for the latter and stable for the former, which becomes a global attractor above a critical control rate $p_c$.\nL000059\tThis is a random multiplicative process where distance from the control point is either amplified by a factor $e^{\\kappa}$ by chaotic dynamics or contracted by a factor $e^{-\\gamma}$ by control; this has been studied in turbulent systems \\cite{Friedrich1997,Naert1997,Benzi2003,Durrive2020} and market dynamics \\cite{Levy1994,Levy1995,Levy1996,Frisch1997,Laherrere1998,Takayasu2000,Friedrich2000,Sornette2001}.\nL000060\tThese ideas have also recently gained resonance in quantum systems, where measurement-conditioned feedback operations can stabilize states and steer dynamics~\\cite{Iadecola2023,Herasymenko2023,Buchhold2022,Ravindranath2022,ODea2022,Friedman2022,Piroli2023,Sierant2022,Sierant2023,LeMaire2024,Milekhin2024,Allocca2024,Ravindranath2025,Gerbino2025}.\nL000061\t\nL000062\tIn this Letter, we study stochastic measurement-and-feedback control of quantized chaotic maps, focusing on the quantum Arnold cat map~\\cite{Arnold1968}.\nL000063\tUsing exact quantum dynamics and the truncated-Wigner-approximation (TWA), we extract universal properties of the quantum control transition.\nL000064\tSince essential features of the transition are determined by the local dynamics near the control point, it can be effectively described by an inverted harmonic oscillator (IHO)\\footnote{The IHO arises broadly across physics \\cite{Barton1986,Gentilini2015,Betzios2016,Dalui2019,Hegde2019,Subramanyan2021}.}.\nL000065\tFocusing on this model, we use numerical simulations of Gaussian-state evolution, a semiclassical Fokker-Planck (FP) analysis augmented by quantum uncertainty, and exact eigenoperators of the stochastic quantum channel, to characterize the transition and the controlled phase.\nL000066\t\nL000067\tDespite lacking a compact phase space, genuine quantum chaos, or quantum interference, the IHO shows excellent agreement with controlled cat-map dynamics.\nL000068\tThis indicates that the essential physics of \\emph{quantum} stochastic control is governed locally near the unstable fixed point.\nL000069\tThe measurement-and-feedback protocol suppresses wave-packet spreading and self-interference, effectively pushing the Ehrenfest time to infinity and rendering interference largely irrelevant for controllability.\nL000070\t\nL000071\t\nL000072\t\\textit{Classical Control}---We begin with a brief illustration of classical control of chaos.\nL000073\tTake $\\mathbf{r}(t)$ to be the small displacement from an unstable fixed point or periodic orbit in a 2d phase space, where $t$ is a discrete time index.\nL000074\tThere is always a choice of coordinates where chaotic and control maps act on $\\mathbf{r}(t)$ as $\\mathcal{S}=\\mathrm{diag}(e^\\kappa,e^{-\\kappa})$ and $\\mathcal{C}=\\mathrm{diag}(e^{-\\gamma},e^{-\\gamma})$ respectively, with $\\kappa,\\gamma>0$ parameterizing their respective strengths ($\\det \\mathcal{S} = 1$ due to being area-preserving).\nL000075\tThe behavior of the first component $r_1$ determines controllability of the system: chaos is controlled when the Lyapunov exponent $\\overline{\\ln\\abs{r_1(t)}}<0$ as $t\\to\\infty$, where $\\overline{(\\cdots)}$ represents averaging over stochastic trajectories.\nL000076\tThe average of this quantity can be performed analytically, resulting in a critical control rate \\cite{Antoniou1998,KTinprep},\nL000077\t\\begin{equation} \\label{eq:pc}\nL000078\t    p_c = \\frac{\\kappa}{\\kappa+\\gamma},\nL000079\t\\end{equation}\nL000080\tabove which the system is controlled, and below which chaos prevails.\nL000081\t\nL000082\t\nL000083\t\\textit{Quantized Chaotic Map}---We use the Arnold cat map~\\cite{Arnold1968} as a paradigmatic example of 2d chaos.\nL000084\tClassically, this map transforms the unit square as\nL000085\t\\begin{equation}\nL000086\t    \\mathbf{r}(t+1) = \\begin{pmatrix}\nL000087\t        2 & 1 \\\\\nL000088\t        1 & 1 \\\\\nL000089\t    \\end{pmatrix}\\mathbf{r}(t) \\mod 1,\nL000090\t\\end{equation}\nL000091\tand has fixed point $\\mathbf{r}_0 = 0$ and strength $\\kappa = 2\\ln(\\frac{1+\\sqrt{5}}{2})$.\nL000092\tTo quantize this map we promote the two coordinates to non-commuting quantum operators: $\\mathbf{r}=(r_1\\,\\,\\, r_2)\\to\\hat{\\mathbf{r}}=(\\hat{x}\\,\\,\\,\\hat{p})$, with $[\\hat{x},\\hat{p}] = i\\hbar$.\nL000093\tThe cat map can be implemented as unitary evolution on these operators with $\\hat{U}_\\mathrm{cat} = e^{-i\\hat{p}^2/(2\\hbar)}e^{i\\hat{x}^2/(2\\hbar)}$.\nL000094\tWe take discrete position eigenstates $\\ket{x_n=n/N}$ and momentum eigenstates $\\ket{p_m=m/N}$, $n,m=0,1,\\dots,N-1$.\nL000095\tWith $\\ket{x_n} = \\frac{1}{N}\\sum_m e^{2\\pi i nm/N}\\ket{p_m}$ and unit-square phase space, $\\hbar=\\frac{1}{2\\pi N}$~\\cite{Supplement,Hannay1980}.\nL000096\tThe continuum limit $N\\to\\infty$ is therefore the classical limit.\nL000097\t\nL000098\tBecause unitary quantizations arise from area-preserving maps~\\cite{ArnoldWeinstein1989,DeBievreDegliEsposti1998}, implementing non-area-preserving control requires measurement.\nL000099\tWe do this with a positive operator-valued measure (POVM) defined by Kraus operators.\nL000100\tTo construct them, we introduce a basis via $[2 - \\cos(2\\pi \\hat x) - \\cos(2\\pi \\hat p)]\\ket{n_c} = \\epsilon_{n_c}\\ket{n_c}$ such that $\\ket{0}$ is the controlled state (fixing the phases of the basis by the harmonic oscillator convention, see \\cite{Supplement}).\nL000101\tThis allows us to construct Kraus operators\nL000102\t\\begin{equation} \\label{eq:ctrlKraus}\nL000103\t    \\hat K_m(\\theta) = \\frac{(-i)^m}{\\sqrt{m!}}\\sin^m(\\theta) (\\cos(\\theta))^{\\hat{a}^\\dagger \\hat{a}} \\hat{a}^m,\nL000104\t\\end{equation}\nL000105\twhere $\\theta\\in[0,\\pi/2]$ parametrizes the strength of control, $\\hat a = \\sum_{n_c=0}^{N_\\mathrm{ctrl}-1} \\sqrt{n_c} \\ket{n_c-1}\\bra{n_c}$ where we take $N_\\mathrm{ctrl} = N/2$, and complete the POVM with a projector on the remaining basis states.\nL000106\tThis control channel acts on $\\hat{x}$ and $\\hat{p}$ as a rescaling by $\\cos\\theta$, so classical and quantum control strengths $\\gamma$ and $\\theta$ are related as $\\cos\\theta=e^{-\\gamma}$.\nL000107\t\nL000108\tBoth quantum channels (cat map and control) can be simulated with the truncated Wigner approximation (TWA) \\cite{Polkovnikov2010}.\nL000109\tIn the TWA, dynamics are classical with quantum fluctuations sampled from the initial Wigner function $W_0(x,p) = \\frac1{\\pi \\hbar} e^{-(x^2+p^2)/\\hbar}$, while control induces noise $(x,p)\\mapsto \\cos\\theta(x,p)+\\bm{\\eta}$ with $\\bm{\\eta}$ Gaussian of variance $\\frac{\\hbar}{2}(1-e^{-2\\gamma})$ (see \\cite{Supplement}).\nL000110\tWe use the late-time, trajectory-averaged squared overlap with the control state, $\\bar\\rho_{00} = \\overline{\\ev{\\hat \\rho(t\\to\\infty)}{0}}$ where $\\hat\\rho(t)$ is the density matrix, as an order parameter for control, which we can compute via the TWA under the full channel.\nL000111\tThis formulation neglects interference and follows from the linear approximation in \\cref{eq:control_channel}, so control-POVM nonlinearities are neglected as well.\nL000112\t\nL000113\tIn \\cref{fig:catmapfig}(a) we show $\\bar{\\rho}_{00}(p)$ for finite $\\hbar$, where the transition is \\emph{rounded} into a crossover but sharpens as $\\hbar\\rightarrow 0$ (i.e., $N\\rightarrow\\infty$).\nL000114\tFurthermore, we see this crossover smoothly connect the quantum data for $L\\equiv\\log_2N = 4$--$10$ to the TWA for $L=10$--$90$; the two agree quantitatively for $L=10$ ($N=1024$)~\\cite{Supplement}.\nL000115\tThe control strength $\\theta$ is chosen so that $p_c=1/2$ as calculated by \\cref{eq:pc}.\nL000116\tScaling collapse near $p=p_c$ gives correlation length exponent $\\nu\\approx 1$, and examining $\\bar{\\rho}_{00}$ as a function of $L$ at $p_c$, shown \\cref{fig:catmapfig}(b), gives the order parameter scaling exponent $\\beta\\approx 1$.\nL000117\tFigure \\ref{fig:catmapfig}(c) shows $\\bar\\rho_{00}$ obtained with the TWA for $L=90$ for all $p$ and $\\theta$, and clearly identifies the boundary between controlled and uncontrolled phases, agreeing with the expected classical result for $p_c$.\nL000118\t\nL000119\tThe success of the TWA in capturing the behavior of the quantum cat map's control transition indicates that quantum interference effects are largely irrelevant, and suggests that the transition admits a universal description.\nL000120\tMotivated by this, we now isolate the dynamics near the unstable fixed point.\nL000121\t\nL000122\t\\begin{figure}\nL000123\t    \\centering\nL000124\t    \\includegraphics[width=0.87\\columnwidth]{quant+twa_full_plot.pdf}\nL000125\t    \\caption{(a) Order parameter $\\bar{\\rho}_{00}(p)$ from exact cat-map simulations ($L=\\log_2N=4$--$10$, blue) and TWA ($L=10$--$90$, red); inset: TWA collapse near $p=p_c$ with $\\nu=1$ and $\\beta=0.97$. (b) $\\bar{\\rho}_{00}(L)$ at $p_c$ for exact (blue) and TWA (red); dashed line: $\\bar{\\rho}_{00}\\propto L^{-\\beta}$ with $\\beta=0.97$. (c) TWA $\\bar{\\rho}_{00}$ at $L=90$ vs $p,\\theta$, consistent with the phase boundary $p_c(\\theta)$ (white dash); $\\hbar=\\frac{1}{2\\pi N}=\\frac{1}{2^{L+1}\\pi}$.}\nL000126\t    \\label{fig:catmapfig}\nL000127\t\\end{figure}\nL000128\t\nL000129\t\nL000130\t\\textit{Inverted harmonic oscillator}---The saddle-point structure near an unstable fixed point is modeled by the inverted harmonic oscillator (IHO),\nL000131\t\\begin{equation} \\label{eq:IHOHam}\nL000132\t    \\hat{H} = \\frac{\\hat{p}^2}{2} - \\frac{\\Omega^2\\hat{x}^2}{2},\nL000133\t\\end{equation}\nL000134\twhere $\\Omega$ controls the strength of the potential.\nL000135\tTime evolution under this Hamiltonian $\\hat{U}(t) = \\mathrm{exp}(-i\\hat{H}t/\\hbar)$ generates a single-mode squeezing operation and a Heisenberg-picture quantum channel\nL000136\t\\begin{equation} \\label{eq:UChannel}\nL000137\t    \\mathbb{S}[\\hat{\\mathcal{O}}] = \\hat{U}^\\dagger(t)\\,\\hat{\\mathcal{O}}\\,\\hat{U}(t).\nL000138\t\\end{equation}\nL000139\tThe action of this channel for time $t_S$ models the effect of a quantum-chaotic map near the fixed point with strength $\\kappa = \\Omega\\, t_S$.\nL000140\tThe operators $\\hat{v}_\\pm \\equiv \\sqrt{\\Omega/2}\\left(\\hat{x}\\pm\\hat{p}/\\Omega\\right)$ grow or decay as $\\mathbb{S}[\\hat{v}_\\pm] = e^{\\pm \\kappa} \\hat{v}_\\pm$, and all operators $(\\hat{v}_+)^m(\\hat{v}_-)^n$ are eigenvectors of the channel; $\\expval{\\hat{v}_\\pm}$ are analogs of the components of the classical $\\mathbf{r}$ above.\nL000141\t\nL000142\tAs for the quantum cat map we can define ladder operators $\\hat{a}$, $\\hat{a}^\\dagger$ and number states $\\ket{n}$.\nL000143\tThe vacuum $\\ket{0}$ is the unstable fixed point of IHO evolution.\nL000144\tControl of the IHO can be implemented by introducing an ancilla mode with its own ladder operators $\\hat{b},\\hat{b}^\\dagger$ and number states $\\ket{n}_b$.\nL000145\tInitializing the ancilla in its vacuum $\\ket{0}_b$, coupling it to the IHO, then measuring and resetting it back into the vacuum state yields Kraus operators $K_m(\\theta) = \\bra{m}_b e^{-i \\theta(\\hat{a}^\\dagger \\hat{b} + \\hat{a}\\hat{b}^\\dagger)} \\ket{0}_b$ which have exactly the same form as \\cref{eq:ctrlKraus}.\nL000146\tThe Heisenberg-picture quantum channel for control is\nL000147\t\\begin{equation} \\label{eq:KChannel}\nL000148\t    \\mathbb{C}[\\hat{\\mathcal{O}}] = \\sum_{m=0}^\\infty \\hat{K}_m^\\dagger(\\theta)\\,\\hat{\\mathcal{O}}\\,\\hat{K}_m(\\theta).\nL000149\t\\end{equation}\nL000150\tAll normally-ordered products of $\\hat{a}$ and $\\hat{a}^\\dagger$ are eigenvectors of this channel, $\\mathbb{C}[(\\hat{a}^\\dagger)^k \\hat{a}^l] = \\cos^{k+l}(\\theta)\\, (\\hat{a}^\\dagger)^k \\hat{a}^l$.\nL000151\tAs for \\cref{eq:ctrlKraus}, $\\mathbb{C}$ scales linear operators by $\\cos\\theta=e^{-\\gamma}$.\nL000152\t\nL000153\t\nL000154\tThe full stochastic evolution of a generic operator acting on the IHO is the weighted sum of these two channels\nL000155\t\\begin{equation} \\label{eq:fullChannel}\nL000156\t    \\hat{\\mathcal{O}}(t+1) = \\mathbb{T}[\\hat{\\mathcal{O}}(t)] = (1-p)\\mathbb{S}_\\kappa[\\hat{\\mathcal{O}}(t)] + p\\,\\mathbb{C}_\\gamma[\\hat{\\mathcal{O}}(t)],\nL000157\t\\end{equation}\nL000158\twhere channels are labeled by their respective exponential parameters.\nL000159\t\nL000160\t\nL000161\t\\textit{Quantum dynamics and Gaussian state evolution}---The dynamics of $\\expval{\\hat{v}_\\pm}$ under $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$ follow the classical dynamics, and\nL000162\tquantum effects manifest only at higher orders in canonical operators.\nL000163\tGaussian states are characterized by their mean $\\expval{\\hat{\\mathbf{r}}}$ and covariance matrix,\nL000164\t\\begin{equation}\nL000165\t    \\sigma_{ij} = \\frac{1}{2}\\expval{\\left\\{\\hat{r}_i, \\hat{r}_j\\right\\}} - \\expval{\\hat{r}_i}\\expval{\\hat{r}_j}\nL000166\t\\end{equation}\nL000167\twhere $\\hat{\\mathbf{r}} = (\\hat{v}_+ \\quad \\hat{v}_-)^T$ and $\\{\\,\\cdot\\,,\\,\\cdot\\,\\}$ is the anticommutator.\nL000168\tTo highlight the quantum aspects of control we take $\\expval{\\hat{\\mathbf{r}}} = 0$ so the system is classically controlled.\nL000169\tBecause both $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$ are Gaussian channels, Gaussian states remain Gaussian and we only need to track evolution of $\\sigma$,\nL000170\t\\begin{gather}\nL000171\t    \\mathbb{S}_\\kappa[\\sigma] = \\begin{pmatrix}\nL000172\t        e^{2\\kappa}\\sigma_{11} & \\sigma_{12} \\\\\nL000173\t        \\sigma_{12} & e^{-2\\kappa}\\sigma_{22}\nL000174\t    \\end{pmatrix}\\\\\nL000175\t    \\mathbb{C}_\\gamma[\\sigma] = e^{-2\\gamma} \\,\\sigma + \\frac{\\hbar}{2}\\left(1-e^{-2\\gamma}\\right) \\,\\mathbf{1}. \\label{eq:control_channel}\nL000176\t\\end{gather}\nL000177\tBy design $\\mathbb{S}_\\kappa$ is a single-mode squeezing channel, and $\\mathbb{C}_\\gamma$ is a pure-loss attenuator~\\cite{Serafini2021}.\nL000178\tFor $p\\neq0$ the off-diagonal elements of $\\sigma$ vanish for $t\\to\\infty$ due to control, so $\\sigma_{11},\\sigma_{22}\\equiv \\sigma_\\pm$ alone determine steady state properties.\nL000179\tThese are the variances of canonical operators, so the constant term in $\\mathbb{C}_\\gamma$ manifests the quantum uncertainty relation between them, $\\sigma_+\\sigma_-\\geq \\hbar^2/4$, and the control point is $\\sigma_\\pm=\\hbar/2$.\nL000180\tWe note now that \\cref{eq:control_channel} is the basis for the noise inserted via the TWA control protocol mentioned earlier.\nL000181\tThe actions of $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$ on $\\sigma_\\pm$ do not commute, complicating the analysis of trajectories of $\\sigma_\\pm$, however the system can be analyzed numerically together with analytical methods in applicable limits described later.\nL000182\tFor convenience we scale $\\sigma_\\pm$ by $\\hbar$ in our further analysis, leaving them dimensionless.\nL000183\t\nL000184\t\nL000185\t\\textit{Semiclassical analysis of quantum control transition}---As above we use $\\bar\\rho_{00}$ as the order parameter, with the controlled state signaled by $\\bar{\\rho}_{00}>0$.\nL000186\tWith our assumption $\\expval{\\hat{\\mathbf{r}}}=0$, for a Gaussian trajectory $\\rho_{00}(t) = \\left[(\\sigma_+(t)/+\\tfrac{1}{2})(\\sigma_-(t)+\\tfrac{1}{2})\\right]^{-1/2}$~\\cite{Serafini2021}.\nL000187\tSince an arbitrary density matrix can be written as a linear combination of Gaussian density matrices, the order parameter $\\bar{\\rho}_{00}$ for a generic state is\nL000188\t\\begin{equation} \\label{eq:rho00}\nL000189\t    \\bar{\\rho}_{00} = \\int\\dd \\sigma_+\\dd\\sigma_- \\frac{\\mathcal{Q}(\\sigma_+,\\sigma_-)}{\\sqrt{(\\sigma_++\\frac{1}{2})(\\sigma_-+\\frac{1}{2})}},\nL000190\t\\end{equation}\nL000191\twhere $\\mathcal{Q}(\\sigma_+,\\sigma_-)$ is the steady-state probability density over Gaussian trajectories which obeys\nL000192\t\\begin{equation} \\label{eq:Frobenius}\nL000193\t    \\mathcal{Q}(\\sigma_+,\\sigma_-) = (1-p)\\mathcal{Q}(\\mathbb{S}_\\kappa^{-1}[\\sigma_+,\\sigma_-]) + p\\,\\mathcal{Q}(\\mathbb{C}_\\gamma^{-1}[\\sigma_+,\\sigma_-]).\nL000194\t\\end{equation}\nL000195\tThis is analogous to the Frobenius-Perron equation for the invariant density used in classical chaotic dynamics~\\cite{Hasegawa1992}\nL000196\t~\\footnote{In classical systems, this operator is ill-defined for Hamiltonian dynamics, requiring the introduction of noise to regularize divergences~\\cite{Supplement}.\nL000197\tIn contrast, quantum fluctuations resolve these divergences.}.\nL000198\tWe can compute \\cref{eq:rho00} numerically.\nL000199\t\nL000200\t\\begin{figure}[t]\nL000201\t    \\centering\nL000202\t    \\includegraphics[width=0.87\\columnwidth]{full_plot.pdf}\nL000203\t    \\caption{(a) Steady-state $\\bar{\\rho}_{00}(p)$ from the fixed point of $\\mathbb{T}$ for $\\kappa=\\gamma=2\\ln\\!\\left(\\tfrac{1+\\sqrt{5}}{2}\\right)\\approx0.42$, with cutoffs $2^{-L-1}<\\sigma_\\pm<2^{L-1}$ for $L=10,20,30,40,50$; dashed: late-time average over 5000 trajectories; inset: collapse near $p=p_c$ with $\\nu=1$ and $\\beta=0.96$. (b) $\\bar{\\rho}_{00}(L)$ at $p_c$ (same cutoffs); dashed: $\\bar{\\rho}_{00}\\propto L^{-\\beta}$ with $\\beta=0.96$. (c) $\\bar{\\rho}_{00}(t)$ at $p_c$; dashed: $\\bar{\\rho}_{00}\\propto t^{-1/z}$ with $z=2$.}\nL000204\t    \\label{fig:rho00steady}\nL000205\t\\end{figure}\nL000206\t\nL000207\tIn \\cref{fig:rho00steady} we show results computed with the IHO corresponding to those presented for the cat map in \\cref{fig:catmapfig}.\nL000208\tThe order parameter's dependence on $p$ shown in \\cref{fig:rho00steady}(a) is computed both as an average over stochastic trajectories and as the fixed-point of the quantum channel after imposing cutoffs $\\sigma_+ \\in (1/2,2^{L-1})$ and $\\sigma_- \\in (2^{-L-1},1/2)$ \\footnote{Due to normalization of $\\sigma_\\pm$ by $\\hbar$, this cutoff defined by $L$ corresponds to taking $\\hbar \\sim 1/2^L$ similar to the cat map definition}.\nL000209\tThe two methods agree for large $L$, with quick convergence for $p>p_c$ since values of $\\sigma_\\pm$ far from the control point are rarely explored.\nL000210\tDespite considering only classically-controlled states $\\expval{\\hat{\\mathbf{r}}}=0$ we see a clear control transition sharpening at $p_c$ for large $L$.\nL000211\tCritical properties at $p_c$ are obtained from $L$ and $t$ dependence of $\\bar{\\rho}_{00}$, shown in \\cref{fig:rho00steady}(b,c), and by collapsing the $p$-dependence of $\\bar\\rho_{00}$ near $p=p_c$.\nL000212\tWe find $\\beta \\approx 1$ and $\\nu\\approx 1$, agreeing with the result of the cat map, and also dynamical exponent $z\\approx2$, all characteristic of random walk universality.\nL000213\t\nL000214\t\\textit{Fokker-Planck analysis}---Since $\\sigma_- \\in (0,1/2)$ at late times, $\\bar{\\rho}_{00}$ vanishing or remaining nonzero must result from $\\sigma_+$ diverging for $p<p_c$ and remaining finite for $p>p_c$ in \\cref{eq:rho00}.\nL000215\tThe stochastic dynamics of $\\sigma_+$ are a random multiplicative process with lower bound $\\sigma_+>1/2$~\\cite{Sornette1997}:\nL000216\t$\\sigma_+(t+1)=\\Lambda_t\\, \\sigma_+(t)$ where $\\Lambda_t$ is drawn randomly from $(e^{2\\kappa},e^{-2\\gamma})$ with corresponding probabilities $(1-p,\\, p)$, and $\\sigma_+>1/2$ imposed by hand.\nL000217\tIn the limit of weak dynamics ($\\kappa,\\gamma$ small) and defining $y=\\ln\\sigma_+$, we derive a Fokker-Planck (FP) equation for $P(y,t)$, the distribution of values taken by $y$ during these dynamics,\nL000218\t\\begin{equation} \\label{eq:FP0}\nL000219\t    \\pdv{P(y,t)}{t} = -\\bar{v}\\pdv{P(y,t)}{y} + \\mathcal{D}\\pdv[2]{P(y,t)}{y},\nL000220\t\\end{equation}\nL000221\twith drift velocity $\\bar{v} = 2\\kappa\\left(p_c-p\\right)/p_c$ and diffusion constant $\\mathcal{D} = 2\\kappa^2 p(1-p)/p_c^2$.\nL000222\tThis can be solved for both $P(y,t)$ far from the boundary $y^\\mathrm{min}=-\\ln2$ and for the nontrivial steady state $P(y)$ for $p>p_c$,\nL000223\t\\begin{gather}\nL000224\t    P(y,t) \\sim \\frac{1}{\\sqrt{2\\pi \\mathcal{D}t}}e^{-\\frac{\\left(y-\\bar{v}t\\right)^2}{2\\mathcal{D}t}},\\,\\, y\\gg y^\\mathrm{min} \\\\\nL000225\t    P(y) = \\frac{\\xi}{2^\\xi} e^{-\\xi y} \\,\\,\\Rightarrow\\,\\,     \\mathcal{Q}_+(\\sigma_+) = \\frac{\\xi}{2^\\xi}  \\sigma_+^{-1-\\xi},\\,\\, p>p_c, \\label{eq:powerlawQ}\nL000226\t\\end{gather}\nL000227\twhere $\\xi = \\abs{\\bar{v}}/\\mathcal{D}$.\nL000228\tThe distributions for $\\sigma_+$ are obtained as $\\mathcal{Q}_+(\\sigma_+) = P(\\ln\\sigma_+)/\\sigma_+$, and have log-normal and power-law forms respectively~\\footnote{The distribution $\\mathcal{Q}_+(\\sigma_+)$ is related to the full distribution $\\mathcal{Q}(\\sigma_+,\\sigma_-)$ appearing in \\cref{eq:rho00} and \\cref{eq:Frobenius} by integrating over the allowed values of $\\sigma_-$, giving a distribution for the values of $\\sigma_+$ alone.}.\nL000229\tIn the Supplement~\\cite{Supplement} we present the details of the FP derivation and demonstrate this log-normal behavior of $\\mathcal{Q}_+(\\sigma_+,t)$.\nL000230\t\nL000231\tWith solutions for the distribution we can examine criticality of the transition.\nL000232\tAt $p=p_c$, $\\bar{v}=0$ so the distribution has no overall drift and $y$ evolves diffusively away from the boundary, yielding a divergence in $y$ (and $\\sigma_+$) at late times,\nL000233\t\\begin{equation} \\label{eq:zeqn}\nL000234\t    \\bar{\\rho}_{00}(t) \\sim \\int_{\\frac{1}{2}}^\\infty\\!\\!\\!\\dd\\sigma_+\\frac{\\mathcal{Q}_+(\\sigma_+,t)}{\\sqrt{\\sigma_+(t)}} \\sim \\int_{0}^{\\infty}\\!\\!\\!\\dd y\\frac{e^{-\\frac{y^2}{2\\mathcal{D} t}}}{\\sqrt{\\mathcal{D}t}} e^{-\\frac{y}{2}} \\sim t^{-1/2}.\nL000235\t\\end{equation}\nL000236\tIf we also impose a maximum $\\sigma_+^\\mathrm{max} = 2^L$, giving $y^\\mathrm{max}=L\\ln2$, then for late times and large $L$ the hard wall boundaries combined with the diffusive nature of $P$ give $P(y)\\sim1/L$ and we have\nL000237\t\\begin{equation} \\label{eq:betaeqn}\nL000238\t    \\bar{\\rho}_{00}(L) \\sim \\int_{\\frac{1}{2}}^{2^L} \\dd\\sigma_+ \\frac{\\mathcal{Q}_+(\\sigma_+)}{\\sqrt{\\sigma_+}}\\sim\\int_{0}^{L\\ln2}\\dd y \\frac{e^{-\\frac{y}{2}}}{L}\\sim \\frac{1}{L}.\nL000239\t\\end{equation}\nL000240\tThe Fokker-Planck analysis therefore recovers the critical behavior observed numerically in \\cref{fig:rho00steady}(b,c) with exponents $\\beta=1$ and $z=2$.\nL000241\t\nL000242\tThe multiplicative dynamics used to obtain \\cref{eq:FP0} are approximate.\nL000243\tThe map $\\mathbb{C}_\\gamma$ imposes the constraint $\\sigma_+>1/2$ in a smooth way, while the analysis here imposed it crudely, with the difference largest for $\\sigma_+\\sim1/2$.\nL000244\tHowever, the universal results \\cref{eq:zeqn,eq:betaeqn} depend only on the large-$\\sigma_+$ properties of \\cref{eq:FP0}---diffusive behavior away from the boundary and normalizability of distributions---and critical properties are insensitive to precise behavior near $\\sigma_+\\sim 1/2$.\nL000245\tThis is demonstrated in the Supplement~\\cite{Supplement} by derivation of the FP equation from exact $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$.\nL000246\t\nL000247\t\\textit{Exact quantum dynamics}---The FP analysis developed above is semiclassical, but exact quantum results can be obtained as well.\nL000248\tSince $\\hat{\\mathbf{1}}$ and $\\hat{v}_+$ are eigenvectors of $\\mathbb{T}$ with eigenvalues $1$ and $(1-p)e^{\\kappa}+p\\,e^{-\\gamma}$, an inductive argument can be developed using these base cases to give an infinite set of eigenvectors\nL000249\t\\begin{equation}\nL000250\t    \\hat{Z}_n = (\\hat{v}_+)^n + \\sum_{k=1}^{\\lfloor n/2\\rfloor} \\alpha_{n,k} \\hat{Z}_{n-2k} = \\sum_{k=0}^{\\lfloor n/2\\rfloor}\\beta_{n,k}(\\hat{v}_+)^{n-2k},\nL000251\t\\end{equation}\nL000252\twith eigenvalues $\\lambda_n = (1-p)e^{n\\kappa}+p\\,e^{-n\\gamma}$, i.e. $\\mathbb{T}[\\hat{Z}_n] = \\lambda_n \\hat{Z}_n$, where the $\\lfloor n/2\\rfloor$ coefficients $\\alpha_{n,k}$ or $\\beta_{n,k}$ are found by solving a system of linear equations.\nL000253\tThe full construction is detailed in the Supplement~\\cite{Supplement}.\nL000254\t\nL000255\tWhen $\\lambda_n<1$ the operator $\\hat{Z}_n$ is controlled, $\\langle\\hat{Z}_n\\rangle\\to0$ as $t\\to\\infty$.\nL000256\tSince the eigenvalues of all other order-$n$ eigenoperators are less than one at $p=p_c$, control of $\\hat{Z}_n$ diagnoses controllability for all operators of order $n$.\nL000257\tWe thus obtain\nL000258\t\\begin{equation} \\label{eq:pstar}\nL000259\t    p^\\ast_n = \\frac{e^{n\\kappa}-1}{e^{n\\kappa}-e^{-n\\gamma}} >p_c\\quad \\forall n>0\nL000260\t\\end{equation}\nL000261\tas the control probability for all order-$n$ operators, with $\\lim_{n\\to0}p^\\ast_n = p_c$.\nL000262\tSince $p^\\ast_{n+1}>p^\\ast_n>p_c$ for $n>0$, as $p$ increases above $p_c$ there is a sequence of $p$ values where operators of increasing order become finite.\nL000263\tIn the End Matter, we relate the sequence $p_n^\\ast$ to moments of the steady-state distribution obtained from our Fokker-Planck analysis becoming finite.\nL000264\t\nL000265\t\\textit{Conclusion}---We elucidate universal features of stochastic control transitions in quantum chaotic dynamics, using the quantum cat map as a concrete example.\nL000266\tAgreement between exact dynamics, TWA, and the controlled IHO shows that these universal features are set by uncertainty-limited fluctuations and are largely insensitive to quantum interference.\nL000267\tThis framework explains the emergence of random-walk universality and how quantum fluctuations dress the controlled phase.\nL000268\tPrevious work~\\cite{Iadecola2023,LeMaire2024,Allocca2024,Pan2024,Pan2025} demonstrated stochastic quantum control \\emph{without} full canonical quantization and hence lacked a formal connection to quantum chaos.\nL000269\tIn this work, uncertainty-limited localization and the operator-moment hierarchy provide a genuinely quantum signature; this is underscored by the fact that the small-$\\hbar$ physics is simulable with a classical control map with quantum-limited noise \\cite{Supplement}.\nL000270\tNonetheless, due to the power-law nature of the steady-state \\cref{eq:powerlawQ}, there is potential for interference phenomenon to be seen in the nature of higher moments beyond the analysis here; we leave that analysis to future work.\nL000271\t\nL000272\tA direct platform for the IHO is a driven Kerr/parametric oscillator in cavity or circuit QED; above threshold the origin (vacuum) is an unstable fixed point and the dynamics form an effective phase-space double well while measurement-based feedback or autonomous reservoir engineering implements the attenuation control channel~\\cite{Leghtas2015,Grimm2020,Sayrin2011,Vijay2012}.\nL000273\tFully chaotic maps with clear unstable orbits have cold atomic candidates, where analogous control protocol could be designed~\\cite{Moore1995,Chaudhury2009}.\nL000274\t\nL000275\tAs noted above, the generic theory of the IHO cannot access the uncontrolled phase of specific maps.\nL000276\tOther quantum phenomena within that phase, such as qubit encoding, interference, and entanglement, can occur and are rich areas for future development.\nL000277\tBeyond these, a further question remains of how the \\emph{many-body} problem behaves, where the phase space is extensive and Lyapunov exponents can undergo a transition themselves.\nL000278\t\nL000279\t\\begin{acknowledgments}\nL000280\t\\emph{Acknowledgments}---We thank M.~Prasad, A.~Chakraborty, T.~Iadecola, M.~Kulkarni, and J.~H.~Pixley for discussions and collaboration on related work, and Y.~BenTov for discussions on relations to market dynamics.\nL000281\tJHW is supported by the NSF CAREER Grant No.~DMR-2238895.\nL000282\tSG is supported by NSF CAREER Grant No. DMR-1944967 and in part by NSF DMR-2315063.\nL000283\tThis work was initiated and performed in part at the Aspen Center for Physics, which is supported by the National Science Foundation Grant No.~PHY-1607611.\nL000284\tPortions of this research were conducted with high-performance computational resources provided by Louisiana State University (http://www.hpc.lsu.edu).\nL000285\t\\end{acknowledgments}\nL000286\t\nL000287\t\nL000288\t\\bibliography{references}\nL000289\t\nL000290\t\\appendix\nL000291\t\nL000292\t\\section{End Matter}\nL000293\tThough our main focus has been on the control transition itself, we can examine generic properties of the controlled phase using both distributions obtained from the Fokker-Planck analysis and exact quantum channel results of the IHO.\nL000294\t\nL000295\tIn \\cref{fig:powerlaw}, we compare the power-law form of $\\mathcal{Q}_+(\\sigma_+)$ in \\cref{eq:powerlawQ} to the distribution computed numerically for $p>p_c$.\nL000296\tThe lower boundary of the FP dynamics is vital for the existence of a late-time steady state in the controlled phase---in \\cref{eq:FP0} $\\bar{v}<0$ for $p>p_c$, so the distribution drifts to small $y$ and is held up by the barrier at $y^\\mathrm{min}$.\nL000297\tThese two opposing forces balance to yield a stable distribution.\nL000298\t\nL000299\tWe can further compute moments of this distribution\nL000300\t\\begin{equation}\nL000301\t    \\overline{\\sigma_+^n} = \\int\\dd\\sigma_+ \\sigma_+^n\\mathcal{Q}_+(\\sigma_+) = \\frac{2^{-\\xi}\\xi}{\\xi-n},\nL000302\t\\end{equation}\nL000303\tand find that the $n$th moment of $\\sigma_+$ is finite only when $\\xi>n$.\nL000304\tSetting $\\xi = n$ gives a sequence of control rates at which these moments become finite in the FP framework,\nL000305\t\\begin{equation} \\label{eq:pFP}\nL000306\t    p^\\mathrm{FP}_{2n} = p_c + (1-p_c)n\\kappa + O(\\kappa^2) > p_c,\nL000307\t\\end{equation}\nL000308\twhere we have expanded the result in small $\\kappa$ since this was necessary to obtain \\cref{eq:FP0} and $\\mathcal{Q}_+(\\sigma_+)$.\nL000309\tThe $n$th moment of $\\mathcal{Q}_+$ is related to quantum operators of order $2n$ since $\\sigma_+$ is quadratic.\nL000310\t\nL000311\t\\begin{figure}[h]\nL000312\t    \\centering\nL000313\t    \\includegraphics[width=0.8\\columnwidth]{powerlaw_fig.pdf}\nL000314\t    \\caption{Comparison of the power-law form of the distribution $\\mathcal{Q}_+(\\sigma_+)$ acquired from the FP analysis with the distribution of $\\sigma_+$ computed numerically from the fixed point of $\\mathbb{T}$ with $\\kappa = \\gamma = 0.2$ and cutoff $L=50$ for $p=0.6$.}\nL000315\t    \\label{fig:powerlaw}\nL000316\t\\end{figure}\nL000317\t\nL000318\tThis sequence of moment control rates are directly related to the sequence of control rates $p^\\ast$ in \\cref{eq:pstar} for which quantum operators of order $n$ become controlled: $p^\\ast_{2n} = p^\\mathrm{FP}_{2n}$ to first order in $\\kappa$.\nL000319\tThis confirms that the FP analysis captures key features of the exact quantum dynamics in the appropriate limits, and equivalently demonstrates that the operators $\\hat{Z}_{n}$ generalize the moment-control picture of the semiclassical analysis to a quantum context.\nL000320\t\nL000321\t\nL000322\t\nL000323\t\nL000324\t\nL000325\t\nL000326\t\nL000327\t\nL000328\t\nL000329\t\nL000330\t\nL000331\t\\end{document}\nL000332\t===== END FILE: main.tex =====\nL000333\t\nL000334\t===== BEGIN FILE: supplement.tex =====\nL000335\t\nL000336\t\nL000337\t\nL000338\t\\documentclass[aps, prb, singlecolumn, superscriptaddress]{revtex4-2}\nL000339\t\\usepackage{graphicx}\nL000340\t\\usepackage{braket}\nL000341\t\\usepackage{physics}\nL000342\t\\usepackage{amsmath}\nL000343\t\\usepackage{amssymb}\nL000344\t\\usepackage{mathtools}\nL000345\t\\usepackage{hyperref}\nL000346\t\\usepackage[capitalize]{cleveref}\nL000347\t\\usepackage[usenames]{xcolor}\nL000348\t\nL000349\t\\allowdisplaybreaks\nL000350\t\nL000351\t\\DeclareMathOperator{\\statvar}{var}\nL000352\t\\DeclareMathOperator{\\sgn}{sgn}\nL000353\t\nL000354\t\\DeclarePairedDelimiter\\ceil{\\lceil}{\\rceil}\nL000355\t\\DeclarePairedDelimiter\\floor{\\lfloor}{\\rfloor}\nL000356\t\nL000357\t\\begin{document}\nL000358\t\nL000359\t\\title{Supplement to Universality of stochastic control of quantum chaos with measurement and feedback}\nL000360\t\nL000361\t\\author{Andrew A. Allocca}\nL000362\t\\affiliation{Department of Physics and Astronomy, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000363\t\\affiliation{Center for Computation and Technology, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000364\t\nL000365\t\\author{Devesh K. Verma}\nL000366\t\\affiliation{Department of Physics and Astronomy, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000367\t\nL000368\t\\author{Sriram Ganeshan}\nL000369\t\\affiliation{Department of Physics, City College, City University of New York, New York, New York 10031, USA}\nL000370\t\\affiliation{CUNY Graduate Center, New York, New York 10031, USA}\nL000371\t\nL000372\t\\author{Justin H. Wilson}\nL000373\t\\affiliation{Department of Physics and Astronomy, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000374\t\\affiliation{Center for Computation and Technology, Louisiana State University, Baton Rouge, Louisiana 70803, USA}\nL000375\t\nL000376\t\\maketitle\nL000377\t\nL000378\t\nL000379\t\nL000380\t\nL000381\t\nL000382\t\nL000383\t\nL000384\t\nL000385\t\nL000386\t\nL000387\t\nL000388\t\nL000389\t\nL000390\t\\section{The Quantum Arnold Cat Map details}\nL000391\t\nL000392\t\\subsection{Alternative derivation}\nL000393\t\nL000394\tTo derive the cat map, we take the Heisenberg evolution perspective and attempt to find a unitary matrix such that\nL000395\t\\[\nL000396\tU^\\dagger \\hat x U = 2\\hat x + \\hat p, \\quad U^\\dagger \\hat p U = \\hat x + \\hat p.\nL000397\t\\]\nL000398\tFurther, note that $[\\hat x, \\hat p] = i \\hbar$. We will use $\\hbar$ to compactify us onto the torus.\nL000399\t\nL000400\tTwo operations will be helpful:\nL000401\t\\[\nL000402\t\\begin{aligned}\nL000403\te^{i \\alpha \\hat p^2} \\hat x e^{-i \\alpha \\hat p^2} & = \\hat x + i \\alpha [\\hat p^2, \\hat x] = \\hat x + 2\\alpha\\hbar  \\hat p \\\\\nL000404\te^{-i \\beta \\hat x^2} \\hat p e^{i \\beta \\hat x^2} & = \\hat p - i \\beta[\\hat x^2, \\hat p] = \\hat p + 2\\beta \\hbar  \\hat x\nL000405\t\\end{aligned}\nL000406\t\\]\nL000407\tIf we let $\\alpha = \\frac1{2\\hbar}$ and $\\beta = \\frac{1}{2\\hbar}$, then notice that to get the cat map for Heisenberg evolution, we must have\nL000408\t\\begin{equation}\nL000409\t   U_\\mathrm{cat} = e^{-i \\hat p^2 / (2\\hbar)} e^{i \\hat x^2 / (2\\hbar)}\nL000410\t\\end{equation}\nL000411\t\nL000412\tEquivalently, using Berry's method of quantizing linear maps~\\cite{Hannay1980}, we generate a quantum version of Arnold's cat map~\\cite{Arnold1968}, which is a well known chaotic map.\nL000413\tThe classical cat map is defined to act on a two-dimensional parameter space as\nL000414\t\\begin{equation}\nL000415\t\\label{eq:catmapSUPP}\nL000416\t  \\begin{pmatrix} x' \\\\ p' \\end{pmatrix}=\nL000417\t  \\begin{pmatrix} 2 & 1 \\\\ 1 & 1 \\end{pmatrix}\nL000418\t  \\begin{pmatrix} x \\\\ p \\end{pmatrix} \\mod 1.\nL000419\t\\end{equation}\nL000420\t\nL000421\tThe quantized cat map propagator acts on states $\\ket{Q}$ for $Q = 0,\\ldots, N-1$ (and $x = Q/N$ is the point in the phase space) is given by:\nL000422\t\\begin{equation}\nL000423\t    \\expval{Q_1 | U | Q_2}=\\sqrt{\\frac{i}{N}}\\exp\\Big(\\frac{i \\pi}{N}(Q_1^2+(Q_2 - Q_1)^2 \\Big)\nL000424\t\\end{equation}\nL000425\twhere $N$ must be a positive even integer.\nL000426\tWe can map this to phase space $\\ket{Q} = \\frac1N \\sum_P e^{2\\pi i Q P / N} \\ket{P}$, where now $P=0,\\ldots N-1$, and if we want to impose $p = P/N$, this necessarily means $e^{2\\pi i Q P / N} \\rightarrow e^{2\\pi N i x p} = e^{i x p / \\hbar}$, which works if we let\nL000427\t$$\nL000428\t\\hbar = \\frac1{2\\pi N}.\nL000429\t$$\nL000430\tTherefore, finite-size in these compact discrete maps is intimately tied to its classicality.\nL000431\t\nL000432\tNear the (unstable) fixed point $(0,0)$, the cat map dynamics can be approximated by an inverted harmonic oscillator, and we can derive exactly how by finding the eigenvalues and eigenvectors of the map in \\cref{eq:catmapSUPP} in terms of $\\varphi=\\frac{1+\\sqrt{5}}2$, for which we have $\\{ \\varphi^2, \\varphi^{-2}\\}$ as the eigenvalues and $\\{(\\varphi,1)^T, (-\\varphi^{-1},1)^T\\}$ as the (unnormalized) eigenvectors.\nL000433\t\nL000434\tThis model, therefore has $\\kappa = 2\\ln \\varphi$.\nL000435\t\nL000436\t\\subsection{Control operation}\nL000437\t\nL000438\tIn order to control this system onto the unstable fixed point at the origin, we need a space in which to build the $a$ and $a^\\dagger$ operators used in the Kraus operators in the main text.\nL000439\t\nL000440\tThese operators should annihilate the vacuum state $\\ket{0}$ and approximately create harmonic oscillator numbers states $\\ket{n}$ when $n \\ll N$.\nL000441\tRespecting periodic boundary conditions, we construct these states from the following ``control Hamiltonian'' (we do not use this for dynamics, but purely to find a complete set of states to define these operators):\nL000442\t$$\nL000443\t\\hat H_{\\mathrm{ctrl}} = 2 - \\cos(2\\pi \\hat x) - \\cos(2\\pi \\hat p).\nL000444\t$$\nL000445\tFirst, a note about the energy structure: This Hamiltonian classically has a separatrix at $E=2$, i.e., the central diamond centered around (0,0) and defined by $|x-\\frac12|+|y-\\frac12|=\\frac12$ (this defines the region $\\Omega$ mentioned in the main text).\nL000446\tThis naturally leads us to exclude things outside of the diamond containing $(0,0)$.\nL000447\tQuantum mechanically, it means only using states with $0<E<2$ for control; this will make no difference to the in-text analysis of the controlled phase.\nL000448\t\nL000449\tWith $\\hat H_{\\mathrm{ctrl}}$, we can define the ladder operator $a$ via the eigenstates $\\hat H_{\\mathrm{ctrl}} \\ket{n} = E_n \\ket{n}$, so that\nL000450\t$$\nL000451\ta \\ket{n} = \\sqrt{n} \\ket{n-1}.\nL000452\t$$\nL000453\tHowever, since $a$ connects states with different energies, the global phase chosen for those states changes the operator $a$ itself.\nL000454\tTo fix this phase, we first choose $\\ket{n}$ to be all real valued, and we then fix the sign of $a$ by imposing the standard harmonic oscillator signs for wave functions $\\braket{x}{n} = \\psi_{n}(x)$,\nL000455\t$$\nL000456\t\\sgn(\\psi_{2n}(0)) = (-1)^{n}, \\quad \\sgn(\\psi'_{2n+1}(0)) = (-1)^n.\nL000457\t$$\nL000458\tThis fixes the operator $a$ within the diamond defined by the $0<E<2$ states (inside the classical separatrix).\nL000459\t\nL000460\tWith this definition for $a$, the Kraus operators need no modification except to be truncated to a smaller space $n=0,\\ldots N-1$.\nL000461\tThe control procedure does get slightly modified though: We first measure if the quantum state is in $0<E<2$, and if not, we do nothing.\nL000462\tIf it is, we then choose which Kraus operator $K_m$ to apply based on its Born probability and proceed as normal.\nL000463\tThe quantum simulations are then done on \\emph{trajectories} to maintain state purity and avoid simulating full density matrices.\nL000464\tTherefore, when control is done, we choose which Kraus operator $K_m$ to apply based on its Born probability\nL000465\t\\begin{equation}\nL000466\t    P^{\\mathrm{Born}}_{m}=\\bra{\\psi}\\hat{K}^{\\dagger}_m\\hat{K}_m\\ket{\\psi}.\nL000467\t\\end{equation}\nL000468\twhere, $\\ket{\\psi}$ is the system wavefunction and $0\\leq m \\leq N-1$.\nL000469\t\nL000470\tWe choose $p$ to be the measurement rate, and perform the unitary cat map evolution at a rate of $1-p$.\nL000471\tPerforming this stochastic evolution, we can average over trajectories  to obtain quantities like the order parameter $\\bar{\\rho}_{00}(t) = \\overline{\\lvert\\expval{0|\\psi_t}\\rvert^2}$, where $\\overline{(\\cdots)}$ represents averaging over trajectories.\nL000472\t\nL000473\t\\textbf{Matching the classical control}---To match classical control, we need only to condition it on the region\nL000474\t$$\nL000475\t \\mathbf r \\mapsto \\mathbf r_0 + e^{-\\gamma} (\\mathbf r - \\mathbf r_0), \\quad |x-\\tfrac12|+|p-\\tfrac12| > \\tfrac12.\nL000476\t$$\nL000477\tfor $\\mathbf r = (x,p)$ and $\\mathbf r_0$ is defined such that\nL000478\t$$\nL000479\t\\mathbf r_0 = \\begin{cases}\nL000480\t (0,0), & x + p < 1/2, \\\\\nL000481\t (1,0), & p - x > 1/2, \\\\\nL000482\t (0,1), & x - p > 1/2, \\\\\nL000483\t (1,1), & x + p > 3/2,\nL000484\t\\end{cases}\nL000485\t$$\nL000486\tin order to satisfy the periodic boundary conditions appropriately.\nL000487\tWhile this is not an exact mapping to the Kraus evolution described above, it is a very good approximation as is demonstrated via linear approximation in the main text Eq.~(9).\nL000488\t\nL000489\t\nL000490\t\\subsection{Truncated Wigner approximation}\nL000491\t\nL000492\tThe semiclassical simulations use the truncated Wigner approximation (TWA)~\\cite{Polkovnikov2010} with phase space lifted to $\\mathbb R^2$, valid when trajectories remain localized near the fixed point (torus winding and discrete Wigner effects are negligible).\nL000493\tWith $[\\hat x,\\hat p]=i\\hbar$ and $\\hbar=1/(2\\pi N)$, quantum states near the origin are approximated by smooth Wigner distributions $W(\\mathbf r)$ for $\\mathbf r=(x,p)$.\nL000494\tThe target vacuum has Wigner function\nL000495\t\\begin{equation}\nL000496\t    W_0(\\mathbf r) = \\frac{1}{\\pi\\hbar}e^{-\\mathbf r^2/\\hbar},\nL000497\t\\end{equation}\nL000498\twhere we use local coordinates centered at the fixed point.\nL000499\t\nL000500\t\\textbf{Unitary step.}---The cat-map propagator $\\mathbf r\\mapsto M\\mathbf r \\mod 1$ with $M=\\begin{pmatrix}2&1\\\\1&1\\end{pmatrix}$ from \\cref{eq:catmapSUPP} acts by pushforward,\nL000501\t\\begin{equation}\nL000502\t    W_{t+1}(\\mathbf r) = W_t(M^{-1}\\mathbf r).\nL000503\t\\end{equation}\nL000504\t\nL000505\t\\textbf{Control step.}---Near the fixed point the measurement-feedback channel acts as a pure-loss attenuator on canonical variables (see \\cref{sec:classicalnoise} for the classical noisy analog).\nL000506\tThe affine update is\nL000507\t\\begin{equation}\nL000508\t    \\mathbf r \\mapsto e^{-\\gamma}\\mathbf r + \\boldsymbol{\\eta},\\qquad\nL000509\t    \\boldsymbol{\\eta}\\sim \\mathcal N\\!\\left(\\mathbf 0,\\; \\tfrac{\\hbar}{2}\\left(1-e^{-2\\gamma}\\right)\\mathbf 1\\right),\nL000510\t\\end{equation}\nL000511\twith the restriction to the region $|x-\\tfrac12|+|p-\\tfrac12| > \\tfrac12$ as discussed above.\nL000512\t\nL000513\t\\textbf{Stochastic trajectories.}---We sample $\\mathbf r(0)\\sim W_0$ and stochastically alternate the two maps: with probability $(1-p)$ apply $\\mathbf r\\mapsto M\\mathbf r \\mod 1$, and with probability $p$ apply control.\nL000514\tObservables are computed by averaging over the ensemble.\nL000515\t\nL000516\t\\textbf{Fidelity.}---The order parameter $\\rho_{00}(t)=\\mel{0}{\\rho(t)}{0}$ is estimated via the Wigner overlap,\nL000517\t\\begin{equation}\nL000518\t    \\rho_{00}(t)\\approx 2\\pi\\hbar\\int d^2\\mathbf r\\; W(\\mathbf r,t)\\,W_0(\\mathbf r) \\approx \\frac{2\\pi\\hbar}{N_\\mathrm{samp}}\\sum_{i=1}^{N_\\mathrm{samp}} W_0\\!\\left(\\mathbf r_i(t)\\right),\nL000519\t\\end{equation}\nL000520\twhere $\\mathbf r_i(t)$ are the $N_\\mathrm{samp}$ sampled phase-space points at time $t$ and $W_0 = \\frac{1}{\\pi\\hbar}e^{-\\mathbf r^2/\\hbar}$, the Wigner function of the target vacuum.\nL000521\tThis produced the semiclassical results in Fig.~1 in the main text.\nL000522\t\nL000523\t\\subsection{Comparison of quantum cat map simulations and TWA}\nL000524\tFor large enough system sizes the order parameter $\\bar{\\rho}_{00}$ obtained from direct simulation of the quantum cat map and from the TWA of these dynamics are in excellent agreement, demonstrated in \\cref{fig:comparison}.\nL000525\tThis justifies using the TWA to extend the results for the quantum cat map to much larger system sizes than can be exactly simulated; in the main text we consider the quantum cat map results up to $N=1024$ ($L=\\log_2N=10$) and then extend to larger $N$ with the TWA.\nL000526\t\nL000527\t\\begin{figure}[h]\nL000528\t    \\centering\nL000529\t    \\includegraphics[width=\\linewidth]{quant+twa_comp.pdf}\nL000530\t    \\caption{Comparison between $\\bar{\\rho}_{00}(p)$ computed from simulation of the exact dynamics of the quantum cat map (blue) and the truncated Wigner approximation (red), for three different system sizes $N=256,512,1024$. (Truncated Wigner has quantum noise due to $\\hbar = \\frac1{2\\pi N}$, see text.)}\nL000531\t    \\label{fig:comparison}\nL000532\t\\end{figure}\nL000533\t\nL000534\t\nL000535\t\nL000536\t\nL000537\t\nL000538\t\nL000539\t\nL000540\t\nL000541\t\nL000542\t\nL000543\t\nL000544\t\nL000545\t\nL000546\t\nL000547\t\nL000548\t\nL000549\t\nL000550\t\nL000551\t\nL000552\t\nL000553\t\nL000554\t\nL000555\t\nL000556\t\\section{Fokker-Planck derivation}\nL000557\t\nL000558\tWhen the system is initialized in a state such that $\\expval{\\hat{x}}=\\expval{\\hat{p}}=0$, the late-time value of $\\bar{\\rho}_{00}=\\overline{\\mel{0}{\\rho}{0}}$, which indicates whether the system is controlled, is determined by just a single element of the covariance matrix, $\\sigma_+ = \\expval{(\\hat{v}_+)^2}$.\nL000559\tWith the known form of the channels $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$, the evolution of $\\sigma_+$ can be expressed as a modified multiplicative process:\nL000560\t\\begin{equation}\nL000561\t    \\sigma_+(t+\\delta t) = e^{f(\\sigma_+,v)}e^{v\\,\\delta t}\\,\\sigma_+(t),\nL000562\t\\end{equation}\nL000563\twhere $v$ is drawn randomly from the distribution\nL000564\t\\begin{equation}\nL000565\t    \\pi(v) = (1-p)\\,\\delta(v-2\\Omega)+p\\,\\delta(v+2\\Gamma)\nL000566\t\\end{equation}\nL000567\tand\nL000568\t\\begin{equation}\nL000569\t    f(\\sigma_+,v) = \\log\\left(1+h(v)\\frac{e^{-v\\,\\delta t}-1}{2 \\,\\sigma_+}\\right),\nL000570\t\\end{equation}\nL000571\twith $h(2\\Omega)=0$ and $h(-2\\Gamma)=1$; the form of $h(v)$ is not yet determined beyond the values it takes at these two points.\nL000572\tThe factor $e^{f(\\sigma_+,v)}$ comes from the term in the control evolution imposing the lower bound on $\\sigma_+$ from the uncertainty relation.\nL000573\tThe parameters we use for the strength of the quantum channels are $\\kappa = \\Omega\\delta t$ and $\\gamma = \\Gamma\\delta t$.\nL000574\tThe time step length $\\delta t$ is superfluous in principle; only the strengths of the maps $\\kappa$ and $\\gamma$ are relevant for the dynamics.\nL000575\tIncluding this $\\delta t$, however, allows us to more easily take a continuous time limit later in the derivation while avoiding pathological behavior of the yet-undetermined function $h(v)$.\nL000576\t\nL000577\tPutting $\\sigma_+ = \\frac{1}{2}e^{x}$ we can rewrite the dynamics in terms of a modified random walk of the exponential variable $x$~\\cite{Sornette1997}.\nL000578\tThe factor of $\\frac{1}{2}$ is chosen so that the control point $\\sigma_+ = \\frac{1}{2}$ corresponds to $x=0$.\nL000579\tThe time evolution of $x$ is then\nL000580\t\\begin{equation}\nL000581\t    x(t + \\delta t) = T(x(t),v) = x(t) + v \\,\\delta t+ \\tilde{f}(x(t),v),\nL000582\t\\end{equation}\nL000583\twhere $\\tilde{f}(x,v) = f(\\tfrac{1}{2}e^x,v)$.\nL000584\tThe preimage of $x(t)$ for a given $v$ is\nL000585\t\\begin{equation}\nL000586\t    T^{-1}(x,v) = x - v\\,\\delta t + \\tilde{g}\\left(x,v\\right) \\quad \\text{with}\\quad \\tilde{g}(x,v) = \\log\\left[1-h(v)\\left(1-e^{v\\,\\delta t}\\right)e^{-x}\\right].\nL000587\t\\end{equation}\nL000588\tLetting $\\mathcal{P}(x,t)$ be the distribution of values $x$ takes after many time steps, we have\nL000589\t\\begin{align}\nL000590\t    \\mathcal{P}&(x, t+\\delta t) = \\int_{-\\infty}^\\infty\\dd v\\,\\pi(v)\\,\\mathcal{P}\\left(T^{-1}(x,v),t\\right) = \\int_{-\\infty}^\\infty\\dd v\\,\\pi(v)\\,\\mathcal{P}\\left(x-v\\,\\delta t+\\tilde{g}(x,v),t\\right)\\\\\nL000591\t    &= \\int_{-\\infty}^\\infty\\dd (\\delta v)\\,\\pi(\\bar{v}+\\delta v)\\,\\mathcal{P}\\left(x-\\bar{v}\\,\\delta t-\\delta v\\,\\delta t+\\tilde{g}(x,\\bar{v}+\\delta v),t\\right) \\\\\nL000592\t    &\\approx \\mathcal{P}(T^{-1}(x,\\bar{v}),t) + \\delta t^2\\frac{\\expval{\\delta v^2}}{2} \\Bigg[\\frac{1}{\\delta t^2}\\eval{\\pdv[2]{\\tilde{g}(x,v)}{v}}_{v=\\bar{v}} \\pdv{\\mathcal{P}(y,t)}{y} + \\left(1-\\frac{1}{\\delta t}\\eval{\\pdv{\\tilde{g}(x,v)}{v}}_{v=\\bar{v}}\\right)^2 \\pdv[2]{\\mathcal{P}(y,t)}{y}\\Bigg]_{y=T^{-1}(x,\\bar{v})}, \\label{eq:discreteFP}\nL000593\t\\end{align}\nL000594\twhere in the second line we put $v=\\bar{v}+\\delta v$ with $\\bar{v} = \\int\\dd v\\,v\\,\\pi(v) = 2\\Omega-2p(\\Gamma+\\Omega)$ the average value of $v$, so that $\\int\\dd v\\,\\delta v\\,\\pi(v) = 0$.\nL000595\tIn the final line we expand in $\\delta v$, which involves expanding both the distribution $P$ and the function $\\tilde{g}$.\nL000596\tThis assumes that $\\pi(v)$ is relatively sharply peaked around $\\bar{v}$.\nL000597\tWe also pull a factor of $\\delta t^2$ from the entire bracketed expression.\nL000598\tUsing one of these factors of $\\delta t$, the expectation value of $\\delta v^2$ can be manipulated to give a diffusion constant,\nL000599\t\\begin{align}\nL000600\t    \\mathcal{D} &\\equiv \\delta t\\frac{\\expval{\\delta v^2}}{2} = \\frac{\\delta t}{2}\\int_{-\\infty}^\\infty\\dd v \\,\\pi(v)\\,(v-\\bar{v})^2 \\\\\nL000601\t    &= \\frac{\\delta t}{2}\\left[4p^2(1-p)(\\Gamma+\\Omega)^2+4p(1-p)^2(\\Gamma+\\Omega)^2\\right] = 2p(1-p)(\\Gamma+\\Omega)^2\\delta t.\nL000602\t\\end{align}\nL000603\tIf we define a step size $\\ell = v\\delta t$ then we see that the diffusion constant is the mean-square step size per time step.\nL000604\tIt grows with the difference between the two possible values of $v$---if they are very different, then trajectories will diverge quickly, i.e. fast diffusion.\nL000605\t\nL000606\tNow consider a limit such that our dynamics are well-approximated as continuous in time.\nL000607\tWe can accomplish this by considering $\\delta t$ small with fixed $\\Omega,\\Gamma$, but we should think of this as the limit of weak maps, i.e. small $\\kappa,\\gamma$.\nL000608\tExpanding in $\\delta t$ helps us avoid issues with the yet-undetermined function $h(v)$, but in the end the value of $\\delta t$ is set to 1.\nL000609\t\nL000610\tReturning to \\cref{eq:discreteFP}, we bring $P(T^{-1}(x,\\bar{v}),t)$ to the left-hand side and divide both sides by $\\delta t$ giving\nL000611\t\\begin{equation}\nL000612\t    \\frac{1}{\\delta t}\\left[\\mathcal{P}(x,t+\\delta t)-\\mathcal{P}(T^{-1}(x,\\bar{v}),t)\\right]\nL000613\t    \\underset{\\delta t \\text{ small}}{\\longrightarrow} \\pdv{\\mathcal{P}(x,t)}{t} + \\bar{v}\\left(1-h(\\bar{v})e^{-x}\\right)\\pdv{\\mathcal{P}(x,t)}{x},\nL000614\t\\end{equation}\nL000615\ton the left-hand side, where we have expanded $T^{-1}(x,\\bar{v}) = x - \\bar{v}\\,\\delta t + \\tilde{g}(x,\\bar{v})$ using $\\tilde{g}(x,v)\\approx\\delta t\\,v\\,h(v)\\,e^{-x}+\\delta t^2\\frac{v^2}{2}(1-h(v)e^{-x})h(v)e^{-x}$.\nL000616\tThis could alternatively be written as a total time derivative with $x(t)$ evolving ballistically with velocity $\\bar{v}$.\nL000617\t\nL000618\tThe right-hand side of \\cref{eq:discreteFP} has factors related to the derivatives of $\\tilde{g}(x,v)$,\nL000619\t\\begin{gather}\nL000620\t    \\frac{1}{\\delta t}\\eval{\\pdv{\\tilde{g}(x,v)}{v}}_{v=\\bar{v}} = \\eval{\\pdv{\\left(v\\,h(v)\\right)}{v}}_{v=\\bar{v}}\\,e^{-x} + O(\\delta t) \\\\\nL000621\t    \\frac{1}{\\delta t^2}\\eval{\\pdv[2]{\\tilde{g}(x,v)}{v}}_{v=\\bar{v}} = \\frac{1}{\\delta t}\\eval{\\pdv[2]{\\left(v\\,h(v)\\right)}{v}}_{v=\\bar{v}}e^{-x} +\nL000622\t    \\frac{1}{2}\\eval{\\pdv[2]{\\left[v^2(1-h(v)e^{-x})h(v)\\right]}{v}}_{v=\\bar{v}}e^{-x} + O(\\delta t). \\label{eq:d2gdv2}\nL000623\t\\end{gather}\nL000624\tThe $1/\\delta t$ in the first term of \\cref{eq:d2gdv2} presents a problem.\nL000625\tThough we need to expand the derivatives of $\\mathcal{P}$ in powers of $\\delta t$ since they are evaluated at $T^{-1}(x,\\bar{v})$ and not $x$, when the $1/\\delta t$ term of \\cref{eq:d2gdv2} multiplies $\\partial \\mathcal{P}(x,t)/\\partial x$ there is no factor of $\\delta t$ to cancel it, leading to a divergence for small $\\delta t$ unless we impose a condition to cancel it in general,\nL000626\t\\begin{equation}\nL000627\t    \\pdv[2]{\\left(v\\,h(v)\\right)}{v} = 0 \\quad \\Rightarrow \\quad h(v) = \\frac{\\Gamma}{v}\\frac{v-2\\Omega}{\\Gamma+\\Omega}.\nL000628\t\\end{equation}\nL000629\tSince $h(v)$ was not determined when introduced besides its value at $v=2\\Omega$ and $v=-2\\Gamma$ we are free to use this form to satisfy this additional constraint and ensure a well-formed Fokker-Planck equation in the continuous time limit.\nL000630\tAs a result of this condition, no additional terms involving additional derivatives of $P$ will appear.\nL000631\tThe needed derivatives of $\\tilde{g}$ are\nL000632\t\\begin{align}\nL000633\t    &\\eval{\\pdv{(v\\,h(v))}{v}}_{v=\\bar{v}} = \\frac{\\Gamma}{\\Gamma+\\Omega} = \\frac{\\gamma}{\\kappa+\\gamma} = 1-p_c \\equiv \\lambda \\\\\nL000634\t    &\\frac{1}{2}\\eval{\\pdv[2]{\\left[v^2(1-h(v)e^{-x})h(v)\\right]}{v}}_{v=\\bar{v}}e^{-x} \\nonumber \\\\\nL000635\t    &\\quad= \\left(1-\\frac{\\Gamma}{\\Gamma+\\Omega}e^{-x}\\right)\\frac{\\Gamma}{\\Gamma+\\Omega}e^{-x} = \\left(1-\\lambda e^{-x}\\right)\\lambda e^{-x}\nL000636\t\\end{align}\nL000637\t\nL000638\tWe therefore have the Fokker-Planck equation\nL000639\t\\begin{equation} \\label{eq:FokkerPlanck1}\nL000640\t    \\pdv{\\mathcal{P}(x,t)}{t} = -v(x)\\pdv{\\mathcal{P}(x,t)}{x} + \\mathcal{D}\\,r(x) \\pdv{}{x}\\left[r(x)\\pdv{\\mathcal{P}(x,t)}{x}\\right],\nL000641\t\\end{equation}\nL000642\twith\nL000643\t\\begin{align}\nL000644\t    r(x) &= 1-\\lambda e^{-x}\\\\\nL000645\t    v(x) &= \\bar{v}\\left(1-\\,h(\\bar{v})e^{-x}\\right) = \\left(\\bar{v}+ 2\\kappa \\frac{\\lambda}{e^x-\\lambda}\\right)r(x).\nL000646\t\\end{align}\nL000647\tNotice that everywhere we have a spatial derivative we have a factor of $r(x)$, suggesting that we can change coordinates to make \\cref{eq:FokkerPlanck1} take a cleaner form.\nL000648\tPutting\nL000649\t\\begin{equation}\nL000650\t    z \\equiv \\log\\left(e^x-\\lambda\\right) \\,\\Rightarrow \\pdv{}{z} = r(x)\\pdv{}{x},\nL000651\t\\end{equation}\nL000652\tand defining $P(z,t) = \\mathcal{P}\\left(x(z),t\\right)$ we obtain\nL000653\t\\begin{align} \\label{eq:FokkerPlanck2}\nL000654\t    \\pdv{P(z,t)}{t} &= -(\\bar{v}+2\\gamma\\,p_c e^{-z})\\pdv{P(z,t)}{z} + \\mathcal{D}\\pdv[2]{P(z,t)}{z} \\\\\nL000655\t    &= -2\\gamma\\, p_c e^{-z} P(z,t)-\\pdv{\\left[\\left(\\bar{v}+2\\gamma\\, p_c e^{-z}\\right)P(z,t)\\right]}{z} + \\mathcal{D}\\pdv[2]{P(z,t)}{z}.\nL000656\t\\end{align}\nL000657\tAs a result, the original element of the covariance matrix is $\\sigma_+ = \\frac{1}{2}e^x = \\frac{1}{2}(e^z-p_c+1)$, with the control point $\\sigma_+=\\frac{1}{2}$ now equating to $z = \\log(p_c)$.\nL000658\t\nL000659\tThe Fokker-Planck equation obtained here has followed from the exact stochastic dynamics on $\\sigma_+$, and we see that the equation analyzed in the main text,\nL000660\t\\begin{equation}\nL000661\t    \\pdv{P(z,t)}{t} = -\\bar{v}\\pdv{P(z,t)}{z} + \\mathcal{D}\\pdv[2]{P(z,t)}{z},\nL000662\t\\end{equation}\nL000663\talong with constraint $z>-\\ln(2)$, agrees with this exact equation in the large-$z$ limit.\nL000664\tAccordingly, the solutions for the distribution $P(z,t)$ and therefore $\\mathcal{Q}_+(\\sigma_+)$ far from this boundary are also valid, power-law at $p=p_c$ and log-normal for early times and $p\\neq p_c$.\nL000665\tThe power-law critical behavior is discussed in the main text, and in \\cref{fig:lognormal} we also show agreement with the log-normal distribution in the appropriate limits.\nL000666\t\nL000667\t\\begin{figure}[b]\nL000668\t    \\centering\nL000669\t    \\includegraphics[width=0.7\\textwidth]{lognormal_plots.pdf}\nL000670\t    \\caption{The early-time distribution of values taken by $\\sigma_+$ in numerical simulations with $p=0.4<p_c$ compared to the predicted log-normal form of $\\mathcal{Q}_\\sigma(\\sigma_+)$, shown in a log-log plot.\nL000671\t    The simulations initialize $\\sigma_+(0)=1/2$ and show the values of $\\sigma_+(t_f)$ across $5 \\times 10^6$ stochastic trajectories.\nL000672\t    For $\\kappa=\\gamma=0.02$ we take $t_f=25$, and for $\\kappa=\\gamma=0.2$ we take $t_f=100$.}\nL000673\t    \\label{fig:lognormal}\nL000674\t\\end{figure}\nL000675\t\nL000676\t\\section{Eigenvectors of the Stochastic Evolution}\nL000677\t\nL000678\tThe stochastic dynamics we consider generates time evolution in the Heisenberg picture as\nL000679\t\\begin{equation}\nL000680\t    \\mathbb{T}[\\hat{\\mathcal{O}}(t+1)] = (1-p) \\mathbb{S}_\\kappa[\\hat{\\mathcal{O}}(t)] + p\\, \\mathbb{C}_\\gamma[\\hat{\\mathcal{O}}(t)],\nL000681\t\\end{equation}\nL000682\twhere $\\hat{\\mathcal{O}}$ is a generic operator, and $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$ are the squeezing and control channels.\nL000683\tWhile all the eigenvectors of the individual channels $\\mathbb{S}_\\kappa$ and $\\mathbb{C}_\\gamma$ are simple to calculate, eigenvectors for the full channel $\\mathbb{T}$ are not as straightforward to obtain.\nL000684\tHere, we now construct an infinite set of these eigenvectors that will allow us to draw important conclusions about the controlled phase of this model.\nL000685\t\nL000686\tWe first note the useful identities\nL000687\t\\begin{gather}\nL000688\t    (\\hat{v}_+)^k = \\sum_{l=0}^{\\floor{k/2}} \\underbrace{\\frac{(2l-1)!!}{2^l} \\binom{k}{2l}}_{\\equiv \\mathcal{A}_{k,k-2l}} \\,:(\\hat{v}_+)^{k-2l}: \\,\\, =\\,\\, :(\\hat{v}_+)^k: + \\sum_{l=1}^{\\floor{k/2}}\\mathcal{A}_{k,k-2l}\\,:(\\hat{v}_+)^{k-2l}:\\label{eq:id1}\\\\\nL000689\t    :(\\hat{v}_+)^k:\\,\\, = \\sum_{l=0}^{\\floor{k/2}} \\underbrace{(-1)^l \\frac{(2l-1)!!}{2^l} \\binom{k}{2l}}_{\\equiv (\\mathcal{A}^{-1})_{k,k-2l}} (\\hat{v}_+)^{k-2l},\\label{eq:id2}\nL000690\t\\end{gather}\nL000691\tallowing us to transform between $(\\hat{v}_+)^k$ and $:(\\hat{v}_+)^k:$, where\nL000692\t\\begin{equation}\nL000693\t    :(\\hat{v}_+)^k:\\, = \\left(\\frac{e^{-i\\frac{\\pi}{4}}}{\\sqrt{2}}\\right)^k\\sum_{j=0}^k\\binom{k}{j}(i\\hat{a}^\\dagger)^j\\hat{a}^{k-j}\nL000694\t\\end{equation}\nL000695\thas normally-ordered ladder operators, so that\nL000696\t\\begin{equation}\nL000697\t    \\mathbb{C}_\\gamma[:(\\hat{v}_+)^k:] = e^{-k\\gamma} :(\\hat{v}_+)^k:.\nL000698\t\\end{equation}\nL000699\t\\cref{eq:id1} is simple to derive, and we obtain \\cref{eq:id2} by noting that $\\mathcal{A}_{k,k'}$ are the components of a triangular matrix---we have only nonzero elements for $k>k'$.\nL000700\tThe properties of triangular matrices then allow direct computation of $\\mathcal{A}^{-1}$.\nL000701\t\nL000702\tTwo low-order eigenvectors of $\\mathbb{T}$ are straightforward:\nL000703\t\\begin{align}\nL000704\t    \\mathbb{S}_\\kappa[\\hat{1}] = \\mathbb{C}_\\gamma[\\hat{1}] = \\hat{1}  \\quad&\\Rightarrow\\quad \\mathbb{T}[\\hat{1}] = \\hat{1}\\\\\nL000705\t    \\mathbb{S}_\\kappa[\\hat{v}_+] = e^{\\kappa}\\hat{v}_+, \\quad\\mathbb{C}_\\gamma[\\hat{v}_+] = e^{-\\gamma}\\,\\hat{v}_+ \\quad&\\Rightarrow\\quad \\mathbb{T}[\\hat{v}_+] = \\left[(1-p)e^{\\kappa} + p\\,e^{-\\gamma}\\right]\\hat{v}_+.\nL000706\t\\end{align}\nL000707\tso we can define the corresponding eigenvalues $\\lambda_0 = 1$ and $\\lambda_1(p) = (1-p)e^{\\kappa}+p\\,e^{-\\gamma}$.\nL000708\tWe now build eigenvectors of $\\mathbb{T}$ inductively using these as base cases.\nL000709\t\nL000710\tAssume that for some fixed $n$ we have a set of operators $\\{\\hat{Z}_k\\}$ for $k=0,2,\\dots,n-2$ ($n$ even) or $k=1,3,\\dots,n-2$ ($n$ odd), with $\\hat{Z}_0\\equiv\\hat{1}$, $\\hat{Z}_1\\equiv \\hat{v}_+$, and\nL000711\t\\begin{equation}\nL000712\t    \\mathbb{T}[\\hat{Z}_k] = \\lambda_k(p) \\hat{Z}_k,\nL000713\t\\end{equation}\nL000714\twith known eigenvalues $\\lambda_k(p)$.\nL000715\tAdditionally, assume that we know how to write any of these $\\hat{Z}_k$ as a sum over the operators in this set with smaller index as\nL000716\t\\begin{equation}\nL000717\t    \\hat{Z}_k = (\\hat{v}_+)^k + \\sum_{l=1}^{\\floor{k/2}} \\alpha_{k,k-2l} \\hat{Z}_{k-2l} = \\sum_{l=0}^{\\floor{k/2}} \\beta_{k,k-2l} (\\hat{v}_+)^{k-2l}, \\label{eq:Zeq}\nL000718\t\\end{equation}\nL000719\twhere all coefficients $\\alpha_{k,k-2l}$ are known and the coefficients $\\beta_{k,k-2l}$ can be written in terms of the $\\alpha$s by expanding all $\\hat{Z}_{k-2l}$ in this same way and collecting powers of $\\hat{v}_+$---the first few are $\\beta_{k,k}=1$, $\\beta_{k,k-2}=\\alpha_{k,k-2}$, and $\\beta_{k,k-4}=\\alpha_{k,k-4}+\\alpha_{k,k-2}\\alpha_{k-2,k-4}$.\nL000720\tFor $n=2$ or $3$ the set of known operators is simply $\\hat{Z}_0 = \\hat{1}$ or $\\hat{Z}_1 = \\hat{v}_+$ alone, and these expansions are trivial.\nL000721\t\nL000722\tNow write a new operator,\nL000723\t\\begin{equation} \\label{eq:alphaansatz}\nL000724\t    \\hat{Z}_n = (\\hat{v}_+)^n + \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\hat{Z}_{n-2k}  = (\\hat{v}_+)^n + \\sum_{k=1}^{\\floor{n/2}}\\beta_{n,n-2k} (\\hat{v}_+)^{n-2k}\nL000725\t\\end{equation}\nL000726\twhere $\\alpha_{n,n-2k}$ are $\\floor{n/2}$ undetermined constants, one for each $k$, and $\\beta_{n,n-2k}$ can be written in terms of these $\\alpha$s as in \\cref{eq:Zeq}.\nL000727\tThis new operator evolves under $\\mathbb{T}$ as\nL000728\t\\begin{align*}\nL000729\t    \\mathbb{T}[\\hat{Z}_n] &= \\mathbb{T}[(\\hat{v}_+)^n] + \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\mathbb{T}[\\hat{Z}_{n-2k}] \\\\\nL000730\t    & = (1-p)\\mathbb{S}_{\\kappa}[(\\hat{v}_+)^n] + p\\,\\sum_{k=0}^{\\floor{n/2}}\\mathcal{A}_{n,n-2k}\\mathbb{C}_{\\gamma}\\left[:(\\hat{v}_+)^{n-2k}:\\right] + \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\lambda_{n-2k}(p)\\hat{Z}_{n-2k} \\\\\nL000731\t    & = (1-p)e^{n\\kappa}(\\hat{v}_+)^n + p\\,\\underbrace{\\sum_{k=0}^{\\floor{n/2}}\\mathcal{A}_{n,n-2k}e^{-(n-2k)\\gamma}:(\\hat{v}_+)^{n-2k}:}_{\\text{separate out } k=0 \\text{ term, noting } \\mathcal{A}_{n,n}=1} + \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\lambda_{n-2k}(p)\\hat{Z}_{n-2k} \\\\\nL000732\t    & = (1-p) e^{n\\kappa} (\\hat{v}_+)^n + p\\,e^{-n\\gamma} \\underbrace{:(\\hat{v}_+)^n:}_{\\text{use \\cref{eq:id1}}} +\\, p\\sum_{k=1}^{\\floor{n/2}}\\mathcal{A}_{n,n-2k} e^{-(n-2k)\\gamma}:(\\hat{v}_+)^{n-2k}: + \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\lambda_{n-2k}(p)\\hat{Z}_{n-2k} \\\\\nL000733\t    & = \\underbrace{\\left[(1-p) e^{n\\kappa} + p\\,e^{-n\\gamma}\\right]}_{\\equiv \\lambda_n(p)}(\\hat{v}_+)^n + p\\sum_{k=1}^{\\floor{n/2}}\\mathcal{A}_{n,n-2k}\\left[e^{-(n-2k)\\gamma}-e^{-n\\gamma}\\right] :(\\hat{v}_+)^{n-2k}: + \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\lambda_{n-2k}(p)\\hat{Z}_{n-2k} \\\\\nL000734\t    & = \\lambda_n(p)\\hat{Z}_n + \\sum_{k=1}^{\\floor{n/2}}\\left\\{p\\,\\mathcal{A}_{n,n-2k} \\left[e^{-(n-2k)\\gamma}-e^{-n\\gamma}\\right] :(\\hat{v}_+)^{n-2k}: + \\alpha_{n,n-2k}\\left[\\lambda_{n-2k}(p)-\\lambda_n(p)\\right]\\hat{Z}_{n-2k}\\right\\}\\\\\nL000735\t\\end{align*}\nL000736\tWe now use \\cref{eq:id2} and \\cref{eq:Zeq} to express all operators in the expression in brackets as powers of $\\hat{v}_+$, and re-indexing and reordering the sums gives\nL000737\t\\begin{align}\nL000738\t    \\mathbb{T}[\\hat{Z}_n] &= \\lambda_n(p)\\hat{Z}_n + \\sum_{l=1}^{\\floor{n/2}} \\sum_{k=1}^{l} \\Bigg\\{ p\\,\\left[e^{-(n-2k)\\gamma}-e^{-n\\gamma}\\right]\\,\\mathcal{A}_{n,n-2k}(\\mathcal{A}^{-1})_{n-2k,n-2l} \\nonumber \\\\\nL000739\t    & \\hspace{6cm} + \\left[\\lambda_{n-2k}(p)-\\lambda_n(p)\\right]\\,\\alpha_{n,n-2k}\\beta_{n-2k,n-2l} \\Bigg\\} (\\hat{v}_+)^{n-2l} \\\\\nL000740\t    &\\equiv \\lambda_n(p)\\hat{Z}_n + \\sum_{k=1}^{\\floor{n/2}} \\mathcal{C}_{n,n-2k}\\,(\\hat{v}_+)^{n-2k}.\nL000741\t\\end{align}\nL000742\tDemanding that all of the $\\floor{n/2}$ coefficients $\\mathcal{C}_{n,n-2k}$ vanish enforces particular values for the unknowns $\\alpha_{n,n-2k}$.\nL000743\tThis demand can always be satisfied because $\\mathcal{C}$ can be expressed as a triangular matrix multiplying a vector of powers of $\\hat{v}_+$.\nL000744\tFor $k=1$, $\\mathcal{C}_{n,n-2}=0$ gives an equation that contains only a single unknown, $\\alpha_{n,n-2}$, and we find\nL000745\t\\begin{equation}\nL000746\t    \\alpha_{n,n-2} = \\frac{p\\,\\left[e^{-(n-2)\\gamma}-e^{-n\\gamma}\\right]\\,\\mathcal{A}_{n,n-2}(\\mathcal{A}^{-1})_{n-2,n-2}}{\\left[\\lambda_{n-2}(p)-\\lambda_n(p)\\right]\\,\\beta_{n-2,n-2}},\nL000747\t\\end{equation}\nL000748\tentirely in terms of known quantities.\nL000749\tFor $k=2$, $\\mathcal{C}_{n,n-4} = 0$ gives an equation that depends on $\\alpha_{n,n-4}$ and the now determined $\\alpha_{n,n-2}$, allowing for the former to be obtained explicitly.\nL000750\tThe pattern continues, allowing us to solve for all $\\alpha_{n,n-2k}$ in sequence.\nL000751\t\nL000752\tIn the end we are left with\nL000753\t\\begin{equation}\nL000754\t    \\mathbb{T}[\\hat{Z}_n] = \\lambda_n(p) \\hat{Z}_n\nL000755\t\\end{equation}\nL000756\tso this posited operator is a new eigenvector of $\\mathbb{T}$ with eigenvalue $\\lambda_n(p) = (1-p)e^{n\\kappa}+p\\,e^{-n\\gamma}$.\nL000757\tWe can repeat this process \\textit{ad infinitum} to construct an infinite tower of eigenvectors and eigenvalues for all integers $n$.\nL000758\tThis also confirms the consistency of the assumed form of the operators $\\hat{Z}_k$ in \\cref{eq:Zeq}.\nL000759\tWe can also rewrite \\cref{eq:alphaansatz} as\nL000760\t\\begin{equation} \\label{eq:alphaZ}\nL000761\t    (\\hat{v}_+)^n = \\hat{Z}_n - \\sum_{k=1}^{\\floor{n/2}}\\alpha_{n,n-2k}\\hat{Z}_{n-2k},\nL000762\t\\end{equation}\nL000763\tgiving a way to express any power of $\\hat{v}_+$ in terms of eigenvectors $\\{\\hat{Z}_k\\}$.\nL000764\t\nL000765\t\\subsection{Operator evolution and critical points}\nL000766\tThough the set $\\{\\hat{Z}_n\\}$ does not comprise a complete set of eigenvectors of $\\mathbb{T}$, it allows us to examine the controllability of generic operators.\nL000767\tWith repeated application of $\\mathbb{T}$, the operators $\\hat{Z}_n$ acquire factors of the corresponding $\\lambda_n(p)$, and will diverge whenever $\\lambda_n(p)>1$, allowing us to define a critical control rate for each $n$ as\nL000768\t\\begin{equation} \\label{eq:pstarSUPP}\nL000769\t    \\lambda_n(p^\\ast_n) = 1 \\quad\\Rightarrow\\quad p^\\ast_n = \\frac{e^{n\\kappa}-1}{e^{n\\kappa} - e^{-n\\gamma}},\nL000770\t\\end{equation}\nL000771\twith divergence occurring for $p<p^\\ast_n$ as $t\\to\\infty$.\nL000772\tFor any $\\kappa,\\gamma>0$ we have $p^\\ast_{n+1}>p^\\ast_n$, so that operators of higher order require more frequent interventions to control.\nL000773\tA generic operator $\\hat{\\mathcal{O}}$ containing terms up to $n$th order in canonical operators can be expanded in terms of the eigenvectors of $\\mathbb{T}$.\nL000774\tThis expansion will generically contain $\\hat{Z}_k$ terms for all $k\\leq n$, and so will diverge at late times for all $p < p^\\ast_n$.\nL000775\t\nL000776\t\nL000777\t\\section{Classical noise in the control map}\\label{sec:classicalnoise}\nL000778\t\nL000779\tWe can simulate similar features to the full quantum problem but with classical probability distributions using an Ornstein-Uhlenbeck process in phase space: $x$ evolves as\nL000780\t\\begin{equation}\nL000781\t    \\frac{dx}{dt} = -\\gamma x + \\sqrt{2D} \\xi(t),\nL000782\t\\end{equation}\nL000783\twhere $\\expval{\\xi(t)\\xi(s)}=\\delta(t-s)$, and similarly for $p$.\nL000784\tThe Fokker-Planck equation for the distribution of values of $x$ (or $p$) is well known\nL000785\t\\begin{equation}\nL000786\t    \\frac{\\partial P}{\\partial t} = \\gamma \\frac{\\partial}{\\partial x}(x P) + D \\frac{\\partial^2 P}{\\partial x^2},\nL000787\t\\end{equation}\nL000788\tso the distribution evolves with the kernel\nL000789\t\\begin{equation}\nL000790\t    K(x,t;x',t') = \\sqrt{\\frac{\\gamma}{2\\pi D(1- e^{-2\\gamma(t-t')})}} \\exp\\left[ -\\frac{\\gamma}{2D} \\frac{(x-x' e^{-\\gamma(t-t')})^2}{1-e^{-2\\gamma(t-t')}}\\right].\nL000791\t\\end{equation}\nL000792\t\nL000793\tTaking an initial Gaussian distribution, $P(x,0) = \\frac{1}{\\sqrt{2\\pi \\sigma}} e^{-\\frac{(x - x_0)^2}{2\\sigma}}$, convolution with the evolution kernel yields another Gaussian\nL000794\t\\begin{equation}\nL000795\t    P(x,t) = \\frac{1}{\\sqrt{2\\pi(\\sigma e^{-2\\gamma t}+\\frac{D}{\\gamma}(1-e^{-2\\gamma t}))}} \\exp\\left[ -\\frac1{2} \\frac{(x-x_0 e^{-\\gamma t})^2}{\\sigma e^{-2\\gamma t}+\\frac{D}{\\gamma}(1-e^{-2\\gamma t}))} \\right]\nL000796\t\\end{equation}\nL000797\tTherefore we can track how control changes Gaussian probability distributions\nL000798\t\\begin{equation}\nL000799\t\\begin{aligned}\nL000800\t    x & \\mapsto e^{-\\gamma t}x \\\\\nL000801\t    \\sigma & \\mapsto e^{-2\\gamma t} \\sigma + \\tfrac{D}{\\gamma}(1 - e^{-2\\gamma t})\nL000802\t\\end{aligned}\nL000803\t\\end{equation}\nL000804\tThis will be true for both $x$ and $p$ (or any other basis).\nL000805\tWe also have a chaotic map which behaves the same as indicated in the main text.\nL000806\tThis is the same as what we have for Gaussian bosonic states.\nL000807\t\nL000808\tInterleaving chaos and control stochastically, we can build up a distribution of $v_\\pm$ and $\\sigma_\\pm$.\nL000809\tThe controlled ``distribution'' then takes the form\nL000810\t\\begin{equation}\nL000811\t    P_0(x,p) = \\frac1{2\\pi D/\\gamma} \\exp\\left[-\\frac{\\gamma}{2D}(x^2 + p^2)\\right].\nL000812\t\\end{equation}\nL000813\tThis form can now be integrated against another Gaussian\nL000814\t\\begin{equation}\nL000815\t    P(v_+,v_-) = \\frac{1}{2\\pi\\sqrt{\\sigma_+\\sigma_-}} e^{-\\frac{v_+^2}{2\\sigma_+} - \\frac{v_-^2}{2\\sigma_-}},\nL000816\t\\end{equation}\nL000817\tto give\nL000818\t\\begin{equation}\nL000819\t    \\frac{4\\pi D}{\\gamma} \\int dv_- dv_+ P(v_+, v_-) P_0(v_+, v_-) = \\frac{2D/\\gamma}{\\sqrt{(D/\\gamma+ \\sigma_+)(D/\\gamma+\\sigma_-)}}.\nL000820\t\\end{equation}\nL000821\tThe last step is to note that we average over trajectories so there is a \\emph{probability distribution} of $\\sigma_{\\pm}$ which we call $\\mathbb{Q}(\\sigma_+, \\sigma_-)$.\nL000822\tFor this, we can compute the true probability distribution\nL000823\t\\begin{equation}\nL000824\t    P_{\\mathrm{full}}(x_+,x_-) = \\int d\\sigma_+ d\\sigma_- \\mathbb{Q}(\\sigma_+,\\sigma_-) P(x_+,x_-),\nL000825\t\\end{equation}\nL000826\tand we therefore have the final expression to find the overlap with the noisy controlled distribution\nL000827\t\\begin{equation}\nL000828\t    \\frac{4\\pi D}{\\gamma} \\int dx_- dx_+ P_{\\mathrm{full}}(x_+, x_-) P_0(x_+, x_-) = \\int d\\sigma_+ d\\sigma_- \\frac{(2D/\\gamma) \\; \\mathbb{Q}(\\sigma_+, \\sigma_-)}{\\sqrt{(D/\\gamma+ \\sigma_+)(D/\\gamma+\\sigma_-)}},\nL000829\t\\end{equation}\nL000830\tIf we have quantum-limited noise if $D/\\gamma = \\frac\\hbar2$.\nL000831\tThis shows that the quantum case is related to a noisy classical problem with a particular form of noise (but \\emph{only} with the control map).\nL000832\t\nL000833\t\nL000834\t\nL000835\t\\bibliography{references}\nL000836\t\nL000837\t\\end{document}\nL000838\t===== END FILE: supplement.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

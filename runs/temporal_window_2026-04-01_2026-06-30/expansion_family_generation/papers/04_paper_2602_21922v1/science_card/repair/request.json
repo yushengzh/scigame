@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2602.21922v1\", \"citation\": \"Alessandro Rizzi, Universal Persistent Brownian Motions in Confluent Tissues, Physical Review Letters (2026), DOI:10.1103/g6l8-wbt1\", \"journal_doi\": \"10.1103/g6l8-wbt1\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: main_r1.tex =====\nL000002\t\\documentclass[aps,prl,10pt,twocolumn]{revtex4-1}\nL000003\t\\usepackage{amsmath,amssymb}\nL000004\t\\usepackage{graphicx}\nL000005\t\\usepackage[dvipsnames]{xcolor}\nL000006\t\\usepackage{comment}\nL000007\t\\usepackage[overload]{empheq}\nL000008\t\\usepackage{upgreek}\nL000009\t\\usepackage{lmodern,pdftexcmds}\nL000010\t\\usepackage[sort&compress]{natbib}\nL000011\t\\usepackage{cases}\nL000012\t\nL000013\t\nL000014\t\\usepackage[normalem]{ulem}\nL000015\t\\usepackage{xcolor}\nL000016\t\nL000017\t\\newcommand{\\aleq}{\\mbox{\\\nL000018\t\\raisebox{-.9ex}{$\\stackrel{\\textstyle<}{\\sim}$}\\ }}\nL000019\t\\newcommand{\\ageq}{\\mbox{\\\nL000020\t\\raisebox{-.9ex}{$\\stackrel{\\textstyle >}{\\sim}$}\\ }}\nL000021\t\\renewcommand{\\bm}[1]{\\boldsymbol{\\mathbf{#1}}}\nL000022\t\nL000023\t\nL000024\t\\begin{document}\nL000025\t\nL000026\t\\title{Universal Persistent Brownian Motions in Confluent Tissues}\nL000027\t\nL000028\t\\author{Alessandro Rizzi}\nL000029\t\\affiliation{Institute of Mechanical Engineering, \\'{E}cole Polytechnique F\\'{e}d\\'{e}rale de Lausanne (EPFL)}\nL000030\t\nL000031\t\\author{Sangwoo Kim*}\nL000032\t\\affiliation{Institute of Mechanical Engineering, \\'{E}cole Polytechnique F\\'{e}d\\'{e}rale de Lausanne (EPFL)}\nL000033\t\nL000034\t\\date{\\today}\nL000035\t\nL000036\t\\begin{abstract}\nL000037\t\nL000038\t\nL000039\tBiological tissues are active materials whose non-equilibrium dynamics emerge from distinct cellular force-generating mechanisms. Using a two-dimensional active foam model, we compare the effects of traction forces and junctional tension fluctuations on confluent tissue dynamics. While these two modes of activity produce qualitatively different cell shapes, rearrangement statistics, and spatiotemporal correlations in fluid states, we find that the long-time cellular motion universally converges to persistent Brownian dynamics. This universal feature contrasts with the non-universal correlations between cell geometry, rearrangement rate, and fluidity, which depend sensitively on the underlying modes of active force. Our results demonstrate that persistent Brownian motion provides a minimal framework for describing tissue dynamics, while distinct active forces leave identifiable structural and dynamical signatures, thereby enabling inference of the dominant active force in fluid state tissues.\nL000040\t\nL000041\t\\end{abstract}\nL000042\t\nL000043\t\\maketitle\nL000044\tBiological tissues are a prime example of active matter that constantly consumes energy at cellular and subcellular scales, driving dynamical changes in tissue architecture and mechanical states. This dynamic regulation plays a key role in many biological processes, including embryonic development, homeostasis, and disease progression \\cite{guillot2013mechanics,heisenberg2013forces}. Although signaling pathways and gene expressions have been central in understanding these processes, recent studies highlight that modulating cellular mechanical properties is essential for robust control of tissue mechanical states.\nL000045\t\nL000046\tIn particular, accumulating studies show that biological tissues can induce phase transition behaviors between solid and fluid states through distinct mechanisms \\cite{lawson2021jamming,hannezo2022rigidity,lenne2022sculpting,mao2024mechanical}. An increase in cell packing density within an epithelial monolayer exhibits glassy dynamics and caging behaviors \\cite{angelini2011glass}, reminiscent of jamming and glass transition in soft materials \\cite{o2003jamming,van2009jamming}. A confluent epithelial monolayer can also undergo phase transition by reaching a zero-tension state \\cite{park2015unjamming}. More recent studies show that phase transitions, including jamming, glass, and percolation transitions, play a key role in embryonic development across various organisms \\cite{mongera2018fluid,petridou2019fluidization, petridou2021rigidity, kim2024nuclear,huycke2024patterning}. Complementing experimental observations, theoretical and computational models elucidate different modes of phase transitions, providing the physical basis for explaining such behaviors \\cite{staple2010mechanics,bi2015density,kim2015cell,bi2016motility,krajnc2020solid,kim2021embryonic,kim2024nuclear,li2025fluidization}.\nL000047\t\nL000048\tWhile it is well established that increasing the magnitude of active forces leads to activity-induced phase transitions~\\cite{bi2016motility,malinverno2017endocytic,kim2021embryonic}, how distinct modes of activity shape structural and dynamical features in non-equilibrium fluid states remains unclear. In this paper, we examine two well-known modes of active forces in densely packed monolayer systems, namely traction forces and junctional tension fluctuations, focusing on regimes in which one mode is dominant over the other, to identify similarities and differences in their emergent properties.\nL000049\t\nL000050\t\\begin{figure}[b]\nL000051\t    \\centering\nL000052\t    \\includegraphics[width=1\\linewidth]{fig1.pdf}\nL000053\t    \\caption{Modeling framework and phase transition behaviors. (a) Representative tissue snapshot, showing distinct types of vertices. (b) Traction force as a self-propelling force, whose polarity $\\theta_i$ diffuses over time. (c) Edge tension $T_{ij}$ fluctuates around a fixed point $T_0$. Phase diagram of (d) traction force, and (e) tension fluctuations, based on long-time MSRD.}\nL000054\t    \\label{fig:1}\nL000055\t\\end{figure}\nL000056\t\nL000057\tTo that end, we employ a two-dimensional active foam model~\\cite{kim2021embryonic} under the confluent condition, i.e., with no spaces between cells. The geometry of individual cells follows the vertex model framework, in which vertices at interfaces describe cell contours. In addition to the physical triple vertices at the tricellular junctions, intermediate vertices are introduced to capture complex cell shapes and junctional curvature (Fig.~\\ref{fig:1}(a)). The tissue structure and dynamics follow from the vertex dynamics, described by an overdamped Langevin equation:\nL000058\t\\begin{equation}\nL000059\t    \\eta_{R} \\frac{\\mathrm{d}\\bm{R}_\\alpha}{\\mathrm{d}t} = \\sum_{<i,j>} \\biggl[ \\bm{T}_{ij} \\Theta(T_{ij}) + \\bm{N}_{ij}   \\biggr] + \\sum_{k} \\bm{F}_k.\nL000060\t    \\label{eq:eom_R}\nL000061\t\\end{equation}\nL000062\tHere, ${\\bm{R}}_\\alpha$ denotes the position of vertex $\\alpha$, and $\\mathbf{T}_{ij}$ and $\\mathbf{N}_{ij}$ are the tangential and normal forces at the junction between cell $i$ and $j$ associated with vertex $\\alpha$, and $\\bm{F}_{k} = F_0\\left(\\cos\\theta_k,\\sin\\theta_k\\right)$ is the traction force of cell $k$ acting on vertex $\\alpha$. The effective force comprises three tangential, three normal, and three traction forces at a triple vertex, and two of each at an intermediate vertex (Fig. S7). The Heaviside step function $\\Theta(T_{ij})$ prevents non-physical negative tension. The tangential force arises from the combined effects of cortical tension and cell-cell adhesion, setting a tension scale $T_0$, while the normal force results from osmotic balance between cells. Note that the tangential and normal forces from standard vertex model energy functionals with area and perimeter elasticity can be mapped directly onto our formalism (see Supplementary Information, Section 2.3 and Fig. S8).\nL000063\t\nL000064\tWe consider two dominant modes of activity in isolation: traction forces and tension fluctuations. Cells generate traction force through focal adhesion, cytoskeletal reorganization, and actomyosin contractility~\\cite{brugues2014forces,alert2020physical}, which we model as a self-propulsion $F_0$ with polarity undergoing rotational diffusion as $\\tau_V \\mathrm{d}\\theta_i/\\mathrm{d}t = \\xi$, where $\\tau_V$ is the persistent timescale and $\\xi$ is the standard Gaussian noise of null mean and unit standard deviation, as in an active Brownian particle~\\cite{romanczuk2012active} (Fig.~\\ref{fig:1}(b)).\nL000065\tAlthough this force acts on the cell center, it can be equivalently represented as the same force acting on all vertices independent of intermediate vertices resolution, resulting in a constant speed $F_0/\\eta_R$ of an isolated cell, similar to traction implementation in previous studies \\cite{sussman2017cellgpu,sadhukhan2024motility,de2025epithelial}.\nL000066\t\nL000067\t\nL000068\tTension fluctuations arise from the dynamical regulation of the actomyosin cortex and cell-cell adhesion. We model these stochastic fluctuations using an Ornstein-Uhlenbeck process \\cite{curran2017myosin,krajnc2020solid,kim2021embryonic}, in which the instantaneous tension fluctuates around the mean level $T_0$ by a fluctuation magnitude $\\Delta T$ and a relaxation timescale $\\tau_T$ (Fig.~\\ref{fig:1}(c)).\nL000069\t\nL000070\t\\begin{equation}\nL000071\t\\tau_T \\frac{\\mathrm{d}T_{ij}}{\\mathrm{d}t} = - (T_{ij} - T_0) + \\Delta T \\sqrt{2 \\tau_T} \\xi.\nL000072\t\\end{equation}\nL000073\t\nL000074\tBoth activities are characterized by two parameters, $F_0$ and $\\tau_V$ for traction, and $\\Delta T$ and  $\\tau_T$ for tension fluctuations. We will investigate these parameter pairs separately without mixing (i.e. $\\Delta T=0$ for traction and $F_0=0$ for tension fluctuations), while keeping other non-dimensional parameters fixed at biologically relevant scales (see SI, Section 2) Even for mixed cases, we confirm that our main results remain quantitatively unchanged when the characteristic scale of dominant active force is much larger that of the others (see SI, Section 4 and Fig. S9).\nL000075\t\nL000076\t\nL000077\tWe first investigate how the tissue mechanical states shift from solid to fluid under each mode of activity by computing the mean-squared relative displacement (MSRD); $MSRD(t)=\\left<\\left(\\bm{r}_{ij}(t+t_0)-\\bm{r}_{ij}(t_0)\\right)^2\\right>$, where $\\bm{r}_{ij}$ is the displacement vector between cells $i$ and $j$, which were neighbors at time $t_0$. Both active forces drive a transition from caging to subdiffusive and eventually diffusive behavior as activity increases, with superdiffusive exponents observed for traction forces at large $F_0$ and $\\tau_V$(Fig.~S1(a)-(d)).\nL000078\t\nL000079\tWe evaluate the MSRD at a fixed time, $t^{*}=2500\\tau_R$ (Fig.~S1(e)(f)) and classify states as fluid when $MSRD(t^*)>1$ (Fig.~\\ref{fig:1}(d)(e)), which was shown to effectively distinguish solid and fluid states in non-equilibrium systems \\cite{mongera2018fluid,kim2021embryonic}. Note that the specific choice of $t^{*}$ only induces quantitative shifts in phase boundaries if $t^{*}$ is larger than all other characteristic timescales in the system (Fig.~S2).\nL000080\t\nL000081\t\\begin{figure}[b]\nL000082\t    \\centering\nL000083\t    \\includegraphics[width=\\linewidth]{fig2.pdf}\nL000084\t    \\caption{Cell geometry in fluid states. Schematic representation of (a) shape factor $q$ and (b) aspect ratio $\\alpha$. Cell anisotropy changes for traction (left) and tension fluctuations (right) in terms of (c) shape factor and (d) aspect ratio. The dashed line in (c) indicates $q_c = 3.81$. Triangles, circles, and squares respectively represent solid,  fluid(traction), and fluid(tension fluctuations) states, as defined in Fig.~\\ref{fig:1}(d)(e). (e) Correlations between shape factor, aspect ratio, and MSRD, exhibiting non-universal features.}\nL000085\t    \\label{fig:2}\nL000086\t\\end{figure}\nL000087\t\nL000088\tIncreasing the magnitude of activity, $F_0$ or $\\Delta T$, drives a transition from solid to fluid states, but the effect of the persistent timescale differs for the two modes. Increasing $\\tau_V$ for traction monotonically fluidizes the system, whereas increasing $\\tau_T$ for tension fluctuations induces a non-monotonic behavior in $MSRD(t^*)$, with maximal fluidity at intermediate persistence (Fig.~\\ref{fig:1}(d)(e), Fig.~S1(e)(f)). This contrast reflects intrinsic differences between the two modes. A large $\\tau_V$ prolongs directed forces, enabling rearrangement even at lower $F_0$. In contrast, both small and large $\\tau_T$ hinder fluidization, as short $\\tau_T$ does not provide sufficient persistence of junctional shortening, while long $\\tau_T$ causes divergence between shortening and relaxation timescales. The resulting phase diagrams agree with previous studies \\cite{bi2016motility,barton2017active,kim2021embryonic,yamamoto2022non}, confirming that our model captures known non-equilibrium phase transitions driven by active forces. In the following, we will focus on fluid states to investigate how cell geometry, cellular rearrangements, and spatiotemporal correlations depend on the activity mode.\nL000089\t\nL000090\t\nL000091\t\\begin{figure}[b]\nL000092\t    \\centering\nL000093\t    \\includegraphics[width=\\linewidth]{fig3.pdf}\nL000094\t    \\caption{Cell geometry in fluid states. (a) Representative cell shapes for distinct $q$. (b) Correlations between $q$ and $\\alpha$ for fluid states with experimental data~\\cite{saraswathibhatla2020spatiotemporal,malinverno2017endocytic} shown as black markers. Error bars indicate the standard error of the mean. The insets illustrate the different morphologies at large $q$. }\nL000095\t    \\label{fig:3}\nL000096\t\\end{figure}\nL000097\t\nL000098\t\nL000099\tWe first examine cell anisotropy, a key geometric signature of fluid states~\\cite{bi2015density,kim2021embryonic}, using two measures, the average shape factor $q=\\left<q_i\\right>$ and aspect ratio $\\alpha=\\left<\\alpha_i\\right>$. For each cell, the shape factor is defined as the ratio of the perimeter to the square root of area, $q_i=P_i/\\sqrt{A_i}$ (Fig.~\\ref{fig:2}(a)), and the aspect ratio is obtained by fitting an ellipse of major and minor axes $b_i$ and $a_i$ that preserves the eigenvalues of the second moment area, $\\alpha_i=b_i/a_i$ (Fig.~\\ref{fig:2}(b)).\nL000100\t\nL000101\t\nL000102\tFor both traction and tension fluctuations, greater cell anisotropy correlates with increased motility and fluidity (Fig.~\\ref{fig:2}(c-e)). For traction, the previously reported critical shape factor, $q_c\\approx3.81$~\\cite{bi2015density,bi2016motility}, accurately predicts the solid-fluid boundary identified by $MSRD(t^*)$. However, the phase boundary prediction is less reliable for tension fluctuations, with solid states of $q>q_c$ at intermediate $\\tau_T$(Fig.~\\ref{fig:2}(c)). The aspect ratio shows similar correlations, but its range is significantly narrower under tension fluctuations than under traction (Fig.~\\ref{fig:2}(d)). These differences manifest as non-universal correlations between $q$ and $MSRD(t^*)$, and between $\\alpha$ and $MSRD(t^*)$ (Fig.~\\ref{fig:2}(e)), implying that cell shape alone cannot robustly infer the level of fluidity, particularly in systems dominated by distinct active forces.\nL000103\t\nL000104\tHow cells deform from the isotropic shape also strongly depends on the type of activity. We compare representative cell geometries at fixed $q$ under traction and tension fluctuations (Fig.~\\ref{fig:3}(a)). At high $q$, cells under traction exhibit uniaxial elongation, whereas cells under tension fluctuations develop highly curved long edges. While directed traction forces induce elongation and nematic order (Fig.~S3), increasing tension fluctuations broaden the tension distribution, producing long, low-tension junctions with high curvature due to the Young-Laplace equation. Such lax junctions increase $q$ without increasing cell elongation, yielding smaller aspect ratios at the same $q$ (Fig.~\\ref{fig:3}(b)).\nL000105\t\nL000106\tTo validate this, we analyze MDCK~\\cite{saraswathibhatla2020spatiotemporal} and MCF-10A~\\cite{malinverno2017endocytic} monolayers in fluid states, where dominant activity is traction force (see SI, Section 5 and Fig. S10). MCF-10A and Cn03-treated MDCK cells match our simulations, while cytochalasin D-treated MDCK cells show reduced aspect ratios consistent with suppressed motility. Low-density MDCK cells fall outside of our simulation range but follow the same trend , confirming consistency with our results.\nL000107\t\nL000108\tA similar non-universal feature appears in human bronchial epithelial layers undergoing either compression-induced unjamming or partial epithelial-to-mesenchymal transition (pEMT)~\\cite{mitchel2020primary}, where lax junctions in the pEMT arise from reduced mean tension rather than fluctuations. Our results show that the same non-universal feature can emerge in non-equilibrium regimes.\nL000109\t\nL000110\t\\begin{figure}[t]\nL000111\t    \\centering\nL000112\t    \\includegraphics[width=\\linewidth]{fig4.pdf}\nL000113\t        \\caption{T1 dynamics. (a) Schematics of a successful (left) and an unsuccessful (right) T1 transition. (b) Representative edge length evolution during a T1 transition for traction (purple) and tension fluctuations (green). Solid and dashed lines represent successful and unsuccessful T1 events, respectively. The gray line marks $l_c$. (c) Mean stalling time, and (d) T1 success rate for tension fluctuations. (e) Mean expected change in defect density for unsuccessful T1 transitions.}\nL000114\t    \\label{fig:4}\nL000115\t\\end{figure}\nL000116\t\nL000117\tWe next analyze cellular rearrangements, an essential feature of fluidity. In confluent layers, these occur through T1 transitions, i.e., the loss of existing contacts and the formation of new junctions \\cite{walck2014cell,bi2014energy,krajnc2018fluidization,kim2018universal}(Fig.~\\ref{fig:4}(a)). For both activities, higher fluidity corresponds to a higher T1 rate, $\\theta_\\text{T1}$ (Fig.~S4). To characterize T1 dynamics, we track the length of each edge and identify $t=t_\\text{T1}$ when its length falls below the critical threshold $l_c$ (Fig.~\\ref{fig:4}(b), SI). Under traction, all short edges elongate immediately after the transition with zero stalling time $\\tau_l=0$. In contrast, under tension fluctuations, a fraction of edges exhibit finite stalling times, with both the stalled fraction (Fig.~S5(b)(c)) and mean stalling time (Fig.~\\ref{fig:4}(c), Fig.~S5(d)) increasing with $\\tau_T$.\nL000118\t\nL000119\t\nL000120\tBeyond finite $\\tau_l$, the T1 success rate also differs qualitatively. We define a successful T1 as one that produces a net topology change (Fig.~\\ref{fig:4}(a)). Under traction, the success rate is 1, whereas tension fluctuations produce a substantial fraction of unsuccessful events, reverting to the original topology (Fig.~\\ref{fig:4}(a)(d)). This difference stems from force persistence; traction provides a persistent force throughout the rearrangement, whereas junctional shortening due to tension fluctuations loses directional memory after the transition. This result is consistent with previous studies with mechanical feedback~\\cite{perez2023tension}.\nL000121\t\nL000122\tAn energy argument between adjacent local energy minima explains unsuccessful T1 transitions. Although the system is far from equilibrium, the underlying local energy minima and their energy level can be inferred from the defect density, $\\sigma_n^2=\\left<(n_i-6)^2\\right>$, where $n_i$ is the number of neighbors of cell $i$. In two-dimensional monodisperse systems, higher $\\sigma_n^2$ corresponds to higher energy~\\cite{kim2019simple}. For unsuccessful T1 transitions, we compute the expected change in $\\sigma_n^2$ assuming successful ones, $\\Delta\\sigma_n^2$, and find that they are biased toward energy-increasing configurations (Fig.~\\ref{fig:4}(e)). In contrast, successful T1 transitions yield $\\left|\\Delta\\sigma_n^2\\right| \\ll 1$, as required for steady states. Thus, energy landscape and local energy barriers strongly influence T1 dynamics under tension fluctuations, but not under traction forces.\nL000123\t\nL000124\t\\begin{figure}\nL000125\t    \\centering\nL000126\t    \\includegraphics[width=\\linewidth]{fig5.pdf}\nL000127\t        \\caption{Spatio-temporal correlations in cell dynamics. Normalized mean squared velocity for (a) traction (linear scale) and (b) tension fluctuations (log scale). (c) Effective persistence $\\tau_\\text{eff}$ and (d) correlation length $l_v$. The dashed line in (c) represents unity.}\nL000128\t    \\label{fig:5}\nL000129\t\\end{figure}\nL000130\t\nL000131\tChanges in the persistence of activity also affect cell velocity in distinct ways. Increasing persistence reduces the mean squared velocity, $v^2 = \\left< v_i^2 \\right>$, in both cases, but traction reaches a constant speed, while tension fluctuations slow down to zero (Fig.~\\ref{fig:5}(a)(b)). The velocity plateau for traction arises from the balance between self-propulsion $F_0$ and passive force set by $T_0$ at large $\\tau_V$, similar to dense self-propelled particles~\\cite{szamel2024extremely}. On the other hand, large $\\tau_T$ slows down junctional dynamics, solidifying tissue and reducing cell speed.\nL000132\t\nL000133\tThe spatial and temporal velocity correlations also show qualitative differences between the two activity modes. We compute temporal autocorrelation and spatial correlation functions, extracting an effective persistence time, $\\tau_\\text{eff}$, and a velocity correlation length, $l_v$ (see SI, Section 3). Increasing $\\tau_V$ or $\\tau_T$ enhances velocity persistence, though the effect is much weaker for tension fluctuations (Fig.~\\ref{fig:5}(c), Fig.~S6(a)(b)). While the inherent persistence for traction directly governs cell velocity, the persistence in tension fluctuations couples weakly to cell motion, making it less effective in increasing $\\tau_\\text{eff}$. Furthermore, due to the sharp decrease in velocity, the persistent length of the single cell trajectory under tension fluctuations remains much smaller than a cell length even for large $\\tau_\\text{eff}$ (Fig.~S6(c)). Under traction, collective motion spontaneously emerges with increasing $\\tau_V$, consistent with previous studies~\\cite{henkes2020dense,caprini2020spontaneous,keta2022disordered,li2024relaxation}, while tension fluctuations consistently give $l_v\\ll1$, indicating the absence of collective motion (Fig.~\\ref{fig:5}(d), Fig.~S6(d)-(g), Supplementary movies 1-4).\nL000134\t\nL000135\t\nL000136\t\nL000137\t\\begin{figure}[b]\nL000138\t    \\centering\nL000139\t    \\includegraphics[width=\\linewidth]{fig6.pdf}\nL000140\t        \\caption{Universal and non-universal correlations with cell movement. Long-time (a) MSD and (b) MSRD can be predicted by persistent Brownian motion. (c) The MSRD is not proportional to the T1 rate. The two insets show three cell trajectories over five T1 transitions with color changes for each T1 event. (d) MSRD, corrected by $l_v$ and scaled with $\\theta_{T1}$, collapses into two separate lines as a function of $\\tau_\\text{eff}$. The dashed line in (a) represents unity.}\nL000141\t    \\label{fig:6}\nL000142\t\\end{figure}\nL000143\t\nL000144\t\nL000145\tDespite the clear differences in spatial and temporal correlations, long-time cellular movement can be universally described by persistent Brownian motion~\\cite{furth1920brownsche,selmeczi2005cell}\nL000146\t\nL000147\t\\begin{equation}\nL000148\t    MSD(t) = 2v^2\\tau_\\text{eff}^2 \\left(t/\\tau_\\text{eff} -1 + e^{-t/\\tau_\\text{eff}} \\right).\nL000149\t    \\label{eq:msd}\nL000150\t\\end{equation}\nL000151\t\nL000152\t\nL000153\t\nL000154\tThe long-time limit of Eq.~\\ref{eq:msd}, $MSD(t^*) \\approx 2v^2\\tau_\\text{eff} \\cdot t^*$, predicts the MSD for both activities without free parameters (Fig.~\\ref{fig:6}(a)). After correcting $MSRD$ by $e^{-l_v}$, both activities collapse onto a single master curve (Fig.~\\ref{fig:6}(b)), showing that long-time cellular movement is independent of the details of active forces.\nL000155\t\nL000156\t\nL000157\tIn contrast, $\\theta_\\text{T1}$ does not reliably predict $MSRD(t^*)$ (Fig.~\\ref{fig:6}(c)). This arises from the dependence of long-time cellular motion on persistence, as cells with higher persistence can separate by larger distances with the same number of T1 transitions (Fig.~\\ref{fig:6}(c) insets, Supplementary movies 1-2).  The long-time displacement per T1 rate correlates strongly with $\\tau_\\text{eff}$, indicating that $\\theta_\\text{T1}$ alone cannot predict cellular movement, contrasting with recent studies reporting universal correlations~\\cite{jain2024cell,jain2025emergent}. Even after accounting for $\\tau_\\text{eff}$, the correlations split into two distinct branches, implying that additional non-equilibrium features, such as the typical traveling distance between T1 transitions, are required for a universal prediction.\nL000158\t\nL000159\t\nL000160\tIn this work, we investigated non-equilibrium dynamics of confluent tissues under traction or tension fluctuations and showed that cell geometry, rearrangements, and spatiotemporal dynamics strongly depend on the specific mode of activity in fluid states. These differences lead to non-universal correlations with long-time cell movement, making it infeasible to predict $MSRD(t^*)$ from either cell shape or T1 rate. In contrast, $MSRD(t^*)$ is universally captured by persistent Brownian motion, consistent with prior observations in epithelial monolayers~\\cite{selmeczi2005cell,szabo2010collective,czirok2013collective}, suggesting a general description for biological tissues independent of active force details. Finally, the distinct structural and dynamical signatures between traction and tension fluctuations offer a potential method to infer the dominant active forces in tissues as an alternative approach to assess their mechanical states. Future work should explore mixed regimes with comparable active force magnitudes, together with other active processes such as cell division, apoptosis, extrusion, and insertion, to assess how universally the persistent Brownian dynamics framework can predict fluidity.\nL000161\t\nL000162\t\nL000163\t\\section*{Acknowledgments}\nL000164\t\nL000165\tThe authors are grateful for helpful discussions with Sascha Hilgenfeldt, Cristina Marchetti, Adrien M\\'{e}ry, and Selman Sakar. We thank Scientific IT \\& Applications Support (SCITAS) for providing support with the high-performance computing facilities.\nL000166\t\nL000167\t\\bibliographystyle{unsrt}\nL000168\t\\bibliography{bib.bib}\nL000169\t\nL000170\t\\end{document}\nL000171\t===== END FILE: main_r1.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source packet provides a single quantitative cluster: the universal persistent Brownian motion description of long-time cellular movement (MSD and MSRD) in confluent tissues under two activity modes (traction forces and tension fluctuations). The key equation is MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff}), with long-time limit MSD(t*) ≈ 2 v^2 tau_eff t*. The paper reports that both activities collapse onto a single master curve after correcting MSRD by e^{-l_v}. The controls are the activity parameters F0 and tau_V for traction, and Delta T and tau_T for tension fluctuations, but the paper does not provide explicit numeric values for these controls in the main text. The readouts are MSD, MSRD, v^2, tau_eff, and l_v, but numeric values are not given in the main text. The paper states qualitative relationships (e.g., increasing persistence reduces v^2, tau_eff increases with persistence) but does not provide fitted coefficients or numeric domains. Therefore, the extraction can identify the mechanism and the equation, but lacks numeric control values and numeric readout values to support a deterministic Oracle query. case_authoring_ready is set to false because no numeric control or readout values are reported in the source packet.\\\",\\n  \\\"case_authoring_ready\\\": false,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Alessandro Rizzi, Universal Persistent Brownian Motions in Confluent Tissues, Physical Review Letters (2026), DOI:10.1103/g6l8-wbt1\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/g6l8-wbt1\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2602.21922v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper studies two-dimensional confluent tissue dynamics using an active foam model, comparing two modes of activity: traction forces (self-propulsion with polarity diffusion) and junctional tension fluctuations (Ornstein-Uhlenbeck process). It examines phase transitions, cell geometry, T1 rearrangements, spatiotemporal correlations, and long-time cellular motion. The central quantitative result is that long-time MSD and MSRD are universally described by persistent Brownian motion, independent of the activity mode.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"persistent_brownian_motion\\\",\\n      \\\"statement\\\": \\\"Long-time cellular movement is universally described by persistent Brownian motion, with MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff}).\\\",\\n      \\\"equations\\\": [\\n        \\\"MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff})\\\",\\n        \\\"MSD(t*) ≈ 2 v^2 tau_eff t*\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"MSD\\\",\\n        \\\"v^2\\\",\\n        \\\"tau_eff\\\",\\n        \\\"t\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"msd_prefactor_2\\\",\\n          \\\"value\\\": 2,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"multiplicative constant in MSD equation\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 148,\\n              \\\"line_end\\\": 148,\\n              \\\"support\\\": \\\"Equation MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff}) includes a factor of 2.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"msd_long_time_slope_2\\\",\\n          \\\"value\\\": 2,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"multiplicative constant in long-time MSD limit\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 154,\\n              \\\"line_end\\\": 154,\\n              \\\"support\\\": \\\"Long-time limit MSD(t*) ≈ 2 v^2 tau_eff t* includes a factor of 2.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 145,\\n          \\\"line_end\\\": 150,\\n          \\\"support\\\": \\\"States that long-time cellular movement can be universally described by persistent Brownian motion and gives the equation MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff}).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 154,\\n          \\\"line_end\\\": 154,\\n          \\\"support\\\": \\\"States the long-time limit MSD(t*) ≈ 2 v^2 tau_eff t* predicts MSD for both activities without free parameters.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"confluent_condition\\\",\\n      \\\"statement\\\": \\\"The tissue is confluent, i.e., no spaces between cells.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 57,\\n          \\\"line_end\\\": 57,\\n          \\\"support\\\": \\\"Employs a two-dimensional active foam model under the confluent condition, i.e., with no spaces between cells.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"traction_only\\\",\\n      \\\"statement\\\": \\\"For traction force simulations, tension fluctuations are set to zero (Delta T = 0).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 74,\\n          \\\"line_end\\\": 74,\\n          \\\"support\\\": \\\"States that the two activities are investigated separately without mixing, i.e., Delta T=0 for traction and F0=0 for tension fluctuations.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"tension_fluctuations_only\\\",\\n      \\\"statement\\\": \\\"For tension fluctuation simulations, traction force is set to zero (F0 = 0).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 74,\\n          \\\"line_end\\\": 74,\\n          \\\"support\\\": \\\"States that the two activities are investigated separately without mixing, i.e., Delta T=0 for traction and F0=0 for tension fluctuations.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"fixed_other_parameters\\\",\\n      \\\"statement\\\": \\\"Other non-dimensional parameters are kept fixed at biologically relevant scales (see SI, Section 2).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 74,\\n          \\\"line_end\\\": 74,\\n          \\\"support\\\": \\\"States that other non-dimensional parameters are kept fixed at biologically relevant scales (see SI, Section 2).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"F0\\\",\\n      \\\"definition\\\": \\\"Magnitude of traction force (self-propulsion force) acting on each cell.\\\",\\n      \\\"unit\\\": \\\"force units (non-dimensional)\\\",\\n      \\\"domain_kind\\\": \\\"unreported\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for F0 in the main text; it only states that increasing F0 drives a transition from solid to fluid states.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 88,\\n          \\\"line_end\\\": 88,\\n          \\\"support\\\": \\\"States that increasing the magnitude of activity F0 drives a transition from solid to fluid states.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"tau_V\\\",\\n      \\\"definition\\\": \\\"Persistent timescale for traction force polarity diffusion.\\\",\\n      \\\"unit\\\": \\\"time units (non-dimensional)\\\",\\n      \\\"domain_kind\\\": \\\"unreported\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for tau_V in the main text; it only states that increasing tau_V monotonically fluidizes the system.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 88,\\n          \\\"line_end\\\": 88,\\n          \\\"support\\\": \\\"States that increasing tau_V for traction monotonically fluidizes the system.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"Delta_T\\\",\\n      \\\"definition\\\": \\\"Fluctuation magnitude of junctional tension around the mean level T0.\\\",\\n      \\\"unit\\\": \\\"tension units (non-dimensional)\\\",\\n      \\\"domain_kind\\\": \\\"unreported\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for Delta T in the main text; it only states that increasing Delta T drives a transition from solid to fluid states.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 88,\\n          \\\"line_end\\\": 88,\\n          \\\"support\\\": \\\"States that increasing the magnitude of activity Delta T drives a transition from solid to fluid states.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"tau_T\\\",\\n      \\\"definition\\\": \\\"Relaxation timescale for tension fluctuations.\\\",\\n      \\\"unit\\\": \\\"time units (non-dimensional)\\\",\\n      \\\"domain_kind\\\": \\\"unreported\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for tau_T in the main text; it only states that increasing tau_T induces non-monotonic behavior in MSRD(t*).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 88,\\n          \\\"line_end\\\": 88,\\n          \\\"support\\\": \\\"States that increasing tau_T for tension fluctuations induces a non-monotonic behavior in MSRD(t*).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"MSD\\\",\\n      \\\"definition\\\": \\\"Mean squared displacement of cells over time t.\\\",\\n      \\\"unit\\\": \\\"length^2 (non-dimensional)\\\",\\n      \\\"statistic\\\": \\\"Mean over cells and initial times\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 148,\\n          \\\"line_end\\\": 148,\\n          \\\"support\\\": \\\"Equation for MSD(t) is given.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"MSRD\\\",\\n      \\\"definition\\\": \\\"Mean-squared relative displacement between neighboring cells, MSRD(t) = <(r_ij(t+t0)-r_ij(t0))^2>.\\\",\\n      \\\"unit\\\": \\\"length^2 (non-dimensional)\\\",\\n      \\\"statistic\\\": \\\"Mean over cell pairs and initial times\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 77,\\n          \\\"line_end\\\": 77,\\n          \\\"support\\\": \\\"Defines MSRD(t) = <(r_ij(t+t0)-r_ij(t0))^2>.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"v2\\\",\\n      \\\"definition\\\": \\\"Mean squared velocity of cells, v^2 = <v_i^2>.\\\",\\n      \\\"unit\\\": \\\"length^2/time^2 (non-dimensional)\\\",\\n      \\\"statistic\\\": \\\"Mean over cells\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 131,\\n          \\\"line_end\\\": 131,\\n          \\\"support\\\": \\\"Defines v^2 = <v_i^2>.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"tau_eff\\\",\\n      \\\"definition\\\": \\\"Effective persistence time extracted from temporal autocorrelation of cell velocity.\\\",\\n      \\\"unit\\\": \\\"time (non-dimensional)\\\",\\n      \\\"statistic\\\": \\\"Extracted from autocorrelation function\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 133,\\n          \\\"line_end\\\": 133,\\n          \\\"support\\\": \\\"States that effective persistence time tau_eff is extracted from temporal autocorrelation.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"l_v\\\",\\n      \\\"definition\\\": \\\"Velocity correlation length extracted from spatial correlation function.\\\",\\n      \\\"unit\\\": \\\"length (non-dimensional)\\\",\\n      \\\"statistic\\\": \\\"Extracted from spatial correlation function\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 133,\\n          \\\"line_end\\\": 133,\\n          \\\"support\\\": \\\"States that velocity correlation length l_v is extracted from spatial correlation function.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"universal_persistent_brownian_motion\\\",\\n      \\\"statement\\\": \\\"Long-time cellular movement (MSD and MSRD) is universally described by persistent Brownian motion, independent of the activity mode (traction or tension fluctuations).\\\",\\n      \\\"quantitative_form\\\": \\\"MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff}); long-time limit MSD(t*) ≈ 2 v^2 tau_eff t*\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"MSD\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"param\\\": \\\"msd_prefactor_2\\\"\\n            },\\n            {\\n              \\\"op\\\": \\\"multiply\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"var\\\": \\\"v2\\\"\\n                },\\n                {\\n                  \\\"op\\\": \\\"multiply\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"power\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"var\\\": \\\"tau_eff\\\"\\n                        },\\n                        {\\n                          \\\"param\\\": \\\"msd_exponent_2\\\"\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"subtract\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"subtract\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"divide\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"var\\\": \\\"t\\\"\\n                                },\\n                                {\\n                                  \\\"var\\\": \\\"tau_eff\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"msd_one\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"exp\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"negate\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"op\\\": \\\"divide\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"t\\\"\\n                                    },\\n                                    {\\n                                      \\\"var\\\": \\\"tau_eff\\\"\\n                                    }\\n                                  ]\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"persistent_brownian_motion\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"F0\\\",\\n        \\\"tau_V\\\",\\n        \\\"Delta_T\\\",\\n        \\\"tau_T\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"F0\\\",\\n          \\\"domain_kind\\\": \\\"unreported\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for F0 in the main text; it only states that increasing F0 drives a transition from solid to fluid states.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 88,\\n              \\\"line_end\\\": 88,\\n              \\\"support\\\": \\\"States that increasing the magnitude of activity F0 drives a transition from solid to fluid states.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"tau_V\\\",\\n          \\\"domain_kind\\\": \\\"unreported\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for tau_V in the main text; it only states that increasing tau_V monotonically fluidizes the system.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 88,\\n              \\\"line_end\\\": 88,\\n              \\\"support\\\": \\\"States that increasing tau_V for traction monotonically fluidizes the system.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"Delta_T\\\",\\n          \\\"domain_kind\\\": \\\"unreported\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for Delta T in the main text; it only states that increasing Delta T drives a transition from solid to fluid states.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 88,\\n              \\\"line_end\\\": 88,\\n              \\\"support\\\": \\\"States that increasing the magnitude of activity Delta T drives a transition from solid to fluid states.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"tau_T\\\",\\n          \\\"domain_kind\\\": \\\"unreported\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The paper does not report specific numeric values for tau_T in the main text; it only states that increasing tau_T induces non-monotonic behavior in MSRD(t*).\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 88,\\n              \\\"line_end\\\": 88,\\n              \\\"support\\\": \\\"States that increasing tau_T for tension fluctuations induces a non-monotonic behavior in MSRD(t*).\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"MSD\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"confluent_condition\\\",\\n        \\\"traction_only\\\",\\n        \\\"tension_fluctuations_only\\\",\\n        \\\"fixed_other_parameters\\\"\\n      ],\\n      \\\"applicability\\\": \\\"The claim applies to fluid states of confluent tissues under either traction forces or tension fluctuations, where the activity is dominated by one mode. The long-time limit is valid for t* larger than all other characteristic timescales.\\\",\\n      \\\"statistical_basis\\\": \\\"The paper states that the long-time limit predicts MSD for both activities without free parameters, but does not provide statistical details such as sample size or averaging method.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 145,\\n          \\\"line_end\\\": 150,\\n          \\\"support\\\": \\\"States that long-time cellular movement can be universally described by persistent Brownian motion and gives the equation MSD(t) = 2 v^2 tau_eff^2 (t/tau_eff - 1 + e^{-t/tau_eff}).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 154,\\n          \\\"line_end\\\": 154,\\n          \\\"support\\\": \\\"States that the long-time limit MSD(t*) ≈ 2 v^2 tau_eff t* predicts MSD for both activities without free parameters.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"no_numeric_values\\\",\\n      \\\"statement\\\": \\\"The main text does not provide numeric values for the activity parameters (F0, tau_V, Delta T, tau_T) or for the readouts (MSD, MSRD, v^2, tau_eff, l_v). The paper refers to figures and supplementary information for specific values, but those are not included in the provided source packet.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"universal_persistent_brownian_motion\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"persistent_brownian_motion\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"F0\\\",\\n        \\\"tau_V\\\",\\n        \\\"Delta_T\\\",\\n        \\\"tau_T\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"MSD\\\",\\n        \\\"MSRD\\\",\\n        \\\"v2\\\",\\n        \\\"tau_eff\\\",\\n        \\\"l_v\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"confluent_condition\\\",\\n        \\\"traction_only\\\",\\n        \\\"tension_fluctuations_only\\\",\\n        \\\"fixed_other_parameters\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 74,\\n          \\\"line_end\\\": 74,\\n          \\\"support\\\": \\\"Mentions parameters F0, tau_V, Delta T, tau_T but does not give numeric values.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 88,\\n          \\\"line_end\\\": 88,\\n          \\\"support\\\": \\\"Discusses effects of increasing F0, tau_V, Delta T, tau_T without numeric values.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 154,\\n          \\\"line_end\\\": 154,\\n          \\\"support\\\": \\\"States that MSD(t*) predicts MSD for both activities without free parameters, but no numeric values are given.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"parameters.outputs.MSD.args[1].args[0].var is not a public control\",\"path\":\"$.claims[0].oracle_outputs\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

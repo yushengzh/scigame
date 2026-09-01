@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2503.01962v2\", \"citation\": \"Gabriele Franciolini, Curvature Perturbations from First-Order Phase Transitions: Implications to Black Holes and Gravitational Waves, Physical Review Letters (2026), DOI:10.1103/tfcx-kzqx\", \"journal_doi\": \"10.1103/tfcx-kzqx\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: Short_Paper.tex =====\nL000002\t\\documentclass[twocolumn,superscriptaddress,aps,preprintnumbers,amsmath,amssymb,prl,footinbib]{revtex4-2}\nL000003\t\nL000004\t\nL000005\t\\usepackage[titletoc,toc,title]{appendix}\nL000006\t\\usepackage[english]{babel}\nL000007\t\\usepackage[hidelinks]{hyperref}\nL000008\t\\usepackage[normalem]{ulem}\nL000009\t\\usepackage{adjustbox}\nL000010\t\\usepackage{amsfonts}\nL000011\t\\usepackage{bm}\nL000012\t\\usepackage{enumitem}\nL000013\t\\usepackage{epsfig}\nL000014\t\\usepackage{cancel}\nL000015\t\\usepackage{centernot}\nL000016\t\\usepackage{color}\nL000017\t\\usepackage{comment}\nL000018\t\\usepackage{contour}\nL000019\t\\usepackage{flushend}\nL000020\t\\usepackage{footmisc}\nL000021\t\\usepackage{graphics}\nL000022\t\\usepackage{graphicx}\nL000023\t\\usepackage{mathrsfs}\nL000024\t\\usepackage{mdframed}\nL000025\t\\usepackage{pifont}\nL000026\t\\usepackage{relsize}\nL000027\t\\setcounter{secnumdepth}{2}\nL000028\t\\usepackage{shadowtext}\nL000029\t\\usepackage{slashed}\nL000030\t\\usepackage{soul}\nL000031\t\nL000032\t\\usepackage{tcolorbox}\nL000033\t\\usepackage{textgreek}\nL000034\t\\usepackage{placeins}\nL000035\t\nL000036\t\\usepackage[T1]{fontenc}\nL000037\t\\usepackage{ragged2e}\nL000038\t\nL000039\t\nL000040\t\nL000041\t\\usepackage{titlesec}\nL000042\t\\usepackage{titletoc}\nL000043\t\\usepackage{verbatim}\nL000044\t\\usepackage{xcolor}\nL000045\t\\usepackage{xfrac}\nL000046\t\nL000047\t\nL000048\t\\contourlength{0.2em}\nL000049\t\nL000050\t\\definecolor{myred}{RGB}{123, 28, 20}\nL000051\t\\definecolor{zima_blue}{HTML}{1393C1}\nL000052\t\\hypersetup{setpagesize=false,bookmarksnumbered=true,bookmarksopen=true,colorlinks=true,linkcolor=zima_blue,urlcolor=zima_blue,citecolor=zima_blue,linktocpage=false}\nL000053\t\nL000054\t\\usepackage{fontawesome5}\nL000055\t\\definecolor{linkcolor}{rgb}{0.7752941176470588, 0.22078431372549023, 0.2262745098039215}\nL000056\t\\definecolor{linkcolor}{HTML}{1393C1}\nL000057\t\\newcommand{\\githubmaster}[3][linkcolor]{\\href{#2}{\\color{#1}{#3}}}\nL000058\t\nL000059\t\\newcommand{\\deltaPT}{{\\texttt{deltaPT}}}\nL000060\t\\newcommand{\\deltaPTvTwo}{\\texttt{deltaPT\\,2.0}}\nL000061\t\\newcommand{\\deltaCPT}{${\\large \\tt deltaPT_extension}$}\nL000062\t\\newcommand{\\es}[2] {\\begin{equation} \\label{#1} \\begin{split} #2 \\end{split} \\end{equation}}\nL000063\t\\newcommand{\\al}[1]{\\begin{align} #1 \\end{align} }\nL000064\t\\newcommand{\\be}{\\begin{equation}}\nL000065\t\\newcommand{\\ee}{\\end{equation}}\nL000066\t\\newcommand{\\bea}{\\begin{equation}\\begin{aligned}}\nL000067\t\\newcommand{\\eea}{\\end{aligned}\\end{equation}}\nL000068\t\\newcommand{\\td}{{\\rm d}}\nL000069\t\nL000070\t\nL000071\t\nL000072\t\nL000073\t\nL000074\t\\newif\\ifarxiv\nL000075\t \\arxivtrue\nL000076\t\nL000077\t\nL000078\t\nL000079\t\\begin{document}\nL000080\t\nL000081\t\\title{Curvature Perturbations from First-Order Phase Transitions:\nL000082\t\\texorpdfstring{\\\\}{}Implications to Black Holes and Gravitational Waves}\nL000083\t\nL000084\t\\author{Gabriele Franciolini}\nL000085\t\\email{gabriele.franciolini@cern.ch}\nL000086\t\\affiliation{CERN, Theoretical Physics Department, Esplanade des Particules 1, Geneva 1211, Switzerland}\nL000087\t\\author{Yann Gouttenoire}\nL000088\t\\email{yann.gouttenoire@gmail.com}\nL000089\t\\affiliation{School of Physics and Astronomy, Tel-Aviv University, Tel-Aviv 69978, Israel}\nL000090\t\\affiliation{PRISMA+ Cluster of Excellence $\\&$ MITP, Johannes Gutenberg University, 55099 Mainz, Germany}\nL000091\t\\author{Ryusuke Jinno}\nL000092\t\\email{jinno@phys.sci.kobe-u.ac.jp}\nL000093\t\\affiliation{Department of Physics, Graduate School of Science, Kobe University, 1-1 Rokkodai, Kobe, Hyogo 657-8501, Japan}\nL000094\t\nL000095\t\\begin{abstract}\nL000096\t\nL000097\t\nL000098\t\nL000099\t\nL000100\t\nL000101\t{Understanding whether primordial black holes form during strong first-order phase transition (FOPT) is a crucial open question in cosmology.} We address this using a fully covariant formalism to study cosmological perturbations, highlighting previously overlooked gauge dependencies. We show that non-covariant treatments can overestimate primordial black holes and scalar-induced gravitational waves. Once gauge dependencies are accounted for, both signals are strongly suppressed, {with direct implications for the FOPT interpretation of the Pulsar Timing Array signal.}\nL000102\t\nL000103\t\nL000104\t\\vspace*{5pt} \\noindent \\textit{GitHub}: The {\\tt deltaPT\\,2.0} code to compute cosmological perturbations generated during strongly supercooled first-order phase transitions \\href{https://github.com/YannGou/deltaPT2.0}{\\faGithub\\;YannGou/deltaPT\\,2.0}.\nL000105\t\nL000106\t\\vspace*{5pt}\nL000107\t\\noindent\nL000108\t\\textit{Published version:~\\href{https://doi.org/10.1103/tfcx-kzqx}{Phys.Rev.Lett. 136 (2026) 17, 171404}}\nL000109\t\\end{abstract}\nL000110\t\nL000111\t\nL000112\t\nL000113\t\\preprint{CERN-TH-2025-044, KOBE-COSMO-25-05, MITP-25-016}\nL000114\t\nL000115\t\\maketitle\nL000116\t\nL000117\t\nL000118\t\\textit{\\textbf{ Introduction.}}\nL000119\t{The Universe in the primordial epochs} is expected to possess a higher degree of symmetry than today~\\cite{Kirzhnits:1972ut}.  As the Universe cools, these symmetries may be broken through first-order phase transitions (FOPTs), a generic feature of many early-Universe scenarios, during which bubbles of the new vacuum nucleate and expand, converting the old vacuum energy into heat and bulk fluid motion (see Ref.~\\cite{Gouttenoire:2022gwi} for a review).\nL000120\tIf the energy stored in the bubbles constitutes a large fraction of the total universe energy, {FOPTs have been shown to} leave sizable imprints on the spacetime metric, in terms of gravitational waves~\\cite{Caprini:2015zlo,Caprini:2019egz}, primordial black holes (PBHs)~\\cite{Kodama:1982sf,Hsu:1990fg,Liu:2021svg,Hashino:2021qoq,Jung:2021mku,Kawana:2022olo,Lewicki:2023ioy,Gouttenoire:2023naa,Baldes:2023rqv,Gouttenoire:2023bqy,Salvio:2023ynn,Gouttenoire:2023pxh,Jinno:2023vnr,Banerjee:2023qya,Flores:2024lng,Lewicki:2024ghw,Lewicki:2024sfw,Ai:2024cka,Conaci:2024tlc,Kanemura:2024pae,Banerjee:2024cwv,Hashino:2025fse,Murai:2025hse,Zou:2025sow,Ghoshal:2025dmi,Byrnes:2025tji}, and curvature perturbations~\\cite{Sasaki:1982fi,Liu:2022lvz,Giombi:2023jqq,Elor:2023xbz,Lewicki:2024ghw,Buckley:2024nen,Cai:2024nln,Jinno:2024nwb}. {These curvature perturbations can source scalar-induced gravitational waves (SIGWs), studied in this context in~\\cite{Lewicki:2024ghw} and more generally in~\\cite{Tomita:1975kj,Matarrese:1992rp,Matarrese:1993zf,Matarrese:1997ay,Acquaviva:2002ud,Mollerach:2003nq,Carbone:2004iv,Ananda:2006af,Baumann:2007zm,Espinosa:2018eve,Kohri:2018awv,Domenech:2021ztg}.}\nL000121\t\nL000122\tSince cosmological perturbations generally exhibit gauge dependence~\\cite{Bardeen:1980kt}, reliable predictions for these late-time observables require a covariant treatment of perturbations and their evolution. {Such a treatment is required to assess whether FOPTs can produce observable PBHs and SIGWs, a question of central importance when evaluating the FOPT interpretation of the Pulsar Timing Array signal~\\cite{Gouttenoire:2023bqy,Ellis:2023oxs,Lewicki:2024ghw}.}\nL000123\t\nL000124\tIn this $\\textit{letter}$, we derive the statistical properties of cosmological perturbations produced during a strong first-order phase transition, with a particular emphasis on the gauge choice and the calculation of gauge-invariant quantities.\nL000125\tWe evaluate the abundance of PBHs and the spectrum of SIGWs using the most appropriate quantities for each: the density contrast in the comoving gauge $\\delta^{(C)}$ for the former, to match the convention used to report the threshold for collapse in numerical simulations, while the gauge-invariant curvature perturbation $\\mathcal{R}$ for the latter.\nL000126\t\nL000127\t\\textit{\\textbf{ Covariant linear perturbations from FOPTs.}} We model the nucleation rate by\nL000128\t\\begin{equation}\nL000129\t\\Gamma = H_n^4 \\,e^{\\beta (t-t_n)},\nL000130\t\\end{equation}\nL000131\twhere $H_n$ is the Hubble factor ($H\\equiv \\dot a(t) / a $, with $a$ being the scale factor) at $t=t_n$, defined as the nucleation time.\nL000132\tAdopting a relativistic bag equation of state, the energy and pressure density decompose as\nL000133\t\\begin{equation}\nL000134\t\\label{eq:rho_p_avg}\nL000135\t\\rho=\\rho_R+\\rho_V,\\qquad p=\\rho_R/3-\\rho_V,\nL000136\t\\end{equation}\nL000137\twhere $R$ and $V$ stand for radiation and vacuum components, respectively.\nL000138\tWe consider the supercooled limit for which the latent heat $\\Delta V$ is larger than the radiation energy density just before nucleation $\\alpha \\equiv \\Delta V/\\rho_{R} \\gg 1$. At the background level, the radiation and vacuum energy density obeys the continuity equation\nL000139\t\\begin{align}\nL000140\t\\label{eq:bkg_continuity}\nL000141\t\\overline{\\rho_{\\rm R}}'+4\\mathcal{H}\\overline{\\rho_{\\rm R}}=-\\overline{\\rho_{\\rm V}}',\\qquad \\textrm{with}\\quad \\overline{\\rho_{\\rm V}} = \\overline{F}\\Delta V,\nL000142\t\\end{align}\nL000143\tand the Friedmann equation $3M_{\\rm pl}^2H^2=\\overline{\\rho_{\\rm R}}+\\overline{\\rho_{\\rm V}}$. The prime denotes the derivative with respect to the conformal time $\\eta$ related to the cosmic time $t$ by $\nL000144\t\\eta(t_2) =\\eta(t_1) +\\int^{t_2}_{t_1} d\\tilde{t}/a(\\tilde{t})$, and we defined $\\mathcal{H}=aH$.\nL000145\tThe remaining fraction of false vacuum $\\overline{F}(t) $ is given by\nL000146\t\\begin{equation}\nL000147\t\\overline{F}(t) = \\exp\\left[-\\frac{4\\pi}{3}\\!\\! \\int_{-\\infty}^t \\!\\!\\!\\td t_n\\, \\Gamma(t_n) a(t_n)^3 \\left(\\int_{t_n}^t\\!\\! \\frac{d\\tilde{t}}{a(\\tilde{t})}\\right)^{\\!3}\\right],\nL000148\t\\end{equation}\nL000149\twhere we assumed bubble walls to expand at the speed of light $v_w \\simeq 1$.\nL000150\t\nL000151\tDue to the stochastic nature of bubble nucleation, the stress-energy tensor $T^\\mu_{\\,\\,\\,\\,\\nu}$ acquires fluctuations, assumed to be statistically isotropic, $T^0_{\\,\\,\\,\\,0}=\\overline{\\rho}+\\delta \\rho$, $T^i_{\\,\\,\\,\\,j}=-(\\overline{p}+\\delta p)\\delta^i_j+\\Sigma^i_{~j}$, and $T^i_{\\,\\,\\,\\,0}=(\\overline{\\rho}+\\overline{p})v^i$ where $v^i=dx^i/dt$ is the coordinate velocity. In the following, we use $\\delta \\equiv \\delta \\rho/\\overline{\\rho}$.\nL000152\tAt the linear level, the 10 degrees of freedom of the symmetric $4\\times4$ space-time metric $g_{\\mu\\nu}$ decomposes into 4 scalars, 4 vectors and 2 tensors. Keeping only the scalars ($A,B,C,E$), the spacetime metric reads\nL000153\t\\begin{multline}\nL000154\t    \\mathrm{d}s^2\nL000155\t    =\nL000156\t    a^2 \\Bigl[\nL000157\t    \\bigl(1 + 2A\\bigr)\\,\\mathrm{d}\\eta^2\nL000158\t    - 2\\,\\partial_i B\\,\\mathrm{d}x^i\\,\\mathrm{d}\\eta  \\\\\nL000159\t-\\big((1-2C)\\delta_{ij}+2\\partial_{\\langle i}\\partial_{j\\rangle}E\\big)dx^i dx^j\\Bigr],\nL000160\t\\end{multline}\nL000161\twhere $\\partial_{\\langle i}\\partial_{j\\rangle} E \\equiv (\\partial_i\\partial_j - \\tfrac{1}{3}\\delta_{ij}\\nabla^2)E$. In the absence of anisotropic stress, scalar metric perturbations contain only one physical degree of freedom. The apparent redundancy in their description is known as ``gauge dependence''~\\cite{Bardeen:1980kt}. To extract physical predictions, one must fix the coordinate freedom by choosing a gauge. The assumption of isotropy, $\\Sigma^i_{~j} = 0$, imposes one constraint, leaving two additional scalar gauge degrees of freedom to fix.  A common choice is the spatially-flat gauge (F), defined by $C=E=0$, {in which we denote the density contrast by $\\delta^{(F)}$.} Linearized Einstein equations in Fourier space lead to~\\cite{SuppMat}\nL000162\t\\color{black}\nL000163\t\\begin{equation}\nL000164\t\\label{eq:SF_continuity_prelude}\nL000165\t\\tilde{\\delta}^{(F)'}_\\mathbf{k}+3\\mathcal{H}(c_s^2-\\omega)\\tilde{\\delta}^{(F)}_\\mathbf{k}=(1+\\omega) k^2\\tilde{\\mathcal{V}}_\\mathbf{k}-3\\mathcal{H}\\tilde{\\delta}_{p,\\rm nad,\\mathbf{k}},\nL000166\t\\end{equation}\nL000167\twhere $\\tilde{X}_{\\mathbf{k}}(t)$ denotes the Fourier-transform of $X(\\mathbf{x},t)$.\nL000168\tThe quantities $\\omega \\equiv \\overline{p}/\\overline{\\rho}$ and $c_s^2\\equiv {\\overline{p}}'/{\\overline{\\rho}}'$ are the equation of state and speed of sound, respectively.\nL000169\tThe quantity $\\delta_{p,\\rm nad}$ is the non-adiabatic pressure perturbation\nL000170\t\\begin{align}\nL000171\t\\delta_{p,\\rm nad} \\equiv \\frac{\\delta p_{\\rm nad}}{\\overline{\\rho}},\\quad \\textrm{with}\\quad \\delta p_{\\rm nad} \\equiv \\delta p^{(F)} - c_s^2 \\delta \\rho^{(F)},\\label{eq:comoving_definition_deltapnad}\nL000172\t\\end{align}\nL000173\twhich is gauge-invariant in spite of the superscript $(F)$ on the right hand-side. Using Eq.~\\eqref{eq:rho_p_avg}, Eq.~\\eqref{eq:comoving_definition_deltapnad} becomes\nL000174\t\\begin{equation}\nL000175\t\\label{eq:delta_nad_FOPT_main}\nL000176\t\\delta p_{\\rm nad} = \\frac{1-3c_s^2}{3}\\overline{\\rho}\\,\\delta^{(F)}-\\frac{4}{3}\\Delta V\\delta F^{(F)},\nL000177\t\\end{equation}\nL000178\twhere $\\delta F^{(F)} = F^{(F)}-\\overline{F}$ with $F^{(F)}\\equiv \\rho_V^{(F)}/\\Delta V$.\nL000179\tThe quantity $\\mathcal{V}$ in Eq.~\\eqref{eq:SF_continuity_prelude} is the gauge-invariant scalar velocity $\\mathcal{V}\\equiv v+E'$ with $\\partial_i(v)=\\delta_{ij}v^j$. Einstein equation along $0i$ gives\nL000180\t\\begin{equation}\nL000181\t\\label{eq:GI_velocity}\nL000182\t\\mathcal{V}= -\\frac{2}{3(1+\\omega)} \\frac{\\mathcal{H}\\Phi+\\Phi'}{\\mathcal{H}^2},\nL000183\t\\end{equation}\nL000184\twhere $\\Phi$ is the gauge-invariant Newtonian potential~\\cite{Bardeen:1980kt}. A combination of Einstein equations along $00$ and $ij$ gives\nL000185\t\\begin{equation}\nL000186\t\\label{eq:Newtonian_potential}\nL000187\t\\tilde{\\Phi}_{\\mathbf{k}}'' + 3 (1 + c_s^2)\\mathcal{H} \\tilde{\\Phi}_{\\mathbf{k}}'\nL000188\t+[3 (c_s^2-\\omega)\\mathcal{H}^2+c_s^2 k^2]\\tilde{\\Phi}_{\\mathbf{k}}\nL000189\t= \\frac{3}{2}\\mathcal{H}^2\\tilde{\\delta}_{p,\\rm nad,\\mathbf{k}}.\nL000190\t\\end{equation}\nL000191\tThe initial conditions for the system Eqs.~\\eqref{eq:SF_continuity_prelude} and \\eqref{eq:Newtonian_potential} are\nL000192\t\\begin{equation}\nL000193\t\\tilde{\\delta}^{(F)}_{\\mathbf{k}}(0)=0,\\qquad \\tilde{\\Phi}_{\\mathbf{k}}(0)=0,\\qquad \\tilde{\\Phi}_{\\mathbf{k}}'(0)=0,\nL000194\t\\end{equation}\nL000195\twhere we have neglected the primordial curvature perturbations (i.e.~generated during inflation), which we assume to be small at these scales.\nL000196\tFor more details on cosmological perturbation theory, we refer the reader to the Supplemental Material (SuM) or Refs.~\\cite{Kodama:1984ziu,Mukhanov:1990me,Mukhanov:2005sc,Baumann:2022mni,Peter:2013avv}.\nL000197\t\nL000198\tIn the spatially-flat gauge, constant-time hypersurfaces are unperturbed\nL000199\t$ds^2\\big|_{\\eta={\\rm const.}}=-a^2dx^2$.\nL000200\tThis is particularly convenient since by plugging Eq.~\\eqref{eq:delta_nad_FOPT_main} into Eq.~\\eqref{eq:SF_continuity_prelude}, we get a perturbation equation\nL000201\t\\begin{align}\nL000202\t\\delta{\\tilde{\\rho}}_{R,{\\mathbf{k}}}^{(F)'}+4\\mathcal{H}\\delta{\\tilde{\\rho}}_{R,{\\mathbf{k}}}^{(F)}=-\\delta{\\tilde{\\rho}}_{\\rm V,{\\mathbf{k}}}^{(F)'}+\\frac{4}{3}\\overline{\\rho_R}\\, k^2 \\tilde{\\mathcal{V}}_{\\mathbf{k}},\\label{eq:SF_continuity}\nL000203\t\\end{align}\nL000204\twhich coincides with the background equation in Eq.~\\eqref{eq:bkg_continuity} in the super-Hubble limit $k\\ll \\mathcal{H}$.\nL000205\tHence, in the spatially-flat gauge and in the super-Hubble limit, different patches evolve as distinct FLRW universes \\cite{Wands:2000dp},\nL000206\tand we can identify\nL000207\t\\begin{equation}\nL000208\t\\label{eq:F_k_F}\nL000209\t\\tilde{F}^{(F)}_{\\mathbf{k}} \\underset{k\\ll\\mathcal{H}}{\\simeq} \\tilde{F}^{\\rm (FLRW)}_{\\mathbf{k}},\nL000210\t\\end{equation}\nL000211\twhere $F^{\\rm (FLRW)}$ is the false vacuum fraction in a flat FLRW universe. Notice that such equality does not hold in other gauges. The code \\deltaPT~developed in Ref.~\\cite{Lewicki:2024ghw} calculates the false vacuum fraction $F^{\\rm (FLRW)}_{\\rm avg}(R,t)$ averaged over a ball of radius $R$, in a flat FLRW universe. In this work, we rely on the approximation~\\footnote{We leave a proper de-convolution from the top-hat window function $W(r,R)=\\Theta(R-r)/V$ followed by inverse-Fourier transformation for future work.\nL000212\t}\nL000213\t\\begin{equation}\nL000214\t\\label{eq:F_k_F_avg}\nL000215\t\\tilde{F}^{\\rm (FLRW)}_{\\mathbf{k}}(t) \\simeq V F^{\\rm (FLRW)}_{\\rm avg}(R=k^{-1},t),\nL000216\t\\end{equation}\nL000217\twith $V=4\\pi R^3/3$.\nL000218\tThe factor $V$ ensures that Fourier transforms carry the usual volume dimension.\nL000219\tDue to Eq.~\\eqref{eq:F_k_F_avg}, it follows that $\\tilde{X}_{\\mathbf{k}}(t)\\simeq V X_{\\rm avg}(R=k^{-1},t)$ for any perturbations $X$ derived in this work.\nL000220\tThis approximation should become exact in the super-Hubble limit $k\\ll \\mathcal{H}$ when gradient terms are negligible. We now denote perturbations by $X\\equiv \\tilde{X}_{\\mathbf{k}}/V\\simeq X_{\\rm avg}(R=k^{-1})$.\nL000221\t\nL000222\t\\begin{figure}[t]\nL000223\t\\centering\nL000224\t\\includegraphics[width=0.48\\textwidth]{perturbations_traj_letter}\nL000225\t\\caption{\\label{fig:delta_Phi_numerical}\nL000226\tTime evolution of the comoving curvature perturbation $\\mathcal{R}$, and the density contrast in the spatially-flat $\\delta^{(F)}$ and comoving $\\delta^{(C)}$ gauge during a FOPT. We show perturbations $X$ averaged over a comoving volume $4\\pi k^{-3}/3$.\nL000227\tWe also report the non-adiabatic pressure $\\delta p_{\\rm nad}$ peaking close to Hubble crossing epoch $\\mathcal{H}=k$. For presentation purposes we assume $\\beta / H = 4$ and show the wavenumber $k = 0.9 k_{\\rm max}$, where we identify $k_{\\rm max}$ as the maximal ${\\cal H}$. $j=1$ indicates the time of first bubble nucleation, which is slightly delayed with respect to average (orange vs black dashed line).}\nL000228\t\\end{figure}\nL000229\t\nL000230\tIn practice, the evolution of perturbations can be derived as follows: from Eqs.~\\eqref{eq:F_k_F}, \\eqref{eq:F_k_F_avg} and \\deltaPT, we calculate $\\delta p_{\\rm nad}$ in Eq.~\\eqref{eq:delta_nad_FOPT_main}, then we solve the closed system of equations in \\eqref{eq:SF_continuity_prelude} and \\eqref{eq:Newtonian_potential} to determine $\\Phi$ and $\\delta^{(F)}$, see SuM for more details. Another common choice of coordinate is the comoving gauge (C), in which the fluid velocity perturbation vanishes ($v + B = 0,~ E=0$).\nL000231\tThe density contrast in the comoving gauge can be derived using the transformation rules\nL000232\t\\begin{align}\nL000233\t&\\delta^{(C)}=\\delta^{(F)}+ 3(1+\\omega)\\mathcal{R},\\label{eq:delta_C_F}\nL000234\t\\end{align}\nL000235\twhere $\\mathcal{R}$ is the comoving curvature perturbation given by the gauge-invariant expression~\\cite{Bardeen:1980kt}\nL000236\t\\begin{align}\nL000237\t\\mathcal{R} ~\\equiv ~\\Phi - \\mathcal{H}\\mathcal{V} ~=~ \\frac{5+3\\omega}{3+3\\omega} \\Phi +\\frac{2\\Phi'}{3(1+\\omega)\\mathcal{H}}.\nL000238\t\\label{eq:mathcalR_def_main}\nL000239\t\\end{align}\nL000240\t{The transformation rule in Eq.~\\eqref{eq:delta_C_F}  follows from the textbook relationship $\\zeta =\\mathcal{R}-\\delta^{(C)}/3(1+\\omega)$~\\cite{Baumann:2022mni} where $\\zeta~\\equiv~ -\\delta^{(F)}/3(1+\\omega)$ is the curvature perturbation on uniform-density hypersurfaces, see SuM for details.}  {Building on this framework, our public GitHub release \\deltaPTvTwo~\\cite{deltaPTv2} extends \\deltaPT~\\cite{Lewicki:2024ghw} to compute the covariant cosmological perturbations analyzed in this work.}\nL000241\tWe show the time evolution of $\\delta^{(F)}$, $\\delta^{(C)}$, $\\mathcal{R}$ and $\\delta p_{\\rm nad}$ in Fig.~\\ref{fig:delta_Phi_numerical}, for a single realization of the bubble nucleation dynamics within a ball of radius $R=k^{-1}$ operated with \\deltaPTvTwo~\\cite{deltaPTv2} . {We derive the perturbations statistics by making $N_{\\rm sim}=10^6$ realizations of random bubble nucleation histories and storing the Hubble-crossing values of the perturbations in a histogram~\\footnote{{In each patch, we randomly sample the nucleation times $t_j$ and positions $d_j$ of the first $j_c=50$ bubbles and assume a deterministic evolution for subsequent nucleation dynamics~\\cite{Lewicki:2024ghw}. The probability distributions for $t_j$ and $d_j$ within a patch of radius $R$ are derived analytically in App.~A of Ref.~\\cite{Lewicki:2024ghw} and are summarized in the SuM.}\nL000242\t}.}\nL000243\tIn Fig.~\\ref{fig:proba_distrib_P_deltaC}, we show the resulting probability density function (PDF) of the density contrast. The variance of the density contrast in the spatially-flat and comoving gauges, as well as the comoving curvature perturbation are shown in Fig.~\\ref{fig:PS_allquantities}.\nL000244\t\\begin{figure}[ht!]\nL000245\t\\centering\nL000246\t\\includegraphics[width=0.48\\textwidth]{PDF_deltaC_vs_deltaF}\nL000247\t\\caption{\\label{fig:proba_distrib_P_deltaC}\nL000248\tProbability distribution of the density contrast in the comoving (blue) and spatially-flat (red) gauges, obtained from {solving cosmological perturbations equations for $N_{\\rm sim}=10^6$ distinct random nucleation histories inside a patch of comoving volume $4\\pi k^{-3}/3$.} The dashed lines show the best fits using the distribution in Eq.~\\eqref{eq:fit_function}. The dotted lines shows the best fits using a Gaussian distribution.\nL000249\tWe choose $k=0.9k_{\\rm max}$ where $k_{\\rm max}$ is the scale entering at percolation.\nL000250\tThe colored boxes indicate the collapse condition in the comoving (blue) and spatially-flat (red) gauges. We cut the box from below at the indicative amplitude for a stellar mass PBH. }\nL000251\t\\end{figure}\nL000252\t\nL000253\t\\begin{comment}\nL000254\tNeglecting the time derivative corrections $\\Phi'\\simeq 0$ in Eqs.~\\eqref{eq:delta_C_F}, \\eqref{eq:delta_N_F}, \\eqref{eq:mathcalR_def_main}, we obtain over super-Hubble scales $k\\ll \\mathcal{H}$\nL000255\t\\begin{equation}\nL000256\t\\label{eq:R_delta_relationship}\nL000257\t-\\mathcal{R}~ \\simeq ~ \\frac{\\delta^{(F)}}{4}~\\simeq~ \\frac{3}{4}\\delta^{(N)}~ \\simeq ~ \\frac{9}{4}\\left(\\frac{k}{\\mathcal{H}}\\right)^2\\delta^{(C)}.\nL000258\t\\end{equation}\nL000259\t\\end{comment}\nL000260\t\nL000261\t\nL000262\t\\textit{\\textbf{ Primordial Black Hole formation.}}\nL000263\tOnce the density contrast in a Hubble patch exceeds a threshold, it collapses into a PBH~\\cite{Zeldovich:1967lct,Hawking:1971ei,Carr:1974nx,Carr:1975qj,Chapline:1975ojl}. Numerical relativity simulations~\\cite{Escriva:2021aeh} define the collapse threshold in terms of the compaction function evaluated at Hubble crossing $t_H$~\\cite{Shibata:1999zs,Harada:2023ffo}. At this epoch, it reduces to the density contrast averaged over a Hubble-scale region, $\\delta_{\\rm avg}(R=k^{-1},t_H)$~\\cite{Musco:2018rwt,Escriva:2019phb}, which in our notation corresponds to $\\delta(k\\simeq\\mathcal{H})$.\nL000264\tAs we have seen, the latter is gauge-dependent, see also Ref.~\\cite{Harada:2015yda}. Recent simulations have relied on the comoving gauge, see e.g.~\\cite{Musco:2018rwt}. This gauge is advantageous since the $00$ component of Einstein's equations reduces to Poisson’s equation\nL000265\t\\begin{equation}\nL000266\t\\label{eq:Poisson_eq}\nL000267\t    \\Delta \\Phi = \\frac{3}{2}\\mathcal{H}^2\\delta^{(C)}.\nL000268\t\\end{equation}\nL000269\t In this gauge, a patch collapses into a PBH if~\\cite{Musco:2018rwt,Escriva:2019phb,Escriva:2021aeh}\nL000270\t\\begin{equation}\nL000271\t\\label{eq:PBH_threshold}\nL000272\t\\delta^{(C)}(k\\simeq\\mathcal{H}) \\gtrsim \\delta_c^{(C)} \\in [0.40,\\,0.67],\nL000273\t\\end{equation}\nL000274\twith the exact value depending on the curvature {real space} profile \\cite{Musco:2020jjb}. These simulations assume adiabatic evolution from super-Hubble scales~\\cite{Musco:2018rwt,Escriva:2019phb,Escriva:2021aeh}. In our scenario, {non-adiabatic effects are present} but decay rapidly after percolation (see Fig.~\\ref{fig:delta_Phi_numerical}), and we therefore adopt the standard collapse criterion evaluated at $k=\\mathcal{H}$.\nL000275\t\nL000276\t\nL000277\t\nL000278\tWe proceed to estimate the abundance of primordial black holes. Denoting $P(\\delta^{(C)})$ as the PDF for $\\delta^{(C)}$ at $k={\\cal H}$, the PBH mass fraction at formation reads\nL000279\t\\begin{align}\nL000280\t\\label{eq:beta_k_M_1stOPT}\nL000281\t\\beta_k(M) &= \\int_{\\delta^{(C)}_c}^{\\infty}\nL000282\t{\\rm d}\\delta^{(C)} \\,\nL000283\t\\left (\\frac{M(\\delta^{(C)})}{M_k} \\right )\nL000284\tP(\\delta^{(C)}) .\nL000285\t\\end{align}\nL000286\tIn the first line of Eq.~\\eqref{eq:beta_k_M_1stOPT}, the PBH mass $M$ is related to $\\delta^{(C)}$ through the critical scaling law \\cite{Choptuik:1992jv,Evans:1994pj,Niemeyer:1997mt,Musco:2012au}\nL000287\t\\begin{equation}\nL000288\t\\label{eq:choptuik_law}\nL000289\tM(\\delta^{(C)}) = {\\cal K} M_k (\\delta^{(C)} - \\delta_c^{(C)})^\\gamma,\nL000290\t\\end{equation}\nL000291\twith $\\gamma = 0.36$, ${\\cal K} \\sim 3$, and\nL000292\t$M_k = 4\\pi M_{\\rm pl}^2/H_k$\nL000293\trepresents the mass within the Hubble sphere when scale $k$ re-enters, $H_k=k/a$.\nL000294\tUsing that PBHs redshift like matter, we obtain the DM abundance composed of PBH $f_{\\rm PBH}$\nL000295\t\\begin{equation}\nL000296\t\\frac{df_{\\rm PBH}}{d\\ln(M)} \\simeq \\int d\\ln{k}\\,\\left(\\frac{\\beta_k(M)}{3 \\times 10^{-10}}\\right)\\left(\\frac{T_k}{\\rm GeV}\\right),\nL000297\t\\end{equation}\nL000298\twhere $T_k$ is the temperature at Hubble crossing.\nL000299\tApproximating the spectrum to a nearly monochromatic distribution close to $k \\sim k_{\\rm max}$, one parametrically finds\nL000300\t\\begin{equation}\nL000301\tf_{\\rm PBH} ~\\sim~\nL000302\t\\left (\\frac{P(\\delta_c^{(C)})}{10^{-10}}\\right )\\,\nL000303\t\\left (\\frac{T_{k}}{\\rm GeV} \\right ),\nL000304\t\\end{equation}\nL000305\twhere the Hubble crossing temperature is related to the Hubble mass as\nL000306\t\\begin{equation}\nL000307\tM_k(T_k)\nL000308\t= 4.8\\times 10^{-2} M_\\odot\nL000309\t\\left(\\frac{106.75}{g_*} \\right)^{1/2} \\left( \\frac{\\rm GeV}{T_k} \\right)^{2},\nL000310\t\\end{equation}\nL000311\tand $g_*$ is the number of relativistic degrees of freedom.\nL000312\t\nL000313\tAs shown in blue in Fig.~\\ref{fig:proba_distrib_P_deltaC}, the distribution\nL000314\t$P(\\delta^{(C)})$, here plotted for $k=0.9k_{\\rm max}$, is negatively skewed with an extended tail in the negative range and an exponential suppression of large overdensities, reflecting the exponentially-low probability of forming late-blooming patches~\\cite{Gouttenoire:2023naa}. As in Refs.~\\cite{Tomberg:2023kli,Lewicki:2024ghw}, the fit (with $\\epsilon, \\sigma > 0$)\nL000315\t\\begin{equation}\nL000316\t\\label{eq:fit_function}\nL000317\tP(\\delta) \\propto \\exp\\!\\left[\\frac{\\epsilon}{2}(\\delta-\\mu) - \\frac{2}{\\epsilon^2\\sigma^2}\\left(1 - e^{\\frac{\\epsilon}{2}(\\delta-\\mu)}\\right)^2\\right]\nL000318\t\\end{equation}\nL000319\taccurately describes the data (see SuM).\nL000320\t\nL000321\tDue to the negative non-Gaussianity (NG), even for a completion rate as low as $\\beta/H=4$,\nL000322\t$P({\\delta^{(C)}})$ drops sharply around $\\delta^{(C)}\\sim 0.1$ and is strongly suppressed above the optimistic PBH threshold $\\delta^{(C)}_c\\gtrsim 0.4$ in Eq.~\\eqref{eq:PBH_threshold}. We found similar results for $\\beta/H =2$, just above the no-completion boundary. We conclude that within the framework considered here, slow FOPTs do not appear to yield PBHs in observable amounts. The PDF for $\\delta^{(F)}$ in the spatially-flat gauge, shown in red in Fig.~\\ref{fig:proba_distrib_P_deltaC}, is broader but still heavily skewed, and with the collapse threshold shifted to{\nL000323\t\\begin{equation}\nL000324\t\\label{eq:delta_F_delta_C_link}\nL000325\t    \\delta^{(F)}_c\\simeq 10\\,\\delta^{(C)}_c\nL000326\t\\end{equation}\nL000327\tfollowing from Eqs.~\\eqref{eq:delta_C_F} and \\eqref{eq:Poisson_eq} with $k=\\mathcal{H}$, $\\omega=1/3$, and $\\Phi'\\simeq 0$~\\footnote{As known from textbooks, e.g.~\\cite{Baumann:2022mni}, and re-derived in the SuM, the approximation $\\Phi'\\simeq0$ holds for superhorizon modes only in the absence of non-adiabatic pressure perturbations, $\\delta_{p,\\mathrm{nad}}=0$. In our scenario, bubble dynamics generate $\\delta_{p,\\mathrm{nad}}\\neq0$, leading to departures from $\\Phi'\\simeq0$ on superhorizon scales. Nevertheless, $\\Phi'\\simeq0$ remains a good approximation near horizon crossing, $k\\simeq \\mathcal{H}$, justifying its use in evaluating the PBH collapse threshold. The time evolution of $\\Phi(t)$ is shown in the SuM.\nL000328\t},} the conclusion remains unchanged. Note that our analysis neglects non-linear corrections to the density-curvature relation, which would slightly reduce the variance of $\\delta^{(C)}$ further \\cite{DeLuca:2019qsy,Young:2019yug}.\nL000329\t\nL000330\t\\begin{figure}[ht]\nL000331\t\\centering\nL000332\t\\includegraphics[width=0.48\\textwidth]{variance_betaOH4_7_minimal}\nL000333\t\\caption{\\label{fig:PS_allquantities}\nL000334\tVariance of the perturbations $X$ averaged over a ball of comoving radius $k^{-1}$, $\\sigma_{X}^2\\equiv \\left< X_{\\rm avg}^2(R=k^{-1},t_H)\\right>$, evaluated at Hubble crossing epoch $t_H$. We show the comoving curvature perturbation $\\mathcal{R}$ (red), the density contrast in the spatially-flat $\\delta^{(F)}$ (blue) and comoving gauge $\\delta^{(C)}$ (yellow), and the non-adiabatic pressure perturbation $\\delta_{p,{\\rm nad}}$ (green).\nL000335\t}\nL000336\t\\end{figure}\nL000337\t\nL000338\t\\textit{\\textbf{ Induced Gravitational Waves.}} We now focus on the GW spectrum from FOPT, seizing the relevance of SIGWs from curvature perturbations.\nL000339\tThe GW abundance today can be written as\nL000340\t\\begin{equation}\nL000341\t\\Omega_{\\rm GW}(k)=\\frac{1.7\\times10^{-5}}{g_*^{1/3}(T_k)}\\Big[\\Omega_{\\rm PGW}(k,T_k)+\\Omega_{\\rm SIGW}(k,T_k)\\Big],\nL000342\t\\end{equation}\nL000343\twhere $\\Omega_{\\rm PGW}$ and $\\Omega_{\\rm SIGW}$ are the spectrum of primary GWs (PGWs) and SIGWs.\nL000344\tPrimary GW are produced from bubble collision and relativistic shells. Assuming that the latter remain thin and conserve their energy after collision, their GW spectrum is approximated by the broken power-law bulk flow formula~\\cite{Jinno:2017fby,Konstandin:2017sat,Baldes:2024wuz}\nL000345\t\\begin{equation}\nL000346\t\\Omega_{\\rm PGW} \\simeq 0.06 \\left( \\frac{H}{\\beta}\\right)^2\nL000347\t\\frac{(a+b) f^a f_\\star^b}{\\left(af^{a+b}+b f_\\star^{a+b} \\right)}S_H(f),\nL000348\t\\end{equation}\nL000349\twith $f_\\star=0.8(\\beta/H)(\\mathcal{H}/2\\pi)$, $a=0.9$, $b=2.1$, and $S_H(f)$ imposing a $f^3$ behavior for $f<\\mathcal{H}/2\\pi$.\nL000350\tSIGWs are given by~\\cite{Tomita:1975kj,Matarrese:1992rp,Matarrese:1993zf,Matarrese:1997ay,Acquaviva:2002ud,Mollerach:2003nq,Carbone:2004iv,Ananda:2006af,Baumann:2007zm,Domenech:2021ztg,Espinosa:2018eve,Kohri:2018awv}\nL000351\t\\begin{equation}\nL000352\t\\Omega_{\\rm SIGW}(k,\\eta)= \\frac{1}{24}\\left(\\frac{k}{{\\cal H}(\\eta)}\\right)^2\\overline{{\\cal P}_h(k,\\eta)},\nL000353\t\\end{equation}\nL000354\twhere the power spectrum induced at second-order from curvature perturbations is\nL000355\t\\begin{align}\nL000356\t\\overline{ {\\cal P}_h(k,\\eta)} &\nL000357\t(2\\pi)^3\\delta_D^{(3)}(\\mathbf{k}+\\mathbf{k}')\nL000358\t= \\frac{16 k^3}{2 \\pi^2}\nL000359\t\\sum_s\nL000360\t\\int\\frac{{\\rm d}^3\\mathbf{p}}{(2\\pi)^{3}}\nL000361\t\\int\\frac{{\\rm d}^3\\mathbf{q}}{(2\\pi)^{3}}\nL000362\t\\nonumber \\\\\nL000363\t&\nL000364\t\\times\nL000365\t\\overline{J_s(\\mathbf{k},\\mathbf{p},\\eta)\nL000366\tJ_s(\\mathbf{k}',\\mathbf{q},\\eta) }\nL000367\t\\langle\nL000368\t\\tilde{\\mathcal{R}}_{\\mathbf{p}}\nL000369\t\\tilde{\\mathcal{R}}_{\\mathbf{k}-\\mathbf{p}}\nL000370\t\\tilde{\\mathcal{R}}_{\\mathbf{q}}\nL000371\t\\tilde{\\mathcal{R}}_{\\mathbf{k'}-\\mathbf{q}}\nL000372\t\\rangle\\,,\nL000373\t\\label{eq:Phfull}\nL000374\t\\end{align}\nL000375\thaving defined\nL000376\t\\begin{equation}\nL000377\tJ_s(\\mathbf{k},\\mathbf{p},\\eta)\nL000378\t\\equiv Q_{s}(\\mathbf{k},\\mathbf{p})\nL000379\tI(\\mathbf{k},\\mathbf{p},\\eta)\nL000380\t\\end{equation}\nL000381\t\\begin{figure}[ht!]\nL000382\t\\centering\nL000383\t\\includegraphics[width=0.48\\textwidth]{2ndGW_withNG.pdf}\nL000384\t\\caption{\\label{fig:2ndGW}\nL000385\tSIGW contribution to the GWs from FOPT. The solid line reports the total $\\Omega_{\\rm GW}$, while the dotted line the subdominant SIGWs, which includes the (negligible) NG corrections.\nL000386\t}\nL000387\t\\end{figure}\nL000388\tas the product of the polarization tensor contracted with the loop momenta $Q_{s}(\\mathbf{k},\\mathbf{p}) = e_{s}^{ij}(\\hat{\\mathbf{k}})p_ip_j$, and the kernel function $ I(\\mathbf{k},\\mathbf{p},\\eta)$ being the convolution of source and Green function, see e.g.~Ref.~\\cite{LISACosmologyWorkingGroup:2025vdz} and references therein for the explicit expressions.\nL000389\tThe overline denotes a time average over oscillations~\\cite{Maggiore:1999vm} and $s$ labels the two GW polarizations. We take the Gaussian limit in which only disconnected contractions contribute to the four-point function in \\eqref{eq:Phfull}.\nL000390\tWe extract the curvature power spectrum,\nL000391\t$\\langle \\tilde{\\mathcal{R}}(\\mathbf{k})\\tilde{\\mathcal{R}}(\\mathbf{k}')\\rangle = (2\\pi)^3\\delta_D^{(3)}(\\mathbf{k}+\\mathbf{k}')(2\\pi^2/k^3)\\mathcal{P}_{\\mathcal{R}}(k)$, from the variance of the volume-averaged curvature perturbation $\\sigma_{\\mathcal{R}}^2$ shown in Fig.~\\ref{fig:PS_allquantities} by inverting the formula\nL000392\t\\begin{align}\nL000393\t\\label{eq:variance_power_spectrum}\nL000394\t\\sigma_{\\mathcal{R}}^2\\equiv \\left< \\mathcal{R}_{\\rm avg}^2\\right>\nL000395\t= \\int \\frac{{\\rm d}k}{k}\\,| \\tilde{W}(k,R)|^2 \\mathcal{P}_{\\mathcal{R}}(k),\nL000396\t\\end{align}\nL000397\twhere $\\tilde{W}(k,R)$ is the Fourier-transform of the top-hat window function. Using $\\mathcal{P}_\\mathcal{R}(k)\\propto k^3$ we obtain $\\mathcal{P}_{\\mathcal{R}}(k=R^{-1}) \\simeq 2\\sigma_\\mathcal{R}^2/3\\pi$.\nL000398\tFig.~\\ref{fig:2ndGW} shows the resulting GW spectra for various $\\beta/H$.\nL000399\tWe conclude that SIGWs are never strong enough to form a secondary peak in the total spectrum and at most affect the far-IR tail due to the logarithmic scaling\nL000400\t$\\Omega_{\\rm SIGW} (k \\ll k_{\\star}) \\, {\\propto}\\, k^3(1 + \\tilde A \\ln^2(k/\\tilde k))$~\\cite{Atal:2021jyo}. {In the SuM, we show that non-Gaussianities, quantified by the skewness $\\langle\\mathcal{R}^3\\rangle$~\\cite{Luo:1992er,Komatsu:2001rj,Nakama:2016gzw,Garcia-Bellido:2017aan,Unal:2018yaa,Cai:2018dig,Cai:2019amo,Ragavendra:2020sop,Yuan:2020iwf,Adshead:2021hnm,Davies:2021loj,Abe:2022xur,Garcia-Saenz:2022tzu,Garcia-Saenz:2023zue,Li:2023xtl,Yuan:2023ofl,Perna:2024ehx,Gouttenoire:2025jxe}, have negligible contributions to the SIGW signal.}\nL000401\t\nL000402\t\nL000403\t\nL000404\t{\\textit{\\textbf{ Discussion and implications of our results.}}}\nL000405\tIn this work we have employed a covariant formalism to study cosmological perturbations originating from a FOPT, with implications for PBHs and SIGWs.\nL000406\tUpon modeling bubble dynamics on a FLRW background, previous works have implicitly chosen the spatially-flat gauge (F). However, the values of the density contrast at the PBH formation threshold $\\delta^{(C)}_c\\in[0.4,0.67]$ and its relation to the comoving curvature perturbation at Hubble crossing $\\mathcal{R}\\simeq -9\\delta^{(C)}/4 $~\\footnote{{The relation $\\mathcal{R}\\simeq -9\\delta^{(C)}/4$ follows from Eqs.~\\eqref{eq:mathcalR_def_main} and \\eqref{eq:Poisson_eq} for $k=\\mathcal{H}$, $\\omega=1/3$, and $\\Phi'\\simeq 0$.}} -- widely quoted in the PBH literature -- are valid in the comoving gauge (C).\nL000407\tAt Hubble crossing, the density contrast in the spatially-flat and comoving gauges are related by $\\delta^{(F)} \\simeq 10\\delta^{(C)}$, {see Eq.~\\eqref{eq:delta_F_delta_C_link}.}\nL000408\tMisidentifying these two gauges leads to an underestimation of the PBH collapse threshold by a factor of 10, leading to a dramatic overestimation of the PBH abundance.\nL000409\tThe same gauge confusion overestimates the comoving curvature perturbation $\\mathcal{R}$ by a factor $10$ and therefore overestimates SIGWs by a factor of $10^4$.\nL000410\tAdditionally, we identified a factor of $2/3\\pi$ between the variance of the spatially averaged $\\mathcal{R}$ and its power spectrum, {see below Eq.~\\eqref{eq:variance_power_spectrum},} further suppressing SIGWs by a factor of $20$, {leading to lower SIGWs amplitude with respect to Ref.~\\cite{Lewicki:2024ghw} by a factor $2\\times 10^5$.}\nL000411\t\nL000412\t{Let us now discuss the implication of the fact that PBH and SIGW production from FOPTs appear to be far smaller than previously thought. First, this implies it would be harder to use PBHs to search for evidence of strong FOPTs having taken place in the primordial universe.\nL000413\tSecondly, this result has important implications for the FOPT interpretation of the PTA signal: the loudest region of the posterior is not necessarily excluded by PBH overproduction constraints, particularly those from LIGO-Virgo-KAGRA~\\cite{Gouttenoire:2023bqy,Ellis:2023oxs,Lewicki:2024ghw}, and FOPTs with a reheating temperature above a GeV might not explain the PTA signal~\\cite{Lewicki:2024ghw}.\nL000414\t}\nL000415\t\nL000416\t{\\textit{\\textbf{Limitations and Future Directions}}}\nL000417\tWe have neglected gravitational effects on nucleation rates~\\cite{Coleman:1980aw} and on the expansion of bubbles~\\cite{Giombi:2023jqq,Jinno:2024nwb}, as well as the gradient energy of bubble walls~\\cite{Lewicki:2023ioy,Flores:2024lng,Hashino:2025fse}.\nL000418\tThe actual distribution of radiation converted from the vacuum energy is also important in understanding perturbations on small scales $k \\gtrsim \\mathcal{H}$~\\cite{Jinno:2019jhi,Lewicki:2022pdb}.\nL000419\t{While asphericities have a small impact on the threshold for PBH collapse in the standard scenario \\cite{Yoo:2020lmg}, it is not yet clear whether the same conclusion applies in the present case.}\nL000420\tFuture work should incorporate these effects and perform full numerical simulations tracking non-linear curvature perturbations and non-adiabatic pressure effects to refine PBH formation criteria.\nL000421\t\nL000422\t\\textit{\\textbf{ Acknowledgements.}}---\nL000423\tYG thanks Caner Unal for his valuable contributions during early stages of this project, and Sokratis Trifinopoulos and Miguel Vanvlasselaer for interesting discussions. We thank Pedro Schwaller for spotting a typo in Fig. 4 and Karsten Jedamzik for drawing our attention to typographical issues in Eqs.~6 and~8.\nL000424\tYG acknowledges support by the Cluster of Excellence ``PRISMA+'' funded by the German Research Foundation (DFG) within the German Excellence Strategy (Project No. 390831469), and by a fellowship awarded by the Azrieli Foundation.\nL000425\tThe work of RJ is supported by JSPS KAKENHI Grant Numbers 23K17687, 23K19048, and 24K07013.\nL000426\t\nL000427\t\nL000428\t\nL000429\t\nL000430\t\nL000431\t\nL000432\t\\appendix\nL000433\t\\onecolumngrid\nL000434\t\nL000435\t\\fontsize{11}{13}\\selectfont\nL000436\t\nL000437\t\\makeatletter\nL000438\t\\long\\def\\@makecaption#1#2{\nL000439\t  \\vskip\\abovecaptionskip\nL000440\t  \\parbox{\\hsize}{\nL000441\t    \\fontsize{10.5}{12.5}\\selectfont\nL000442\t    \\justifying\nL000443\t    #1.\\ #2\nL000444\t  }\nL000445\t  \\vskip\\belowcaptionskip\nL000446\t}\nL000447\t\\makeatother\nL000448\t\nL000449\t\nL000450\t\nL000451\t\nL000452\t\nL000453\t\nL000454\t\nL000455\t\nL000456\t\nL000457\t\nL000458\t\nL000459\t\nL000460\t\nL000461\t\nL000462\t\nL000463\t\nL000464\t\nL000465\t\nL000466\t\nL000467\t\\newpage\nL000468\t\\vspace{1cm}\nL000469\t\nL000470\t\\ifarxiv\nL000471\t\nL000472\t\nL000473\t\nL000474\t\\begin{center}\nL000475\t\\textbf{\\it\\Large Supplemental Material}\nL000476\t\\end{center}\nL000477\t\\renewcommand{\\tocname}{\\it\nL000478\t\\vspace{-1.5cm}\nL000479\t}\nL000480\t\nL000481\t\\else\nL000482\t\nL000483\t\nL000484\t\nL000485\t\\begin{center}\nL000486\t\\textbf{\\large Supplemental Material for ``Curvature Perturbations from First-Order Phase Transitions:\nL000487\tImplications to Black Holes and Gravitational Waves''}\nL000488\t\\end{center}\nL000489\t\nL000490\t\\noindent\nL000491\t\\renewcommand{\\tocname}{\\it\nL000492\t\\vspace{-1cm}\nL000493\tGabriele Franciolini, Yann Gouttenoire, Ryusuke Jinno\nL000494\t}\nL000495\t\\fi\nL000496\t\nL000497\t\nL000498\t\nL000499\t\\titleformat{\\section}\nL000500\t{\\normalfont\\fontsize{12}{14}\\bfseries  \\centering }{\\thesection.}{1em}{}\nL000501\t\\titleformat{\\subsection}\nL000502\t{\\normalfont\\fontsize{12}{14}\\bfseries \\centering}{\\thesubsection.}{1em}{}\nL000503\t\\titleformat{\\subsubsection}\nL000504\t{\\normalfont\\fontsize{12}{14}\\bfseries \\centering}{\\thesubsubsection)}{1em}{}\nL000505\t\nL000506\t\\titleformat{\\paragraph}\nL000507\t{\\normalfont\\fontsize{12}{14}\\bfseries  }{\\thesection:}{1em}{}\nL000508\t\nL000509\t\nL000510\t {\nL000511\t \\hypersetup{linkcolor=black}\nL000512\t \\tableofcontents\nL000513\t }\nL000514\t\nL000515\t\nL000516\t\\section{Background equations}\nL000517\t\nL000518\tWe consider a perfect fluid in a homogeneous, isotropic universe whose stress-energy tensor can be written as\nL000519\t\\begin{equation}\nL000520\t    \\overline{T}^\\mu_{\\ \\nu} = (\\overline{\\rho} + \\overline{p})\\overline{u}^\\mu \\overline{u}_\\nu - \\overline{p}\\delta^\\mu_\\nu,\nL000521\t\\end{equation}\nL000522\twhere $\\overline{u}_\\mu = a\\delta^0_\\mu$ and $\\overline{u}^\\mu = a^{-1}\\delta_0^\\mu$. The Einstein field equations in this background lead to the usual Friedmann and continuity equations:\nL000523\t\\begin{equation}\nL000524\t    H^2 = \\frac{8\\pi G}{3}\\overline{\\rho}, \\quad\nL000525\t    \\dot{H} = -\\frac{3(1+\\omega)}{2}H^2, \\quad\nL000526\t    \\dot{\\overline{\\rho}} =-3(1+\\omega)H\\overline{\\rho},\nL000527\t\\end{equation}\nL000528\twhere $H \\equiv \\dot{a}/a$.\nL000529\tExpressing time in terms of the conformal variable $\\eta$, with $\\mathrm{d}t/\\mathrm{d}\\eta = a(\\eta)$, the above relations become:\nL000530\t\\begin{equation}\nL000531\t\\label{eq:Friedmann_comoving}\nL000532\t    \\mathcal{H}^2 = \\frac{8\\pi G}{3}\\overline{\\rho}a^2, \\quad\nL000533\t    \\mathcal{H}' =-\\frac{1 + 3\\omega}{2}\\mathcal{H}^2, \\quad\nL000534\t    \\overline{\\rho}' =- 3(1+\\omega)\\mathcal{H}\\overline{\\rho} ,\nL000535\t\\end{equation}\nL000536\twhere $\\mathcal{H} \\equiv a'/a$ is the comoving Hubble factor and $\\omega$ is the equation of state of the universe\nL000537\t\\begin{equation}\nL000538\t\\label{eq:EoS}\nL000539\t\\omega~\\equiv~ \\overline{p} /\\overline{\\rho}.\nL000540\t\\end{equation}\nL000541\tIntegration of the continuity and Friedmann equation for constant $\\omega$ give\nL000542\t\\begin{equation}\nL000543\t    \\overline{\\rho} \\propto a^{-3(1+\\omega)},\\qquad \\qquad\nL000544\t    a \\propto t^{\\,\\frac{2}{3(1+\\omega)}},\\qquad \\textrm{and}\\qquad\nL000545\t    a \\propto \\eta^{\\,\\frac{2}{1+3\\omega}}.\nL000546\t\\end{equation}\nL000547\tUseful relationships between dot and prime derivatives include:\nL000548\t\\begin{equation}\nL000549\t    H = \\frac{\\mathcal{H}}{a}, \\quad\nL000550\t    \\dot{H} = \\frac{\\mathcal{H}'}{a^2} - \\frac{\\mathcal{H}^2}{a^2}, \\quad\nL000551\t    \\dot{F} = \\frac{F'}{a}, \\quad\nL000552\t    \\ddot{F} = \\frac{F''}{a^2} - H\\frac{F'}{a},\nL000553\t\\end{equation}\nL000554\twhere $F$ is an arbitrary function.\nL000555\t\nL000556\t\nL000557\t\\section{Cosmological Scalar Perturbation Theory}\nL000558\t\nL000559\tWe briefly review the theory of linear cosmological scalar perturbations and the associated gauge-invariant variables used throughout this work.\nL000560\tThis framework provides the basis for our analysis of perturbations generated during first-order phase transitions.\nL000561\t\nL000562\t\\subsection{Gauge-invariant linear perturbations}\nL000563\t\nL000564\t\\textbf{Linear metric perturbations ---}\nL000565\tThe line element with linear perturbations around a flat FLRW metric can be written as:\nL000566\t\\begin{equation}\nL000567\t    \\mathrm{d}s^2\nL000568\t    =\nL000569\t    a^2 \\Bigl[\nL000570\t    -\\bigl(1 + 2A\\bigr)\\,\\mathrm{d}\\eta^2\nL000571\t    + 2\\,B_i\\,\\mathrm{d}x^i\\,\\mathrm{d}\\eta\nL000572\t    + \\bigl(\\delta_{ij} + h_{ij}\\bigr)\\,\\mathrm{d}x^i\\,\\mathrm{d}x^j\nL000573\t    \\Bigr].\nL000574\t\\end{equation}\nL000575\tWe follow the notations of Ref.~\\cite{Peter:2013avv,Baumann:2022mni}.\nL000576\tThe quantity $B_i$ can be split into a gradient plus a divergence-free component:\nL000577\t\\begin{equation}\nL000578\t    B_i = \\partial_i B + \\hat{B}_i,\nL000579\t\\end{equation}\nL000580\tand the symmetric perturbation $h_{ij}$ can be further decomposed into scalar, vector, and tensor contributions:\nL000581\t\\begin{equation}\nL000582\t    h_{ij} = 2C\\delta_{ij}\nL000583\t    + 2\\partial_{\\langle i}\\partial_{j\\rangle}E\nL000584\t    + 2\\partial_{(i}\\hat{E}_{j)}\nL000585\t    + \\hat{E}_{ij}\nL000586\t\\end{equation}\nL000587\twhere $\\partial_{\\langle i}\\partial_{j\\rangle} E \\equiv (\\partial_i\\partial_j - \\tfrac{1}{3}\\delta_{ij}\\nabla^2)E$ and $\\partial_{(i} \\hat{E}_{j)}\nL000588\t= \\frac{1}{2} \\left( \\partial_i \\hat{E}_j + \\partial_j \\hat{E}_i \\right)$. The “hatted” functions ($\\hat{B}_i$, $\\hat{E}_i$, $\\hat{E}_{ij}$) are divergence-free, while $\\hat{E}_{ij}$ is also traceless. Overall, the ten metric degrees of freedom decompose into four scalars ($A,B,C,E$), four vector components ($\\hat{B}_i, \\hat{E}_i$), and two tensor modes ($\\hat{E}_{ij}$).\nL000589\tPopular gauge choices are, e.g.~\\cite{Kodama:1984ziu}:\nL000590\t\\begin{enumerate}\nL000591\t    \\item \\textit{Spatially-Flat gauge} ($C=E=0$)\nL000592\t    \\begin{equation}\nL000593\t    \\label{eq:SF_gauge}\nL000594\t        \\mathrm{d}s^2\nL000595\t        =\nL000596\t        a^2 \\bigl[\nL000597\t        -(1 + 2A)\\,\\mathrm{d}\\eta^2\nL000598\t        + 2\\,B_i\\,\\mathrm{d}x^i\\,\\mathrm{d}\\eta\nL000599\t        + \\mathrm{d}\\mathbf{x}^2\nL000600\t        \\bigr].\nL000601\t    \\end{equation}\nL000602\t\nL000603\t    \\item \\textit{Newtonian gauge} ($B=E=0$)\nL000604\t    \\begin{equation}\nL000605\t    \\label{eq:Newtonian_gauge}\nL000606\t        \\mathrm{d}s^2\nL000607\t        =\nL000608\t        a^2 \\bigl[\nL000609\t        -(1 + 2A)\\,\\mathrm{d}\\eta^2\nL000610\t        + (1 + 2C)\\,\\mathrm{d}\\mathbf{x}^2\nL000611\t        \\bigr].\nL000612\t    \\end{equation}\nL000613\t\nL000614\t    \\item \\textit{Comoving gauge} ($v + B = 0,~ E=0$)\nL000615\t    \\begin{equation}\nL000616\t    \\label{eq:Comoving_gauge}\nL000617\t        \\mathrm{d}s^2\nL000618\t        =\nL000619\t        a^2\\bigl[\nL000620\t        -(1 + 2A)\\,\\mathrm{d}\\eta^2\nL000621\t        + 2\\,B_i\\,\\mathrm{d}x^i\\,\\mathrm{d}\\eta\nL000622\t        + (1 + 2C)\\,\\mathrm{d}\\mathbf{x}^2\nL000623\t        \\bigr].\nL000624\t    \\end{equation}\nL000625\t    \\begin{comment}\nL000626\t    \\item \\textbf{Synchronous gauge} ($A=B=0$)\nL000627\t    \\begin{equation}\nL000628\t        \\mathrm{d}s^2\nL000629\t        =\nL000630\t        a^2 \\Bigl[\nL000631\t        \\mathrm{d}\\eta^2\nL000632\t        - \\bigl(\\delta_{ij} + 2C\\delta_{ij} + 2\\partial_{\\langle i}\\partial_{j\\rangle}E \\bigr)\\,\\mathrm{d}\\mathbf{x}^2\nL000633\t        \\Bigr].\nL000634\t    \\end{equation}\nL000635\t    \\end{comment}\nL000636\t\\end{enumerate}\nL000637\t\nL000638\t\\textbf{Linear matter perturbations ---}\nL000639\tStarting from\nL000640\t$T^\\mu{}_\\nu=(\\rho+p)u^\\mu u_\\nu+p\\,\\delta^\\mu{}_\\nu+\\Sigma^\\mu{}_\\nu$,\nL000641\tthe linear perturbation reads~\\cite{Peter:2013avv,Baumann:2022mni}\nL000642\t\\begin{equation}\nL000643\t\\delta T^\\mu{}_\\nu\nL000644\t=(\\delta\\rho+\\delta p)\\,\\overline{u}^\\mu\\overline{u}_\\nu\nL000645\t+(\\overline{\\rho}+\\overline{p})\\big(\\delta u^\\mu\\overline{u}_\\nu+\\overline{u}^\\mu\\delta u_\\nu\\big)\nL000646\t-\\delta p\\,\\delta^\\mu{}_\\nu-\\Sigma^\\mu{}_\\nu,\nL000647\t\\end{equation}\nL000648\twhere $\\Sigma^\\mu{}_\\nu$ is the first order anisotropic stress.\nL000649\tThe unit norm $u^\\mu u_\\mu=\\overline{u}^\\mu \\overline{u}_\\mu=-1$ implies\nL000650\t\\begin{equation}\nL000651\t\\delta g_{\\mu\\nu}\\overline{u}^\\mu \\overline{u}^\\nu + 2\\overline{u}_\\mu\\delta u^\\mu=0.\nL000652\t\\end{equation}\nL000653\tUsing $\\overline{u}^\\mu=a^{-1}\\delta^\\mu_0$ and $\\delta g_{00}=-2a^2A$, we get $\\delta u^0=-Aa^{-1}$.\nL000654\tParametrizing the spatial velocity by $\\delta u^i=v^i/a$, the 4-velocity reads\nL000655\t\\begin{equation}\nL000656\tu^\\mu=a^{-1}(1-A,\\,v^i),\\qquad\nL000657\tu_\\mu=a(-(1+A),\\,v_i+B_i),\nL000658\t\\end{equation}\nL000659\twhere we used $u_\\alpha=g_{\\alpha\\beta}u^\\beta$ and the convention $v_i=\\delta_{ij}v^j$. By definition, the anisotropic stress is purely spatial in the fluid rest\nL000660\tframe and therefore satisfies $\\Sigma^\\mu{}_\\nu u^\\nu=0$ and\nL000661\t$\\Sigma^\\mu{}_\\mu=0$.\nL000662\tWe deduce that the perturbed stress-energy components are:\nL000663\t\\begin{align}\nL000664\t    &T^0_{\\ 0} = -(\\overline{\\rho} + \\delta\\rho), &T^0_{\\ i} = (\\overline{\\rho} + \\overline{p})(v_i + B_i),  \\\\\nL000665\t   & T^i_{\\ 0} = -(\\overline{\\rho} + \\overline{p})\\,v^i\\equiv q^i, &T^i_{\\ j} = (\\overline{p} + \\delta p)\\delta^i_j + \\Sigma^i_{\\ j}.\nL000666\t\\end{align}\nL000667\tWe introduce the scalar part of the 3-velocity and of the 3-momentum~\\footnote{We follow the convention of \\cite{Peter:2013avv,Baumann:2022mni} where $v_i=\\delta_{ij}v^j$. Instead Refs.~\\cite{Mukhanov:1990me,Mukhanov:2005sc} define $v_i=-a^2v^i$.}\nL000668\t\\begin{equation}\nL000669\t    \\partial_i( v) \\equiv  v_i,\\qquad \\textrm{and}\\qquad  q\\equiv (\\overline{\\rho}+\\overline{p})v.\nL000670\t\\end{equation}\nL000671\tWe define the density contrast $\\delta \\equiv \\delta \\rho/\\rho$.\nL000672\t\nL000673\t\\textbf{Gauge-invariant quantities ---}\nL000674\tUnder an infinitesimal coordinate transformation generated by scalar functions $T$ and $L$\nL000675\t\\begin{equation}\nL000676\t\\label{eq:coordinate_transformation}\nL000677\tx^\\mu(q)\\rightarrow \\tilde{x}^\\mu(q)\\equiv x^\\mu(q)+\\xi^\\mu(q),\\quad \\textrm{where}\\quad \\xi^0\\equiv T,\\quad\\textrm{and}\\quad \\xi^i\\equiv \\partial^i L,\nL000678\t\\end{equation}\nL000679\twhere $q$ denotes a physical spacetime point, the scalar metric perturbations transform as~\\cite{Baumann:2022mni}\nL000680\t\\begin{equation}\nL000681\t\\label{eq:metric_shift}\nL000682\t    A\\rightarrow A-T'-\\mathcal{H}T,\\quad B\\rightarrow B+T-L',\\quad C\\rightarrow C-\\mathcal{H}T-\\frac{1}{3}\\nabla^2 L,\\quad E\\rightarrow E-L.\nL000683\t\\end{equation}\nL000684\tThese transformation laws motivate the definition of two gauge-invariant combinations, the Newtonian (or Bardeen) potentials~\\cite{Bardeen:1980kt, Baumann:2022mni}:\nL000685\t\\begin{align}\nL000686\t\\label{eq:Bardeen_Potentials}\nL000687\t    \\Psi \\equiv A + \\mathcal{H}(B - E') + (B - E')', \\qquad \\Phi \\equiv -C + \\frac{1}{3}\\nabla^2 E - \\mathcal{H}(B - E').\nL000688\t\\end{align}\nL000689\tUnder the same coordinate transformation in Eq.~\\eqref{eq:coordinate_transformation}, matter perturbations transform as~\\cite{Baumann:2022mni}\nL000690\t\\begin{equation}\nL000691\t\\label{eq:matter_shift}\nL000692\t    \\delta \\rightarrow \\delta-\\frac{\\overline{\\rho}'}{\\overline{\\rho}} T,\\quad \\delta p\\rightarrow \\delta p-\\overline{p}'T,\\quad v\\to v+L',\\quad \\Sigma_{i j}\\rightarrow \\Sigma_{ij}.\nL000693\t\\end{equation}\nL000694\tThis in turn motivates the introduction of the following gauge-invariant matter variables~\\cite{Peter:2013avv}\nL000695\t\\begin{equation}\nL000696\t\\label{eq:density_constrast_defs}\nL000697\t   \\mathcal{V} \\equiv v + E',\\quad \\delta^{(N)} \\equiv \\delta + \\frac{\\overline{\\rho}'}{\\overline{\\rho}}(B - E'),\\quad \\delta^{(C)}\\equiv \\delta  + \\frac{\\overline{\\rho}'}{\\overline{\\rho}}(v+B) ,\\quad \\delta^{(F)}\\equiv \\delta+\\frac{\\overline{\\rho}'}{\\mathcal{H}\\overline{\\rho}}\\left( -C+\\frac{1}{3}\\nabla^2E\\right).\nL000698\t\\end{equation}\nL000699\tThe quantities $ \\delta^{(N)}$, $ \\delta^{(C)}$, and  $\\delta^{(F)}$ reduce to the contrast density in the Newtonian, comoving and spatially-flat gauges~\\footnote{Note that Ref.~\\cite{Peter:2013avv} introduces $\\delta^{(F)}\\equiv \\delta-(\\overline{\\rho}'/\\overline{\\rho})(C/\\mathcal{H})$ instead of $\\delta^{(F)}\\equiv \\delta-(\\overline{\\rho}'/\\overline{\\rho})(C/\\mathcal{H})+(\\overline{\\rho}'/\\overline{\\rho})(\\nabla^2E/3\\mathcal{H})$ which is however not invariant under the transformation rules in Eq.~\\eqref{eq:metric_shift}.}, defined in Eqs.~\\eqref{eq:SF_gauge}, \\eqref{eq:Newtonian_gauge} and \\eqref{eq:Comoving_gauge}, respectively. The quantity $ \\mathcal{V}$ reduce to the coordinate velocity $v$ in those three gauges.\nL000700\tSimilarly, we define the gauge-invariant pressure perturbations,\nL000701\t\\begin{equation}\nL000702\t    \\delta p^{(N)} \\equiv \\delta p + \\overline{p}'(B - E'),\\quad \\delta p^{(C)}\\equiv \\delta p  + \\overline{p}'(v+B) ,\\quad \\delta p^{(F)} \\equiv \\delta p+\\frac{\\overline{p}'}{\\mathcal{H}}\\left( -C+\\frac{1}{3}\\nabla^2E\\right).\nL000703\t\\end{equation}\nL000704\t\nL000705\t\\textbf{Linearized Einstein equations ---}\nL000706\tIn the absence of anisotropic stress ($\\Sigma^i_{\\ j}=0$) the trace-free part of Einstein equations along $ij$ leads to\nL000707\t\\begin{equation}\nL000708\t\\label{eq:no_anisotropy}\nL000709\t    \\Psi = \\Phi.\nL000710\t\\end{equation}\nL000711\tTheir expressions in Eqs.~\\eqref{eq:Bardeen_Potentials} expressed in the gauges defined in Eqs.~\\eqref{eq:SF_gauge}, \\eqref{eq:Newtonian_gauge} and \\eqref{eq:Comoving_gauge}, are\nL000712\t\\begin{equation}\nL000713\t\\label{eq:Psi_Phi_different_gauges}\nL000714\t    \\Psi =\nL000715\t    \\begin{cases}\nL000716\t        A, & \\\\\nL000717\t        A + \\mathcal{H}B + B', &  \\\\\nL000718\t        A + \\mathcal{H}B + B', & .\nL000719\t    \\end{cases}\\qquad  \\Phi =\nL000720\t    \\begin{cases}\nL000721\t        -C, & \\text{(Newtonian gauge)}, \\\\\nL000722\t        -\\mathcal{H}B, & \\text{(spatially-flat gauge)}, \\\\\nL000723\t        -C - \\mathcal{H}B, & \\text{(Comoving gauge)}.\nL000724\t    \\end{cases}\nL000725\t\\end{equation}\nL000726\tThe condition in Eq.~\\eqref{eq:no_anisotropy} imposes specific relationships among $A$, $B$, and $C$ in different gauges\nL000727\t\\begin{equation}\nL000728\t\\label{eq:Psi_equal_Phi}\nL000729\t    \\Psi=\\Phi\\quad \\Rightarrow \\quad\\begin{cases}\nL000730\t    A=-C,\\qquad \\qquad \\qquad \\qquad \\qquad\\qquad\\textrm{(Newtonian gauge)},\\\\\nL000731\t    A+2\\mathcal{H}B+B'=0,\\quad \\qquad \\qquad \\qquad\\textrm{(Spatially-flat gauge)},\\\\\nL000732\t  A+C+2\\mathcal{H}B+B'=0,\\qquad \\qquad \\qquad \\textrm{(Comoving gauge)}.\nL000733\t    \\end{cases}\nL000734\t\\end{equation}\nL000735\tThe linearised Einstein equations, $00$ component, spatial integration of $0j$ component and trace of $ij$ components, give in the Newtonian gauge, e.g.~\\cite{Mukhanov:1990me,Baumann:2022mni}:\nL000736\t\\begin{align}\nL000737\t    \\nabla^2\\Phi - 3\\mathcal{H}(\\Phi' + \\mathcal{H}\\Phi) &= \\frac{3}{2}\\mathcal{H}^2\\delta^{(N)},\\label{eq:Einstein_eq_0_0}\\\\\nL000738\t    \\Phi' + \\mathcal{H}\\Phi &= -\\frac{3}{2}\\mathcal{H}^2 (1+\\omega)\\mathcal{V},\\label{eq:Einstein_eq_0_i}\\\\\nL000739\t    \\Phi'' + 3\\mathcal{H}\\Phi' -3\\omega\\mathcal{H}^2\\Phi &= \\frac{3}{2}\\mathcal{H}^2\\frac{\\delta p^{(N)}}{\\overline{\\rho}}.\\label{eq:Einstein_eq_i_j}\nL000740\t\\end{align}\nL000741\t Combining Eqs.~\\eqref{eq:Einstein_eq_0_0} and \\eqref{eq:Einstein_eq_i_j}, we obtain the evolution equation for the gauge-invariant Newtonian potential\nL000742\t\\begin{equation}\nL000743\t\\label{eq:Newtonian_potential_evolution_app}\nL000744\t\\Phi'' + 3 (1 + c_s^2)\\mathcal{H} \\Phi' + (3 (c_s^2-\\omega)\\mathcal{H}^2-c_s^2 \\Delta)\\Phi =\\frac{3}{2}\\mathcal{H}^2 \\frac{\\delta p_{\\rm nad}}{\\overline{\\rho}},\nL000745\t\\end{equation}\nL000746\twhere we used $\\mathcal{H}' = -(1 + 3\\omega)\\mathcal{H}^2/2$ given by Eq.~\\eqref{eq:Friedmann_comoving} and where $\\delta p_{\\rm nad}$ is the non-adiabatic (or entropic) part of the density perturbation\nL000747\t\\begin{equation}\nL000748\t\\label{eq:delta_nad_app_def}\nL000749\t    \\delta p_{\\rm nad}\\equiv \\delta p-c_s^2\\delta \\rho,\nL000750\t\\end{equation}\nL000751\twhere $c_s^2$ is the (adiabatic) speed of sound of the universe. It is a background quantity defined by\nL000752\t\\begin{equation}\nL000753\t\\label{eq:SoS}\nL000754\tc_s^2 \\equiv \\frac{\\delta p}{\\delta \\rho}\\Big|_{\\delta p_{\\rm nad}=0} = \\frac{\\overline{p}'}{\\overline{\\rho}'} = \\omega -\\frac{\\omega'}{3(1+\\omega)\\mathcal{H}}.\nL000755\t\\end{equation}\nL000756\tThe adiabatic condition $\\delta p_{\\rm nad}=0$ implies that perturbations correspond to a local time shift of the background, $\\eta\\to\\eta+T(\\eta,\\mathbf{x})$~\\cite{Baumann:2022mni}. To first order, this gives $\\delta\\rho=\\overline{\\rho}'\\,T$ and $\\delta p=\\overline{p}'\\,T$, yielding the second equality in Eq.~\\eqref{eq:SoS}. Another interpretation is that fluctuations in pressure arise solely from fluctuations in density, hence the local equation of state $p(\\rho)$ is uniform and $\\delta p/\\delta \\rho = d\\overline{p}/d\\overline{\\rho}$~\\cite{Bardeen:1983qw}. The last equality in Eq.~\\eqref{eq:SoS} follows from Eqs.~\\eqref{eq:EoS} and \\eqref{eq:Friedmann_comoving}.\nL000757\tCombining Eq.~\\eqref{eq:Einstein_eq_0_0} and \\eqref{eq:Einstein_eq_0_i}, we get the relativistic Poisson equation\nL000758\t\\begin{equation}\nL000759\t\\label{eq:Einstein_eq_00_0i_Poisson}\nL000760\t    \\nabla^2\\Phi ~=~ \\frac{3}{2}\\mathcal{H}^2\\delta^{(C)},\nL000761\t\\end{equation}\nL000762\twhere the comoving density contrast $\\delta^{(C)}$ is given by the gauge-invariant expressions:\nL000763\t\\begin{align}\nL000764\t\\label{eq:Delta_def}\nL000765\t    \\delta^{(C)}= \\delta^{(N)} +2\\Phi+\\frac{2\\Phi'}{\\mathcal{H}} =\\delta^{(N)}  + \\frac{\\overline{\\rho}'}{\\overline{\\rho}}\\mathcal{V}=\\delta  + \\frac{\\overline{\\rho}'}{\\overline{\\rho}}(v+B) ,\nL000766\t\\end{align}\nL000767\twith the three equalities being derived from Eqs.~\\eqref{eq:Einstein_eq_0_0}, \\eqref{eq:Einstein_eq_0_i}, \\eqref{eq:density_constrast_defs}, respectively.\nL000768\tUsing Eqs.~\\eqref{eq:Bardeen_Potentials},~\\eqref{eq:density_constrast_defs} and \\eqref{eq:Einstein_eq_0_i}, we deduce the transformation rules between the density contrast in the different gauges\nL000769\t\\begin{align}\nL000770\t    &\\delta^{(C)}-\\delta^{(N)}=+2\\Phi+\\frac{2\\Phi'}{\\mathcal{H}}, \\label{eq:delta_C_delta_N}\\\\\nL000771\t    &\\delta^{(F)}-\\delta^{(N)}=-3(1+\\omega)\\Phi, \\label{eq:delta_F_delta_N}\\\\\nL000772\t    &\\delta^{(C)}-\\delta^{(F)}= (5+3\\omega)\\Phi +\\frac{2\\Phi'}{\\mathcal{H}}.\\label{eq:delta_C_delta_F}\nL000773\t\\end{align}\nL000774\tWe can check that those transformation rules are in agreement with the literature, e.g. \\cite[Eqs.~5.87]{Peter:2013avv}.\nL000775\tThe continuity equation in the different gauges are given by\nL000776\t\\begin{align}\nL000777\t&\\delta^{(N)'}+3\\mathcal{H}(c_s^2-\\omega)\\delta^{(N)}=-(1+\\omega)(\\Delta \\mathcal{V}-3\\Phi')-3\\mathcal{H}\\frac{\\delta p_{\\rm nad}}{\\overline{\\rho}},\\label{eq:delta_N_eq}\\\\\nL000778\t&\\delta^{(F)'}+3\\mathcal{H}(c_s^2-\\omega)\\delta^{(F)}=-(1+\\omega)\\Delta \\mathcal{V}-3\\mathcal{H}\\frac{\\delta p_{\\rm nad}}{\\overline{\\rho}},\\label{eq:delta_F_eq}\\\\\nL000779\t&\\delta^{(C)'}-3\\omega\\mathcal{H}\\delta^{(C)}=-(1+\\omega)\\Delta \\mathcal{V}.\\label{eq:delta_C_eq}\nL000780\t\\end{align}\nL000781\tThe first equation in Eq.~\\eqref{eq:delta_N_eq} can be calculated from a combination of Eq.~\\eqref{eq:Einstein_eq_0_0} and its derivative. The second equation in Eq.~\\eqref{eq:delta_F_eq} can be deduced from the first using Eq.~\\eqref{eq:delta_F_delta_N}. The third equation in Eq.~\\eqref{eq:delta_C_eq} can be derived from taking the derivative of Eq.~\\eqref{eq:Einstein_eq_00_0i_Poisson}, using Eq.~\\eqref{eq:Einstein_eq_0_i} and finally using Eq.~\\eqref{eq:Einstein_eq_00_0i_Poisson} again. The first two equations are also given in \\cite[Eqs.~5.125 and 5.128]{Peter:2013avv}.\nL000782\t\nL000783\t\nL000784\t\nL000785\t\\subsection{Gauge-invariant curvature perturbations}\nL000786\tWe can introduce two additional gauge-invariant quantities to express curvature perturbations. At first the comoving curvature perturbation $\\mathcal{R}$~\\cite{Bardeen:1980kt}\nL000787\t\\begin{align}\nL000788\t\\mathcal{R} ~\\equiv ~ -C+\\frac{1}{3}\\nabla^2E-\\mathcal{H}(v+B) ~=~\\Phi - \\mathcal{H}\\mathcal{V} ~=~ \\frac{5+3\\omega}{3+3\\omega} \\Phi +\\frac{2\\Phi'}{3(1+\\omega)\\mathcal{H}},\nL000789\t\\label{eq:mathcalR_def}\nL000790\t\\end{align}\nL000791\twhere the third equality follows from Eq.~\\eqref{eq:Einstein_eq_0_i}.\nL000792\tThe curvature perturbation on uniform density hypersurface $\\zeta$~\\cite{Bardeen:1983qw,Wands:2000dp,Lyth:2004gb}:\nL000793\t\\begin{equation}\nL000794\t\\label{eq:zeta_def}\nL000795\t\\zeta ~\\equiv ~ -C+\\frac{1}{3}\\nabla^2E+\\mathcal{H}\\frac{\\overline{\\rho}}{\\overline{\\rho}'}\\delta ~=~ \\Phi-\\frac{1}{3}\\frac{\\delta^{(N)}}{1+\\omega} = -\\frac{1}{3}\\frac{\\delta^{(F)}}{1+\\omega} ~=~ \\mathcal{R}-\\frac{\\delta^{(C)}}{3(1+\\omega)},\nL000796\t\\end{equation}\nL000797\twhere the third and fourth equalities follow from Eqs.~\\eqref{eq:delta_F_delta_N} and \\eqref{eq:delta_C_delta_F}. Those two gauge-invariant quantities, $\\mathcal{R}$  and $\\zeta$,  are particularly convenient due to their laws of conservation. Using $\\mathcal{H}' = -(1+3\\omega)\\mathcal{H}/2$, $\\omega'=-3\\mathcal{H}(1+\\omega)(c_s^2-\\omega)$, Eq.~\\eqref{eq:Einstein_eq_0_i} and Eq.~\\eqref{eq:Newtonian_potential_evolution_app}, we calculate\nL000798\t\\begin{align}\nL000799\t\\label{eq:R_prime_Phi_prime}\nL000800\t\\mathcal{R}' ~=~  \\mathcal{H} \\frac{\\delta p_{\\rm nad}}{\\overline{\\rho}+\\overline{p}} - \\frac{2c_s^2}{3(1+\\omega)}\\frac{k^2}{\\mathcal{H}}\\Phi,\\qquad \\textrm{and} \\qquad\\zeta' ~= ~ \\mathcal{H} \\frac{\\delta p_{\\rm nad}}{\\overline{\\rho}+\\overline{p}} - \\frac{k^2 \\mathcal{V}}{3}.\nL000801\t\\end{align}\nL000802\tThe Fourier index $k$ is suppressed for clarity.\nL000803\tIn the absence of large-scale non-adiabatic pressure fluctuation $\\delta p_{\\rm nad}=0$, the curvature perturbations are conserved $\\mathcal{R}'\\simeq \\zeta'\\simeq 0$ on super-horizon scales $k\\ll \\mathcal{H}$. Plugging $\\delta p_{\\rm nad}=0$ and $c_s^2\\simeq \\omega$ into Eq.~\\eqref{eq:Newtonian_potential_evolution_app}, we deduce that the Newtonian potential is also conserved  $\\Phi'\\simeq 0$ for adiabatic evolution and super-horizon scales.\nL000804\tFor constant Newtonian potential $\\Phi'\\simeq 0$, Eqs.~\\eqref{eq:Einstein_eq_00_0i_Poisson}, \\eqref{eq:delta_C_delta_N}, \\eqref{eq:delta_F_delta_N}, \\eqref{eq:delta_C_delta_F}, and \\eqref{eq:mathcalR_def}  lead to\nL000805\t\\begin{equation}\nL000806\t\\label{eq:R_relations}\nL000807\t-\\mathcal{R}\\simeq -\\left( \\frac{5+3\\omega}{3+3\\omega} \\right)\\Phi \\simeq  \\frac{5+3\\omega}{2(1+\\omega)}\\left(\\frac{\\mathcal{H}}{k}\\right)^2\\delta^{(C)}\\simeq\\frac{5+3\\omega}{1+\\omega}\\frac{\\left(\\mathcal{H}/k\\right)^2\\delta^{(F)}}{2+3(5+3\\omega)(\\mathcal{H}/k)^2}\\simeq\\frac{5+3\\omega}{2(1+\\omega)}\\frac{\\left(\\mathcal{H}/k\\right)^2\\delta^{(N)}}{1+3(\\mathcal{H}/k)^2}.\nL000808\t\\end{equation}\nL000809\tUsing Eqs.~\\eqref{eq:zeta_def}, we deduce\nL000810\t\\begin{equation}\nL000811\t\\label{eq:zeta_relations}\nL000812\t-\\zeta  \\simeq  \\frac{(2+3(5+3\\omega)(\\mathcal{H}/k)^2)}{6(1+\\omega)}\\delta^{(C)}\\simeq \\frac{\\delta^{(F)}}{3(1+\\omega)}\\simeq\\frac{(2+3(\\mathcal{H}/k)^2(5+3\\omega)}{6(1+\\omega)(1+3(\\mathcal{H}/k)^2)}\\delta^{(N)},\nL000813\t\\end{equation}\nL000814\tas well as\nL000815\t\\begin{equation}\nL000816\t\\label{eq:R_zeta_relations}\nL000817\t    \\zeta \\simeq  \\frac{(2+3(5+3\\omega)(\\mathcal{H}/k)^2)}{3(5+3\\omega)(\\mathcal{H}/k)^2}\\mathcal{R}.\nL000818\t\\end{equation}\nL000819\tWe recover the well-known result that $\\zeta \\simeq \\mathcal{R}$ in the super-horizon limit $k\\ll \\mathcal{H}$ in the absence of large-scale non-adiabatic pressure perturbation.\nL000820\tEq.~\\eqref{eq:R_relations}, \\eqref{eq:zeta_relations}, and \\eqref{eq:R_zeta_relations} become exact in the limit $\\Phi' \\to 0$.\nL000821\tEvaluating those expression at horizon crossing $\\mathcal{H}=k$ and assuming a radiation-dominated universe $\\omega=1/3$, we obtain\nL000822\t\\begin{align}\nL000823\t\\label{eq:R_relations_rad}\nL000824\t -\\mathcal{R}~\\simeq~ -\\frac{9}{10}\\zeta~\\simeq~ -\\frac{3}{2}\\Phi~ \\simeq  ~ \\frac{9\\delta^{(F)}}{40}~\\simeq~ \\frac{9}{16}\\delta^{(N)}~ \\simeq ~ \\frac{9}{4}\\delta^{(C)} .\nL000825\t\\end{align}\nL000826\tFig.~\\ref{fig:Variance_betaOH4_perturbations} (right) shows that the adiabatic and horizon-entry approximations in Eq.~\\eqref{eq:R_relations_rad} remain accurate during\nL000827\ta first-order phase transition, except for modes entering the horizon near\nL000828\tpercolation, $k \\sim k_{\\rm max}$, due to violation of the non-adiabaticity condition $\\delta p_{\\rm nad}\\neq 0$.\nL000829\t\nL000830\t\nL000831\t\nL000832\t\\section{Application to a First-Order Phase Transition}\nL000833\t\\label{app:Bubble_growth_theory}\nL000834\t\nL000835\tIn the previous section, we reviewed the theory of cosmological perturbations. This framework can be applied to any specific scenario once the relevant input quantities are specified, namely the equation-of-state parameter $\\omega$, the sound speed $c_s^2$, the non-adiabatic pressure perturbation $\\delta p_{\\rm nad}$, and the initial conditions.\nL000836\tWe now apply this formalism to a first-order phase transition. In Sec.~\\ref{subsec:deltapnad}, we derive the expressions for the aforementioned input quantities. The non-adiabatic pressure perturbation $\\delta p_{\\rm nad}$ relies on the false vacuum fraction $F$ which we show how to compute with $\\deltaPT$ in Sec.~\\ref{subsec:falsevacuum}. Finally, the cosmological perturbations are numerically calculated in Sec.~\\ref{subsec:cosmo_pert}.\nL000837\t\nL000838\t\nL000839\t\\subsection{The non-adiabatic pressure fluctuation}\nL000840\t\\label{subsec:deltapnad}\nL000841\t\nL000842\tDuring a FOPT, the energy and pressure densities are\nL000843\t\\begin{equation}\nL000844\t\\label{eq:rho_p_bar_app}\nL000845\t\\rho=\\rho_R+\\rho_V,\\qquad \\textrm{and}\\qquad p=\\rho_R/3-\\rho_V,\\qquad \\textrm{with}\\qquad \\rho_V(t) = \\Delta V F(t),\nL000846\t\\end{equation}\nL000847\twhere $\\Delta V$ is the vacuum energy difference accross the phase transition and $F$ is the volume fraction still remaining in the old vacuum.\nL000848\tWe deduce the equation of state $\\omega=\\overline{p}/\\overline{\\rho}$ and speed of sound $c_s^2=\\overline{p}'/\\overline{\\rho}'$  of the universe\nL000849\t\\begin{equation}\nL000850\t\\label{eq:omega_cs_app}\nL000851\t\\omega = \\frac{\\overline{\\rho}_R/3-\\overline{\\rho_V}}{\\overline{\\rho_R}+\\overline{\\rho_V}},\\qquad \\textrm{and}\\qquad  c_s^2 = \\frac{1}{3}\\left(1+\\frac{\\overline{\\rho_V}'}{\\mathcal{H}\\overline{\\rho_{R}}} \\right).\nL000852\t\\end{equation}\nL000853\tNeglecting prior seeds like primordial curvature perturbations produced during inflation and responsible for galaxy formation, the growth of the linear perturbations --- whether it is the gravitational potential $\\Phi$, the density contrast $\\delta^{(X)}$ in a given gauge $(X)$ or the gauge-invariant velocity $\\mathcal{V}$ --- are sourced by the non-adiabatic perturbation $\\delta p_{\\rm nad} =\\delta p^{(X)}-c_s^2\\delta\\rho^{(X)}$. Using Eqs.~\\eqref{eq:rho_p_bar_app} and \\eqref{eq:omega_cs_app}, we can write\nL000854\t\\begin{equation}\nL000855\t\\label{eq:delta_nad_FOPT}\nL000856\t\\delta p_{\\rm nad} = \\frac{1-3c_s^2}{3}\\overline{\\rho}\\,\\delta^{(X)}-\\frac{4}{3}\\Delta V(F_k^{(X)}-\\overline{F}),\nL000857\t\\end{equation}\nL000858\twhere $F_k^{(X)}=\\rho_{\\rm V}^{(X)}/\\Delta V$ is the false vacuum fraction in a finite comoving volume $V(k)=4\\pi k^{-3}/3$ and $\\overline{F}$ is the background value.\nL000859\tThe spatially-flat gauge (F) is particularly convenient,\nL000860\tsince constant-time hypersurfaces are flat, cf.~Eq.~\\eqref{eq:SF_gauge}. As discussed in the main text, this suggests that the false\nL000861\tvacuum fraction in the spatially-flat gauge can be modeled by assuming an FLRW\nL000862\tbackground, which we adopt here as a working approximation,\nL000863\t\\begin{equation}\nL000864\t\\label{eq:F_k_F_k_FLRW}\nL000865\tF_k^{(F)} \\simeq F_k^{(\\mathrm{FLRW})},\nL000866\t\\end{equation}\nL000867\twhere $F_k^{(\\mathrm{FLRW})}$ is evaluated using \\deltaPT~\\cite{Lewicki:2024ghw}.\nL000868\tNote that the expression for $F_k^{(X)}$ in the other gauges can determined by recalling that the non-adiabatic pressure perturbation $\\delta p_{\\rm nad}$ is gauge-independent, see e.g. Eq.~\\eqref{eq:R_prime_Phi_prime}. In order to leave Eq.~\\eqref{eq:delta_nad_FOPT} invariant under a gauge transformation $X\\to Y$, the false vacuum fraction $F_k^{(X)}$ must transform as\nL000869\t\\begin{equation}\nL000870\tF_k^{(X)}- F_k^{(Y)} = \\frac{1-3c_s^2}{4}\\frac{\\overline{\\rho}}{\\Delta V}\\left(\\delta^{(X)}-\\delta^{(Y)}\\right).\nL000871\t\\end{equation}\nL000872\t\nL000873\t\nL000874\t\nL000875\t\\subsection{The false vacuum fraction}\nL000876\t\\label{subsec:falsevacuum}\nL000877\t\nL000878\tThe false vacuum fraction in a finite comoving volume $V(k)=4\\pi k^{-3}/3$ in a FLRW background $F_k^{(\\rm FLRW)}$, introduced in Eq.~\\eqref{eq:F_k_F_k_FLRW}, can be calculated with the public code \\deltaPT~\\cite{Lewicki:2024ghw}{, now upgraded to \\deltaPTvTwo~\\cite{deltaPTv2}.}\nL000879\tWe now review the calculation.\nL000880\tThe false vacuum fraction is decomposed into two components: one that arises from the first $j_c$ bubbles and another from the remaining bubbles~\\cite{Lewicki:2024ghw}\nL000881\t\\begin{equation}\nL000882\t\\label{eq:F_FLRW_def_app}\nL000883\tF_k^{(\\rm FLRW)}(t) = F_k^{(j\\leq j_c)}(t)F_k^{(j> j_c)}(t).\nL000884\t\\end{equation}\nL000885\tThe contribution from the first $j_c$ bubbles is computed stochastically by drawing,\nL000886\tfrom their respective probability distributions, the times $\\{t_j\\}_{j\\le j_c}$ at\nL000887\twhich the $j^{\\rm th}$ bubble first nucleates inside or reaches the volume $V(k)$,\nL000888\ttogether with the corresponding distances $\\{d_j\\}_{j\\le j_c}$ from the center of\nL000889\t$V(k)$. The probability distribution for $t_j$ is a Poisson distribution~\\cite{Lewicki:2024ghw}\nL000890\t\\begin{equation} \\label{eq:poisson}\nL000891\tp_{t,j}(t;k) = \\frac{\\td \\bar{N}_k(t)}{\\td t} \\frac{\\bar{N}_k(t)^{j-1}}{\\Gamma(j)} e^{-\\bar{N}_k(t)} ,\\qquad \\textrm{with}\\quad \\bar{N}_k(t) = \\frac{4\\pi}{3} \\int_{-\\infty}^t \\td t_n, \\Gamma(t_n) a(t_n)^3 \\left[ k^{-1} + R(t;t_n) \\right]^3.\nL000892\t\\end{equation}\nL000893\tThe quantity $\\bar{N}_k(t)$ is the average number of bubbles with non-vanishing overlap with the volume $a^3 V(k)$ at time $t$. We recall that $\\Gamma(t)=H_0^4\\,\\textrm{exp}(\\beta t)$ is the nucleation rate and $H_0$ the Hubble rate in $t=0$.\nL000894\tA bubble that reaches or nucleates within the volume $V(k)$ at time $t_j$ must have formed at a distance $d_j < k^{-1} + R(t;t_n)$, where $t_n$ is the time of nucleation. The probability distribution for this distance, $d_j$, increases with $d_j^2$ up to the maximum radius~\\cite{Lewicki:2024ghw}\nL000895\t\\begin{equation} \\label{eq:pd}\nL000896\tp_d(d_j;t,k) = \\frac{4\\pi d_j^2}{\\bar{N}_k(t)} \\int_{-\\infty}^t \\td t_n \\Gamma(t_n) a(t_n)^3 \\theta(k^{-1} + R(t;t_n) - d_j) .\nL000897\t\\end{equation}\nL000898\tThe contribution of the first $j_c$ bubbles is~\\cite{Lewicki:2024ghw}\nL000899\t\\begin{equation} \\label{eq:Fk_first}\nL000900\tF_k^{(j\\leq j_c)}(t) \\simeq \\prod_{j=1}^{j_c} \\left[1-f(t;t_j,d_j,k)\\right] ,\\qquad \\textrm{with} \\quad f(t;t_j,d_j,k) = \\frac{V_{\\rm int}(d_j,\\max[0,d_j-k^{-1}]+R(t;t_j),k^{-1})}{V(k)}.\nL000901\t\\end{equation}\nL000902\tThe quantity $f(t;t_j,d_j,k)$ is the fraction of the volume $V(k)$ occupied by the $j$th bubble.\nL000903\tThe quantity $V_{\\rm int}$ is the volume of the overlap between two spheres, with radii $R$ and $r$ and separated by a distance $d$~\\cite{Lewicki:2024ghw}\nL000904\t\\begin{equation}\nL000905\tV_{\\rm int}(d,R,r) =\nL000906\t\\begin{cases}\nL000907\t\\frac{4\\pi}{3} d^3 \\xi\\left(\\frac{R}{d},\\frac{r}{d}\\right) & \\text{if } |R-r| \\leq d \\leq R+r, \\\\\nL000908\t\\frac{4\\pi}{3} \\min[r,R]^3 & \\text{if } d < |R-r|, \\\\\nL000909\t0 & \\text{if } d > R+r,\nL000910\t\\end{cases}\nL000911\t\\end{equation}\nL000912\twhere $\\xi(x,y)=(1-x-y)^2(1+2(x+y)-3(x-y)^2)/16$.\nL000913\tThe contribution from the remaining bubbles is approximated as an averaged quantity~\\cite{Lewicki:2024ghw}\nL000914\t\\begin{align}\nL000915\t\\label{eq:F_k_second_1}\nL000916\tF_k^{(j> j_c)}(t) \\simeq \\textrm{exp}\\left[-\\sum^{+\\infty}_{j=j_c+1}\\int dt_jdd_j p_{t,j}(t_j;k)p_d(d_j;t_j,k)f(t;t_j,d_j,k) \\right].\nL000917\t\\end{align}\nL000918\tApproximating the sum over $j$ by an integral and the Poisson distribution in Eq.~\\eqref{eq:poisson} by a delta function $p_{t,j}(t;k)=\\dot{\\overline{N}}_k(t)\\delta_{D}\\left(\\overline{N}_k(t)-j\\right)$, the expression in Eq.~\\eqref{eq:F_k_second_1} simplifies to~\\cite{Lewicki:2024ghw}\nL000919\t\\begin{align}\nL000920\t\\label{eq:F_k_second_2}\nL000921\tF_k^{(j> j_c)}(t)\\simeq \\textrm{exp}\\left[-\\int_{-\\infty}^t d\\tilde{t}d\\tilde{d} ~\\Theta\\left(\\overline{N}_k(\\tilde{t})-j_c\\right)\\frac{d\\overline{N}_k(\\tilde{t})}{d\\tilde{t}}p_d(\\tilde{d};\\tilde{t},k)f(t;\\tilde{t},\\tilde{d},k) \\right].\nL000922\t\\end{align}\nL000923\t\nL000924\t\nL000925\t\\begin{figure}[ht!]\nL000926\t\\centering\nL000927\t\\includegraphics[width=0.49\\textwidth]{plot_delta_Phi_bkg}\nL000928\t\\includegraphics[width=0.49\\textwidth]{plot_delta_Phi_gauge_inv}\nL000929\t\\caption{  \\label{fig:plot_delta_Phi_gauge_inv}\nL000930\t\\textbf{Left:} Background quantities  $\\rho_{\\rm R}$, $\\rho_{\\rm V}$,  $\\omega$, $c_s^2$ and linear perturbations $\\delta^{(C)}$, $\\delta p_{\\rm nad}$ and $\\mathcal{R}$. The vertical lines indicate the nucleation times of the $j^{\\rm th}$ bubble appearing within the spherical patch of comoving size $R=k^{-1}$, modeled by {\\deltaPTvTwo~\\cite{deltaPTv2}.} \\textbf{Right:}\nL000931\tThe exact agreement between the solid, dashed, and dotted curves confirms the covariance of the system of equations and the internal consistency of the numerical implementation.   The solid, dashed and dotted lines employ Eqs.~\\eqref{eq:delta_F_eq}, \\eqref{eq:delta_N_eq}, and \\eqref{eq:delta_C_eq} respectively.\nL000932\tIn all cases, the Newtonian potential $\\Phi$ is computed from Eq.~\\eqref{eq:Newtonian_potential_evolution_app} and the non-adiabatic pressure perturbation $\\delta p_{\\rm nad}$ from Eq.~\\eqref{eq:delta_nad_FOPT}.\nL000933\tThe perturbation $\\delta^{(X)}$ are reconstructed using Eqs.~\\eqref{eq:delta_C_delta_N}, \\eqref{eq:delta_F_delta_N}, and \\eqref{eq:delta_C_delta_F}.}\nL000934\t\\end{figure}\nL000935\t\\begin{figure}[ht!]\nL000936\t\\centering\nL000937\t\\includegraphics[width=0.48\\textwidth]{perturbations_allvariables_betaOH4_kOkmaxp3}\nL000938\t\\includegraphics[width=0.48\\textwidth]{perturbations_allvariables_betaOH4_kOkmaxp9}\nL000939\t\\includegraphics[width=0.48\\textwidth]{perturbations_deltaFC_calR_betaOH4_kOkmaxp3}\nL000940\t\\includegraphics[width=0.48\\textwidth]{perturbations_deltaFC_calR_betaOH4_kOkmaxp9}\nL000941\t\\caption{  \\label{fig:perturbations_allvariables}\nL000942\tEvolution of cosmological linear perturbations during a first-order phase transition in a spherical patch of inverse comoving size $k=0.3k_{\\rm max}$ (\\textbf{left}) and $k=0.9k_{\\rm max}$ (\\textbf{right}). The top panels show a single representative simulation, while the bottom panels display an ensemble of $10$ simulations. In each case, the nucleation times and positions of the first $j_c=50$ bubbles are randomly sampled. }\nL000943\t\\end{figure}\nL000944\t\nL000945\t\nL000946\t\\subsection{Evolution of cosmological perturbations}\nL000947\t\\label{subsec:cosmo_pert}\nL000948\t\nL000949\t{In \\deltaPTvTwo~\\cite{deltaPTv2}, we extend\nL000950\t\\deltaPT~\\cite{Lewicki:2024ghw}} to add the calculation the gravitational potential $\\Phi$ (cf. Eq.~\\eqref{eq:Newtonian_potential_evolution_app}) as well as the calculation of the density contrast in the Newtonian gauge $\\delta^{(N)}$ (cf. Eqs.~\\eqref{eq:delta_N_eq}), spatially-flat gauge $\\delta^{(F)}$ (cf. \\eqref{eq:delta_F_eq}) and comoving gauge $\\delta^{(C)}$ (cf. \\eqref{eq:delta_C_eq}). The equation of state $\\omega$ and speed of sound $c_s$ are calculated from Eq.~\\eqref{eq:omega_cs_app} and the non-adiabatic curvature perturbation $\\delta p_{\\rm nad}$ is calculated from Eq.~\\eqref{eq:delta_nad_FOPT}. We plot the time evolution of the different background and perturbed quantities in Fig.~\\ref{fig:plot_delta_Phi_gauge_inv} and \\ref{fig:perturbations_allvariables}. We run $N_{\\rm sim}=10^6$ simulations, stores the values of perturbation at horizon-crossing $\\mathcal{H}=k$ at each time, and draw their probability density function (PDF) in Fig.~\\ref{fig:PDF_different_betaOH_deltaC} and \\ref{fig:PDF_betaOH4_perturbations}. The variance of those PDFs are shown in Fig.~\\ref{fig:Variance_betaOH4_perturbations}. The phenomenological consequences in terms of PBHs, and SIGWs are discussed in the next section.\nL000951\t\nL000952\t\nL000953\t\nL000954\t\\begin{figure}[ht!]\nL000955\t\\centering\nL000956\t\\includegraphics[width=0.49\\textwidth]{PDF_different_betaOH_calR}\nL000957\t\\includegraphics[width=0.49\\textwidth]{PDF_different_betaOH_deltaC}\nL000958\t\\caption{  \\label{fig:PDF_different_betaOH_deltaC}\nL000959\tProbability density function for the curvature perturbations $\\mathcal{R}$ (\\textbf{left}) and density contrast in the comoving gauge $\\delta^{(C)}$ (\\textbf{right}).  }\nL000960\t\\end{figure}\nL000961\t\\begin{figure}[ht!]\nL000962\t\\centering\nL000963\t\\includegraphics[width=0.49\\textwidth]{PDF_betaOH4_deltaF}\nL000964\t\\includegraphics[width=0.49\\textwidth]{PDF_betaOH4_deltaC}\nL000965\t\\includegraphics[width=0.49\\textwidth]{PDF_betaOH4_calR}\nL000966\t\\includegraphics[width=0.49\\textwidth]{PDF_betaOH4_velocity}\nL000967\t\\caption{  \\label{fig:PDF_betaOH4_perturbations}\nL000968\tProbability distribution for the density contrast in the spatially-flat gauge $\\delta^{(F)}$ (\\textbf{top-left}), comoving gauge $\\delta^{(C)}$  (\\textbf{top-right}), the comoving curvature perturbation $\\mathcal{R}$  (\\textbf{bottom-left}) and the comoving velocity $\\mathcal{V}$ (\\textbf{bottom-right}). }\nL000969\t\\end{figure}\nL000970\t\nL000971\t\nL000972\t\nL000973\t\\begin{comment}\nL000974\t\\begin{figure}[ht!]\nL000975\t\\centering\nL000976\t\\includegraphics[width=0.48\\textwidth]{variance_different_betaOH_calR}\nL000977\t\nL000978\t\\caption{  \\label{fig:Variance_perturbations}\nL000979\tVariance of the comoving curvature perturbation $\\mathcal{R}$ and of the density contrast in the spatially-flat gauge, $\\delta^{(F)}$, as a function  of $k$  for different values of $\\beta/H$.\nL000980\t\nL000981\t}\nL000982\t\\end{figure}\nL000983\t\\end{comment}\nL000984\t\nL000985\t\nL000986\t\\begin{comment}\nL000987\t\\subsection{Curvature power spectrum}\nL000988\t\nL000989\tAs discussed in the main text, the curvature power spectrum $\\mathcal{P}_{\\mathcal{R}}(k)$ is related to the variance $\\sigma_\\mathcal{R}^2$of the spatially-averaged curvature by $\\mathcal{P}_{\\mathcal{R}}(k=R^{-1}) \\simeq 2\\sigma_\\mathcal{R}^2/3\\pi$.\nL000990\tRef.~\\cite{Elor:2023xbz} derived a semi-analytic expression for the curvature power spectrum generated during a FOPT, which we parametrize as\nL000991\t\\begin{equation}\nL000992\t\\label{eq:PR_FOPT}\nL000993\t\\mathcal{P}_{\\mathcal{R}}(k)\nL000994\t=\nL000995\t\\left(\\frac{\\alpha_\\star}{1+\\alpha_\\star}\\right)^{\\!2}\nL000996\t\\left(\\frac{H_\\star}{\\beta}\\right)^{\\!2}\nL000997\t\\frac{a_1 (k_p/\\beta)^3}{\\bigl[a_2+(k_p/\\beta)^2\\bigr]^3}\nL000998\t\\,\\Theta(H_\\star-k_p) ,\nL000999\t\\end{equation}\nL001000\twhere $k_p\\equiv k/a_\\star$, and the numerical coefficients are\nL001001\t$a_1\\simeq0.90$ and $a_2\\simeq0.24$.\nL001002\tThe Heaviside function enforces the restriction to superhorizon modes, since subhorizon fluctuations lie outside the regime of validity of the effective description used in Ref.~\\cite{Elor:2023xbz}. As shown in Fig.~\\ref{fig:Variance_perturbations} (right), the curvature power spectrum in Eq.~\\eqref{eq:PR_FOPT} captures the correct order of magnitude and overall parametric dependence of the spectrum obtained in this work.\nL001003\tHowever, quantitative differences are clearly visible across the parameter range considered.\nL001004\tA detailed investigation of the origin of these discrepancies, including differences in approximations and domain of validity, is left for future work.\nL001005\t\\end{comment}\nL001006\t\nL001007\t\nL001008\t\nL001009\t\\begin{figure}[ht!]\nL001010\t\\centering\nL001011\t\\includegraphics[width=0.48\\textwidth]{variance_betaOH4}\nL001012\t\\includegraphics[width=0.48\\textwidth]{Perfect_Matching}\nL001013\t\\includegraphics[width=0.48\\textwidth]{variance_different_betaOH_calR}\nL001014\t\\caption{  \\label{fig:Variance_betaOH4_perturbations}\nL001015\t\\textbf{Top-Left:} Standard deviation (square root of the variance) of the different cosmological variables at horizon entry $\\mathcal{H}=k$. \\textbf{Top-Right:} The adiabatic relationships in Eq.~\\eqref{eq:R_relations_rad} are very well satisfied except for $k\\sim k_{\\rm max}$ due to the presence of large non-adiabatic pressure (\\textbf{purple}). \\textbf{Bottom:} Variance of the comoving curvature perturbation $\\mathcal{R}$ and of the density contrast in the spatially-flat gauge $\\delta^{(F)}$ for different values of $\\beta/H$. }\nL001016\t\\end{figure}\nL001017\t\nL001018\t\\FloatBarrier\nL001019\t\nL001020\t\nL001021\t\\section{Cosmological Implications}\nL001022\t\nL001023\tHaving derived the cosmological perturbations generated during FOPTs, we now turn to their implications for primordial black holes (PBHs) and scalar-induced gravitational waves (SIGWs).\nL001024\t\nL001025\t\\subsection{Primordial Black Holes}\nL001026\t\nL001027\t\nL001028\tThis section summarizes the fitting procedure used to model the PDF of the comoving-gauge density contrast $P(\\delta^{(C)})$, which controls the PBH abundance (see main text)\nL001029\t\\begin{equation}\nL001030\tf_{\\rm PBH} ~\\sim~\nL001031\t\\left (\\frac{P(\\delta_c^{(C)})}{10^{-10}}\\right )\\,\nL001032\t\\left (\\frac{T_{k}}{\\rm GeV} \\right ),\nL001033\t\\end{equation}\nL001034\tthrough its exponentially sensitive high-density tail, i.e. at the PBH threshold value $\\delta_c^{(C)} \\in [0.40,\\,0.67]$~\\cite{Musco:2018rwt,Escriva:2019phb,Escriva:2021aeh}. The PDF is evaluated at horizon re-entry, $\\delta^{(C)}(k\\simeq\\mathcal{H})$, where the standard collapse criterion applies.\nL001035\tThe PDF of $\\delta^{(C)}$ is shown for different values of $\\beta/H$ in Fig.~\\ref{fig:PDF_different_betaOH_deltaC} (right) and different values of $k$ in Fig.~\\ref{fig:PDF_betaOH4_perturbations} (top-right).  We observe a strong suppression of large overdensities which strongly suppress the PBH abundance below observation level.\nL001036\tAs in Ref.~\\cite{Lewicki:2024ghw}, we find that the PDF is well described by the three-parameter fit introduced in\nL001037\tRef.~\\cite{Tomberg:2023kli} in the context of ultra-slow-roll inflation,\nL001038\t\\begin{equation}\nL001039\t\\label{eq:fit_function_app}\nL001040\tP(\\delta) = P_0\\exp\\!\\left[\\frac{\\epsilon}{2}(\\delta-\\mu)\nL001041\t- \\frac{2}{\\epsilon^2\\sigma^2}\nL001042\t\\left(1 - e^{\\frac{\\epsilon}{2}(\\delta-\\mu)}\\right)^2\\right],\nL001043\t\\end{equation}\nL001044\twhere $\\mu$ sets the peak position, $\\sigma$ the width, and $\\epsilon>0$ controls the skewness. In the Gaussian limit $\\epsilon\\to0$, this expression reduces to a standard normal distribution. The best fit for those parameters is given in Table.~\\ref{tab:sample}.\nL001045\t\nL001046\t{\nL001047\t\\renewcommand{\\arraystretch}{1.4}\nL001048\t\\setlength{\\tabcolsep}{15pt}\nL001049\t\\begin{table}[h]\nL001050\t    \\centering\nL001051\t    \\begin{tabular}{|l|c|c|c|c|}\nL001052\t\\hline\nL001053\t$\\beta/H$ & $P_0$ & $\\mu$ & $\\epsilon$ & $\\sigma$\nL001054\t\\\\\nL001055\t\\hline\nL001056\t\\hline\nL001057\t1 & 0.99 & -0.35 & 9.1 & 1.0\nL001058\t\\\\\nL001059\t\\hline\nL001060\t2 & 0.66 & -0.14 & 21 & 0.52\nL001061\t\\\\\nL001062\t\\hline\nL001063\t3 & 0.15 & -0.019 & 32 & 0.084\nL001064\t\\\\\nL001065\t\\hline\nL001066\t4 & 0.084 & -0.0042 & 48 & 0.041\nL001067\t\\\\\nL001068\t\\hline\nL001069\t5 & 0.056 & -2.4$\\times10^{-4}$ & 61 & 0.025\nL001070\t\\\\\nL001071\t\\hline\nL001072\t6 & 0.040 & 4.2$\\times10^{-4}$ & 71 & 0.016\nL001073\t\\\\\nL001074\t\\hline\nL001075\t7 & 0.031 & 4.6$\\times10^{-4}$ & 85 & 0.012\nL001076\t\\\\\nL001077\t\\hline\nL001078\t8 & 0.024 & 4.9$\\times10^{-4}$ & $1.1\\times10^{2}$ & 0.0091\nL001079\t\\\\\nL001080\t\\hline\nL001081\t\\end{tabular}\nL001082\t\\caption{\\label{tab:sample}\nL001083\tFit of the PDF of the density contrast in the comoving gauge ${\\cal P}_{\\delta^{(C)}}$ for $k=0.9k_{\\rm max}$.}\nL001084\t\\end{table}\nL001085\t}\nL001086\t\nL001087\t\nL001088\t\\begin{figure}[t]\nL001089\t\\centering\nL001090\t\\includegraphics[width=0.48\\textwidth]{Negative_fNL.pdf}\nL001091\t\\includegraphics[width=0.48\\textwidth]{2ndGW_ratio.pdf}\nL001092\t\\caption{\nL001093\t\\label{fig:Negative_fNL}\nL001094\tLeft: Effective NG parameter $F_{\\rm NL}$ extracted from the skewness of the curvature perturbation $\\mathcal{R}$ as a function of $\\beta/H$, evaluated at $k\\simeq0.9\\,k_{\\rm max}$.\nL001095\tRight: Ratio of the non-Gaussian contributions $\\Omega_{\\rm SIGW}^{(1)}+\\Omega_{\\rm SIGW}^{(2)}$ to the Gaussian SIGW spectrum $\\Omega_{\\rm SIGW}^{(0)}$.\nL001096\tFor the parameter range relevant to first-order phase transitions, non-Gaussian corrections to the SIGW signal are subdominant.\nL001097\t}\nL001098\t\\end{figure}\nL001099\t\nL001100\t\nL001101\t\\subsection{Scalar-induced gravitational waves}\nL001102\t\nL001103\tSIGWs generated at second order in cosmological perturbation theory are given by\nL001104\t\\cite{Tomita:1975kj,Matarrese:1992rp,Matarrese:1993zf,Matarrese:1997ay,Acquaviva:2002ud,Mollerach:2003nq,Carbone:2004iv,Ananda:2006af,Baumann:2007zm,Espinosa:2018eve,Kohri:2018awv,Domenech:2021ztg}\nL001105\t\\begin{equation}\nL001106\t\\Omega_{\\rm SIGW}(k,\\eta)\nL001107\t= \\frac{1}{24}\nL001108\t\\left(\\frac{k}{{\\cal H}(\\eta)}\\right)^2\nL001109\t\\overline{{\\cal P}_h(k,\\eta)} \\,,\nL001110\t\\label{eq:OmegaGW}\nL001111\t\\end{equation}\nL001112\twhere $\\overline{{\\cal P}_h}$ denotes the oscillation-averaged tensor power spectrum \\cite{Maggiore:1999vm}.\nL001113\tThe induced tensor spectrum is\nL001114\t\\begin{align}\nL001115\t\\overline{{\\cal P}_h(k,\\eta)}\\,\nL001116\t(2\\pi)^3 \\delta_D^{(3)}(\\mathbf{k}+\\mathbf{k}')\nL001117\t&=\nL001118\t\\frac{16 k^3}{2\\pi^2}\nL001119\t\\sum_s\nL001120\t\\int \\frac{d^3\\mathbf{p}}{(2\\pi)^3}\nL001121\t\\int \\frac{d^3\\mathbf{q}}{(2\\pi)^3}\nL001122\t\\nonumber\\\\\nL001123\t&\\hspace{-1.2cm}\\times\nL001124\t\\overline{\nL001125\tJ_s(\\mathbf{k},\\mathbf{p},\\eta)\nL001126\tJ_s(\\mathbf{k}',\\mathbf{q},\\eta)\nL001127\t}\nL001128\t\\,\nL001129\t\\big\\langle\nL001130\t\\mathcal{R}_{\\mathbf{p}}\nL001131\t\\mathcal{R}_{\\mathbf{k}-\\mathbf{p}}\nL001132\t\\mathcal{R}_{\\mathbf{q}}\nL001133\t\\mathcal{R}_{\\mathbf{k}'-\\mathbf{q}}\nL001134\t\\big\\rangle \\,,\nL001135\t\\label{eq:Phfull_app}\nL001136\t\\end{align}\nL001137\twhere $s$ labels the two GW polarizations.\nL001138\tThe kernel\nL001139\t\\begin{equation}\nL001140\tJ_s(\\mathbf{k},\\mathbf{p},\\eta)\nL001141\t\\equiv Q_s(\\mathbf{k},\\mathbf{p})\\, I(\\mathbf{k},\\mathbf{p},\\eta)\nL001142\t\\end{equation}\nL001143\tis the product of the polarization contraction\nL001144\t$Q_s(\\mathbf{k},\\mathbf{p})=e^{ij}_s(\\hat{\\mathbf{k}})p_ip_j$\nL001145\tand the time-dependent convolution of the source with the Green function,\nL001146\t$I(\\mathbf{k},\\mathbf{p},\\eta)$.\nL001147\tExplicit expressions can be found in\nL001148\tRefs.~\\cite{Espinosa:2018eve,Kohri:2018awv,LISACosmologyWorkingGroup:2025vdz}.\nL001149\tFor Gaussian curvature perturbations, only disconnected Wick contractions contribute to the four-point function in Eq.~\\eqref{eq:Phfull_app}.\nL001150\tIn the presence of primordial non-Gaussianities (NGs), additional disconnected contributions arise, together with genuinely connected terms proportional to the curvature trispectrum\nL001151\t\\cite{Nakama:2016gzw,Garcia-Bellido:2017aan,Unal:2018yaa,Cai:2018dig,Cai:2019amo,Ragavendra:2020sop,Yuan:2020iwf,Adshead:2021hnm,Davies:2021loj,Abe:2022xur,Garcia-Saenz:2022tzu,Garcia-Saenz:2023zue,Li:2023xtl,Yuan:2023ofl,Perna:2024ehx,Gouttenoire:2025jxe}.\nL001152\t\nL001153\tWe quantify the level of NG by the skewness of the curvature perturbation,\nL001154\t\\cite{Luo:1992er,Komatsu:2001rj}\nL001155\t\\begin{equation}\nL001156\tF_{\\rm NL}\nL001157\t\\equiv\nL001158\t\\frac{\\langle \\mathcal{R}^3 \\rangle}\nL001159\t{6 \\langle \\mathcal{R}^2 \\rangle^2} \\,.\nL001160\t\\end{equation}\nL001161\tAs shown in Fig.~\\ref{fig:Negative_fNL} (left), $F_{\\rm NL}$ exhibits a scale dependence.\nL001162\tSince the SIGW signal is dominated by modes near the peak of the scalar power spectrum, we evaluate $F_{\\rm NL}$ at\nL001163\t$k\\simeq 0.9\\,k_{\\rm max}$.\nL001164\tFor $\\beta_H\\equiv \\beta/H \\in [2,15]$, we find the empirical fit\nL001165\t\\begin{equation}\nL001166\t\\log_{10} F_{\\rm NL}\nL001167\t\\simeq\nL001168\ta \\log_{10}^2(\\beta_H/b)\nL001169\t+ c \\log_{10}(\\beta_H/b) \\,,\nL001170\t\\end{equation}\nL001171\twith $a\\simeq -1.34$, $b\\simeq 3.67$, and $c\\simeq 2.95$.\nL001172\t\nL001173\tThe present-day SIGW spectrum can be decomposed as~\\cite{Inomata:2019yww,DeLuca:2019ufz,Yuan:2019fwv,Domenech:2020xin} \\begin{equation}\\label{eq:Omegabar-total} \\Omega_{\\rm SIGW} =\\Omega_{\\rm SIGW}^{(0)} +\\Omega_{\\rm SIGW}^{(1)} +\\Omega_{\\rm SIGW} ^{(2)} \\ , \\end{equation} \\begin{align} \\Omega_{\\rm SIGW}^{(0)} = \\frac{1}{3} \\int_1^\\infty \\td t \\int_{-1}^1 \\td s \\frac{\\overline{J^2(u,v)}}{(u v)^2} {\\cal P}_\\mathcal{R} (v k) {\\cal P}_\\mathcal{R} (u k) , \\label{eq:P_h_ts} \\end{align} where $u=(t + s)/2$, $v=(t - s)/2$ and the transfer function $\\overline{J^2 (u,v)}$ depends on the cosmological background~\\cite{Kohri:2018awv,Espinosa:2018eve}. In accordance with Refs.~\\cite{Adshead:2021hnm, Li:2023qua, Zhu:2023faa, Ragavendra:2021qdu, Atal:2021jyo}, the higher-order terms in \\eqref{eq:Omegabar-total} can be expressed as \\begin{align} \\Omega_{\\rm SIGW}^{(1)} =& \\frac{2F_{\\rm NL}^2}{3} \\prod_{i=1}^2 \\biggl[\\int_1^\\infty \\td t_i \\int_{-1}^1 \\td s_i\\, u_iv_i\\biggr] \\Bigg\\{ \\frac{1}{2} \\overline{J^2 (s_1,t_1)} \\frac{ {\\cal P}_\\mathcal{R} (v_1 v_2 k) {\\cal P}_\\mathcal{R} (u_1 k) {\\cal P}_\\mathcal{R} (v_1 u_2 k)}{(u_1v_1u_2v_2)^3} \\nonumber \\\\ +& \\int_0^{2\\pi} \\frac{\\td \\varphi_{12}}{2\\pi}\\, \\cos 2\\varphi_{12} \\overline{J (s_1,t_1) J (s_2,t_2)} \\frac{{\\cal P}_\\mathcal{R} (v_2 k)}{v_2^3} \\frac{{\\cal P}_\\mathcal{R} (w_{12} k)}{w_{12}^3} \\bigg[ \\frac{{\\cal P}_\\mathcal{R} (u_2 k)}{u_2^3} + \\frac{{\\cal P}_\\mathcal{R} (u_1 k)}{u_1^3} \\bigg] \\Bigg\\} \\label{eq:Omega-C} \\end{align} and \\begin{align} \\label{eq:Omega-N} \\Omega_{\\rm SIGW}^{(2)} &= \\frac{F_{\\rm NL}^4}{6} \\prod_{i=1}^3 \\biggl[\\int_1^\\infty \\td t_i \\int_{-1}^1 \\td s_i\\, u_iv_i\\biggr] \\Bigg\\{\\frac{1}{2}\\overline{J^2 (s_1,t_1)} \\frac{{\\cal P}_\\mathcal{R} (v_1 v_2 k) {\\cal P}_\\mathcal{R} (v_1 u_2 k) {\\cal P}_\\mathcal{R} (u_1 v_3 k) {\\cal P}_\\mathcal{R} (u_1 u_3 k)}{(u_1v_1u_2v_2u_3v_3)^3} \\\\ & + \\int_0^{2\\pi} \\frac{\\td \\varphi_{12}}{2\\pi}\\frac{\\td \\varphi_{23}}{2\\pi} \\cos (2\\varphi_{12} ) \\overline{J (s_1,t_1) J (s_2,t_2)} \\frac{{\\cal P}_\\mathcal{R}(u_3 k)}{u_3^3} \\frac{{\\cal P}_\\mathcal{R} (w_{13} k)}{w_{13}^3} \\frac{{\\cal P}_\\mathcal{R} (w_{23} k)}{w_{23}^3} \\bigg[ \\frac{{\\cal P}_\\mathcal{R} (v_3 k)}{v_3^3} + \\frac{{\\cal P}_\\mathcal{R} (w_{123} k)}{w_{123}^3} \\bigg]\\Bigg\\} \\ , \\nonumber \\end{align} where we defined $s_i=u_i-v_i$, $t_i=u_i+v_i$, and \\begin{subequations} \\begin{eqnarray} y_{ij}&=&\\frac{\\cos\\varphi_{ij}}{4}\\sqrt{(t_i^2-1)(t_j^2-1)(1-s_i^2)(1-s_j^2)}+\\frac{1}{4}(1-s_it_i)(1-s_jt_j)\\ , \\\\ w_{ij}&=&\\sqrt{v_i^2+v_j^2-y_{ij}}\\, , \\qquad w_{123}=\\sqrt{v_1^2+v_2^2+v_3^2+y_{12}-y_{13}-y_{23}},\\qquad \\varphi_{13}=\\varphi_{12}-\\varphi_{23}.\\ . \\end{eqnarray} \\end{subequations} The time-averaged integrated transfer functions $J(u,v)$ were derived in Refs.~\\cite{Espinosa:2018eve,Kohri:2018awv,Atal:2021jyo,Adshead:2021hnm,Li:2023qua}, and are \\begin{align}\\label{eq:J-ave-12} & \\overline{ J (s_i,t_i)J (s_j,t_j) } = \\frac{9}{8}\\frac{\\left(t_i^2-1\\right) \\left(t_j^2-1\\right) \\left(1-s_i^2\\right) \\left(1-s_j^2\\right) \\left(t_i^2+s_i^2-6\\right) \\left(t_j^2+s_j^2-6\\right) }{\\left(t_i^2-s_i^2\\right)^3 \\left(t_j^2-s_j^2\\right)^3} \\nonumber\\\\ & \\Bigg[ \\left( \\left(t_i^2+s_i^2-6\\right) \\ln \\left| \\frac{t_i^2-3}{3-s_i^2}\\right| - 2\\left(t_i^2-s_i^2\\right) \\right) \\left( \\left(t_j^2+s_j^2-6\\right) \\ln \\left| \\frac{t_j^2-3}{3-s_j^2}\\right| - 2\\left(t_j^2-s_j^2\\right) \\right) \\nonumber\\\\ & + \\pi^2\\Theta\\left(t_i-\\sqrt{3}\\right) \\Theta\\left(t_j-\\sqrt{3}\\right) \\left(t_i^2+s_i^2-6\\right) \\left(t_j^2+s_j^2-6\\right) \\Bigg]\\ . \\end{align}\nL001174\tThe contribution of scalar-induced gravitational waves to the total gravitational-wave signal from the first-order phase transition is shown in the main text to be numerically negligible,\nL001175\t$\\Omega_{\\rm SIGW} \\ll \\Omega_{\\rm PGW}$.\nL001176\tAs a consequence, the impact of primordial non-Gaussianities on the SIGW spectrum is also negligible,\nL001177\t$\\Omega_{\\rm SIGW}^{(1)},\\,\\Omega_{\\rm SIGW}^{(2)} \\ll \\Omega_{\\rm SIGW}^{(0)}$,\nL001178\tas illustrated in Fig.~\\ref{fig:Negative_fNL} (right).\nL001179\t\nL001180\tThis behavior is expected on parametric grounds:\nL001181\ta suppressed SIGW contribution,\nL001182\t$\\Omega_{\\rm SIGW}/\\Omega_{\\rm PGW}\\sim \\langle \\mathcal{R}^2\\rangle$,\nL001183\timplies correspondingly small non-Gaussian corrections,\nL001184\t$\\Omega_{\\rm SIGW}^{(1)}/\\Omega_{\\rm SIGW}^{(0)}\\sim F_{\\rm NL}^2\\langle \\mathcal{R}^2\\rangle$\nL001185\tand\nL001186\t$\\Omega_{\\rm SIGW}^{(2)}/\\Omega_{\\rm SIGW}^{(0)}\\sim F_{\\rm NL}^4\\langle \\mathcal{R}^2\\rangle^2$.\nL001187\t\nL001188\t\nL001189\t\nL001190\t\nL001191\t\\bibliographystyle{apsrev4-1}\nL001192\t\\bibliography{biblio}\nL001193\t\nL001194\t\\end{document}\nL001195\t===== END FILE: Short_Paper.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. This is a bounded mechanical repair: change only the field or fields needed to satisfy the exact schema/locator diagnostic below. Preserve every other scientific statement, equation, numeric value, uncertainty, domain, claim, source ID, dependency, and locator from the rejected response. Reconcile an unknown reference only with a source-grounded entity already represented in the response and source; do not invent a new scientific entity or fact. For a locator error, use only an exact supporting range in the unchanged numbered source. Return the complete JSON object without Markdown or commentary.\",\"previous_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides a quantitative framework for cosmological perturbations from first-order phase transitions, with explicit equations, fitted parameters, and numerical results. The best quantitative cluster is the PDF of the comoving-gauge density contrast P(delta^(C)) at k=0.9 k_max, fitted by a three-parameter function with tabulated values for beta/H from 1 to 8. This supports a numeric control (beta/H), a numeric readout (P(delta^(C))), a quantitative mechanism (the fit function), and an objective response within an explicit domain. The extraction is case_authoring_ready.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Gabriele Franciolini, Curvature Perturbations from First-Order Phase Transitions: Implications to Black Holes and Gravitational Waves, Physical Review Letters (2026), DOI:10.1103/tfcx-kzqx\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/tfcx-kzqx\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2503.01962v2\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper derives covariant cosmological perturbations generated during strongly supercooled first-order phase transitions, focusing on gauge-invariant quantities, and evaluates implications for primordial black hole abundance and scalar-induced gravitational waves. The selected cluster is the probability density function of the comoving-gauge density contrast at horizon crossing, fitted by a three-parameter function for different beta/H values.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"pdf_fit_mechanism\\\",\\n      \\\"statement\\\": \\\"The probability density function of the density contrast in the comoving gauge is described by a three-parameter fit function P(delta) = P0 * exp[ (epsilon/2)(delta - mu) - (2/(epsilon^2 sigma^2)) (1 - exp((epsilon/2)(delta - mu)))^2 ], with parameters mu, sigma, epsilon > 0, and normalization P0.\\\",\\n      \\\"equations\\\": [\\n        \\\"P(delta) = P0 * exp[ (epsilon/2)(delta - mu) - (2/(epsilon^2 sigma^2)) (1 - exp((epsilon/2)(delta - mu)))^2 ]\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"P(delta)\\\",\\n        \\\"P0\\\",\\n        \\\"epsilon\\\",\\n        \\\"mu\\\",\\n        \\\"sigma\\\",\\n        \\\"delta\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"P0_betaH1\\\",\\n          \\\"value\\\": 0.99,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1057,\\n              \\\"line_end\\\": 1057,\\n              \\\"support\\\": \\\"Table row for beta/H=1 lists P0=0.99\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH1\\\",\\n          \\\"value\\\": -0.35,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1057,\\n              \\\"line_end\\\": 1057,\\n              \\\"support\\\": \\\"Table row for beta/H=1 lists mu=-0.35\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH1\\\",\\n          \\\"value\\\": 9.1,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1057,\\n              \\\"line_end\\\": 1057,\\n              \\\"support\\\": \\\"Table row for beta/H=1 lists epsilon=9.1\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH1\\\",\\n          \\\"value\\\": 1.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1057,\\n              \\\"line_end\\\": 1057,\\n              \\\"support\\\": \\\"Table row for beta/H=1 lists sigma=1.0\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH2\\\",\\n          \\\"value\\\": 0.66,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=2\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1060,\\n              \\\"line_end\\\": 1060,\\n              \\\"support\\\": \\\"Table row for beta/H=2 lists P0=0.66\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH2\\\",\\n          \\\"value\\\": -0.14,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=2\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1060,\\n              \\\"line_end\\\": 1060,\\n              \\\"support\\\": \\\"Table row for beta/H=2 lists mu=-0.14\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH2\\\",\\n          \\\"value\\\": 21.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=2\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1060,\\n              \\\"line_end\\\": 1060,\\n              \\\"support\\\": \\\"Table row for beta/H=2 lists epsilon=21\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH2\\\",\\n          \\\"value\\\": 0.52,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=2\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1060,\\n              \\\"line_end\\\": 1060,\\n              \\\"support\\\": \\\"Table row for beta/H=2 lists sigma=0.52\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH3\\\",\\n          \\\"value\\\": 0.15,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=3\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1063,\\n              \\\"line_end\\\": 1063,\\n              \\\"support\\\": \\\"Table row for beta/H=3 lists P0=0.15\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH3\\\",\\n          \\\"value\\\": -0.019,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=3\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1063,\\n              \\\"line_end\\\": 1063,\\n              \\\"support\\\": \\\"Table row for beta/H=3 lists mu=-0.019\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH3\\\",\\n          \\\"value\\\": 32.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=3\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1063,\\n              \\\"line_end\\\": 1063,\\n              \\\"support\\\": \\\"Table row for beta/H=3 lists epsilon=32\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH3\\\",\\n          \\\"value\\\": 0.084,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=3\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1063,\\n              \\\"line_end\\\": 1063,\\n              \\\"support\\\": \\\"Table row for beta/H=3 lists sigma=0.084\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH4\\\",\\n          \\\"value\\\": 0.084,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=4\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1066,\\n              \\\"line_end\\\": 1066,\\n              \\\"support\\\": \\\"Table row for beta/H=4 lists P0=0.084\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH4\\\",\\n          \\\"value\\\": -0.0042,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=4\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1066,\\n              \\\"line_end\\\": 1066,\\n              \\\"support\\\": \\\"Table row for beta/H=4 lists mu=-0.0042\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH4\\\",\\n          \\\"value\\\": 48.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=4\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1066,\\n              \\\"line_end\\\": 1066,\\n              \\\"support\\\": \\\"Table row for beta/H=4 lists epsilon=48\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH4\\\",\\n          \\\"value\\\": 0.041,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=4\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1066,\\n              \\\"line_end\\\": 1066,\\n              \\\"support\\\": \\\"Table row for beta/H=4 lists sigma=0.041\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH5\\\",\\n          \\\"value\\\": 0.056,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=5\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1069,\\n              \\\"line_end\\\": 1069,\\n              \\\"support\\\": \\\"Table row for beta/H=5 lists P0=0.056\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH5\\\",\\n          \\\"value\\\": -0.00024,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=5\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1069,\\n              \\\"line_end\\\": 1069,\\n              \\\"support\\\": \\\"Table row for beta/H=5 lists mu=-2.4e-4\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH5\\\",\\n          \\\"value\\\": 61.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=5\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1069,\\n              \\\"line_end\\\": 1069,\\n              \\\"support\\\": \\\"Table row for beta/H=5 lists epsilon=61\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH5\\\",\\n          \\\"value\\\": 0.025,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=5\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1069,\\n              \\\"line_end\\\": 1069,\\n              \\\"support\\\": \\\"Table row for beta/H=5 lists sigma=0.025\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH6\\\",\\n          \\\"value\\\": 0.04,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=6\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1072,\\n              \\\"line_end\\\": 1072,\\n              \\\"support\\\": \\\"Table row for beta/H=6 lists P0=0.040\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH6\\\",\\n          \\\"value\\\": 0.00042,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=6\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1072,\\n              \\\"line_end\\\": 1072,\\n              \\\"support\\\": \\\"Table row for beta/H=6 lists mu=4.2e-4\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH6\\\",\\n          \\\"value\\\": 71.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=6\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1072,\\n              \\\"line_end\\\": 1072,\\n              \\\"support\\\": \\\"Table row for beta/H=6 lists epsilon=71\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH6\\\",\\n          \\\"value\\\": 0.016,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=6\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1072,\\n              \\\"line_end\\\": 1072,\\n              \\\"support\\\": \\\"Table row for beta/H=6 lists sigma=0.016\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH7\\\",\\n          \\\"value\\\": 0.031,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=7\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1075,\\n              \\\"line_end\\\": 1075,\\n              \\\"support\\\": \\\"Table row for beta/H=7 lists P0=0.031\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH7\\\",\\n          \\\"value\\\": 0.00046,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=7\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1075,\\n              \\\"line_end\\\": 1075,\\n              \\\"support\\\": \\\"Table row for beta/H=7 lists mu=4.6e-4\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH7\\\",\\n          \\\"value\\\": 85.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=7\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1075,\\n              \\\"line_end\\\": 1075,\\n              \\\"support\\\": \\\"Table row for beta/H=7 lists epsilon=85\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH7\\\",\\n          \\\"value\\\": 0.012,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=7\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1075,\\n              \\\"line_end\\\": 1075,\\n              \\\"support\\\": \\\"Table row for beta/H=7 lists sigma=0.012\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"P0_betaH8\\\",\\n          \\\"value\\\": 0.024,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Normalization constant of the PDF fit for beta/H=8\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1078,\\n              \\\"line_end\\\": 1078,\\n              \\\"support\\\": \\\"Table row for beta/H=8 lists P0=0.024\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"mu_betaH8\\\",\\n          \\\"value\\\": 0.00049,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Peak position parameter of the PDF fit for beta/H=8\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1078,\\n              \\\"line_end\\\": 1078,\\n              \\\"support\\\": \\\"Table row for beta/H=8 lists mu=4.9e-4\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"epsilon_betaH8\\\",\\n          \\\"value\\\": 110.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Skewness parameter of the PDF fit for beta/H=8\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1078,\\n              \\\"line_end\\\": 1078,\\n              \\\"support\\\": \\\"Table row for beta/H=8 lists epsilon=1.1e2\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma_betaH8\\\",\\n          \\\"value\\\": 0.0091,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Width parameter of the PDF fit for beta/H=8\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1078,\\n              \\\"line_end\\\": 1078,\\n              \\\"support\\\": \\\"Table row for beta/H=8 lists sigma=0.0091\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1038,\\n          \\\"line_end\\\": 1044,\\n          \\\"support\\\": \\\"The fit function P(delta) = P0 exp[ (epsilon/2)(delta - mu) - (2/(epsilon^2 sigma^2)) (1 - exp((epsilon/2)(delta - mu)))^2 ] is introduced, with mu setting peak position, sigma width, epsilon>0 skewness.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 1053,\\n          \\\"line_end\\\": 1083,\\n          \\\"support\\\": \\\"Table lists best-fit parameters P0, mu, epsilon, sigma for beta/H values 1 through 8, for the PDF of the comoving-gauge density contrast at k=0.9 k_max.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"k_equals_0p9_kmax\\\",\\n      \\\"statement\\\": \\\"The PDF is evaluated at wavenumber k = 0.9 k_max, where k_max is the scale entering at percolation.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1083,\\n          \\\"line_end\\\": 1083,\\n          \\\"support\\\": \\\"Table caption states the fit is for k=0.9 k_max.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 249,\\n          \\\"line_end\\\": 249,\\n          \\\"support\\\": \\\"Figure caption states k=0.9 k_max where k_max is the scale entering at percolation.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"horizon_crossing_evaluation\\\",\\n      \\\"statement\\\": \\\"The density contrast is evaluated at horizon crossing, delta^(C)(k ~ H).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1034,\\n          \\\"line_end\\\": 1034,\\n          \\\"support\\\": \\\"The PDF is evaluated at horizon re-entry, delta^(C)(k ~ H), where the standard collapse criterion applies.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"Nsim_1e6\\\",\\n      \\\"statement\\\": \\\"The PDF is obtained from N_sim = 10^6 distinct random nucleation histories inside a patch of comoving volume 4 pi k^{-3}/3.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 248,\\n          \\\"line_end\\\": 248,\\n          \\\"support\\\": \\\"Figure caption states the PDF is obtained from solving cosmological perturbation equations for N_sim=10^6 distinct random nucleation histories inside a patch of comoving volume 4 pi k^{-3}/3.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"jc_50_bubbles\\\",\\n      \\\"statement\\\": \\\"In each patch, the nucleation times and positions of the first j_c=50 bubbles are randomly sampled, with deterministic evolution for subsequent bubbles.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 241,\\n          \\\"line_end\\\": 241,\\n          \\\"support\\\": \\\"Footnote states in each patch, the nucleation times t_j and positions d_j of the first j_c=50 bubbles are randomly sampled and deterministic evolution is assumed for subsequent nucleation dynamics.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"beta_over_H\\\",\\n      \\\"definition\\\": \\\"The ratio beta/H, where beta is the inverse duration of the phase transition and H is the Hubble rate at nucleation.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [1, 2, 3, 4, 5, 6, 7, 8],\\n      \\\"domain_statement\\\": \\\"The table provides fit parameters for beta/H = 1, 2, 3, 4, 5, 6, 7, 8.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1053,\\n          \\\"line_end\\\": 1080,\\n          \\\"support\\\": \\\"Table lists rows for beta/H values 1 through 8.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"P_deltaC\\\",\\n      \\\"definition\\\": \\\"Probability density function of the density contrast in the comoving gauge, P(delta^(C)), evaluated at horizon crossing and at k=0.9 k_max.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"The PDF is obtained from N_sim=10^6 realizations of random bubble nucleation histories, storing Hubble-crossing values in a histogram.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1034,\\n          \\\"line_end\\\": 1035,\\n          \\\"support\\\": \\\"The PDF of delta^(C) is evaluated at horizon re-entry and shown for different beta/H values.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 248,\\n          \\\"line_end\\\": 248,\\n          \\\"support\\\": \\\"The PDF is obtained from N_sim=10^6 distinct random nucleation histories.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"pdf_fit_claim\\\",\\n      \\\"statement\\\": \\\"The probability density function of the comoving-gauge density contrast at k=0.9 k_max is described by the three-parameter fit P(delta) = P0 * exp[ (epsilon/2)(delta - mu) - (2/(epsilon^2 sigma^2)) (1 - exp((epsilon/2)(delta - mu)))^2 ], with parameters tabulated for beta/H from 1 to 8.\\\",\\n      \\\"quantitative_form\\\": \\\"P(delta) = P0 * exp[ (epsilon/2)(delta - mu) - (2/(epsilon^2 sigma^2)) (1 - exp((epsilon/2)(delta - mu)))^2 ]\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"P_deltaC\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"param\\\": \\\"P0_betaH4\\\"\\n            },\\n            {\\n              \\\"op\\\": \\\"exp\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"subtract\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"multiply\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"divide\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"epsilon_betaH4\\\"\\n                            },\\n                            {\\n                              \\\"op\\\": \\\"multiply\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"var\\\": \\\"delta\\\"\\n                                },\\n                                {\\n                                  \\\"op\\\": \\\"subtract\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"delta\\\"\\n                                    },\\n                                    {\\n                                      \\\"param\\\": \\\"mu_betaH4\\\"\\n                                    }\\n                                  ]\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"multiply\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"divide\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"multiply\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"var\\\": \\\"delta\\\"\\n                                },\\n                                {\\n                                  \\\"op\\\": \\\"subtract\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"delta\\\"\\n                                    },\\n                                    {\\n                                      \\\"param\\\": \\\"mu_betaH4\\\"\\n                                    }\\n                                  ]\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"op\\\": \\\"multiply\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"epsilon_betaH4\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"epsilon_betaH4\\\"\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"sigma_betaH4\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"sigma_betaH4\\\"\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"pdf_fit_mechanism\\\"],\\n      \\\"control_names\\\": [\\\"beta_over_H\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"beta_over_H\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [1, 2, 3, 4, 5, 6, 7, 8],\\n          \\\"domain_statement\\\": \\\"The table provides fit parameters for beta/H = 1, 2, 3, 4, 5, 6, 7, 8.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 1053,\\n              \\\"line_end\\\": 1080,\\n              \\\"support\\\": \\\"Table lists rows for beta/H values 1 through 8.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"P_deltaC\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"k_equals_0p9_kmax\\\", \\\"horizon_crossing_evaluation\\\", \\\"Nsim_1e6\\\", \\\"jc_50_bubbles\\\"],\\n      \\\"applicability\\\": \\\"The fit applies to the PDF of the comoving-gauge density contrast at k=0.9 k_max, for beta/H values 1 through 8. The PDF is evaluated at horizon crossing.\\\",\\n      \\\"statistical_basis\\\": \\\"The PDF is obtained from N_sim=10^6 realizations of random bubble nucleation histories, storing Hubble-crossing values in a histogram. The fit parameters are best-fit values from this distribution.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1038,\\n          \\\"line_end\\\": 1044,\\n          \\\"support\\\": \\\"The fit function is introduced and described.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 1053,\\n          \\\"line_end\\\": 1083,\\n          \\\"support\\\": \\\"Table provides best-fit parameters for beta/H values 1 through 8.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"fit_parameter_uncertainty_unspecified\\\",\\n      \\\"statement\\\": \\\"The paper does not specify the uncertainty convention for the fitted PDF parameters (P0, mu, epsilon, sigma). The values are reported without error bars or confidence intervals.\\\",\\n      \\\"claim_ids\\\": [\\\"pdf_fit_claim\\\"],\\n      \\\"mechanism_ids\\\": [\\\"pdf_fit_mechanism\\\"],\\n      \\\"control_names\\\": [\\\"beta_over_H\\\"],\\n      \\\"readout_names\\\": [\\\"P_deltaC\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"k_equals_0p9_kmax\\\", \\\"horizon_crossing_evaluation\\\", \\\"Nsim_1e6\\\", \\\"jc_50_bubbles\\\"],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 1053,\\n          \\\"line_end\\\": 1083,\\n          \\\"support\\\": \\\"The table lists fit parameters without any uncertainty estimates.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"multiply requires at least 2 argument(s)\",\"path\":\"$.claims[0].oracle_outputs\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 4,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card.schema",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

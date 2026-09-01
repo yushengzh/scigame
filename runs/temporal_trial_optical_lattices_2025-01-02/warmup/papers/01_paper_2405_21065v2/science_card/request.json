@@ -1,0 +1,699 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered LaTeX source. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nOnly encode a quantity as a continuous control when the source supports responses across a nonzero interval. A control and every claim-specific domain must satisfy minimum < maximum; never encode a fixed value with minimum = maximum. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored numeric interval for every cited control; never substitute the broader paper-level control range. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, executable expression trees, or code.\n\nScienceCard JSON Schema:\n{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"}},\"required\":[\"control_name\",\"minimum\",\"maximum\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"minimum\",\"maximum\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2405.21065v2\", \"citation\": \"Alan Bregazzi, Single-Beam Grating-Chip 3D and 1D Optical Lattices, Physical Review Letters (2025), DOI:10.1103/physrevlett.134.013001\", \"journal_doi\": \"10.1103/physrevlett.134.013001\"}\n\nSource-grounded routing hint from pre-screening:\nInspect only the source-reported trapped atom number versus lattice hold time for the 3D and 1D optical lattice branches, including their exponential-decay fits, 54 ms and 220 ms lifetimes, the t_hold < 75 ms exclusion, and the branch-specific physical explanation and fixed experimental conditions. Treat lattice dimensionality as the hidden branch and hold time as the common Player control. Do not invent an initial atom number, normalized readout, fit endpoint, uncertainty, or control upper bound from an unavailable figure. If the TeX does not support a complete numeric response and a common finite hold-time domain, set case_authoring_ready false.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nThe line numbers below are the only valid locator coordinate system.\n\nL000001\t===== BEGIN FILE: Lattice.tex =====\nL000002\t\\documentclass[aps,prl,floatfix,showpacs,twocolumn,amsmath,amssymb,superscriptaddress]{revtex4-2}\nL000003\t\nL000004\t\\usepackage{upgreek}\nL000005\t\\usepackage{hyperref}\nL000006\t\\usepackage{siunitx}\nL000007\t\\usepackage{amsmath}\nL000008\t\\usepackage{graphicx}\nL000009\t\\usepackage{float}\nL000010\t\nL000011\t\\begin{document}\nL000012\t\nL000013\t\\title{Single-beam grating-chip 3D and 1D optical lattices}\nL000014\t\nL000015\t\\author{Alan Bregazzi}\nL000016\t\\author{James P. McGilligan}\nL000017\t\\author{Paul F. Griffin}\nL000018\t\\author{Erling Riis}\nL000019\t\\author{Aidan S. Arnold}\nL000020\t\\affiliation{SUPA and Department of Physics, University of Strathclyde, G4 0NG, Glasgow, United Kingdom}\nL000021\t\nL000022\t\\begin{abstract}\nL000023\t\nL000024\tUltracold atoms are crucial for unlocking truly precise and accurate quantum metrology, and provide an essential platform for quantum computing, communication and memories. One of the largest ongoing challenges is the miniaturization of these quantum devices. Here, we show that the typically macroscopic optical lattice architecture at the heart of many ultra-precise quantum technologies can be realized with a single input laser beam on the same diffractive chip already used to create the ultracold atoms. Moreover, this inherently ultra-stable platform enables access to a plethora of new lattice dimensionalities and geometries, ideally suited for the design of high-accuracy, portable quantum devices.\nL000025\t\nL000026\t\\end{abstract}\nL000027\t\nL000028\t\\maketitle\nL000029\t\nL000030\tOptical lattices, formed by the standing wave of two or more interfering laser beams are an essential platform for many quantum optics experiments \\cite{Dipole_review_Weidemuller,Bloch2008, Optical_clock_review_Ludlow2015}.\nL000031\tThe extremely long atomic coherence times possible in such optical traps have been used extensively in some of the most sensitive measurements to date, notably extending the lifetime in atomic memories many orders of magnitude to several seconds \\cite{Dudin2013}, and allowing optical lattice clocks \\cite{Takamoto2005} to reach fractional frequency accuracies at the $10^{-18}$ level \\cite{Transportable_lattice_clock_Takamoto2020,Sr_lattice_Gravitational_redshift_Bothwell2022}. Such clocks are typically built on 1D lattices, but 3D \\cite{Akatsuka2008,Campbell2017} and 2D lattices \\cite{Swallows2011} can also be used.\nL000032\t\nL000033\tLattices in one \\cite{Anderson1998}, two \\cite{Paredes2004,Kinoshita2004},  and three \\cite{Greiner2002} dimensions were also vital components for many key experiments with quantum degenerate gases. By selectively preparing a single 2D layer from such 3D lattices, quantum gas microscopes can be prepared in bosonic \\cite{Bakr2009,Stefan_lattice_microscope_Sherson2010} and fermionic \\cite{Cheuk2015,Haller2015,Parsons2015} atoms, in an increasing range of atomic species \\cite{Yamamoto2016,Tarruell2023,Su2023,Sohmen2023}. Optical lattices for storage, augmented by optical tweezers for transport \\cite{Young2022}, can also be used in the burgeoning field of neutral-atom quantum computing \\cite{Ebadi2022,Graham2022}.\nL000034\t\nL000035\tIn recent years there has been a concerted effort to develop portable cold-atom sensors, translating the excellent performance of lab-based experiments to real-world applications.\nL000036\tOptical-lattice-based devices\nL000037\tutilise laser-cooled atomic clouds, created in magneto-optical traps (MOTs \\cite{Raab1987}) using overlapping near-resonant laser beams,\nL000038\twhich are subsequently loaded into the lattice potentials. The lattices themselves are typically generated from a single laser at a far-detuned\nL000039\twavelength which is then split into multiple intersecting laser paths \\footnote{Often with frequency shifts between non-colinear beams.},\nL000040\tadding more complexity to beam delivery. Mirrors aid stability in 1D lattices, by providing a fixed node of the optical standing wave, however this stable point is often many centimetres away from the atoms. Multiple intersecting 1D lattices can generate higher-dimensional lattices, if they are carefully mutually orthogonally polarised and/or frequency shifted to avoid optical interference which can shake the lattice or even change its geometry \\cite{Hopkins1997}.\nL000041\t\nL000042\tPrevious work on atom chips has demonstrated\nL000043\tatomic loading from a MOT into a 1D optical lattice by way of a magnetic surface trap \\cite{Atom_chip_lattice_Gallego2009,Atom_chip_lattice_Straatsma2015}, however the mirror and 3D MOTs used require four and six beams, respectively.\nL000044\tThe integration of a single-beam pyramid MOT \\cite{Lee1996} and 1D and 2D optical lattices  \\cite{pyramid_MOT_lattice_NPL_Bowden2019} has also been demonstrated, but the lattice did not use the same input beam direction as the MOT, and  lattice mirrors were $\\gg 1\\,$mm from the atoms.\nL000045\tThe equivalent to a single-input-beam MOT with a 1D lattice along the same input axis has been achieved in\nL000046\tinterferometry\nL000047\t\\cite{Bodart2010}, however the lattice in this case is used as a beamsplitter instead of storage, and  atom number may be limited \\cite{Vangeleyn2009}.\nL000048\t\nL000049\tGrating magneto-optical traps (GMOTs) offer a convenient platform for the formation of ultracold\nL000050\tatomic clouds with a single input trapping beam \\cite{GMOT1_Nshii2013,GMOT2_McGilligan2017}. This technology has now been extended to a range of atomic species \\cite{Li_GMOT_Barker2022,Sr_GMOT_NIST_Sitaram2020,Sr_GMOT_PTB_Bondza2022,Sr_grating_design_Burrow2023} and applications, and is well-placed for adoption in compact, cold-atom quantum sensors \\cite{GMOT_chip_scale_McGilligan2020,GMOT_interferometer_Lee2022,Abend2023}.\nL000051\tHere we extend this single-input beam architecture to the formation of optical lattices \\cite{GMOT1_Nshii2013}. By aligning a single high intensity far-detuned laser beam onto different areas of the grating chip, 1D, 2D and 3D lattices can be formed -- on the same grating used for the GMOT. All lattice beams share a common nodal plane, pinned to the grating chip surface $\\lesssim1\\,$mm from the atoms, so the resulting optical lattice is stable against the drift often seen in macroscopic systems.\nL000052\tWe anticipate that this simple, highly compact and stable\nL000053\toptical lattice geometry will be ideal for many portable quantum-optic experiments.\nL000054\t\nL000055\t\\begin{figure*}[ht]\nL000056\t\\centering\nL000057\t\\begin{minipage}{.33\\linewidth}\nL000058\t\\includegraphics[width=\\linewidth]{Fig1a.png}\nL000059\t\nL000060\t\\end{minipage}\nL000061\t\\begin{minipage}{.338\\linewidth}\nL000062\t\\includegraphics[width=\\linewidth]{Fig1b.png}\nL000063\t\\end{minipage}\nL000064\t\\begin{minipage}{.318\\linewidth}\nL000065\t\\includegraphics[width=\\linewidth]{Fig1c.png}\nL000066\t\\end{minipage}\nL000067\t\\caption{Grating and lattice geometry in a $(4\\,\\textrm{mm})^3$ volume, here with both periods magnified by 250 to aid visibility. Red and purple arrows in \\textbf{a} indicate the laser beams incident ($-z$ direction) on the triangular grating to generate the 3D and 1D lattice, respectively.  All other arrows ($+z$ direction) indicate principle contributing diffracted orders, and planes 1 and 2 are used to generate images of the 3D lattice structure (red linear shading in \\textbf{b} and \\textbf{c}, respectively). The gray lines in \\textbf{b} are spaced by the grating period.  The 3D lattice is shown in the $xy$-plane at $z=1.5\\,$mm above the grating surface (plane 1, \\textbf{b}) and  the $zy$-plane at $x=0\\,$mm (plane 2, \\textbf{c}). The $zx$-plane at $y=0\\,$mm is similar to \\textbf{c}, and shown in Fig.~SM1 in the Supplementary Material (SM). Dark red dashed lines indicate the 3D beam overlap region boundaries within which the MOT can form, and the solid and dashed blue ellipses indicate the approximately Gaussian MOT's $e^{-1/2}$ and $e^{-2}$ radii, respectively. Gravity $g$ is in the $-y$ direction. Equivalent images of \\textbf{c} for the 1D lattice are shown in Fig.~SM2 in the SM.}\nL000068\t\nL000069\t\\label{fig:fig1_place_holder}\nL000070\t\\end{figure*}\nL000071\t\nL000072\tFig.~\\ref{fig:fig1_place_holder} \\textbf{a} illustrates the central $4\\times4\\,\\textrm{mm}^2$ of the $20\\times20\\,\\textrm{mm}^2$ GMOT chip we use to create a 3D lattice. The chip comprises three sectors of one-dimensional diffraction grating (gray triangles).\nL000073\tThe binary grating sectors have properties and fabrication methods as detailed in \\cite{GMOT1_Nshii2013,Cotter2016,McGilligan2016,Sr_grating_design_Burrow2023}, and are optimised for the atomic species utilised here -- $^{87}$Rb.\nL000074\tWe use a similar theoretical description to our MOT modelling papers \\cite{Vangeleyn2009,McGilligan2015}, however here we consider the coherent superposition of electric fields rather than the Doppler- and Zeeman-effect sensitive sums of intensity-based average radiation pressures (see Supplementary Material (SM)). Theoretical cross-sections of the 3D lattice itself are shown in Fig.~\\ref{fig:fig1_place_holder} \\textbf{b} and \\textbf{c}, illustrating the different lattice regions with their distinct geometries and dimensions. The 1D lattice model and experimental data are shown in Fig.~SM2 \\textbf{a} and \\textbf{b}, respectively.\nL000075\t\nL000076\tTo make the 3D (1D) optical lattices in this paper, we use a single circularly- (linearly-) polarised  laser beam, normally incident near the centre of the grating with wavelength $\\approx 780\\,$nm ($1070\\,$nm),  power $0.9\\,$W ($10\\,$W), and $e^{-2}$ intensity radius\nL000077\t$2.5\\,$mm ($80\\,\\upmu$m). For the near-resonant lattice at $\\approx 780\\,$nm, the laser red-detuning was $78\\,$GHz relative to the center of the four Doppler-broadened D$_2$ transitions. Our Al-coated grating, has a material reflectivity of 88\\% at $780\\,$nm and 95\\% at $1070\\,$nm \\cite{Handbook_of_Optical_materials}. Due to the grating period $d=1080\\,$nm, the $780\\,$nm light diffracts ($\\pm 1$-order) at an angle of $\\theta=45^\\circ$ to the grating normal with diffraction efficiencies into the first and zeroth orders of $\\eta_{\\pm1}\\approx\\,35\\,\\%$ and  $\\eta_{0}\\approx\\,5\\,\\%$ respectively \\cite{McGilligan2016}. The $1070\\,$nm light has most power in the zeroth order $\\eta_{0}\\approx\\,70\\,\\%$, and the first-order diffraction angle is  large (82$^\\circ$) so these beams have no impact on the 1D lattice.\nL000078\t\nL000079\tAs a basis for loading the optical lattices, $\\approx$8$\\times10^{6}$ \\textsuperscript{87}Rb atoms are loaded into a GMOT and cooled to $\\approx$3$\\,\\mu$K using a standard red molasses cooling stage \\cite{GMOT1_Nshii2013,GMOT2_McGilligan2017}. Stray DC magnetic fields are cancelled by three pairs of orthogonal Helmholtz coils. The MOT location with respect to the chip, and its overlap with the optical lattice, can be controlled within the GMOT's optical overlap volume by varying the zero position of the quadrupole magnetic field.\nL000080\tThe typical MOT location and size are also shown in Fig.~\\ref{fig:fig1_place_holder} \\textbf{b} and \\textbf{c}.\nL000081\t\nL000082\tThe grating chip is bonded to the open end facet of a rectangular cuvette vacuum cell using UHV compatible epoxy, allowing a base vacuum pressure at the $10^{-8}\\,$mbar level, as measured by the ion pump. No bowing of the chip is observed due to pressure differential\nL000083\t\\cite{Atom_chip_vacuumSquires2016}. The decision to mount the chip in-vacuum was made to allow the lattice to form as close to the chip surface as possible with no glass interface, enabling future use of atoms in chip-surface traps \\footnote{The lattices here could in principle be achieved with an ex-vacuo grating chip, near a thin-walled glass chamber, but this could reduce the lattice capture efficiency.}.\nL000084\t\nL000085\tAtom detection is achieved via fluorescence imaging onto a CCD camera sensor. The imaging system is aligned orthogonal to the directions of both the MOT/lattice beam and gravity.\nL000086\tA spatially selective focal plane is utilised to reduce background noise originating from scattered light \\footnote{Additionally, a notch filter with a peak transmission centred around $780\\,$nm is used when investigating the 1D $1070\\,$nm lattice}. For both the 3D and 1D lattice geometries $150\\,\\upmu$s long resonant fluorescent images are taken with the MOT light after a $1\\,$ms time of flight following the extinction of the lattice beam.\nL000087\tIn both the 3D and 1D lattices, the lattice beam power can be rapidly adjusted by a single-pass acousto-optic modulator (AOM) designed for the beam wavelength.\nL000088\t\nL000089\tThe $780\\,$nm 3D lattice beam is from a near-resonant diode laser \\cite{Thompson2012} with a tapered amplifier. The broadband amplified spontaneous emission (ASE) pedestal associated with this laser produces some near-resonant light which can heat atoms from the lattice via scattering. To reduce this effect we filter the lattice beam through a $7.5\\,$cm long $>70\\,^\\circ$C Rb vapour cell\nL000090\t\\cite{ASE_hot_cell_Daffurn2021}.\nL000091\tThe lattice beam is combined with the MOT beam on a polarising beam splitter.\nL000092\tAtoms are loaded into the 3D lattice potentials by switching the lattice beam on at the end of the red molasses sequence, to mitigate the effect of light shifts on the cooling process.\nL000093\t\nL000094\tTo form the far-detuned 1D lattice a $1070\\,$nm ytterbium\nL000095\tlaser is used. The vertically polarised light is combined with the MOT light on a dichroic mirror and aligned onto the grating chip.\nL000096\tAtoms are loaded into the 1D lattice by switching the lattice beam on at the beginning of the red molasses cooling stage.\nL000097\t\nL000098\t\\begin{figure}[!t]\nL000099\t\\centering\nL000100\t\\includegraphics[width=.8\\linewidth]{Fig2.pdf}\nL000101\t\\caption{ Number of trapped atoms as a function of lattice hold time for the 3D lattice (red triangles, solid fit) and 1D lattice (purple circles, dashed fit). Fitted exponential decays reveal estimated lattice lifetimes of $54\\,$ms and $220\\,$ms for the 3D and 1D lattice,  respectively.}\nL000102\t\\label{fig:lifetime}\nL000103\t\\end{figure}\nL000104\t\nL000105\tA log plot of the number of trapped atoms as a function of hold time in both the 3D and 1D lattice is shown in Fig.~\\ref{fig:lifetime}.\nL000106\tExponential decays are fitted, excluding data where $t_\\textrm{hold}<75\\,$ms, to\nL000107\teliminate untrapped atoms ejected from the imaging region over this time scale due to gravity. The 1D lattice has a much longer lifetime, this is because it is much deeper and the far-off resonance light also induces less scattering and thereby heating than the near-resonant 3D lattice. The overlap volume between the 3D lattice and the MOT is much larger than for the 1D lattice, which can be seen by the difference in initial lattice atom number.\nL000108\t\nL000109\tFrom the time constant of the fits we estimate a 3D lattice lifetime of $54\\,$ms.  Due to the limited power available from the laser a relatively low detuning from the Rb D\\textsubscript{2} line of $\\Delta=-78\\,$GHz was used. As a consequence, atomic heating due to photon scattering is significant, estimated to be $1\\,$kHz for each photon absorption-emission cycle\nL000110\twithin the deepest (and brightest) parts of the lattice, where the expected potential depth at lattice sites is $40\\,\\upmu$K. This leads to a maximum heating rate at lattice sites of $10\\,\\upmu$K/s in good agreement with the observed ensemble heating rate across the lattice of $6\\,\\upmu$K/s \\footnote{Alan Bregazzi, PhD thesis (Strathclyde, 2024).}. Along with any residual unfiltered laser ASE, and the relatively shallow lattice depth, this heating accounts for the shorter near-resonant lattice lifetime.\nL000111\t\nL000112\tThe far-off resonance 1D lattice is expected to have less photon scattering ($3\\,$Hz) with a greater depth at the lattice sites ($500\\,\\upmu$K). Fitting an exponential decay to lattice atom number data indicates a longer trap lifetime of $220\\,$ms.\nL000113\tAn estimation of the background vacuum pressure can be made using the known relation between MOT lifetime and vacuum pressure\nL000114\t\\cite{Arpornthip2012,Moore2015,Burrow2021}. The shallower potential of the 1D lattice compared to the MOT  leads to a shorter background-limited lifetime \\cite{GMOT2_McGilligan2017,parametric_oscillation_Wu2006}. When the Rb partial pressure was changed, the MOT fill time was consistently twice as long as the 1D lattice decay time, indicating that both the MOT and 1D lattice are background-pressure limited.\nL000115\t\nL000116\tThe long hold time of the atoms, far in excess of that possible if they were in free-fall, is strong evidence of the formation of an optical dipole trap. The observed behaviour could not arise due to  optical molasses or any light scattering forces. Even if we overestimate the effects, by considering a single laser beam scattering at $1\\,$kHz against gravity, the maximum acceleration is $6\\,$m/s$^2$. Similarly, using a 1D Doppler model with co-propagating beams in the gravity direction with our laser intensity and detuning, the overestimated molasses acceleration reached is a millionth of that due to gravity.\nL000117\t\nL000118\tAlthough direct imaging of the lattice is not possible without a suitable microscope for site-resolved imaging,\nL000119\tadditional evidence can be obtained via investigating parametric resonances at the lattice trapping frequencies  \\cite{CO2_1D_lattice_Friebel1998,parametric_oscillation_Wu2006}. This resonance technique relies on modulating the lattice potential. When the modulation frequency is equal to twice the trapping frequency $\\nu_\\textrm{trap}$, the kinetic energy of the atoms increases exponentially, resulting in parametric excitation to higher vibrational states of the trapping potential. Eventually atoms are ejected entirely from the trapping potential. This process can be easily observed experimentally by an increase in cloud size, due to atoms entering higher vibrational states, or a drop in atom number as atoms are ejected from the trap. In addition to the fundamental parametric resonance at $2\\nu_\\textrm{trap}$, sub-harmonics can also be excited at frequencies given by $2\\nu_\\textrm{trap}/n$, where $n$ is an integer \\cite{CO2_1D_lattice_Friebel1998}.\nL000120\t\nL000121\tWe modulated the lattice beam power in the range $(88-100)\\,\\%$ using the AOM. In the 3D lattice, modulation is applied for $50\\,$ms after first holding the atoms in the static lattice for $50\\,$ms to allow for free evaporation \\cite{Dipole_review_Weidemuller}. The atoms are then imaged after a $1\\,$ms time of flight. In the 1D lattice case, modulation is applied for $150\\,$ms due to the improved lattice lifetime and the need to eject a significant number of atoms from the deeper 1D potentials in order to observe the trap resonances. In all cases the modulation scans are randomised in frequency to negate any effects due to long-term drifts in experimental conditions during the data campaigns.\nL000122\t\nL000123\t\\begin{figure*}[!t]\nL000124\t\\centering\nL000125\t\nL000126\t\\includegraphics[width=\\linewidth]{Fig3.pdf}\nL000127\t\\caption{(\\textbf{a}) Experimental  standard deviation $\\sigma$ of the 3D lattice cloud distribution, showing the spectrum of vibrational heating ($\\sigma>0.44\\,\\textrm{mm}$), with beam power $650\\,$mW and detuning $\\Delta=-78\\,$GHz. (\\textbf{b}) Primary vibrational resonance frequency plotted as a function of optical power divided by detuning from the \\textsuperscript{87}Rb D\\textsubscript{2} transition. Black squares $\\Delta=-30\\,$GHz, dark red triangles $\\Delta=-54\\,$GHz, light red circles $\\Delta=-78\\,$GHz. Large light red circle corresponds to the primary resonance observed in \\textbf{a}. (\\textbf{c})  Experimental spectra of the 1D lattice vibrational heating, indicated here by atom loss due to lower signal:noise in $\\sigma$ than \\textbf{a}.}\nL000128\t\\label{fig:3_3D_resonance}\nL000129\t\\end{figure*}\nL000130\t\nL000131\tA spectrum of the cloud  spatial standard deviation after modulation, as a function of modulation frequency, illustrates the heating of the atoms in the near-resonant 3D lattice (Fig.~\\ref{fig:3_3D_resonance} \\textbf{a}). We see a clear primary peak\nL000132\tat around $100\\,$kHz, with a partially-resolved secondary feature at around $50\\,$kHz. Because the 3D lattice is relatively shallow, broad resonances are expected as the atoms explore the full sinusoidal potential, not just the harmonic lattice minima.\nL000133\t\nL000134\tWe have also determined the expected theoretical trap frequencies in the 3D lattice, allowing for the spread due to lattice intensity variation across the atomic cloud from the Gaussian nature of the input and diffracted beams. For the conditions in Fig.~\\ref{fig:3_3D_resonance} \\textbf{a} this yields trap frequencies in the range $\\nu_{z}=(100\\pm 10)\\,$kHz and $\\nu_{r}=(46\\pm5)\\,$kHz, where standard deviations are given, also allowing for the spatially varying lattice population due to the initial MOT cloud distribution used for loading.\nL000135\tIn addition, the atoms after optical molasses are usually populated uniformly across the magnetic hyperfine levels. While subject to the circularly  polarised lattice beam \\footnote{Required for balanced diffraction from all three sectors of the grating.} the atoms are subject to the theoretical trap frequencies above corrected by a factor $\\sqrt{\\{2,3,4,5,6\\}/4}\\approx\\{0.71, 0.87, 1.00, 1.12, 1.22\\},$ depending on which of the five different $F=2$ $m_F$ states they are in.\nL000136\t\nL000137\tThe experimental 3D lattice heating frequencies therefore match surprisingly well with\nL000138\tthe expected trap frequencies \\footnote{Similar discrepancies between theory and experiment have been reported previously, with experimental frequencies (60-90)\\% below the maximum theoretical expectations in several separate experiments Ref.~\\cite{parametric_oscillation_Wu2006}.}. We also found that changing the lattice depth affects the resolution of the primary and secondary features in Fig.~\\ref{fig:3_3D_resonance} \\textbf{a}, with data for a range of five powers in the SM.\nL000139\tThis may be due to atom loss from lower depth lattice sites at lower laser power leading to a remaining trapped atom distribution predominantly occupying the central portion of the lattice structure with a lower spread of trap frequencies.\nL000140\t\nL000141\tTo further test that the atoms experience a lattice arising due to the dipole force, we measured the primary lattice resonance frequency for a  variety of beam powers $P$, and red detunings $\\Delta$.\nL000142\tBy plotting the primary observed resonance frequency as a function of $P/\\Delta$, resonance data for different 3D lattice trap depths can be summarised in a single plot, as shown in Fig.~\\ref{fig:3_3D_resonance}\\textbf{b}.\nL000143\t As expected, these data follow a $\\nu=A\\sqrt{P/\\Delta}$ relation, where here the fitted value is $A=34.2\\,$kHz$\\,($GHz/mW$)^{1/2}$, in good agreement with theory.\nL000144\t\nL000145\tThe measured parametric resonance frequencies in the 1D lattice (Fig.~\\ref{fig:3_3D_resonance} \\textbf{c}) are $\\nu_{z}=200\\,$kHz and $\\nu_{r}=0.5\\,$kHz, which, like in the 3D case, match well with sub-harmonics of the expected trap frequencies, $\\nu_{z}=290\\,$kHz and $\\nu_{r}=0.9\\,$kHz. There should be much less spatial variation in trap frequency due to lattice structure in the 1D lattice compared to the 3D lattice, and the atoms are expected to be in the deeper harmonic parts of the lattice, with no trap frequency variation with $m_F$ state. In the 1D case, however, the signal-to-noise of the parametric heating is low, and the (relatively broad) resonances can only be observed via atom number loss. This is due to lower spatial overlap of the 1D lattice with the MOT and hence lower initial atom number  (Fig.~\\ref{fig:lifetime}), as well as rapid radial expansion during fluorescence imaging (Fig.~SM2 and discussion in the SM). The 1D lattice beam focal position on the grating surface was optimised for atom number, and given the lattice beam Rayleigh range of $19\\,$mm, the beam waist was constant over the entire lattice.\nL000146\t\nL000147\tIn this paper we have demonstrated optical lattices in one and three dimensions. However, we note that by loading the MOT atoms into a magnetic and/or optical trap, they can be transported beyond the MOT capture volume, and thus future single-input-beam two-dimensional lattices are within easy reach (Fig.~\\ref{fig:fig1_place_holder} \\textbf{b}, \\textbf{c}).\nL000148\t\nL000149\tWe have demonstrated experimentally that the GMOT architecture can be extended from a single-input-beam MOT, to both three- and one-dimensional single-input-beam optical lattices on the same chip that is also likely to enable 2D lattices. Because the grating surface, from which all other lattice beams originate, is a node of the electric field the associated beam phases and thereby grating lattices are expected to be much more stable than standard optical lattices derived from multiple centimetre-distant mirrors.\nL000150\t\nL000151\tThe 3D and 2D lattices arising from our binary grating chip with three-fold symmetry (`tri' chips) naturally generate lattices of a topical \\cite{Struck2011,Xu2023,Mongkolkiattichai2023} triangular nature. However, equivalent 3D body-centred-cubic lattices (comprising offset 2D square lattice layers) can be generated using binary gratings based on either four sectors of linear grating (`quad' chips \\cite{GMOT1_Nshii2013,Imhof2017,Burrow2021}), or the larger capture volume 2D checkerboard grating option \\cite{GMOT1_Nshii2013}. By moving beyond binary gratings into multi-level gratings, it is expected that more exotic lattice geometries may  also be explored \\cite{Viebahn2019,Wintersperger2020,Leung2020}. Given that typical optical lattices have beam waists around $100\\,\\upmu$m, it seems natural to have a GMOT grating region bordered by a wide variety of small grating patterns that the MOT can be transported to, to easily explore different lattice geometries within the same experimental setup.\nL000152\t\nL000153\tWe therefore expect our technology is ideally suited for application in a wide range of stable, high-accuracy, portable quantum devices.\nL000154\t\nL000155\t\\begin{acknowledgments}\nL000156\tThe authors would like to thank Arthur La Rooij and Oliver Burrow for valuable discussions.\nL000157\tA.B.\\ was supported by a Ph.D. studentship from the Defence Science and Technology Laboratory (Dstl). J.P.M. gratefully acknowledges support from a Royal Academy of Engineering Research Fellowship. We thank the UK EPSRC for funding via grant EP/T001046/1. For the purpose of open access, the\nL000158\tauthors have applied a Creative Commons Attribution (CC BY)\nL000159\tlicence to any Author Accepted Manuscript (AAM) version\nL000160\tarising from this submission. The dataset is available here \\footnote{Dataset DOI to be added.}, and supplementary material which includes Refs.~\\cite{Vangeleyn2010,Henderson2020,Arnold2000} can be found here \\footnote{Supplementary Material link to be added}.\nL000161\t\\end{acknowledgments}\nL000162\t\nL000163\t\\bibliography{Lattice.bib}\nL000164\t\nL000165\t\\end{document}\nL000166\t===== END FILE: Lattice.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "latex"
+  },
+  "response_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "type": "number"
+                  },
+                  "minimum": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "minimum",
+                  "maximum",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "minimum",
+            "maximum",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

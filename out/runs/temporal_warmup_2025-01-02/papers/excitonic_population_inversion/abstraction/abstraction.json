@@ -1,0 +1,341 @@
+{
+  "assessment": "The paper reports several quantitative claims: (1) a long-lived negative photoconductivity with lifetime 17 ps under resonant pumping at 1.476 eV; (2) a short-lived positive response with lifetime ~3 ps for off-resonant pumping; (3) Drude and inverted Lorentz oscillator strengths with decay constants 2.4 ps and 2 ps/15 ps; (4) magnon frequency 1.2 THz with lifetime 70 ps; (5) threshold-saturation behavior of negative spectral weight with pump fluence. The most central and independently abstractable claim is the long-lived negative photoconductivity (negative Δσ1) under resonant pumping, which can be modeled as an inverted Lorentzian with a 17 ps decay. The other claims are either secondary or not sufficiently self-contained for a closed-form oracle. Therefore, one candidate is proposed.",
+  "candidates": [
+    {
+      "apparatus": {
+        "description": "Pump-probe setup with tunable near-infrared pump and THz probe in reflection geometry, measuring pump-induced change in complex optical conductivity.",
+        "name": "time_resolved_terahertz_spectrometer"
+      },
+      "background": "In the antiferromagnetic insulator NiPS3, resonant excitation of a spin-correlated exciton at 1.476 eV creates a long-lived population inversion that manifests as negative photoconductivity in the THz range. The transient optical conductivity change is modeled as a sum of a Drude term and an inverted Lorentzian oscillator.",
+      "budget": 20,
+      "claim": "Resonant pumping at the exciton energy (1.476 eV) in antiferromagnetic NiPS3 induces a long-lived negative photoconductivity (negative Δσ1) that persists for tens of picoseconds, with a lifetime of 17 ps, while off-resonant pumping yields only a short-lived positive Drude response.",
+      "confidence_threshold": 0.95,
+      "controls": [
+        {
+          "description": "Energy of the optical pump pulse.",
+          "maximum": 1.63,
+          "minimum": 1.45,
+          "name": "pump_photon_energy",
+          "unit": "eV"
+        },
+        {
+          "description": "Photon energy of the THz probe.",
+          "maximum": 12.0,
+          "minimum": 2.0,
+          "name": "probe_energy",
+          "unit": "meV"
+        },
+        {
+          "description": "Time delay between pump and probe pulses.",
+          "maximum": 40.0,
+          "minimum": 0.0,
+          "name": "time_delay",
+          "unit": "ps"
+        },
+        {
+          "description": "Sample temperature.",
+          "maximum": 300.0,
+          "minimum": 5.0,
+          "name": "temperature",
+          "unit": "K"
+        }
+      ],
+      "counterfactual_change": "Set lorentz_amplitude to 0.0, representing off-resonant pumping where the inverted Lorentzian contribution is absent.",
+      "diagnostic_conditions": [
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 7.0,
+          "time_delay": 2.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 7.0,
+          "time_delay": 10.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 7.0,
+          "time_delay": 20.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.494,
+          "temperature": 7.0,
+          "time_delay": 2.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.61,
+          "temperature": 7.0,
+          "time_delay": 2.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 70.0,
+          "time_delay": 2.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 130.0,
+          "time_delay": 2.0
+        }
+      ],
+      "family": "nips3_resonant_pump",
+      "hidden_conditions": [
+        {
+          "probe_energy": 3.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 7.0,
+          "time_delay": 5.0
+        },
+        {
+          "probe_energy": 8.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 7.0,
+          "time_delay": 15.0
+        },
+        {
+          "probe_energy": 7.0,
+          "pump_photon_energy": 1.494,
+          "temperature": 7.0,
+          "time_delay": 1.0
+        },
+        {
+          "probe_energy": 5.0,
+          "pump_photon_energy": 1.476,
+          "temperature": 300.0,
+          "time_delay": 2.0
+        }
+      ],
+      "initial_observations": [
+        "At 7 K with 1.476 eV pumping, Δσ1 becomes negative between 4 and 10 meV after 2 ps, while Δσ2 remains positive.",
+        "The negative Δσ1 persists up to 30 ps.",
+        "Pumping at 1.494 eV or 1.610 eV yields only positive Δσ1 and Δσ2, characteristic of a Drude response."
+      ],
+      "max_replicates": 3,
+      "notes": [
+        "The oracle models Δσ1 and Δσ2 as a sum of Drude and inverted Lorentzian terms, with parameters from the paper's fits.",
+        "The inverted Lorentzian amplitude is negative for resonant pumping, but zero for off-resonant pumping (counterfactual).",
+        "The time dependence is not explicitly encoded in the oracle; the user must vary time_delay to observe decay, but the oracle does not include time decay. This is a simplification; the oracle is static for given parameters.",
+        "The paper reports lifetimes of 2.4 ps (Drude) and 2 ps/15 ps (Lorentz), but these are not used in the oracle outputs directly."
+      ],
+      "oracle": {
+        "counterfactual_parameters": {
+          "drude_amplitude": 1.0,
+          "drude_gamma_sq": 2.25,
+          "lifetime_long": 15.0,
+          "lifetime_short": 2.4,
+          "lorentz_amplitude": 0.0,
+          "lorentz_center": 5.0,
+          "lorentz_gamma": 5.0,
+          "lorentz_gamma_sq": 25.0,
+          "temperature_scale": 155.0
+        },
+        "kind": "closed_form",
+        "outputs": {
+          "delta_sigma_1": {
+            "args": [
+              {
+                "args": [
+                  {
+                    "param": "drude_amplitude"
+                  },
+                  {
+                    "args": [
+                      {
+                        "param": "drude_gamma_sq"
+                      },
+                      {
+                        "args": [
+                          {
+                            "var": "probe_energy"
+                          },
+                          {
+                            "param": "drude_gamma_sq"
+                          }
+                        ],
+                        "op": "add"
+                      }
+                    ],
+                    "op": "divide"
+                  }
+                ],
+                "op": "multiply"
+              },
+              {
+                "args": [
+                  {
+                    "param": "lorentz_amplitude"
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "param": "lorentz_gamma"
+                          },
+                          {
+                            "var": "probe_energy"
+                          }
+                        ],
+                        "op": "multiply"
+                      },
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "var": "probe_energy"
+                                  },
+                                  {
+                                    "param": "lorentz_center"
+                                  }
+                                ],
+                                "op": "subtract"
+                              },
+                              2.0
+                            ],
+                            "op": "power"
+                          },
+                          {
+                            "param": "lorentz_gamma_sq"
+                          }
+                        ],
+                        "op": "add"
+                      }
+                    ],
+                    "op": "divide"
+                  }
+                ],
+                "op": "multiply"
+              }
+            ],
+            "op": "add"
+          },
+          "delta_sigma_2": {
+            "args": [
+              {
+                "args": [
+                  {
+                    "param": "drude_amplitude"
+                  },
+                  {
+                    "args": [
+                      {
+                        "var": "probe_energy"
+                      },
+                      {
+                        "args": [
+                          {
+                            "var": "probe_energy"
+                          },
+                          {
+                            "param": "drude_gamma_sq"
+                          }
+                        ],
+                        "op": "add"
+                      }
+                    ],
+                    "op": "divide"
+                  }
+                ],
+                "op": "multiply"
+              },
+              {
+                "args": [
+                  {
+                    "param": "lorentz_amplitude"
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "param": "lorentz_center"
+                          },
+                          {
+                            "var": "probe_energy"
+                          }
+                        ],
+                        "op": "subtract"
+                      },
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "var": "probe_energy"
+                                  },
+                                  {
+                                    "param": "lorentz_center"
+                                  }
+                                ],
+                                "op": "subtract"
+                              },
+                              2.0
+                            ],
+                            "op": "power"
+                          },
+                          {
+                            "param": "lorentz_gamma_sq"
+                          }
+                        ],
+                        "op": "add"
+                      }
+                    ],
+                    "op": "divide"
+                  }
+                ],
+                "op": "multiply"
+              }
+            ],
+            "op": "add"
+          }
+        },
+        "paper_parameters": {
+          "drude_amplitude": 1.0,
+          "drude_gamma_sq": 2.25,
+          "lifetime_long": 15.0,
+          "lifetime_short": 2.4,
+          "lorentz_amplitude": -1.0,
+          "lorentz_center": 5.0,
+          "lorentz_gamma": 5.0,
+          "lorentz_gamma_sq": 25.0,
+          "temperature_scale": 155.0
+        }
+      },
+      "readouts": [
+        {
+          "description": "Pump-induced change in the real part of optical conductivity.",
+          "name": "delta_sigma_1",
+          "resolution": 0.01,
+          "unit": "arb. units"
+        },
+        {
+          "description": "Pump-induced change in the imaginary part of optical conductivity.",
+          "name": "delta_sigma_2",
+          "resolution": 0.01,
+          "unit": "arb. units"
+        }
+      ],
+      "relative_tolerance": 0.1,
+      "source": {
+        "arxiv_versioned_id": "2412.03705v1",
+        "citation": "Jacob A. Warshauer et al., Long-Lived Population Inversion in Resonantly Driven Excitonic Antiferromagnet, Physical Review Letters (2025), DOI:10.1103/physrevlett.134.016901",
+        "journal_doi": "10.1103/physrevlett.134.016901",
+        "locator": "Figure 3(a-d) and text: 'The inverted Lorentz oscillator strength ωpL^2 reaches maximum at 2 ps then decays with 2 ps and 15 ps time constants.'",
+        "role": "primary"
+      },
+      "title": "Long-lived negative photoconductivity under resonant exciton pumping in NiPS3"
+    }
+  ]
+}

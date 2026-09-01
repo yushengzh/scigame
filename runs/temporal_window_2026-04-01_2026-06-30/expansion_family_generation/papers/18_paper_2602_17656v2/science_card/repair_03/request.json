@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2602.17656v2\", \"citation\": \"Alvise Bastianello, Exotic Critical States as Fractional Fermi Seas in the One-Dimensional Bose Gas, Physical Review Letters (2026), DOI:10.1103/j3s5-gjpf\", \"journal_doi\": \"10.1103/j3s5-gjpf\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: FFS_GHD_v2.tex =====\nL000002\t\\documentclass[aps,prl,reprint,amsmath,amssymb,superscriptaddress, 10pt]{revtex4-2}\nL000003\t\nL000004\t\\usepackage[usenames,dvipsnames]{xcolor}\nL000005\t\\usepackage{amsmath,amssymb}\nL000006\t\\usepackage{graphicx}\nL000007\t\\usepackage{hyperref}\nL000008\t\\usepackage{braket}\nL000009\t\\usepackage[normalem]{ulem}\nL000010\t\\usepackage{enumerate}\nL000011\t\\usepackage{MnSymbol}\nL000012\t\\usepackage{esint}\nL000013\t\\usepackage{comment}\nL000014\t\\newcommand{\\Cite}[1]{\\mbox{\\cite{#1}}}\nL000015\t\\usepackage[normalem]{ulem}\nL000016\t\nL000017\t\\newcommand{\\be}{\\begin{equation}}\nL000018\t\\newcommand{\\ee}{\\end{equation}}\nL000019\t\\def\\bes{\\begin{subequations}}\nL000020\t\\def\\esu{\\end{subequations}}\nL000021\t\nL000022\t\\newcommand{\\dr}{\\text{dr}}\nL000023\t\\newcommand{\\bdr}{\\textbf{dr}}\nL000024\t\\newcommand{\\eff}{\\text{eff}}\nL000025\t\\newcommand{\\cc}{\\text{c}}\nL000026\t\\newcommand{\\rhoq}{\\rho_\\text{q}}\nL000027\t\\newcommand{\\moy}[1]{\\left\\langle #1 \\right\\rangle}\nL000028\t\\newcommand{\\abs}[1]{\\left\\lvert #1 \\right\\rvert}\nL000029\t\nL000030\t\nL000031\t\\newcommand{\\scexp}{{\\xi}}\nL000032\t\\newcommand{\\dd}{{\\rm d}}\nL000033\t\\newcommand{\\g}{g_\\text{1D}}\nL000034\t\nL000035\t\nL000036\t\nL000037\t\\newcommand{\\para}[1]{ \\noindent\\emph{\\textbf{#1---}}}\nL000038\t\nL000039\t\\newcommand{\\wind}{\\mathcal{W}}\nL000040\t\nL000041\t\\newcommand{\\com}[1]{{#1}}\nL000042\t\nL000043\t\nL000044\t\nL000045\t\\newcommand{\\ab}[1]{{\\com{\\color{blue}}  #1}}\nL000046\t\\newcommand{\\abC}[1]{{\\com{[\\emph{\\color{blue} #1}]}}}\nL000047\t\\newcommand{\\abD}[1]{{\\com{\\color{blue}\\sout{#1}}}}\nL000048\t\nL000049\t\\newcommand{\\ml}[1]{{\\color{red}  #1}}\nL000050\t\\newcommand{\\hcn}[1]{{\\color{blue}  #1}}\nL000051\t\\newcommand{\\mlC}[1]{{\\com{[\\emph{\\color{red} #1}]}}}\nL000052\t\\newcommand{\\hcnC}[1]{{\\com{[\\emph{\\color{blue} #1}]}}}\nL000053\t\\newcommand{\\mlD}[1]{{\\com{\\color{red}\\sout{#1}}}}\nL000054\t\\newcommand{\\ga}[1]{{\\color{orange}  #1}}\nL000055\t\\newcommand{\\gaC}[1]{{\\com{[\\emph{\\color{orange} #1}]}}}\nL000056\t\\newcommand{\\gaD}[1]{{\\com{\\color{orange}\\sout{#1}}}}\nL000057\t\nL000058\t\\newcommand{\\ch}[1]{{\\color{blue}#1}}\nL000059\t\nL000060\t\\begin{document}\nL000061\t\nL000062\t\\newcommand{\\titleinfo}{Exotic critical states as fractional Fermi seas in the one-dimensional Bose gas}\nL000063\t\\title{\\titleinfo}\nL000064\t\\author{Alvise Bastianello}\\thanks{These authors contributed equally to this work.}\nL000065\t\\affiliation{CEREMADE, CNRS, Universit\\'e Paris-Dauphine, Universit\\'e PSL, 75016 Paris, France}\nL000066\t\\email{alvise.bastianello@dauphine.psl.eu}\nL000067\t\nL000068\t\\author{Yi Zeng}\\thanks{These authors contributed equally to this work.}\nL000069\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000070\t\nL000071\t\\author{Sudipta Dhar}\nL000072\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000073\t\\author{Zekui Wang}\nL000074\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000075\t\\affiliation{\nL000076\tState Key Laboratory of Quantum Optics Technologies and Devices, Institute of Opto-Electronics, Shanxi University, Taiyuan 030006, P. R. China}\nL000077\t\nL000078\t\\author{Xudong Yu}\nL000079\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000080\t\nL000081\t\\author{Milena Horvath}\nL000082\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000083\t\nL000084\t\\author{Grigori E. Astrakharchik}\nL000085\t\\affiliation{Departament de Física, Campus Nord B4-B5, Universitat Politècnica de Catalunya, E-08034 Barcelona, Spain}\nL000086\t\nL000087\t\\author{Yanliang Guo}\nL000088\t\\email{Yanliang.Guo@uibk.ac.at}\nL000089\t\\affiliation{Key Laboratory of Quantum State Construction and Manipulation (Ministry of Education), School of Physics, Renmin University of China, Beijing 100872, China}\nL000090\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000091\t\nL000092\t\\author{Hanns-Christoph  N{\\\"a}gerl}\nL000093\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000094\t\nL000095\t\\author{Manuele Landini}\nL000096\t\\affiliation{Institut f{\\\"u}r Experimentalphysik und Zentrum f{\\\"u}r Quantenphysik, Universit{\\\"a}t Innsbruck, Technikerstra{\\ss}e 25, Innsbruck, 6020, Austria}\nL000097\t\nL000098\t\\begin{abstract} Critical quantum field theories occupy a central position in modern theoretical physics for their inherent universality stemming from long-range correlations. As an example, the Tomonaga–Luttinger liquid (TLL) describes a wealth of one-dimensional quantum systems at low temperatures. Its behavior is deeply rooted in the emergence of an effective Fermi sea, leading to power-law correlations and Friedel oscillations. A promising direction to realize systems exhibiting novel universal behavior beyond TLL is through the generalization of the underlying Fermi sea. In this Letter, we show that fractional Fermi seas with reduced occupancy arise in an integrable Bose gas driven out of equilibrium by cyclic changes in interactions across the full range of repulsive and attractive regimes.\nL000099\tThe correlation functions feature signatures of criticality incompatible with a conventional TLL, suggesting a novel critical phase. Our predictions, based on Generalized Hydrodynamics, are directly relevant to cold atoms.\nL000100\t\\end{abstract}\nL000101\t\\maketitle\nL000102\t\nL000103\t\\para{Introduction.}  Low-temperature quantum matter manifests emergent universality deeply connected with the statistics and symmetries of its microscopic constituents, captured by effective quantum field theories~\\cite{fradkin2013field}. Particularly important are critical, or gapless, field theories, featuring long-range correlations and possibly conformal invariance~\\cite{francesco2012conformal}. A prominent example is the celebrated Tomonaga-Luttinger liquid (TLL)~\\cite{Haldane1981,Cazalilla2004}, which describes the low-energy properties of a wealth of one dimensional quantum models. The TLL is associated with Fermi seas and low-energy excitations around the Fermi momentum $p_F$, resulting in correlation functions with power-law decay~\\cite{Cazalilla2004}\nL000104\tand Friedel oscillations (FO)~\\cite{Cazalilla2004,Friedel1952}  with natural wavelength $\\hbar/p_F$. While Fermi seas generally arise in fermionic systems, in one dimension quantum statistics and interactions are deeply intertwined. Hence, Fermi seas and TLL behavior may also emerge for interacting bosons at low-temperatures~\\cite{vonDelft1998}.\nL000105\t\nL000106\tA natural question is whether a generalization of Fermi seas is conceivable, still manifesting critical properties.\nL000107\tA possible pathway follows Haldane's proposal~\\cite{Haldane1991,Wu2001} on generalized exclusion statistics (GES): Pauli exclusion principle is extended to allow at most $1/\\alpha$ particles in the same state, interpolating between fermions ($\\alpha=1$) and bosons ($\\alpha=0$).\nL000108\tGES describes anyonic systems~\\cite{Batchelor2006}, as well as bosons with tunable interactions~\\cite{bernard1994,Batchelor2007},\nL000109\tbridging the non-interacting and hard-core (fermionized) regimes.\nL000110\tExtending this idea, one can also ``hyperfermionize\" the system with occupancy $1/\\alpha<1$: we refer to these states where only one state every $\\alpha$ is occupied as ``fractional Fermi seas\" (FFS). FFS realized as the ground state of a system following GES are also described by TLL theory~\\cite{Wu2001}.\nL000111\t\nL000112\t\\begin{figure}[b!]\nL000113\t\\includegraphics[width=0.99\\columnwidth]{Fig_1.png}\nL000114\t\\caption{\\textbf{Interaction cycles and fractional Fermi seas.---}\nL000115\t(a) We perform slow cyclical changes of $\\g$ crossing the TG-sTG transition.\nL000116\t(b) Each cycle maps the initial GGE onto a GGE with reduced occupancy, realizing an analogue of a\nL000117\tGES.\nL000118\t(c) In particular, the initial ground state is transformed into a fractional Fermi sea.}\nL000119\t\\label{Fig_1}\nL000120\t\\end{figure}\nL000121\t\nL000122\tIn this Letter, we use interaction cycles~\\cite{Yonezawa2013,Marciniak2025,Kao2021} in the integrable Lieb-Liniger (LL) model~\\cite{Lieb1963} to realize FFS, and show that their correlation functions bear signatures of criticality beyond the conventional TLL. The experimental realization is presented in Ref.~\\cite{ExpHolo}.\nL000123\tThe LL model describes one-dimensional bosons with contact interactions with coupling $\\g$~\\cite{Olshanii1998}.\nL000124\tWe consider nonequilibrium protocols where $\\g$ is slowly and cyclically changed in time as depicted in Fig.~\\ref{Fig_1}(a). Starting the protocol from weakly-repulsive values of $\\g$, the coupling is ramped to strongly repulsive values, then quenched through the Tonks-Girardeau (TG) -- super Tonks-Girardeau (sTG) transition~\\cite{Astrakharchik2005,Batchelor2005,Haller2009,Chen2010} to infinite attraction, and ultimately brought back to the non-interacting point $\\g=0$. The cycle is repeated $\\wind$ times.\nL000125\t\nL000126\tIn the cycle, FFS are not realized as ground states of a GES, but rather as highly-excited nonequilibrium states described by Generalized Gibbs Ensembles (GGE)~\\cite{Rigol2007,Ilievski2015,Calabrese2016} built on the infinitely many conserved quantities of the LL model~\\cite{Lieb1963}, which also implies the existence of stable quasiparticles parametrized by their rapidity $\\lambda$~\\cite{takahashi2005thermodynamics}. At finite density of excitations, quasiparticles become collective modes strongly renormalized by many-body interactions.\nL000127\tThe rapidities generalize the notion of a single-particle wavevector of non-interacting systems to the interacting case.\nL000128\tIn such eigenstates in the thermodynamic limit, the occupancy $\\vartheta(\\lambda)$ describes the fraction of occupied states and it is valued between zero and one. In the ground state, $\\vartheta(\\lambda)$ is a maximally-occupied Fermi sea.\nL000129\tWe use Generalized Hydrodynamics (GHD)~\\cite{Alvaredo2016,Bertini2016,Bastianello2022,Doyon2024}, a hydrodynamic approach to nearly-integrable models, to show that after the cycle is repeated $\\wind$ times the initial GGE is mapped into a new one with reduced maximum occupancy $\\vartheta(\\lambda)\\leq 1/(2\\wind+1)$, in agreement with previous results obtained under the assumption of quantum adiabaticity (QA)~\\cite{Yonezawa2013,Marciniak2025}. Within QA, the protocol is  also known as holonomy cycle~\\cite{Yonezawa2013,Marciniak2025,Kao2021}: we choose a separate notation to emphasize the difference with the hydrodynamic framework, as we later discuss.\nL000130\tThe cycle acts as a \\emph{projector} onto a Hilbert subspace\nL000131\twith an occupancy described by an effective fractional GES with $\\alpha=2\\wind+1$, see Fig.~\\ref{Fig_1}(b).\nL000132\tThe initial ground state is mapped into an FFS, see Fig.~\\ref{Fig_1}(c).\nL000133\t\nL000134\tWe show that FFS manifest signatures of criticality in the one-particle correlation function $g^{(1)}(x)\\equiv \\langle \\hat{\\psi}^\\dagger(x)\\hat{\\psi}(0)\\rangle/n$, where $n$ is the particle density and $\\hat{\\psi}$ is the bosonic annihilation operator with commutator $[\\hat{\\psi}(x),\\hat{\\psi}^\\dagger(y)]=\\delta(x-y)$.\nL000135\tSpecifically, $g^{(1)}(x)$ features power-law decay of correlation functions and FO for any finite repulsive interaction strength, in agreement with predictions in the limit of zero or infinite repulsion~\\cite{Marciniak2025}.\nL000136\tThe FFS realized in this nonequilibrium setting offer a richer paradigm beyond the conventional TLL theory.\nL000137\t\nL000138\t\\para{Interaction cycles and GHD.}\nL000139\tThe Lieb-Liniger Hamiltonian is\nL000140\t\\be\\label{eq_LL_H}\nL000141\t\\hat{H}=\\int \\dd x \\left(\\frac{\\hbar^2}{2m}\\partial_x\\hat{\\psi}^\\dagger\\partial_x\\hat{\\psi}+\\frac{\\g}{2}\\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}\\right)\\, ,\nL000142\t\\ee\nL000143\twhere $\\g$ is the pairwise interaction coupling and $m$ is the atom's mass.\nL000144\tGHD is valid for slow and weakly inhomogeneous protocols and it incorporates weak integrability-breaking terms~\\cite{Bastianello2021}. It was employed in cold-atom experiments accounting for the effect of traps\nL000145\t\\cite{Schemmer2019,Malvania2021,Schuttelkopf2024,dubois2024}, time-dependent couplings~\\cite{horvath2025} and other integrability-breaking terms~\\cite{Cataldini2022,Moller2021,Yang2024Phantom}.\nL000146\t\nL000147\tHere, we summarize the key concepts of GHD~\\cite{takahashi2005thermodynamics}, leaving further details to the Supplementary Material (SM)~\\cite{suppmat}.\nL000148\tThe simultaneous eigenstates of $\\hat{H}$ and of all the other conserved quantities are labeled by a set of rapidities $|\\{\\lambda_i\\}_{i=1}^N\\rangle$, each describing a quasiparticle.\nL000149\tQuasiparticles experience a scattering phase $\\Theta( \\lambda)=-2\\arctan(\\tfrac{\\hbar^2\\lambda}{m\\g})$, which affects the rapidity quantization through the non-linear Bethe equations~\\cite{bethe1931theorie,Lieb1963}.\nL000150\tFor large system sizes $L\\to+\\infty$, in the thermodynamic limit one introduces macrostates $|\\{\\lambda_i\\}_{i=1}^N\\rangle\\to \\rho(\\lambda)$~\\cite{takahashi2005thermodynamics} where the root density $\\rho(\\lambda)$ is the coarse-grained rapidity's density of state, directly accessible in experiments~\\cite{Wilson2020,Malvania2021,dubois2024,Li2023,Yang2024Phantom,horvath2025}.\nL000151\tImportantly, several microstates share the same root density, which identifies a GGE~\\cite{Ilievski2016StrCh} with extensive entropy $\\mathcal{S}[\\rho]$~\\cite{suppmat}.\nL000152\tFrom the thermodynamic limit of the Bethe equations, the total root density is introduced $\\rho^t(\\lambda)=\\frac{1}{2\\pi}-\\int \\tfrac{\\dd\\lambda'}{2\\pi}\\varphi(\\lambda-\\lambda')\\rho(\\lambda')$, with $\\varphi(\\lambda)=\\partial_\\lambda \\Theta(\\lambda)$.\nL000153\tFor a given state, $\\rho^t(\\lambda)$ describes the total available phase space compatible with interactions.\nL000154\tAs a result of this, the occupancy $\\vartheta(\\lambda)\\equiv\\rho(\\lambda)/\\rho^t(\\lambda)$ represents the fraction of occupied states. In particular, the ground state of the repulsive ($\\g>0$) Hamiltonian \\eqref{eq_LL_H} has zero entropy, and its occupancy $\\vartheta(\\lambda)$ is a Fermi sea with occupation of one for $|\\lambda|<\\lambda_\\text{F}$ and zero otherwise. The Fermi rapidity $\\lambda_\\text{F}$ generalizes the Fermi momentum to the rapidity space. For $\\g=0$, the root density coincides with the bosonic momentum distribution, whereas in the TG regime, $\\rho(\\lambda)$ is the momentum distribution of the fermionic quasiparticles describing the hard core bosons~\\cite{Girardeau1960,Kinoshita2004,Wilson2020}.\nL000155\t\nL000156\tIn general, computing $\\vartheta(\\lambda)$ in a non-equilibrium protocol is challenging~\\cite{Caux2016,Piroli2017}, but for the case of slow changes in the coupling, it can be determined within GHD.\nL000157\tDescribing realistic experiments requires accounting for finite-temperature and inhomogeneities~\\cite{ExpHolo}. Here, we consider homogeneous systems starting from the ground state of $\\hat{H}$ for $\\g>0$.\nL000158\tIn the attractive regime $\\g<0$, quasiparticles can form bound states~\\cite{McGuire1964}.\nL000159\tAt the TG-sTG transition, bound state formation is suppressed due to their divergent binding energy~\\cite{Astrakharchik2005,Batchelor2005,Haller2009}, while at finite $\\g$, the formation of bound states is halted by integrability~\\cite{Piroli2015,Koch2021,horvath2025}. Therefore, when the cycle is traversed in the forward direction\nL000160\tno bound states are generated.\nL000161\tIn this case, the GHD equations reduce to~\\cite{Bastianello2019}\nL000162\t\\be\\label{eq_ghd}\nL000163\t\\partial_t\\vartheta(\\lambda)+a^\\text{eff}(\\lambda)\\partial_\\lambda \\vartheta(\\lambda)=0\\, ,\nL000164\t\\ee\nL000165\twhere the effective acceleration $a^\\eff(\\lambda)\\propto \\partial_t \\g$  is a non-linear function of the state itself, see SM~\\cite{suppmat}.\nL000166\t\\begin{figure*}[t!]\nL000167\t\\includegraphics[width=0.99\\textwidth]{Fig_2.pdf}\nL000168\t\\caption{\\textbf{Rapidity and momentum distribution, and one-particle correlation.---}Panels (a,b,c). We plot the smooth evolution of the root density $\\rho(\\lambda)$ versus the normalized interaction strength $\\gamma\\equiv 2m\\g/(\\hbar^2 n)$ in the cycle, where the vertical axis is shown on the non-linear scale $(2/\\pi)\\arctan(\\gamma/3)+(1-\\text{sign}(\\gamma))+2\\wind$. Due to finite interaction strength, $\\rho(\\lambda)$ shows a $\\gamma$- dependent concavity (more prominent at small $\\gamma$).\nL000169\tIn the repulsive regime (a.1,a.2,a.3), we also plot the momentum distribution $P(p)$ as a function of $\\lambda\\equiv p/\\hbar$, to facilitate its comparison with $\\rho(\\lambda)$. The statistical error is negligible on the plot scale: in the inset of panel a.2, we show in light blue the partial averages obtained by dividing the total number of samples in five groups with the same size. The small relative distance shows the convergence of the Monte Carlo sampling,  see SM~\\cite{suppmat} for details. Panels (d,e,f). Examples of $g^{(1)}(x)$ in linear (d.1,e.1,f.1) and log-log (d.2,e.2,f.2) scales, showing FO with a power-law decaying amplitude and a crossover between a short-distance (SD) and a faster long-distance (LD) power-law at a distance $\\bar{x}$.\nL000170\tWe show the case of $\\gamma=25$, with a prominent power-law crossover.\nL000171\tGray lines are data of five independent Monte Carlo simulations and the black line is their average. Deviations from the average are appreciable only in the tails of the plots in log-log scale. The apparent large-distance plateau visible in the log-log scale is due to the statistical noise of the Monte Carlo simulations~\\cite{suppmat}.\nL000172\t}\\label{Fig_n2}\nL000173\t\\end{figure*}\nL000174\t  The solution of Eq.~\\eqref{eq_ghd} parametrically depends on time through $\\g$\nL000175\t  and the branch of the cycle $\\wind$, hence we parametrize the solution as $\\vartheta_{\\g,\\wind}(\\lambda)$.\nL000176\tEquation~\\eqref{eq_ghd} is valid both in the repulsive and attractive regimes, and must be properly continued when joining the two at $\\g=0$ and $\\g=\\pm\\infty$, imposing the continuity of $\\rho(\\lambda)$~\\cite{Koch2021}. At the TG-sTG transition $\\rho^t(\\lambda)$ approaches a constant value, hence the continuity of $\\rho(\\lambda)$ implies that $\\vartheta(\\lambda)$ is also continuous.\nL000177\tOn the other hand, at the zero-crossing (or $\\g=0$ point) $\\rho^t(\\lambda)$ tends to $\\tfrac{1}{2\\pi}+\\text{sign}(\\g)\\rho(\\lambda)$,\nL000178\tleading to the requirement $1/\\vartheta_{\\g=0^+,\\wind+1}=2+1/\\vartheta_{\\g=0^-,\\wind}$.\nL000179\tWith this condition, an implicit solution to Eq.~\\eqref{eq_ghd} is given through the method of characteristics~\\cite{Bastianello2019,Moller2020,suppmat}. Starting from the ground state, GHD predicts the announced FFS occupancies\nL000180\t\\be\\label{eq_occ_FFS}\nL000181\t\\vartheta_{\\g,\\wind}(\\lambda)=\\frac{1}{2\\wind+1}\\hspace{2pc}\\text{if}\\,\\,\\,\\, |\\lambda|<\\lambda_\\text{F}(\\g,\\wind)\\, ,\nL000182\t\\ee\nL000183\tand zero otherwise.\nL000184\tAbove, the running Fermi rapidity evolves according to Eq.~\\eqref{eq_ghd} as $\\partial_t\\lambda_\\text{F}(\\g,\\wind)=a^\\eff(\\lambda_\\text{F}(\\g,\\wind))$. More conveniently, it can be fixed by the density, $n=\\int \\dd\\lambda\\,  \\rho(\\lambda)$.\nL000185\tWhile Eq.~\\eqref{eq_occ_FFS} describes the evolution from the ground state's GGE, the continuity conditions at $\\g=0$ for the occupancy $\\vartheta$ are always valid, and show that arbitrary initial GGEs are mapped into new GGEs with reduced maximum occupancy $\\vartheta_{\\g,\\wind}(\\lambda)\\le (2\\wind+1)^{-1}$ \\cite{suppmat}, providing a non-equilibrium analogy with GES.\nL000186\tPrevious mapping~\\cite{bernard1994,Batchelor2007} based on $\\rho(\\lambda)$ showed that the equilibrium thermodynamics of integrable models equals the GES's thermodynamics~\\cite{Wu2001} for a $\\lambda-$dependent generalization of $0<\\alpha<1$.\nL000187\t\nL000188\tHere, instead, we suggest a far-from-equilibrium analogy with fractional GES with $\\alpha>1$ on the occupancy $\\vartheta(\\lambda)$.\nL000189\tYet, the correspondence is not exact, as the fractional statistics is here realized through conservation laws and not with a statistical constraint.\nL000190\tAs the conserved quantities, such as energy and number of particles, are linear functions of $\\rho(\\lambda)$, a suitably-chosen GES that in its ground state has the same root density of the FFS would have, by definition, the same conserved quantities.\nL000191\tHowever, operators that do not commute with the conserved charges can experience deviations visiting virtual states of the Hilbert space beyond the projected sector, see Fig.~\\ref{Fig_1}(b). For example, this is the case for the $g^{(1)}(x)$ correlation function. As a GES's ground state is a maximally-occupied Fermi sea compatible with the statistics, it behaves as a nearly -rigid Fermi sea where only excitations around the Fermi edges contribute to low-energy modes, resulting in a conventional TLL description~\\cite{Wu2001}.\nL000192\tIn contrast, in the FFS realized as GGEs, the Pauli blockade is not enforced since the occupancy is not maximal. Hence, low-energy modes do not involve the Fermi edges only, but also the bulk.\nL000193\tNonetheless, the sharp discontinuities in $\\vartheta(\\lambda)$ still leaves signature of criticality in $g^{(1)}(x)$ beyond conventional TLL~\\cite{DeNardis2018}.\nL000194\t\\begin{figure}[t!]\nL000195\t\\includegraphics[width=0.99\\columnwidth]{Fig_3.pdf}\nL000196\t\\caption{\\textbf{Power law exponent and FO in one-particle correlation function for $\\gamma>0$--- }Panel (a) shows the FO's frequency, which is $2\\pi n \\wind$ at $\\gamma=0$~\\cite{Marciniak2025} and it deviates from it at finite $\\gamma$, shown on the same nonlinear scale of Fig.~\\ref{Fig_n2}. Panel (b). Short-distance (SD) and long-distance (LD) power law exponents, see Fig.~\\ref{Fig_n2}(b). For details on the fit, see SM~\\cite{suppmat}. Panel (c). Crossover distance $\\bar{x}$ between the two power laws, defined as the intersection of the two power laws as in Fig.~\\ref{Fig_n2}(b).\nL000197\tError bars are obtained by comparing the fits of five independent Monte Carlo samplings for each value of $\\gamma$ and $\\wind$, and are omitted when negligible on the plot scale. We show the error bars only for the LD exponent in Panel (b) and $\\bar{x}$ in Panel (a).\nL000198\t}   \\label{Fig_n3}\nL000199\t\\end{figure}\nL000200\t\nL000201\t\nL000202\t\\para{Exotic criticality.} To investigate the emergent critical properties of the FFS, we focus on $g^{(1)}(x)$, as inspired by predictions in conventional TLL~\\cite{Cazalilla2004} and motivated by its relevance for cold-atom experiments~\\cite{ExpHolo}.\nL000203\tExact analytical results are not available for $g^{(1)}(x)$ in the thermodynamic limit for finite $\\g$ and at all distances~\\cite{vonDelft1998,Cazalilla2004,Takacs2025,Wei2015}. However, for repulsive coupling $\\g>0$, $g^{(1)}(x)$ can be computed via a Monte Carlo algorithm~\\cite{senese2025} leveraging the Bethe ansatz results~\\cite{Caux2007},  see also Refs.~\\cite{suppmat,Alba2016,Dubail2020,Zhang2024}.\nL000204\tWith this method, we compute the momentum distribution and then $g^{(1)}(x)$ through Fourier transform (Fig.~\\ref{Fig_n2}). For $(\\g>0,\\wind=0)$, where conventional TLL holds, $g^{(1)}(x)$ shows a single power-law decay with no appreciable oscillations. This is expected, as TLL predicts $g_1(x)\\simeq \\text{(const)}\\times|x|^{-\\frac{1}{2K}}$ with $K$ being the Luttinger parameter, and FO are sub-leading in this regime. In the excited branches with $\\wind>0$, $g^{(1)}(x)$ oscillates with a power-law decaying envelope at any finite interaction strength, consistent with Ref.~\\cite{Marciniak2025} at the non-interacting and TG points.\nL000205\tAlso, $g^{(1)}(x)$ shows other exotic properties, such as a crossover from a slower to a faster power law, see Fig.~\\ref{Fig_n2}(d.2,e.2,f.2).\nL000206\tWe fit the numerical data with the function $A \\cos(k_\\text{FO} x+\\phi)/x^\\nu$: while we found the FO wavevector $k_\\text{FO}$ to be the same at all distances, we identify a transition between a short-distance powerlaw exponent $\\nu_\\text{SD}$ and a faster decay at long-distance governed by the exponent $\\nu_\\text{LD}$.\nL000207\tThe crossover distance $\\bar{x}$, defined as the distance where the short-distance and large-distance envelopes are equal~\\cite{suppmat}, non-trivially changes with interactions, diverging at the non-interacting points where the analytic result $g^{(1)}(x)|_{g=0}=\\sin( 2\\pi n\\wind x)/(2\\pi n\\wind x) $ holds~\\cite{Marciniak2025}, and $\\bar{x}$ moves to shorter distances as the interaction strength increases. As $\\g$ increases, the decay becomes faster, eventually transitioning from a oscillating power law to an oscillating exponential decay in the TG regime~\\cite{suppmat}.\nL000208\t\nL000209\tFigure~\\ref{Fig_n3} reports the observed power-law exponents and FO.\nL000210\tThe oscillation frequency $k_\\text{FO}$ (Fig.~\\ref{Fig_n3}(a)) changes monotonically during the cycle.\nL000211\tWithin the TLL description, FO are expected at frequencies that are $2\\pi$-multiples of the density.\nL000212\tFor $\\wind\\ge 1$ we observe deviations, except at $\\g=0$.\nL000213\tIn Fig.~\\ref{Fig_n3}(b) we report the values of the power-law exponents, and the crossover distance between the slower and faster decay is shown in Fig.~\\ref{Fig_n3}(c).\nL000214\tWithin each branch, the exponents increase with interaction strength and the crossover distance decreases. For fixed $\\g$, the exponent decreases for larger $\\wind$. This is expected, since each cycle pumps energy into kinetic degrees of freedom, making interactions less relevant.\nL000215\tThe emergence of power-law correlations in a highly excited state is remarkable, and\nL000216\twe argue that the exotic behavior of $g^{(1)}(x)$, featuring dominant FO and bi-modal power law decay, is the signature of an underlying beyond-TLL critical field theory.\nL000217\t\\begin{figure}[b!]\nL000218\t\\includegraphics[width=0.99\\columnwidth]{Fig_4.pdf}\nL000219\t\\caption{\\textbf{Energy and reversibility---} We show in blue the energy $E_\\text{tot}$ and in red the kinetic energy $E_\\text{kin}$ during the cycle. The normalized interaction strength (lower axis) is shown on a non-linear scale (same as Fig.~\\ref{Fig_n2}).\nL000220\tReversibility is broken at $\\gamma=0$ as manifested in both the jump in entropy in the forward cycle and a strong variation in the energies ($E_\\text{tot}$ dashed blue line, $E_\\text{kin}$ dashed red line), due to the formation of bound states in the reversed cycle~\\cite{Koch2021,horvath2025,suppmat}.\nL000221\t}\\label{Fig_n4}\nL000222\t\\end{figure}\nL000223\t\nL000224\t\\para{Comparing GHD with QA.} In\nL000225\tFig.~\\ref{Fig_n4} we show the total energy density $E=\\langle \\tfrac{\\hbar^2}{2m}\\partial_x\\hat{\\psi}^\\dagger\\partial_x\\hat{\\psi}+\\tfrac{\\g}{2}\\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}\\rangle$ and kinetic energy density $E_\\text{kin}=\\langle \\tfrac{\\hbar^2}{2m}\\partial_x\\hat{\\psi}^\\dagger\\partial_x\\hat{\\psi}\\rangle$ predicted by GHD through Eq.~\\eqref{eq_ghd}~\\cite{suppmat}. These predictions coincide with those of QA~\\cite{Marciniak2025}, naturally motivating its comparison with GHD.\nL000226\tIn the QA framework, the state evolves following a \\emph{single eigenstate} of the instantaneous Hamiltonian, and its evolution is fully reversible. QA is expected to be valid for protocols acting on time scales larger than the inverse energy gap between the instantaneous eigenstate and the rest of the spectrum. This gap closes in the thermodynamic limit.\nL000227\tWithin GHD, instead, the state evolves in a superposition of many instantaneous eigenstates (microstates) described by the same GGE, among which the eigenstate evolved within QA is found.\nL000228\tUnlike QA, the GHD description remains valid also in the thermodynamic limit, with controlled expansions~\\cite{Nardis2018,Bastianello2020,Durnin2021,Hubner2025} beyond the first-order derivatives of Eq. \\eqref{eq_ghd}.\nL000229\t\nL000230\tEigenstates from the same GGE are indistinguishable based on local correlation functions~\\cite{Caux2013,Essler2024}, hence the identical energy predictions. However, within GHD reversibility is broken.\nL000231\tWhen considering the evolution in the reverse direction of the cycle, bound state formation cannot be ignored~\\cite{horvath2025}.\nL000232\tWhenever the $\\g=0$ point is crossed, bound states are formed~\\cite{Koch2021,Koch2022}, resulting in a strong energy increase, see Fig.~\\ref{Fig_n4}.\nL000233\tThis ``staircase reversibility\" is also captured by the macrostate's entropy $\\mathcal{S}$ density~\\cite{suppmat}\nL000234\t\\be\nL000235\t\\mathcal{S}=n[(1+2\\wind)\\log(1+2\\wind)-(2\\wind)\\log(2\\wind)]\\, ,\nL000236\t\\ee\nL000237\twhich is constant within each branch $\\wind$, and suddenly jumps crossing $\\g=0$, signaling the irreversibility of the crossing, see Fig.~\\ref{Fig_n4}.\nL000238\t\nL000239\t\\para{Discussion.}\nL000240\tWe have studied interaction cycles in the LL model as a way to engineer exotic far-from-equilibrium states described by FFS. These states are realized as GGEs, protected from thermalization by integrability, and predicted by GHD.\nL000241\tWe show how FFSs bear signatures of a novel critical phase in the one-particle correlation function, featuring prominent FO and power law decay at any repulsive interaction.\nL000242\tA similar behavior is expected for FFS with attractive interactions.\nL000243\t\nL000244\tA recent experiment~\\cite{Kao2021} investigated interaction cycles in a dipolar Bose gas. Crucially, the dipolar interactions enhance the stability of the attractive regime~\\cite{Chen2023}, usually unstable~\\cite{Gerton2000,Donley2001,Strecker2002}, at the price of breaking integrability~\\cite{Panfil2023,biagetti2025}.\nL000245\tIn principle, non-integrable dynamics melts the FFS through relaxation of the GGE to a conventional finite-temperature Gibbs ensemble.\nL000246\tIn a joint submission~\\cite{ExpHolo}, we present the experimental realization of interactions cycles in ultracold cesium atoms more faithfully described by the LL model \\eqref{eq_LL_H}, observing FO in $g^{(1)}(x)$ in quantitative agreement with the GHD framework developed in this Letter.\nL000247\t\nL000248\tThe FFS we presented suggest an analogy with GES, which is here realized out of equilibrium by projecting initial states in subspaces of the Hilbert space with reduced occupancy. As the realization of GES only pertains to a sector of the Hilbert space, correlation functions involving virtual states beyond this sector feature exotic behavior beyond TLL predictions expected for conventional GES,\nL000249\tas we detect in the one-particle correlation.\nL000250\tUnderstanding how much the analogy with GES can be pursued, and developing a field-theory approach describing this novel critical phase, are among the most intriguing directions opened by this work.\nL000251\t\nL000252\t\\noindent\\para{Data availability.} Data are available on Zenodo~\\cite{Zenodo}.\nL000253\t\nL000254\t\\noindent\\para{Note.}The additional references~\\cite{Doyon2020,Gangardt2003,Doyon2017} appear in the supplementary material.\nL000255\t\nL000256\t\\noindent\\para{Acknowledgments.}\nL000257\tThe Innsbruck team acknowledges funding by the European Research Council (ERC) with project number 101201611 and by an FFG infrastructure grant with project number FO999896041. Y.Z. and  Y.G. are supported by the Austrian Academy of Sciences (\\\"OAW) with APART-MINT 12234 and by the Austrian Science Fund (FWF) with project number 10.55776/COE1, respectively. Z.W. is supported by the Quantum Science and Technology-National Science and Technology Major Project (Grant No. 2021ZD0302003) and the National Natural Science Foundation of China (Grant Nos. 12488301, 12034011, U23A6004). A.B. acknowledges partial support of the German Research Foundation (DFG) under the Germany's Excellence Strategy-EXC-2101-3990814868.\nL000258\tG. E. A. acknowledges financial support from Ministerio de Ciencia e Innovación MCIN/AEI/10.13039/501100011033 (Spain) under Grant No. PID2023-147469NB-C21.\nL000259\t\nL000260\t\nL000261\t\nL000262\t\\bibliography{biblio}\nL000263\t\nL000264\t\\clearpage\nL000265\t\\onecolumngrid\nL000266\t\\newpage\nL000267\t\nL000268\t\\setcounter{equation}{0}\nL000269\t\\setcounter{figure}{0}\nL000270\t\nL000271\t\\setcounter{page}{1}\nL000272\t\\setcounter{section}{0}\nL000273\t\\renewcommand\\thesection{\\arabic{section}}\nL000274\t\\renewcommand\\thesubsection{\\arabic{subsection}}\nL000275\t\\renewcommand{\\thetable}{S\\arabic{table}}\nL000276\t\\renewcommand{\\theequation}{S\\arabic{equation}}\nL000277\t\\renewcommand{\\thefigure}{S\\arabic{figure}}\nL000278\t\\setcounter{secnumdepth}{2}\nL000279\t\nL000280\t\\begin{center}\nL000281\t{\\Large Supplementary Material\\\\\nL000282\t\\titleinfo\nL000283\t}\nL000284\t\\end{center}\nL000285\t\\bigskip\nL000286\t\\bigskip\nL000287\t\nL000288\tThe Supplementary Material provides the technical details supporting our results. Section~\\ref{sec_TBAGHD} overviews the thermodynamics of integrable models and their hydrodynamics (GHD), while Sec.~\\ref{sec_MC} discusses the numerical method we used to compute the momentum distribution and $g^{(1)}(x)$.\nL000289\t\nL000290\t\\section{Thermodynamic Bethe ansatz and Generalized Hydrodynamics }\nL000291\t\\label{sec_TBAGHD}\nL000292\t\nL000293\tIn this Section we provide a short overview of the thermodynamics of integrable models, usually referred to as thermodynamic Bethe ansatz (TBA)~\\cite{takahashi2005thermodynamics}, and Generalized Hydrodynamics (GHD). Here, we give a short account of these frameworks: for a more in-depth discussion, the interested reader can refer to reviews~\\cite{Bastianello2022,Doyon2024} and lecture notes~\\cite{Doyon2020}.\nL000294\t\nL000295\t\\subsection{From microscopic to thermodynamics}\nL000296\t\\label{sec_tba}\nL000297\tIntegrable models feature infinitely-many extensive conserved charges $\\hat{Q}_j=\\int \\dd x\\, \\hat{{\\rm q}}_j(x)$, where $\\hat{{\\rm q}}_j(x)$ is a local observable. In this ensemble of charges, one can find the number or particles $\\hat{{\\rm q}}_j(x)\\to \\hat{\\psi}^\\dagger(x)\\hat{\\psi}(x)$, the momentum $\\hat{{\\rm q}}_j(x)\\to \\frac{\\hbar}{2}(i\\hat{\\psi}^\\dagger(x)\\partial_x\\hat{\\psi}(x)+\\text{h.c.})$, the Hamiltonian $\\hat{{\\rm q}}_j(x)\\to \\frac{\\hbar^2}{2m}\\partial_x\\hat{\\psi}^\\dagger\\partial_x\\hat{\\psi}+\\frac{\\g}{2}\\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}$, and infinitely many others~\\cite{takahashi2005thermodynamics}.\nL000298\tThese extensive charges are in involution, and simultaneous eigenstates can be found in the form\nL000299\t\\be\\label{eq_suppstate}\nL000300\t|\\{\\lambda_i\\}_{i=1}^N\\rangle\\propto \\sum_{\\mathcal{P}}A(\\mathcal{P})\\prod_{j=1}^N e^{i\\lambda_{\\mathcal{P}_j}x_j}\\, ,\nL000301\t\\ee\nL000302\twhere above one sums over all the permutations $\\mathcal{P}$ of the rapidity's set $\\{\\lambda_i\\}_{i=1}^N$, and the coefficients obey $A(\\Pi_{j,j+1}\\mathcal{P})=-\\exp\\left[-i \\Theta(\\lambda_{\\mathcal{P}_j}-\\lambda_{\\mathcal{P}_{j+1}})\\right]A(\\mathcal{P})$ with $\\Pi_{j,j+1}$ being the permutation exchanging the elements in positions $j$ and $j+1$.\nL000303\tSimilarly to what happens in non-interacting systems, the conserved charges act additively on the rapidities $\\hat{Q}_j|\\{ \\lambda_i\\}_{i=1}^N\\rangle=\\left(\\sum_{i=1}^N q_j(\\lambda_i)\\right)|\\{\\lambda_i\\}_{i=1}^N\\rangle$, where the functions $q_j(\\lambda)$ are called charge eigenvalues. For the number of particles $q_j(\\lambda)\\to 1$, for the momentum $q_j(\\lambda)\\to p(\\lambda)=\\hbar \\lambda$, and for the energy $q_j(\\lambda)\\to \\epsilon(\\lambda)=\\frac{\\hbar^2 \\lambda^2}{2m}$. On a finite system of size $L$, periodic boundary conditions result in non-linear equations to quantize the allowed rapidities, known as Bethe equations~\\cite{Lieb1963}\nL000304\t\\be\\label{Seq_bethe}\nL000305\t\\frac{I_j}{L}=\\frac{\\lambda_j}{2\\pi}+\\frac{1}{2\\pi L}\\sum_{k\\ne j} \\Theta(\\lambda_j-\\lambda_k)  \\, ,\nL000306\t\\ee\nL000307\twhere $\\{I_j\\}_{j=1}^N$ are integers for odd number of particles, and half integers for even number of particles. Any set of $\\{I_j\\}_{j=1}^N$ with all distinct elements corresponds to an eigenstate \\eqref{eq_suppstate}. In the repulsive regime of LL $(\\g>0)$, the Bethe equations admit only solutions with real rapidities. In the attractive regime, complex rapidities are possible and, in the thermodynamic limit, they arrange in regular patterns where ``strings\" of rapidities share the same real part and are regularly shifted in the imaginary axis. These solutions are called Bethe strings~\\cite{takahashi2005thermodynamics} and are associated with bound states. Hereafter, we assume no bound states are excited, so only real rapidities are possible: a short detour accounting for bound states will be provided in Section~\\ref{sec_ghd} when discussing the irreversibility of the cycle. The Bethe equations are highly non-linear and difficult to solve, but one can largely simplify the problem in the thermodynamic limit introducing the root density $\\rho(\\lambda)$ as $\\frac{I_j}{L}=\\frac{\\lambda_j}{2\\pi}+\\int\\frac{\\dd\\lambda'}{2\\pi} \\Theta(\\lambda_j-\\lambda')\\rho(\\lambda')+\\mathcal{O}(L^{-2})$. As a next step, one looks at these equations as a state-dependent change of variables $\\lambda\\to z(\\lambda)=\\frac{\\lambda}{2\\pi}+\\int\\frac{\\dd\\lambda'}{2\\pi} \\Theta(\\lambda-\\lambda')\\rho(\\lambda')$. The total root density is then introduced as the Jacobian of this change of variables $\\rho^t(\\lambda)\\equiv \\tfrac{\\dd z(\\lambda)}{\\dd\\lambda}$.\nL000308\tWe can now discuss thermodynamics and, more generally, GGEs. The grand canonical partition function on a Gibbs ensemble is $\\mathcal{Z}_{\\text{Gibbs}}=\\text{Tr}\\left[e^{-\\beta (\\hat{H}-\\mu \\hat{N})}\\right]$, with $\\hat{N}$ being the number of particles, while $\\beta=\\frac{1}{K_\\text{B} T}$ and $\\mu$ is the chemical potential. On more general GGEs, the partition function is~\\cite{Rigol2007} $\\mathcal{Z}_\\text{GGE}=\\text{Tr}\\left[e^{-\\sum_k \\beta_k \\hat{Q}_k}\\right]$. The trace over the GGE density matrix can be written on the basis of the quantum numbers $\\{I_j\\}_{j=1}^N$ and then, in the thermodynamic limit, converted into a path integral over the possible macroscopic configurations in the rapidity space $\\rho(\\lambda)$~\\cite{takahashi2005thermodynamics}\nL000309\t\\be\\label{eq_ZGGE}\nL000310\t\\mathcal{Z}_{\\text{GGE}}=\\sum_{\\{I_j\\}_{j=1}^N} e^{-\\sum_k \\sum_{j=1}^N\\beta_k q_k(\\lambda_j)}\\simeq \\int \\mathcal{D}\\rho\\, e^{\\mathcal{S}[\\rho]-L\\int \\dd\\lambda\\, \\left[\\sum_k\\beta_k q_k(\\lambda)\\right]\\rho(\\lambda)}\\, ,\nL000311\t\\ee\nL000312\twhere the entropy\nL000313\t\\be\\label{Seq_entropy}\nL000314\t\\mathcal{S}[\\rho]=L\\int \\dd\\lambda\\, \\rho^t(\\lambda)\\left[-\\vartheta(\\lambda) \\log\\vartheta(\\lambda)-(1-\\vartheta(\\lambda))\\log(1-\\vartheta(\\lambda))\\right]\\, ,\nL000315\t\\ee\nL000316\taccounts for the microstate degeneracy associated to a macrostate $\\rho(\\lambda)$, and we defined the occupancy $\\vartheta(\\lambda)=\\rho(\\lambda)/\\rho^t(\\lambda)$. In the thermodynamic limit $L\\to +\\infty$, the saddle point approximation of the path integral becomes exact, resulting in an integral equation uniquely determining the root density $\\rho(\\lambda)$ associated to a set of generalized temperatures $\\{\\beta_k\\}_k$\nL000317\t\\be\\label{eq_tba}\nL000318\t\\varepsilon(\\lambda)=\\sum_k \\beta_k q_k(\\lambda)+\\int \\frac{\\dd\\lambda'}{2\\pi}\\varphi(\\lambda-\\lambda')\\log(1+e^{-\\varepsilon(\\lambda')})\\, ,\nL000319\t\\ee\nL000320\twhere we parametrized the occupancy as $\\vartheta(\\lambda)=\\big(1+e^{\\varepsilon(\\lambda)}\\big)^{-1}$ and we used $\\varphi(\\lambda)=\\partial_\\lambda \\Theta(\\lambda)$.\nL000321\tIf the form of a GGE in terms of the generalized inverse temperature is known (hence, $\\sum_k \\beta_k q_k(\\lambda)$ is determined), the above equation ultimately allows to determine the GGE's occupancy $\\vartheta(\\lambda)$ and root density $\\rho(\\lambda)$. The reverse is also true: knowing the occupancy of a GGE, through Eq.~\\eqref{eq_tba} one can fix the function $\\sum_k \\beta_k q_k(\\lambda)$ and ultimately characterize the GGE microscopically through Eq.~\\eqref{eq_ZGGE}. We will take advantage of this fact to sample the momentum distribution in Section~\\ref{sec_MC}.\nL000322\tLet us now focus on Gibbs ensembles $\\sum_k \\beta_k q_k(\\lambda)\\to \\beta(\\epsilon(\\lambda)-\\mu)$ and more precisely on the ground state sending the temperature to zero $\\beta\\to +\\infty$. In this case, Eq.~\\eqref{eq_tba} becomes singular and $\\varepsilon(\\lambda)$ diverges to negative values within an interval $\\lambda\\in (-\\lambda_F,\\lambda_F)$, whereas it diverges to positive values out of it. As a result, the occupancy becomes a Fermi sea with unitary filling $\\vartheta(\\lambda)=\\chi(\\lambda,\\lambda_F)$, where the value of the Fermi rapidity $\\lambda_F$ is implicitly determined fixing the particle's density $n=\\int \\dd\\lambda\\, \\rho(\\lambda)$.\nL000323\tBefore discussing hydrodynamics, we report the expressions to compute the energies shown in Fig.~2.\nL000324\tSince the total energy is a conserved charge, its expression readily follows\nL000325\t\\be\\label{Seq_Etot}\nL000326\tE_\\text{tot}=\\Bigg\\langle \\frac{\\hbar^2}{2m}\\partial_x\\hat{\\psi}^\\dagger\\partial_x\\hat{\\psi}+\\frac{\\g}{2}\\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}\\Bigg\\rangle=\\int \\dd\\lambda \\,\\epsilon(\\lambda) \\rho(\\lambda)\\, .\nL000327\t\\ee\nL000328\tTo access the kinetic energy $E_\\text{kin}=\\Bigg\\langle \\frac{\\hbar^2}{2m}\\partial_x\\hat{\\psi}^\\dagger\\partial_x\\hat{\\psi}\\Bigg\\rangle$, which is of utmost interest for cold atom experiments, one uses $E_\\text{tot}-E_\\text{kin}=\\frac{\\g}{2}\\langle \\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}\\rangle$, where $\\langle\\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}\\rangle$ can be computed through the Hellmann-Feynman theorem~\\cite{Gangardt2003}\nL000329\t\\be\\label{Seq_g2}\nL000330\t\\langle\\hat{\\psi}^\\dagger\\hat{\\psi}^\\dagger\\hat{\\psi}\\hat{\\psi}\\rangle=\\int \\frac{\\dd\\lambda}{2\\pi}(\\partial_\\lambda \\epsilon)^\\dr\\vartheta(\\lambda) \\int \\dd\\lambda' \\partial_{\\g}\\Theta(\\lambda-\\lambda')\\rho(\\lambda')\\, ,\nL000331\t\\ee\nL000332\twhere for an arbitrary function $\\tau(\\lambda)$ one defines the dressing $\\tau(\\lambda)\\to \\tau^\\dr(\\lambda)$ as the solution of the integral equation $\\tau^\\dr(\\lambda)=\\tau(\\lambda)-\\int \\frac{\\dd\\lambda'}{2\\pi}\\varphi(\\lambda-\\lambda')\\vartheta(\\lambda')\\tau^\\dr(\\lambda')$.\nL000333\t\nL000334\t\\subsection{Hydrodynamics in integrable models}\nL000335\t\\label{sec_ghd}\nL000336\t\nL000337\tThe hydrodynamics of integrable models is framed within Generalized Hydrodynamics (GHD). Initially proposed to describe inhomogeneous states evolved with exactly integrable Hamiltonians~\\cite{Alba2016,Bertini2016}, it quickly grew into a powerful framework capable of handling integrability breaking~\\cite{Bastianello2022} and ultimately quantitatively describing experiments~\\cite{Schemmer2019,Malvania2021,Schuttelkopf2024,dubois2024,horvath2025,Cataldini2022,Moller2021,Yang2024Phantom}.\nL000338\tGHD assumes a separation of scale, approximating the local properties of the system as well-described by a local GGE $\\rho(\\lambda)\\to \\rho_{t,x}(\\lambda)$: on a large scale, the local and instantaneous root density evolves accordingly to certain kinetic equations. At the Euler scale, i.e. by retaining only up to first derivatives in the hydrodynamic expansion, it states\nL000339\t\\be\\label{Seq_GHD_rho}\nL000340\t\\partial_t \\rho_{t,x}(\\lambda)+\\partial_x[v^\\text{eff}(\\lambda)\\rho_{t,x}(\\lambda)]+\\partial_\\lambda[a^\\text{eff}(\\lambda) \\rho_{t,x}(\\lambda)]=0\\, ,\nL000341\t\\ee\nL000342\tthat can be equivalently rewritten in terms of the occupancy as\nL000343\t\\be\\label{Seq_GHD_fill}\nL000344\t\\partial_t \\vartheta_{t,x}(\\lambda)+v^\\text{eff}(\\lambda)\\partial_x\\vartheta_{t,x}(\\lambda)+a^\\text{eff}(\\lambda) \\partial_\\lambda\\vartheta_{t,x}(\\lambda)=0\\, .\nL000345\t\\ee\nL000346\t\nL000347\tThe effective velocity $v^\\eff(\\lambda)$ and acceleration $a^\\eff(\\lambda)$ are renormalized by the effect of interactions and depend on the local state $\\rho_{t,x}(\\lambda)$, making the GHD equations highly non-linear. The effective acceleration is caused by weak integrability breaking, for example, by adding a smooth potential to the LL Hamiltonian $\\hat{H}\\to\\hat{H}+\\int \\dd x\\, V(x)\\hat{\\psi}^\\dagger\\hat{\\psi}$ or by considering a time-dependent coupling.\nL000348\tIn this case, the effective velocity~\\cite{Alvaredo2016,Bertini2016} and acceleration~\\cite{Doyon2017,Bastianello2019} have the following form\nL000349\t\\be\nL000350\tv^\\eff(\\lambda)=\\frac{(\\partial_\\lambda \\epsilon)^\\dr}{(\\partial_\\lambda p)^\\dr}\\, , \\hspace{2pc}a^\\eff(\\lambda)=\\frac{(f(\\lambda))^\\dr}{(\\partial_\\lambda p)^\\dr}\\, ,\nL000351\t\\ee\nL000352\twhere the bare force term is~\\cite{Bastianello2019,Moller2020}\nL000353\t\\be\nL000354\tf(\\lambda)= -\\partial_x V+\\partial_t \\g\\int \\dd\\lambda' \\partial_{\\g}\\Theta(\\lambda-\\lambda')\\rho(\\lambda')\\, .\nL000355\t\\ee\nL000356\t\nL000357\tAlthough we gave the full inhomogeneous form of the GHD equation \\eqref{Seq_GHD_rho} \\eqref{Seq_GHD_fill} for completeness, in this work for the sake of simplicity we focus on the homogeneous case, hence we drop spatial dependencies. In realistic experiments~\\cite{ExpHolo}, the force term due to the inhomogeneity must be accounted for. In this case, one resorts to a numerical solution of the GHD equations based on the implicit solution within the method of characteristics~\\cite{Bastianello2019,Moller2020}\nL000358\t\\be\\label{eq_characteristics}\nL000359\t\\vartheta_{t,x(t)}(\\lambda(t))=\\vartheta_{t_0,x}(\\lambda)\nL000360\t\\ee\nL000361\twhere the evolving coordinates $x(t)$ and $\\lambda(t)$ satisfies\nL000362\t\\be\nL000363\t\\frac{\\dd x(t)}{\\dd t}=v^\\eff(\\lambda(t))\\Big|_{x=x(t)} \\hspace{2pc} \\frac{\\dd \\lambda(t)}{\\dd t}=a^\\eff(\\lambda(t))\\Big|_{x=x(t)}\nL000364\t\\ee\nL000365\twith initial conditions $x(t_0)=x$ and $\\lambda(t_0)=\\lambda$. This implicit solution is very convenient for numerical methods~\\cite{Bastianello2019,Moller2020}, and it describes an inhomogeneous translation of the filling fraction in the phase space. It immediately follows that $\\max\\vartheta_{t,x}(\\lambda)$ remains constant during the evolution with Eq. \\eqref{eq_characteristics}. Hence, the maximum occupancy $\\vartheta$ does not change within the repulsive or attractive branches, but it can jump when crossing between the two regimes.\nL000366\t\nL000367\tThe effect of the time-dependent coupling can be propagated with GHD equations until the TG-sTG transition, then continued smoothly in the attractive case where bound states are not excited, and eventually reach the non-interacting point. In crossing the non-interacting point from the attractive to the repulsive side $\\g=0^{-}\\to \\g=0^+$, one must ensure the continuity of $\\rho(\\lambda)$ resulting in a discontinuity of the occupancy $\\vartheta(\\lambda)$ as discussed in the main text, and a sudden entropy increase.\nL000368\tThe GHD equations \\eqref{Seq_GHD_rho} \\eqref{Seq_GHD_fill} conserve the entropy \\eqref{Seq_entropy} $\\partial_t \\mathcal{S}=0$~\\cite{Bastianello2019}, but sudden jumps can appear whenever crossing the non-interacting points. To compute the staircase value of the entropy it is most convenient to focus on the TG regime, where the scattering kernel becomes trivial $\\lim_{\\g\\to\\infty}\\varphi(\\lambda)=0$: here, the result announced in the main text Eq.~(4) is readily recovered.\nL000369\t\nL000370\t\\subsubsection{Crossing $\\g=0$ from repulsive to attractive: bound state formation and reversibility-breakdown}\nL000371\t\nL000372\t\\begin{figure}[h!]\nL000373\t\\includegraphics[width=0.99\\columnwidth]{Fig_S1.pdf}\nL000374\t\\caption{\\textbf{Bound state production in the reversed cycle.---} We show the bound state participation, normalized on the particle's density $n$, obtained by reversing the cycle and crossing $\\g=0^+\\to \\g=0^-$ after having first reached the cycle's winding $\\wind$.\nL000375\tAs $\\wind$ is increased, the formation of large bound states is more unlikely.\nL000376\t}\\label{Fig_S1}\nL000377\t\\end{figure}\nL000378\t\nL000379\t\nL000380\tIn principle, the attractive regime features bound states, called Bethe strings, of an arbitrary number of particles. According to GHD, these bound states are not excited when crossing the TG-sTG transition, nor during the slow evolution through the attractive regime in the direct cycle, hence we neglected them so far. However, reversing the cycle, bound states are created crossing $\\g=0$ from the repulsive $\\g=0^+$ to the attractive regime $\\g=0^{-}$~\\cite{Koch2021}: once the bound states are formed, they remain stable due to approximate integrability as interactions become more attractive, while their binding energy grows. Eventually, in a realistic experiment~\\cite{horvath2025}, highly-energetic bound states become unstable and cause atom losses. Roughly, this can be expected to happen when the binding energy of the bound states becomes comparable with the transverse trapping energy, and the 1D regime is lost.\nL000381\tThe GHD equations in the presence of bound states are analogous to Eqs. \\eqref{Seq_GHD_rho} \\eqref{Seq_GHD_fill}, where an extra index should be added labeling the bound states $\\rho(\\lambda)\\to \\{\\rho_j(\\lambda)\\}_{j=1}^N$. Here, each $\\rho_j(\\lambda)$ represents the root density associated with a bound state (bright solitons) of $j$ particles. By retaining only $j=1$, the GHD equations \\eqref{Seq_GHD_rho} \\eqref{Seq_GHD_fill} are obtained.\nL000382\tA complete discussion of these equations can be found in Ref.~\\cite{Koch2022}, as well as the generalization to Eq.~\\eqref{Seq_Etot} and \\eqref{Seq_g2} plotted in Fig.~4.\nL000383\tIn Fig.~\\ref{Fig_S1}, we show the bound state population $P_j\\equiv \\int \\dd\\lambda\\, \\rho_j(\\lambda)$ obtained by reverse crossing the non-interacting point after entering the $\\mathcal{W}=1,2,3$ cycles according to the analytical results from Ref.~\\cite{Koch2021}. Notice that, crossing $\\g=0$ from repulsive to attractive, the entropy is continuous~\\cite{Koch2021}.\nL000384\t\nL000385\t\\section{Sampling the momentum distribution via Monte Carlo method}\nL000386\t\\label{sec_MC}\nL000387\t\nL000388\tThis section gives an overview of the numerical method used to compute the momentum distribution and ultimately $g^{(1)}(x)$ through the Fourier transform.\nL000389\tThe method proposed in Ref.~\\cite{senese2025} combines known analytical formulas from integrability~\\cite{Calabrese2016} with a Monte Carlo approach.\nL000390\tWith minor modifications, we follow Ref.~\\cite{senese2025} and provide a short overview of the method for completeness.\nL000391\tWe aim to compute $\\langle \\hat{\\psi}^\\dagger(x) \\hat{\\psi}(0)\\rangle$ on a GGE. Using the microscopic states \\eqref{eq_suppstate} this amounts to\nL000392\t\nL000393\t\\begin{multline}\\label{Seq_g1}\nL000394\t\\langle \\hat{\\psi}^\\dagger(x) \\hat{\\psi}(0)\\rangle=\\frac{1}{\\mathcal{Z}_\\text{GGE}}\\sum_{\\{\\lambda_j\\}_{j=1}^N}\\langle \\{\\lambda_j\\}_{j=1}^N| \\hat{\\psi}^\\dagger(x) \\hat{\\psi}(0)|\\{\\lambda_j\\}_{j=1}^N\\rangle e^{-\\sum_{j=1}^n \\left(\\sum_k \\beta_k q_k(\\lambda_j)\\right)}=\\\\\nL000395\t\\frac{1}{\\mathcal{Z}_\\text{GGE}}\\sum_{\\{\\lambda_j\\}_{j=1}^N}\\sum_{\\{\\mu_\\ell\\}_{\\ell=1}^{N-1}} |\\langle \\{\\mu_j\\}_{\\ell=1}^{N-1}|\\hat{\\psi}(0)|\\{\\lambda_j\\}_{j=1}^N\\rangle |^2e^{i x \\hbar^{-1} \\left(\\sum_{j=1}^{N} p(\\lambda_j)-\\sum_{\\ell=1}^{N-1} p(\\mu_\\ell)\\right)}e^{-\\sum_{j=1}^n \\left(\\sum_k \\beta_k q_k(\\lambda_j)\\right)}\nL000396\t\\end{multline}\nL000397\t\nL000398\tAnalytical expressions as determinants of $(N-1)\\times (N-1)$ matrices are available for the form factor $|\\langle \\{\\mu_j\\}_{\\ell=1}^{N-1}|\\hat{\\psi}(0)|\\{\\lambda_j\\}_{j=1}^N\\rangle |^2$~\\cite{Calabrese2016}: for completeness, we also report them\nL000399\tat the end of this section.\nL000400\tImportantly, these determinant representations allow an efficient computation of the form factor for a large number of particles, eventually ensuring the feasibility of the Monte Carlo approach.\nL000401\tIt is now convenient to collect the form factor and GGE weight in an effective Boltzmann weight\nL000402\t\\be\nL000403\t\\mathcal{E}_\\text{MC}(\\{\\mu_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})=-\\log|\\langle \\{\\mu_j\\}_{\\ell=1}^{N-1}|\\hat{\\psi}(0)|\\{\\lambda_j\\}_{j=1}^N\\rangle |^2 +\\sum_{j=1}^n \\left(\\sum_k \\beta_k q_k(\\lambda_j)\\right)\\, .\nL000404\t\\ee\nL000405\tNotice that, as previously discussed, by reversing Eq.~\\ref{eq_tba}, starting with a known form of $\\rho(\\lambda)$ describing a GGE, we can recover the weight function $\\sum_k \\beta_k q_k(\\lambda)$. This is indeed the procedure we use to determine the GGE's weight $\\sum_k \\beta_k q_k(\\lambda)$ during the cycle.\nL000406\tFrom a direct inspection of Eq.~\\eqref{Seq_g1} notice that $n=\\langle \\hat{\\psi}^\\dagger(0)\\hat{\\psi}(0)\\rangle=\\mathcal{Z}_\\text{GGE}^{-1} \\mathcal{Z}_\\text{MC}$, where we define $\\mathcal{Z}_\\text{MC}=\\sum_{\\{\\lambda_j\\}_{j=1}^N}\\sum_{\\{\\mu_\\ell\\}_{\\ell=1}^{N-1}}e^{-\\mathcal{E}_\\text{MC}(\\{\\mu_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})}$.\nL000407\tWith this observation, we conveniently move to the Fourier space in defining the momentum distribution as $P(p)=\\int \\frac{\\dd x}{2\\pi}\\, e^{-i x\\hbar^{-1} p}\\langle \\hat{\\psi}^\\dagger(x) \\hat{\\psi}(0)\\rangle$, which can now be represented as\nL000408\t\nL000409\t\\be\\label{eq_Pdis}\nL000410\t\\frac{1}{n}P(p)=\nL000411\t\\frac{1}{\\mathcal{Z}_\\text{MC}}\\sum_{\\{\\lambda_j\\}_{j=1}^N}\\sum_{\\{\\mu_\\ell\\}_{\\ell=1}^{N-1}} \\delta\\left(p\\hbar^{-1}- \\hbar^{-1} \\left(\\sum_{j=1}^{N} p(\\lambda_j)-\\sum_{\\ell=1}^{N-1} p(\\mu_\\ell)\\right)\\right)e^{-\\mathcal{E}_\\text{MC}(\\{\\mu_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})}\nL000412\t\\ee\nL000413\t\nL000414\tWe can now use a Markov chain to sample the above right hand side, updating the configurations $(\\{\\mu_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})$ accordingly as follows.\nL000415\t\nL000416\t\\begin{enumerate}\nL000417\t\\item We first update the $\\{\\lambda_j\\}_{j=1}^N$ configuration, parametrizing through the quantum numbers $\\{I_j\\}_{j=1}^N$ numerically solving the Bethe equations \\eqref{Seq_bethe}.\nL000418\tA single step consists in:\nL000419\t\\begin{enumerate}\nL000420\t\\item Randomly select a label $\\bar{j}$ and update $I_j\\to I'_{\\bar{j}} =I_j+\\delta I_{\\bar{j}}$. $\\delta I_{\\bar{j}}$ is chosen as a random integer in the interval $[-\\delta_\\text{max},\\delta_\\text{max}]$, the value of $\\delta_\\text{max}$ is tuned to retain at least $10\\%$ acceptance rate.\nL000421\t\\item First one checks if the new configuration is allowed, ensuring $I'_{\\bar{j}}\\ne I_j$ for every $j$. If the new configuration is allowed, the new rapidity configuration $\\{\\lambda'_j\\}$ is computed solving the Bethe Equations. The new configuration is accepted with probability $\\exp\\left[- \\sum_k \\beta_k q_k(\\lambda'_j)+\\sum_k \\beta_k q_k(\\lambda_j)\\right]$. Notice that computing this acceptance probability is fast as it does not require computing the form factor, and the computational cost is mainly due to solving the Bethe equations.\nL000422\t\\item Repeat the above procedure for a number of $n_\\text{GGE}$ of proposed allowed configurations.\nL000423\t\\end{enumerate}\nL000424\t\\item After a sufficient number of updates of the $\\lambda-$configurations, we update the $\\mu-$configurations.\nL000425\t\\begin{enumerate}\nL000426\t\\item First a seed is proposed. One randomly selects a label $\\bar{j}$ and defines a set of quantum numbers $\\{J_\\ell\\}_{\\ell=1}^{N-1}$ parametrizing the $\\mu-$rapidities by removing from the $\\{I_j\\}_{j=1}^N$ set the quantum number $I_{\\bar{j}}$, and then the others are shifted of $-1/2$ if they precede $I_{\\bar{j}}$, and of $+1/2$ if they follow, to accommodate for the changed parity in the number of particles of the state with a hole. The probability used to choose the hole position $\\bar{j}$ is determined by the weights $e^{-\\mathcal{E}_\\text{MC}(\\{\\mu_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})}$.\nL000427\t\\item After the hole is created, the initial configuration is updated $\\{\\mu_\\ell\\}_{\\ell=1}^{N-1}\\to \\{\\mu'_\\ell\\}_{\\ell=1}^{N-1}$ similarly to what previously done with the $\\lambda-$rapidities, but determining the acceptance probability with $\\exp\\left[-\\mathcal{E}_\\text{MC}(\\{\\mu'_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})+\\mathcal{E}_\\text{MC}(\\{\\mu_j\\}_{\\ell=1}^{N-1}|\\{\\lambda_j\\}_{j=1}^{N})\\right]$.\nL000428\t\\item The $\\mu-$rapidities are updated for $n_\\text{FF}$ allowed proposed moves. For each $\\lambda-$configuration, the momentum distribution \\eqref{eq_Pdis} is sampled only after a $10\\%$ of the initial $n_\\text{FF}$ steps have been performed, to avoid the initial bias.\nL000429\tFig.~\\ref{Fig_S_conv} shows, for a fixed configuration of $\\{\\lambda_i\\}$, the typical convergence in the evolving $\\{\\mu_i\\}_{i=1}^{N-1}$.\nL000430\t\nL000431\t\\begin{figure}[h!]\nL000432\t\\includegraphics[width=0.99\\columnwidth]{Fig_SM_conv.pdf}\nL000433\t\\caption{\\textbf{Convergence of the Monte Carlo sampling in the number of steps.---} For the example of $\\gamma=5$ and $N=30$ number of particles, shows the average of the momentum $P$ (left) and its variance (right) through the Markov chain evolving the $\\{\\mu_j\\}_{j=1}^{N-1}$ configuration.\nL000434\t}\\label{Fig_S_conv}\nL000435\t\\end{figure}\nL000436\t\nL000437\t\\end{enumerate}\nL000438\t\\item Step 1 and 2 are repeated $n_\\text{sample}-$times, averaging each time.\nL000439\t\\item Errors are estimated by running independent copies of the Markov chains, considering their average as the most representative value.\nL000440\t\\item For the data shown in this work, we consider $N=30$ particles and $L=30$, in such a way the density is one $n=1$. We checked convergence to the thermodynamic limit, within the Monte Carlo fluctuations, upon varying $N$ and $L$. A comparison of $g^{(1)}$ obtained with $N=30$ and $N=50$ is provided in Fig. \\ref{Fig_S_conv_size}, showing convergence in $N$ is attained within the uncertainty of the Monte Carlo sampling.\nL000441\t\nL000442\tFor each fixed $\\{\\lambda_i\\}_{i=1}^N$ we consider $2\\times 10^6$ updates of the $\\{\\mu_i\\}_{i=1}^{N-1}$ configuration which is sampled every $2\\times 10^4$ steps. The $\\{\\lambda_i\\}_{i=1}^N$ configuration is sampled every $5\\times 10^5$ steps. With a choice of $\\delta_\\text{max}=4$, the acceptance is around $10\\%$, but it changes for different $\\gamma$. For each point of the cycle parametrized by $(\\gamma,\\wind)$, we run $5$ independent realization of the Monte Carlo, each made of about $1000$ samples. To show statistical uncertainty, these partial averages are shown in the plots with light shading together with their average (solid colors), which is the most representative value.\nL000443\t\\end{enumerate}\nL000444\t\nL000445\t\nL000446\t\\begin{figure}[t!]\nL000447\t\\includegraphics[width=0.75\\columnwidth]{Fig_SM_N.pdf}\nL000448\t\\caption{\\textbf{Convergence of the Monte Carlo sampling in the number of particles---} For the examples of $(\\gamma=1,\\wind=2)$ ((a.1) and (a.2)) and $(\\gamma=20,\\wind= 2)$ ((b.1) and (b.2)), we show the convergence of the Monte Carlo sampling upon varying the number of particles $N$ and the size $L$, fixing the density $n=N/L=1$. We show results for $N=30$ (solid orange line) and $N=50$ (dashed black line). For a fair comparison, we consider the same number of Monte Carlo samplings: we consider 1000 independent samplings, divided in 5 batches of 200 to assess statistical fluctuations. Light orange and black lines, more evident in the log scale (a.2) and (b.2), are the partial averages for $N=30$ and $N=50$, respectively. Other choices of $\\gamma$ and $\\wind$ show a similar overlap for the two values of $N$, proving convergence. Except for this figure, the $N=30$ case is always considered with a larger total number of samples (5000), to further reduce statistical uncertainity.\nL000449\t}\\label{Fig_S_conv_size}\nL000450\t\\end{figure}\nL000451\t\nL000452\t\nL000453\t\nL000454\t\\begin{figure}[b!]\nL000455\t\\includegraphics[width=0.99\\columnwidth]{Fig_SM_Oscillations.pdf}\nL000456\t\\caption{\\textbf{Fitting the oscillating decay in $g^{(1)}$---} We show a typical example of the fit of the bimodal oscillating power-law displayed by $g^{(1)}(x)$. Numerical data from Monte Carlo sampling are shown in black for $30$ particles and $n=1$. To assess the statistical error,\nL000457\twe consider five independent Monte Carlo samplings (gray lines) of 1000 samples each, and show their average as the solid black curve.\nL000458\tWe focus on $\\gamma=25$ and different branches of the cycle $\\wind=0,1,2$ (from left to right). In the upper row we show the fit (yellow line) of the short distance (SD) power law, and highlight the interval used for the fit (shaded area). In the second row, we zoom-in on the large distance (LD) tails which are independently fitted (red line). For $\\wind=0$ the tails are not shown, since there is no change in the observed power law.} \\label{Fig_S_Osc}\nL000459\t\\end{figure}\nL000460\t\nL000461\t\nL000462\tAfter having sampled the momentum distribution, $g^{(1)}(x)$ is recovered through Fourier transform. Then, we fit the oscillating power law decay: we now further describe our fitting procedure.\nL000463\tFor $\\wind=0$, where FO are subdominant, we fit $g^{(1)}(x)$ with a simple power law $A /x^B$. Instead, for the oscillating $g^{(1)}(x)$ featured for $\\wind\\ge 1$, we use $A \\cos(k_\\text{FO} x+\\phi)/x^\\nu$.\nL000464\tThe fit is performed at short distances within an interval $[x_{1,a},x_{2,a}]$ and then at larger distances $[x_{1,b},x_{2,b}]$ to capture the short-distance and large-distance power laws. In practice, for $\\wind\\ge 1$ we choose $[x_{1,a},x_{2,a}]=[0.05,\\bar{x}]$ and $[x_{1,b},x_{2,b}]=[\\bar{x},\\tilde{x}]$.\nL000465\tWe discuss below how $\\bar{x}$ and $\\tilde{x}$ are determined.\nL000466\tAn example of the fit is given in Fig.~\\ref{Fig_S_Osc} for the complete fitting function, while in the main text we focused only on the power law.\nL000467\tThe crossover distance between the two-power laws $\\bar{x}$ is defined by the intersection of the power-law envelope. After having fitted the short-distance (SD) and long-distance (lD) oscillating powerlaws with the convention that $A_\\text{SD}>0$ and $A_\\text{LD}>0$, we define\nL000468\t\\be\nL000469\t\\bar{x}=\\exp\\left[\\frac{\\log A_\\text{SD}-\\log A_\\text{LD}}{\\nu_\\text{LD}-\\nu_\\text{SD}}\\right]\\, .\nL000470\t\\ee\nL000471\tThe large cutoff $\\tilde{x}$ is instead determined as it follows.\nL000472\tWe observe that for values of $|g^{(1)}(x)|\\lesssim 10^{-3}$ the statistical error becomes of the same order of the correlation itself , hence we determine $\\tilde{x}$ from the threshold such that the power-law envelope becomes smaller than the cutoff $A_\\text{LD}/\\tilde{x}^{\\nu_\\text{LD}}=10^{-3}$.\nL000473\tThe values of $\\bar{x}$ and $\\tilde{x}$ are self-consistently determined: we repeat the fit several times adjusting the fitting interval until convergence is reached.\nL000474\t\nL000475\tWe observe that as $\\gamma$ is increased, the power decay becomes faster until at strong $\\gamma$ is difficult to clearly distinguish the two power-laws. In the Tonks-Girardeau regime, we observe a transition between the bimodal power law to an oscillating exponential decay. In the Tonks-Girardeau regime, $g^{(1)}(x)$ can be alternatively computed taking advantage of the fermionization of the hard-core bosons. This allows to compute $g^{(1)}(x)$ with high precision --despite the quickly-vanishing tails-- directly in the thermodynamic limit without need of the Monte Carlo routine described above, see eg. Ref.~\\cite{horvath2025}.\nL000476\tIn Fig.~\\ref{Fig_S_TG}.\nL000477\tIn Fig.~\\ref{Fig_S_TG}, we present Monte Carlo results at large interaction strength together with the Tonks–Girardeau limit of infinite interactions, that shows a clear exponential decay.\nL000478\t\nL000479\t\\begin{figure}[h!]\nL000480\t\\includegraphics[width=0.99\\columnwidth]{Fig_SM_Tonks.pdf}\nL000481\t\\caption{\\textbf{Tonks-Girardeau regime and transition to exponential decay---} For the example $\\wind=1$, the $g^{(1)}(x)$ for four strongly interacting datasets from the Monte Carlo sampling are shown, respectively for $\\gamma=10, 50,100$ and $1000$ (for simplicity, only the average is shown without error bars) and compared against the Tonks-Girardeau limit. In the linear scale (left) the Monte Carlo data converge to the Tonks-Girardeau limit for strong repulsion. In the right panel we show the data in a log scale, emphasizing the Tonks-Girardeau limit clearly features an oscillating exponential decay. As commented in the main text, the apparent saturation of the Monte Carlo data to a plateau is a numerical artifact of the limited statistical precision of the method.\nL000482\t}\\label{Fig_S_TG}\nL000483\t\\end{figure}\nL000484\t\nL000485\t\nL000486\t\\subsection{The Form Factor}\nL000487\t\\label{SSec_FF}\nL000488\t\nL000489\tThe determinant form for the form factor $|\\langle \\{\\mu_j\\}_{\\ell=1}^{N-1}|\\hat{\\psi}(0)|\\{\\lambda_j\\}_{j=1}^N\\rangle |^2$ has been computed in Ref.~\\cite{Caux2007} as (below, $c\\equiv m \\g/\\hbar^2)$\nL000490\t\\be\\label{eq_FFA}\nL000491\t|\\langle \\{\\mu_j\\}_{\\ell=1}^{N-1}|\\hat{\\psi}(0)|\\{\\lambda_j\\}_{j=1}^N\\rangle |^2= c^{2N-1}\\frac{\\prod_{j>k=1}^N((\\lambda_j-\\lambda_k)^2+c^2)^2}{\\prod_{a=1}^N \\prod_{b=1}^{N-1}(\\lambda_a-\\mu_b)^2}\\frac{\\det U(\\{\\mu_i\\}_{i=1}^{N-1},\\{\\lambda_j\\}_{j=1}^N)}{||\\{\\lambda_j\\}_{j=1}^N||^2||\\{\\mu_i\\}_{i=1}^{N-1}||^2}\\, ,\nL000492\t\\ee\nL000493\twhere $||\\{\\lambda_j\\}_{j=1}^N||^2$ is the norm of a Bethe state that is computable as\nL000494\t\\be\nL000495\t||\\{\\lambda_j\\}_{j=1}^N||^2=c^N\\prod_{j>k=1}^N\\frac{(\\lambda_j-\\lambda_k)^2+c^2}{(\\lambda_j-\\lambda_k)^2} \\det \\mathcal{G}(\\{\\lambda_j\\}_{j=1}^N)\\hspace{2pc}\\text{with} \\hspace{2pc}\nL000496\t\\mathcal{G}(\\{\\lambda_j\\}_{j=1}^N)=\\delta_{j,k}\\left[L+\\sum_{\\ell=1}^N\\varphi(\\lambda_j-\\lambda_\\ell)\\right]-\\varphi(\\lambda_j-\\lambda_k)\\, .\nL000497\t\\ee\nL000498\tThe matrix $U(\\{\\mu_i\\}_{i=1}^{N-1},\\{\\lambda_j\\}_{j=1}^N)$ appearing in Eq.~\\eqref{eq_FFA} is a $N-1\\times N-1$ matrix with elements\nL000499\t\\be\nL000500\t U_{j,k}(\\{\\mu_i\\}_{i=1}^{N-1},\\{\\lambda_j\\}_{j=1}^N)=\\delta_{j,k}\\left(\\frac{V_j^+-V_j^-}{i}\\right)+\\frac{\\partial_{a=1}^{N-1}(\\mu_a-\\lambda_j)}{\\partial_{a\\ne j}^{N-1}(\\lambda_a-\\lambda_j)} \\big[\\varphi(\\lambda_j-\\lambda_k)-\\varphi(\\lambda_N-\\lambda_k)\\big]\\, ,\nL000501\t\\ee\nL000502\twhere $V_j^\\pm=\\prod_{a=1}^{N-1}(\\mu_a-\\lambda_j \\pm i c)/\\prod_{a=1}^N(\\lambda_a-\\lambda_j\\pm i c)$.\nL000503\t\nL000504\t\nL000505\t\nL000506\t\nL000507\t\nL000508\t\\end{document}\nL000509\t===== END FILE: FFS_GHD_v2.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. This is a bounded mechanical repair: change only the field or fields needed to satisfy the exact schema/locator diagnostic below. Preserve every other scientific statement, equation, numeric value, uncertainty, domain, claim, source ID, dependency, and locator from the rejected response. Reconcile an unknown reference only with a source-grounded entity already represented in the response and source; do not invent a new scientific entity or fact. For a locator error, use only an exact supporting range in the unchanged numbered source. Return the complete JSON object without Markdown or commentary.\",\"previous_output\":\"{\\n  \\\"assessment\\\": \\\"The source packet is a single LaTeX file containing the main text and supplementary material of a Physical Review Letters paper on fractional Fermi seas in the one-dimensional Bose gas. The extraction focuses on the quantitative cluster describing the one-particle correlation function g^(1)(x) for repulsive interactions (gamma>0) across cycle branches W=0,1,2, with controls gamma and W, and readouts k_FO, nu_SD, nu_LD, and xbar. The paper reports fitted power-law exponents and crossover distances from Monte Carlo data, with error bars from five independent samplings. The source provides explicit formulas for the occupancy, entropy, and crossover distance, and describes the fitting procedure. The extraction captures the central-value relations and parameters, with uncertainty conventions preserved as source_unspecified where not defined. The case is authoring-ready with numeric controls and readouts.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Alvise Bastianello, Exotic Critical States as Fractional Fermi Seas in the One-Dimensional Bose Gas, Physical Review Letters (2026), DOI:10.1103/j3s5-gjpf\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/j3s5-gjpf\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2602.17656v2\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper studies interaction cycles in the integrable Lieb-Liniger model, realizing fractional Fermi seas (FFS) with reduced occupancy. It uses Generalized Hydrodynamics (GHD) to predict the occupancy and computes the one-particle correlation function g^(1)(x) via Monte Carlo for repulsive interactions, extracting power-law exponents and Friedel oscillation frequencies. The extraction focuses on the quantitative cluster for gamma>0 and cycle branches W=0,1,2, as reported in Figures 2 and 3 and the supplementary material.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"ghd_ffs_occupancy\\\",\\n      \\\"statement\\\": \\\"The GHD evolution of the occupancy under cyclic interaction changes maps the initial ground state to a fractional Fermi sea with occupancy 1/(2W+1) for |lambda| < lambda_F(gamma,W) and zero otherwise, with the running Fermi rapidity fixed by the density.\\\",\\n      \\\"equations\\\": [\\n        \\\"vartheta_{g,W}(lambda) = 1/(2W+1) if |lambda| < lambda_F(g,W), else 0\\\",\\n        \\\"1/vartheta_{g=0^+,W+1} = 2 + 1/vartheta_{g=0^-,W}\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"vartheta\\\",\\n        \\\"lambda\\\",\\n        \\\"lambda_F\\\",\\n        \\\"g\\\",\\n        \\\"W\\\",\\n        \\\"n\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"ffs_occupancy_numerator\\\",\\n          \\\"value\\\": 1,\\n          \\\"uncertainty\\\": \\\"None reported\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Numerator in the occupancy formula\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 180,\\n              \\\"line_end\\\": 183,\\n              \\\"support\\\": \\\"Equation (eq_occ_FFS) states vartheta_{g,W}(lambda)=1/(2W+1) for |lambda|<lambda_F(g,W) and zero otherwise.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"ffs_occupancy_denominator_coefficient\\\",\\n          \\\"value\\\": 2,\\n          \\\"uncertainty\\\": \\\"None reported\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Coefficient multiplying W in the denominator 2W+1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 180,\\n              \\\"line_end\\\": 183,\\n              \\\"support\\\": \\\"Equation (eq_occ_FFS) shows denominator 2W+1.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"ffs_occupancy_denominator_offset\\\",\\n          \\\"value\\\": 1,\\n          \\\"uncertainty\\\": \\\"None reported\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Constant offset in the denominator 2W+1\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 180,\\n              \\\"line_end\\\": 183,\\n              \\\"support\\\": \\\"Equation (eq_occ_FFS) shows denominator 2W+1.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 179,\\n          \\\"line_end\\\": 185,\\n          \\\"support\\\": \\\"GHD predicts FFS occupancies with vartheta=1/(2W+1) for |lambda|<lambda_F, and continuity conditions at g=0.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"g1_powerlaw_fit\\\",\\n      \\\"statement\\\": \\\"The one-particle correlation function g^(1)(x) for repulsive interactions and W>=1 is fitted with an oscillating power law A cos(k_FO x + phi)/x^nu, with a short-distance exponent nu_SD and a long-distance exponent nu_LD, and a crossover distance xbar defined by the intersection of the two power-law envelopes.\\\",\\n      \\\"equations\\\": [\\n        \\\"g^(1)(x) = A cos(k_FO x + phi) / x^nu\\\",\\n        \\\"xbar = exp[(log A_SD - log A_LD)/(nu_LD - nu_SD)]\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"g^(1)\\\",\\n        \\\"x\\\",\\n        \\\"A\\\",\\n        \\\"k_FO\\\",\\n        \\\"phi\\\",\\n        \\\"nu\\\",\\n        \\\"nu_SD\\\",\\n        \\\"nu_LD\\\",\\n        \\\"xbar\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"g1_fit_amplitude\\\",\\n          \\\"value\\\": 1,\\n          \\\"uncertainty\\\": \\\"Not reported as a single value; amplitudes A_SD and A_LD are fit parameters.\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Amplitude in the oscillating power-law fit\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 206,\\n              \\\"line_end\\\": 206,\\n              \\\"support\\\": \\\"Fit function A cos(k_FO x+phi)/x^nu.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"g1_fit_phase\\\",\\n          \\\"value\\\": 0,\\n          \\\"uncertainty\\\": \\\"Not reported as a single value; phase phi is a fit parameter.\\\",\\n          \\\"unit\\\": \\\"rad\\\",\\n          \\\"role\\\": \\\"Phase in the oscillating power-law fit\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 206,\\n              \\\"line_end\\\": 206,\\n              \\\"support\\\": \\\"Fit function A cos(k_FO x+phi)/x^nu.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 206,\\n          \\\"line_end\\\": 207,\\n          \\\"support\\\": \\\"Fit with A cos(k_FO x+phi)/x^nu, with nu_SD and nu_LD, and crossover distance xbar defined by equality of envelopes.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 467,\\n          \\\"line_end\\\": 470,\\n          \\\"support\\\": \\\"xbar defined as exp[(log A_SD - log A_LD)/(nu_LD - nu_SD)].\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"homogeneous_system\\\",\\n      \\\"statement\\\": \\\"The system is homogeneous (no trapping potential), as considered in the main text.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 157,\\n          \\\"line_end\\\": 157,\\n          \\\"support\\\": \\\"We consider homogeneous systems starting from the ground state.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"no_bound_states_forward\\\",\\n      \\\"statement\\\": \\\"In the forward cycle, no bound states are generated; only real rapidities are considered.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 159,\\n          \\\"line_end\\\": 160,\\n          \\\"support\\\": \\\"When the cycle is traversed in the forward direction no bound states are generated.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"density_one\\\",\\n      \\\"statement\\\": \\\"The particle density is n=1 (with N=30 particles and L=30).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 440,\\n          \\\"line_end\\\": 440,\\n          \\\"support\\\": \\\"We consider N=30 particles and L=30, in such a way the density is one n=1.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"monte_carlo_parameters\\\",\\n      \\\"statement\\\": \\\"Monte Carlo sampling uses N=30, L=30, 2e6 updates of mu-configurations sampled every 2e4 steps, lambda-configurations sampled every 5e5 steps, delta_max=4, and 5 independent realizations of about 1000 samples each.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 440,\\n          \\\"line_end\\\": 442,\\n          \\\"support\\\": \\\"Details of Monte Carlo parameters: N=30, L=30, 2e6 updates, sampling intervals, delta_max=4, 5 independent realizations.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"gamma\\\",\\n      \\\"definition\\\": \\\"Normalized interaction strength gamma = 2m g / (hbar^2 n), where g is the 1D coupling.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [\\n        1,\\n        5,\\n        20,\\n        25\\n      ],\\n      \\\"domain_statement\\\": \\\"The paper reports data for gamma values including 1, 5, 20, and 25, as shown in figures and supplementary material.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 168,\\n          \\\"line_end\\\": 170,\\n          \\\"support\\\": \\\"Figure 2 caption mentions gamma=25 as an example; Figure S1 shows gamma=5; Figure S2 shows gamma=1 and gamma=20.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"W\\\",\\n      \\\"definition\\\": \\\"Cycle branch index, the number of completed interaction cycles.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [\\n        0,\\n        1,\\n        2\\n      ],\\n      \\\"domain_statement\\\": \\\"The paper reports data for cycle branches W=0,1,2, as shown in Figure 3 and Figure S3.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 196,\\n          \\\"line_end\\\": 197,\\n          \\\"support\\\": \\\"Figure 3 caption mentions W values; Figure S3 shows W=0,1,2.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"k_FO\\\",\\n      \\\"definition\\\": \\\"Friedel oscillation wavevector, the frequency of oscillations in g^(1)(x), extracted from the fit A cos(k_FO x + phi)/x^nu.\\\",\\n      \\\"unit\\\": \\\"inverse length (units of n)\\\",\\n      \\\"statistic\\\": \\\"Fit parameter from the oscillating power-law fit to Monte Carlo data; error bars from comparing fits of five independent Monte Carlo samplings.\\\",\\n      \\\"uncertainty\\\": \\\"Error bars obtained by comparing fits of five independent Monte Carlo samplings; omitted when negligible on plot scale.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 206,\\n          \\\"line_end\\\": 206,\\n          \\\"support\\\": \\\"Fit function includes k_FO as the oscillation wavevector.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 196,\\n          \\\"line_end\\\": 197,\\n          \\\"support\\\": \\\"Figure 3(a) shows FO frequency; error bars from five independent samplings.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"nu_SD\\\",\\n      \\\"definition\\\": \\\"Short-distance power-law exponent of the oscillating decay in g^(1)(x), extracted from fitting the short-distance interval.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Fit parameter from the oscillating power-law fit; error bars from comparing fits of five independent Monte Carlo samplings.\\\",\\n      \\\"uncertainty\\\": \\\"Error bars obtained by comparing fits of five independent Monte Carlo samplings; shown only for LD exponent in Figure 3(b).\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 206,\\n          \\\"line_end\\\": 206,\\n          \\\"support\\\": \\\"Identify transition between short-distance exponent nu_SD and long-distance exponent nu_LD.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 196,\\n          \\\"line_end\\\": 197,\\n          \\\"support\\\": \\\"Figure 3(b) reports SD and LD power law exponents.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"nu_LD\\\",\\n      \\\"definition\\\": \\\"Long-distance power-law exponent of the oscillating decay in g^(1)(x), extracted from fitting the long-distance interval.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"statistic\\\": \\\"Fit parameter from the oscillating power-law fit; error bars from comparing fits of five independent Monte Carlo samplings.\\\",\\n      \\\"uncertainty\\\": \\\"Error bars obtained by comparing fits of five independent Monte Carlo samplings; shown for LD exponent in Figure 3(b).\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 206,\\n          \\\"line_end\\\": 206,\\n          \\\"support\\\": \\\"Identify transition between short-distance exponent nu_SD and long-distance exponent nu_LD.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 196,\\n          \\\"line_end\\\": 197,\\n          \\\"support\\\": \\\"Figure 3(b) reports SD and LD power law exponents.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"xbar\\\",\\n      \\\"definition\\\": \\\"Crossover distance between the short-distance and long-distance power laws, defined as the intersection of the two power-law envelopes.\\\",\\n      \\\"unit\\\": \\\"inverse density units (since n=1)\\\",\\n      \\\"statistic\\\": \\\"Computed from fitted amplitudes and exponents via xbar = exp[(log A_SD - log A_LD)/(nu_LD - nu_SD)]; error bars from comparing fits of five independent Monte Carlo samplings.\\\",\\n      \\\"uncertainty\\\": \\\"Error bars obtained by comparing fits of five independent Monte Carlo samplings; shown for xbar in Figure 3(a).\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 207,\\n          \\\"line_end\\\": 207,\\n          \\\"support\\\": \\\"Crossover distance xbar defined as distance where short-distance and large-distance envelopes are equal.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 467,\\n          \\\"line_end\\\": 470,\\n          \\\"support\\\": \\\"xbar = exp[(log A_SD - log A_LD)/(nu_LD - nu_SD)].\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"ffs_occupancy_claim\\\",\\n      \\\"statement\\\": \\\"After W cycles, the occupancy of the GGE is reduced to 1/(2W+1) for rapidities within the Fermi sea, and zero otherwise.\\\",\\n      \\\"quantitative_form\\\": \\\"vartheta_{g,W}(lambda) = 1/(2W+1) for |lambda| < lambda_F(g,W), else 0\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"occupancy\\\": {\\n          \\\"op\\\": \\\"divide\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"param\\\": \\\"ffs_occupancy_numerator\\\"\\n            },\\n            {\\n              \\\"op\\\": \\\"add\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"multiply\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"param\\\": \\\"ffs_occupancy_denominator_coefficient\\\"\\n                    },\\n                    {\\n                      \\\"var\\\": \\\"W\\\"\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"param\\\": \\\"ffs_occupancy_denominator_offset\\\"\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"ghd_ffs_occupancy\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"W\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"W\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [\\n            0,\\n            1,\\n            2\\n          ],\\n          \\\"domain_statement\\\": \\\"The paper reports data for W=0,1,2, as shown in figures.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 196,\\n              \\\"line_end\\\": 197,\\n              \\\"support\\\": \\\"Figure 3 caption mentions W values; Figure S3 shows W=0,1,2.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"occupancy\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"homogeneous_system\\\",\\n        \\\"no_bound_states_forward\\\"\\n      ],\\n      \\\"applicability\\\": \\\"Valid for the forward cycle in the homogeneous Lieb-Liniger model, with no bound states excited, and for any interaction strength including the crossing at g=0.\\\",\\n      \\\"statistical_basis\\\": \\\"Analytical prediction from GHD, not a statistical fit.\\\",\\n      \\\"uncertainty\\\": \\\"None reported; the occupancy is an exact GHD result.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 180,\\n          \\\"line_end\\\": 183,\\n          \\\"support\\\": \\\"Equation (eq_occ_FFS) states vartheta_{g,W}(lambda)=1/(2W+1) for |lambda|<lambda_F(g,W) and zero otherwise.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"g1_powerlaw_claim\\\",\\n      \\\"statement\\\": \\\"For repulsive interactions and W>=1, the one-particle correlation function g^(1)(x) exhibits an oscillating power-law decay with a short-distance exponent nu_SD and a long-distance exponent nu_LD, with a crossover distance xbar.\\\",\\n      \\\"quantitative_form\\\": \\\"g^(1)(x) = A cos(k_FO x + phi)/x^nu, with nu=nu_SD for x<xbar and nu=nu_LD for x>xbar\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"g1\\\": {\\n          \\\"op\\\": \\\"divide\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"multiply\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"param\\\": \\\"g1_fit_amplitude\\\"\\n                },\\n                {\\n                  \\\"op\\\": \\\"cos\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"add\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"var\\\": \\\"k_FO\\\"\\n                            },\\n                            {\\n                              \\\"var\\\": \\\"x\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"param\\\": \\\"g1_fit_phase\\\"\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            },\\n            {\\n              \\\"op\\\": \\\"power\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"var\\\": \\\"x\\\"\\n                },\\n                {\\n                  \\\"var\\\": \\\"nu\\\"\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"g1_powerlaw_fit\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"gamma\\\",\\n        \\\"W\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"gamma\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [\\n            1,\\n            5,\\n            20,\\n            25\\n          ],\\n          \\\"domain_statement\\\": \\\"The paper reports data for gamma values including 1, 5, 20, and 25.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 168,\\n              \\\"line_end\\\": 170,\\n              \\\"support\\\": \\\"Figure 2 caption mentions gamma=25; Figure S1 shows gamma=5; Figure S2 shows gamma=1 and gamma=20.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"W\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [\\n            0,\\n            1,\\n            2\\n          ],\\n          \\\"domain_statement\\\": \\\"The paper reports data for W=0,1,2.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 196,\\n              \\\"line_end\\\": 197,\\n              \\\"support\\\": \\\"Figure 3 caption mentions W values; Figure S3 shows W=0,1,2.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"g1\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"homogeneous_system\\\",\\n        \\\"no_bound_states_forward\\\",\\n        \\\"density_one\\\"\\n      ],\\n      \\\"applicability\\\": \\\"Valid for repulsive interactions (gamma>0) and cycle branches W>=1, as reported in Figures 2 and 3. The power-law behavior holds for finite interaction strength; in the TG limit it transitions to exponential decay.\\\",\\n      \\\"statistical_basis\\\": \\\"Fit to Monte Carlo data; error bars from five independent samplings.\\\",\\n      \\\"uncertainty\\\": \\\"Error bars obtained by comparing fits of five independent Monte Carlo samplings; omitted when negligible on plot scale.\\\",\\n      \\\"depends_on\\\": [\\n        \\\"ffs_occupancy_claim\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 206,\\n          \\\"line_end\\\": 207,\\n          \\\"support\\\": \\\"Fit with A cos(k_FO x+phi)/x^nu, with nu_SD and nu_LD, and crossover distance xbar.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"uncertainty_convention_unclear\\\",\\n      \\\"statement\\\": \\\"The paper reports error bars from comparing fits of five independent Monte Carlo samplings, but does not specify whether these are standard errors, confidence intervals, or another convention.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"g1_powerlaw_claim\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"g1_powerlaw_fit\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"gamma\\\",\\n        \\\"W\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"k_FO\\\",\\n        \\\"nu_SD\\\",\\n        \\\"nu_LD\\\",\\n        \\\"xbar\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"monte_carlo_parameters\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 197,\\n          \\\"line_end\\\": 197,\\n          \\\"support\\\": \\\"Error bars are obtained by comparing the fits of five independent Monte Carlo samplings.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"unsupported expression operator\",\"path\":\"$.claims[1].oracle_outputs.g1.args[0].args[1].op\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 4,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card.schema",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

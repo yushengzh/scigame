@@ -1,0 +1,728 @@
+from __future__ import annotations
+
+import argparse
+import contextlib
+import io
+import json
+import tempfile
+import unittest
+from collections import Counter
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
+
+from role_benchmark import (
+    BenchmarkTrack,
+    EVALUATOR_SCORE_AXES,
+    FinalSubmission,
+    GenerationResponse,
+    JSONLRunLog,
+    TerminationKind,
+    TokenUsage,
+)
+from role_benchmark.temporal_cases import TEMPORAL_CASE_FAMILIES
+
+from experiments.run_case_matrix import (
+    CASE_FAMILIES,
+    DEFAULT_SCHEDULE_SEED,
+    EPISODE_RESULT_SCHEMA,
+    EXPERIMENT_SCHEMA,
+    MATCHED_FAMILIES,
+    OPENAI_API_KEY_ENV,
+    OPENAI_ENDPOINT,
+    TOTAL_EPISODES,
+    CaseMatrixDeepSeekBackend,
+    _config_payload,
+    _evaluated_result,
+    _infrastructure_failed_result,
+    _make_case,
+    _resolve_api_key,
+    _resolve_api_keys,
+    _run_evaluator,
+    _runtime_profile,
+    build_plan,
+    load_backends,
+    main,
+    prepare_output,
+    run_matrix,
+    select_plan,
+    write_summaries,
+)
+from experiments.run_pendulum_matrix import DeepSeekChatBackend
+from experiments.openai_responses import OpenAIResponsesBackend
+
+
+def _args(output_dir):
+    return argparse.Namespace(
+        output_dir=str(output_dir),
+        case_pack="curated",
+        player_provider="deepseek",
+        player_endpoint="https://player.invalid/chat/completions",
+        player_model="deepseek-v4-flash",
+        player_thinking="disabled",
+        player_reasoning_effort=None,
+        player_timeout_s=1.0,
+        player_api_key=None,
+        player_api_key_stdin=False,
+        player_prompt_api_key=False,
+        player_api_key_env="PLAYER_API_KEY",
+        oracle_provider="deepseek",
+        oracle_endpoint="https://oracle.invalid/chat/completions",
+        oracle_model="deepseek-v4-flash",
+        oracle_thinking="disabled",
+        oracle_reasoning_effort=None,
+        oracle_timeout_s=2.0,
+        oracle_api_key=None,
+        oracle_api_key_stdin=False,
+        oracle_prompt_api_key=False,
+        oracle_api_key_env="ORACLE_API_KEY",
+        evaluator_provider="deepseek",
+        evaluator_endpoint="https://evaluator.invalid/chat/completions",
+        evaluator_model="deepseek-v4-flash",
+        evaluator_thinking="disabled",
+        evaluator_reasoning_effort=None,
+        evaluator_timeout_s=3.0,
+        evaluator_api_key=None,
+        evaluator_api_key_stdin=False,
+        evaluator_prompt_api_key=False,
+        evaluator_api_key_env="EVALUATOR_API_KEY",
+        family=None,
+        world=None,
+        track=None,
+        repeat=None,
+        schedule_seed=DEFAULT_SCHEDULE_SEED,
+        player_max_output_tokens=8192,
+        max_repair_attempts=1,
+        oracle_max_output_tokens=256,
+        evaluator_max_output_tokens=2048,
+        max_actions=16,
+        workers=1,
+        dry_run=False,
+    )
+
+
+def _runtime_keys():
+    return {
+        "player_api_key": "player-secret",
+        "oracle_api_key": "oracle-secret",
+        "evaluator_api_key": "evaluator-secret",
+    }
+
+
+def _fake_evaluator_payload(spec):
+    return {
+        "schema": "role_benchmark.case_matrix_llm_evaluation",
+        "episode_id": spec.episode_id,
+        "run_id": spec.episode_id,
+        "evaluator_profile": "evaluator",
+        "evaluator_provider": "test",
+        "evaluator_model": "judge-model",
+        "status": "evaluated",
+        "started_at": "2026-08-25T00:00:00Z",
+        "ended_at": "2026-08-25T00:00:01Z",
+        "elapsed_s": 1.0,
+        "request": {},
+        "response": {},
+        "evaluation": {
+            "scores": {axis: 0.5 for axis in EVALUATOR_SCORE_AXES},
+            "findings": [],
+            "summary": "Observable process rating.",
+        },
+        "llm_stats": {
+            "generation_calls": 1,
+            "input_tokens": 10,
+            "output_tokens": 5,
+        },
+        "error_type": None,
+        "error_message": None,
+    }
+
+
+def _fake_run(
+    spec,
+    *,
+    kind=TerminationKind.SUBMITTED,
+    success=True,
+):
+    submitted = kind == TerminationKind.SUBMITTED
+    code = {
+        TerminationKind.SUBMITTED: "submitted",
+        TerminationKind.PLAYER_OUTPUT_INVALID: "invalid_json",
+        TerminationKind.ACTION_REJECTED: "action_rejected",
+        TerminationKind.ACTION_LIMIT: "max_actions_reached",
+    }[kind]
+    final = (
+        FinalSubmission(
+            explanation="A fitted executable relationship.",
+            model="fitted_model",
+            parameters={"coefficient": 1.25},
+            scope_conditions=("within the declared controls",),
+        )
+        if submitted
+        else None
+    )
+    outcome = SimpleNamespace(
+        case_id="public.case",
+        termination=SimpleNamespace(kind=kind, code=code, message=code),
+        active_pass=submitted and success,
+        scientifically_evaluable=submitted,
+        protocol_completed=submitted,
+        evaluation=SimpleNamespace(
+            success=submitted and success,
+            message="passed" if submitted and success else "did not pass",
+            scores=(
+                {"predictive_model_pass": float(success)}
+                if submitted
+                else {"active_pass": 0.0}
+            ),
+        ),
+        attempts_used=2,
+        final_submission=final,
+        trajectory_scores={"experiment_discriminativeness_mean": 1.5},
+        protocol_violations=(),
+    )
+    return SimpleNamespace(
+        run_id=spec.episode_id,
+        outcome=outcome,
+        llm_stats=None,
+        oracle_llm_stats=None,
+    )
+
+
+def _evaluated_payload(spec, root, *, kind=TerminationKind.SUBMITTED, success=True):
+    return _evaluated_result(
+        spec=spec,
+        log_path=root / "episodes" / (spec.episode_id + ".jsonl"),
+        output_dir=root,
+        run=_fake_run(spec, kind=kind, success=success),
+        started_at="2026-08-25T00:00:00Z",
+        elapsed_s=1.0,
+    )
+
+
+class CaseMatrixExperimentTests(unittest.TestCase):
+    def test_temporal_pack_has_an_independent_complete_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = _args(root)
+            args.case_pack = "temporal"
+            args.repeat = [1]
+            args.dry_run = True
+            with contextlib.redirect_stdout(io.StringIO()):
+                results = run_matrix(args)
+
+            self.assertEqual(results, [])
+            config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["design"]["case_pack"], "temporal")
+            self.assertEqual(
+                config["design"]["case_families"],
+                list(TEMPORAL_CASE_FAMILIES),
+            )
+            cells_per_repeat = len(TEMPORAL_CASE_FAMILIES) * 4
+            total_episodes = cells_per_repeat * 5
+            self.assertEqual(
+                config["design"]["cells_per_repeat"], cells_per_repeat
+            )
+            self.assertEqual(config["design"]["total_episodes"], total_episodes)
+            self.assertEqual(
+                config["schedule"]["block_sizes"], [cells_per_repeat] * 5
+            )
+            self.assertEqual(
+                len(config["schedule"]["execution_order"]), total_episodes
+            )
+
+    def test_plan_has_exact_family_counts_and_repeat_blocks(self):
+        plan = build_plan()
+        self.assertEqual(len(plan), TOTAL_EPISODES)
+        self.assertEqual(len({spec.episode_id for spec in plan}), TOTAL_EPISODES)
+        self.assertEqual(
+            [spec.schedule_index for spec in plan],
+            list(range(1, TOTAL_EPISODES + 1)),
+        )
+        self.assertEqual(
+            [sum(spec.repeat == repeat for spec in plan) for repeat in range(1, 6)],
+            [80, 80, 80, 80, 80],
+        )
+
+        family_counts = Counter(spec.case_family for spec in plan)
+        for family in MATCHED_FAMILIES:
+            self.assertEqual(family_counts[family], 20)
+
+        matched_cells = {
+            (family, world, track)
+            for family in MATCHED_FAMILIES
+            for world in ("historical", "counterfactual")
+            for track in ("identification", "discovery")
+        }
+        for repeat in range(1, 6):
+            block = [spec for spec in plan if spec.repeat == repeat]
+            self.assertEqual({spec.cell for spec in block}, matched_cells)
+        self.assertTrue(
+            all(left.cell != right.cell for left, right in zip(plan, plan[1:]))
+        )
+
+    def test_schedule_is_seeded_and_selection_preserves_order(self):
+        first = build_plan(123)
+        same = build_plan(123)
+        different = build_plan(456)
+        self.assertEqual(
+            [spec.episode_id for spec in first],
+            [spec.episode_id for spec in same],
+        )
+        self.assertNotEqual(
+            [spec.episode_id for spec in first],
+            [spec.episode_id for spec in different],
+        )
+        self.assertEqual(
+            {spec.episode_id for spec in first},
+            {spec.episode_id for spec in different},
+        )
+        selected = select_plan(
+            first,
+            families=["young_double_slit"],
+            tracks=["discovery"],
+        )
+        self.assertEqual(
+            selected,
+            [
+                spec
+                for spec in first
+                if spec.case_family == "young_double_slit"
+                and spec.track == "discovery"
+            ],
+        )
+        self.assertEqual(len(select_plan(first, repeats=[1])), 80)
+        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 240)
+
+    def test_every_declared_cell_instantiates_through_the_generic_factory(self):
+        unique = {}
+        for spec in build_plan():
+            unique.setdefault(spec.cell, spec)
+        self.assertEqual(len(unique), 80)
+        for spec in unique.values():
+            with self.subTest(cell=spec.cell):
+                case = _make_case(spec)
+                self.assertIs(case.definition.track, BenchmarkTrack(spec.track))
+
+    def test_backend_instances_are_independent_and_reuse_shared_transport(self):
+        self.assertTrue(issubclass(CaseMatrixDeepSeekBackend, DeepSeekChatBackend))
+        with tempfile.TemporaryDirectory() as directory:
+            player, oracle, evaluator = load_backends(
+                _args(directory),
+                **_runtime_keys(),
+            )
+        self.assertIsInstance(player, CaseMatrixDeepSeekBackend)
+        self.assertIsInstance(oracle, CaseMatrixDeepSeekBackend)
+        self.assertIsInstance(evaluator, CaseMatrixDeepSeekBackend)
+        self.assertEqual(len({id(player), id(oracle), id(evaluator)}), 3)
+        self.assertEqual(player._api_key, "player-secret")
+        self.assertEqual(oracle._api_key, "oracle-secret")
+        self.assertEqual(evaluator._api_key, "evaluator-secret")
+        self.assertEqual(player._model, "deepseek-v4-flash")
+        self.assertEqual(oracle._model, "deepseek-v4-flash")
+        self.assertEqual(evaluator._model, "deepseek-v4-flash")
+        self.assertEqual(player._thinking, "disabled")
+        self.assertEqual(oracle._thinking, "disabled")
+        self.assertEqual(evaluator._thinking, "disabled")
+
+    def test_role_profiles_can_mix_providers_models_endpoints_and_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = _args(directory)
+            args.oracle_provider = "openai"
+            args.oracle_endpoint = None
+            args.oracle_model = "gpt-5.6"
+            args.oracle_thinking = None
+            args.oracle_reasoning_effort = "none"
+            args.oracle_api_key_env = None
+            args.evaluator_provider = "openai"
+            args.evaluator_endpoint = "https://judge.invalid/v1/responses"
+            args.evaluator_model = "gpt-5.6-evaluator"
+            args.evaluator_thinking = None
+            args.evaluator_reasoning_effort = "high"
+            runtime = _runtime_profile(args)
+            player, oracle, evaluator = load_backends(args, **_runtime_keys())
+
+        self.assertEqual(runtime.oracle.endpoint, OPENAI_ENDPOINT)
+        self.assertEqual(runtime.oracle.api_key_env, OPENAI_API_KEY_ENV)
+        self.assertEqual(runtime.player.model, "deepseek-v4-flash")
+        self.assertEqual(runtime.oracle.model, "gpt-5.6")
+        self.assertEqual(runtime.evaluator.model, "gpt-5.6-evaluator")
+        self.assertEqual(runtime.oracle.reasoning_effort, "none")
+        self.assertEqual(runtime.evaluator.reasoning_effort, "high")
+        self.assertIsInstance(player, CaseMatrixDeepSeekBackend)
+        self.assertIsInstance(oracle, OpenAIResponsesBackend)
+        self.assertIsInstance(evaluator, OpenAIResponsesBackend)
+        self.assertEqual(len({id(player), id(oracle), id(evaluator)}), 3)
+        self.assertEqual(player._model, "deepseek-v4-flash")
+        self.assertEqual(oracle._model, "gpt-5.6")
+        self.assertEqual(oracle._reasoning_effort, "none")
+        self.assertEqual(evaluator._model, "gpt-5.6-evaluator")
+        self.assertEqual(evaluator._reasoning_effort, "high")
+        self.assertEqual(player._api_key, "player-secret")
+        self.assertEqual(oracle._api_key, "oracle-secret")
+        self.assertEqual(evaluator._api_key, "evaluator-secret")
+
+    def test_openai_config_records_effective_transport_without_credential(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = _args(directory)
+            for role in ("player", "oracle", "evaluator"):
+                setattr(args, role + "_provider", "openai")
+                setattr(args, role + "_endpoint", None)
+                setattr(args, role + "_model", "gpt-5.6-" + role)
+                setattr(args, role + "_thinking", None)
+                setattr(args, role + "_reasoning_effort", "none")
+                setattr(args, role + "_api_key", role + "-runtime-secret")
+            config = _config_payload(args, build_plan(args.schedule_seed))
+
+        serialized = json.dumps(config)
+        for role in ("player", "oracle", "evaluator"):
+            self.assertNotIn(role + "-runtime-secret", serialized)
+            self.assertEqual(config["providers"][role]["api"], "responses")
+            self.assertEqual(
+                config["providers"][role]["response_format"],
+                "json_object_with_app_schema",
+            )
+            self.assertIs(config["providers"][role]["store"], False)
+            self.assertEqual(
+                config["design"][role + "_profile"]["model"],
+                "gpt-5.6-" + role,
+            )
+
+    def test_config_and_output_never_persist_a_credential(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = _args(root)
+            args.player_api_key = "player-secret-value"
+            args.oracle_api_key = "oracle-secret-value"
+            args.evaluator_api_key = "evaluator-secret-value"
+            config = _config_payload(args, build_plan(args.schedule_seed))
+            serialized = json.dumps(config)
+            for secret in (
+                args.player_api_key,
+                args.oracle_api_key,
+                args.evaluator_api_key,
+            ):
+                self.assertNotIn(secret, serialized)
+            self.assertNotIn("api_key", serialized.lower())
+            self.assertEqual(config["schedule"]["block_sizes"], [80] * 5)
+            self.assertEqual(len(config["schedule"]["execution_order"]), 400)
+            prepare_output(root, config)
+            stored = (root / "config.json").read_text(encoding="utf-8")
+            for secret in (
+                args.player_api_key,
+                args.oracle_api_key,
+                args.evaluator_api_key,
+            ):
+                self.assertNotIn(secret, stored)
+            self.assertNotIn("api_key", stored.lower())
+
+    def test_evaluated_sidecar_keeps_family_and_final_relationship(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "episodes").mkdir()
+            spec = build_plan()[0]
+            result = _evaluated_payload(spec, root)
+            self.assertEqual(result["schema"], EPISODE_RESULT_SCHEMA)
+            self.assertEqual(result["case_family"], spec.case_family)
+            self.assertEqual(result["case_id"], "public.case")
+            self.assertEqual(result["status"], "evaluated")
+            self.assertEqual(result["active_pass_category"], "pass")
+            self.assertEqual(result["final_submission"]["model"], "fitted_model")
+            self.assertEqual(
+                result["final_submission"]["parameters"],
+                {"coefficient": 1.25},
+            )
+
+            player_failure = _evaluated_payload(
+                spec,
+                root,
+                kind=TerminationKind.PLAYER_OUTPUT_INVALID,
+            )
+            self.assertEqual(player_failure["status"], "evaluated")
+            self.assertEqual(
+                player_failure["active_pass_category"],
+                "player_generation_failure",
+            )
+            self.assertIsNone(player_failure["final_submission"])
+
+    def test_repeat_one_dispatches_eighty_cells_and_player_failures_continue(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = _args(root)
+            args.repeat = [1]
+            observed = []
+
+            def fake_run_one(*unused_args, **kwargs):
+                spec = kwargs["spec"]
+                observed.append(spec.episode_id)
+                kind = (
+                    TerminationKind.PLAYER_OUTPUT_INVALID
+                    if len(observed) == 1
+                    else TerminationKind.SUBMITTED
+                )
+                return _evaluated_payload(spec, root, kind=kind)
+
+            with mock.patch(
+                "experiments.run_case_matrix._run_one_episode",
+                side_effect=fake_run_one,
+            ), mock.patch(
+                "experiments.run_case_matrix._run_evaluator",
+                side_effect=lambda *unused_args, **kwargs: _fake_evaluator_payload(
+                    kwargs["spec"]
+                ),
+            ), contextlib.redirect_stdout(io.StringIO()):
+                results = run_matrix(args, **_runtime_keys())
+
+            selected = select_plan(build_plan(), repeats=[1])
+            self.assertEqual(observed, [spec.episode_id for spec in selected])
+            self.assertEqual(len(observed), 80)
+            first = next(
+                result for result in results if result["episode_id"] == observed[0]
+            )
+            self.assertEqual(first["status"], "evaluated")
+            self.assertEqual(
+                first["active_pass_category"],
+                "player_generation_failure",
+            )
+
+    def test_nonprefix_selection_is_rejected_before_backend_loading(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = _args(directory)
+            args.repeat = [4]
+            with mock.patch("experiments.run_case_matrix.load_backends") as load:
+                with self.assertRaisesRegex(ValueError, "prefix"):
+                    run_matrix(args, **_runtime_keys())
+            load.assert_not_called()
+
+    def test_infrastructure_failure_is_retried_at_the_same_cell(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = _args(root)
+            args.repeat = [1]
+            first_spec = select_plan(build_plan(), repeats=[1])[0]
+
+            def fail(*unused_args, **kwargs):
+                kwargs["log_path"].write_text("failed\n", encoding="utf-8")
+                return _infrastructure_failed_result(
+                    spec=kwargs["spec"],
+                    log_path=kwargs["log_path"],
+                    output_dir=root,
+                    exc=RuntimeError("provider unavailable"),
+                    started_at="2026-08-25T00:00:00Z",
+                    elapsed_s=1.0,
+                )
+
+            with mock.patch(
+                "experiments.run_case_matrix._run_one_episode", side_effect=fail
+            ), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(RuntimeError, "infrastructure failure"):
+                    run_matrix(args, **_runtime_keys())
+
+            resumed = []
+
+            def succeed(*unused_args, **kwargs):
+                resumed.append((kwargs["spec"].episode_id, kwargs["log_path"].name))
+                return _evaluated_payload(kwargs["spec"], root)
+
+            with mock.patch(
+                "experiments.run_case_matrix._run_one_episode",
+                side_effect=succeed,
+            ), mock.patch(
+                "experiments.run_case_matrix._run_evaluator",
+                side_effect=lambda *unused_args, **kwargs: _fake_evaluator_payload(
+                    kwargs["spec"]
+                ),
+            ), contextlib.redirect_stdout(io.StringIO()):
+                run_matrix(args, **_runtime_keys())
+
+            self.assertEqual(resumed[0][0], first_spec.episode_id)
+            self.assertEqual(
+                resumed[0][1], first_spec.episode_id + ".resume-1.jsonl"
+            )
+            stored = json.loads(
+                (
+                    root
+                    / "results"
+                    / (first_spec.episode_id + ".result.json")
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(stored["status"], "evaluated")
+
+    def test_evaluator_failure_retries_only_evaluator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = _args(root)
+            first_spec = build_plan()[0]
+            active_calls = []
+
+            def active(*unused_args, **kwargs):
+                active_calls.append(kwargs["spec"].episode_id)
+                return _evaluated_payload(kwargs["spec"], root)
+
+            failed_evaluator = _fake_evaluator_payload(first_spec)
+            failed_evaluator.update(
+                {
+                    "status": "infrastructure_failed",
+                    "evaluation": None,
+                    "llm_stats": None,
+                    "error_type": "RuntimeError",
+                    "error_message": "post-hoc evaluator call or decoding failed",
+                }
+            )
+            with mock.patch(
+                "experiments.run_case_matrix.select_plan",
+                return_value=[first_spec],
+            ), mock.patch(
+                "experiments.run_case_matrix._run_one_episode", side_effect=active
+            ), mock.patch(
+                "experiments.run_case_matrix._run_evaluator",
+                return_value=failed_evaluator,
+            ), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(RuntimeError, "evaluator failure"):
+                    run_matrix(args, **_runtime_keys())
+
+            stored_active = json.loads(
+                (root / "results" / (first_spec.episode_id + ".result.json")).read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(stored_active["status"], "evaluated")
+            self.assertEqual(active_calls, [first_spec.episode_id])
+
+            player_loader = mock.Mock(
+                side_effect=AssertionError("Player backend must not be loaded")
+            )
+            oracle_loader = mock.Mock(
+                side_effect=AssertionError("Oracle backend must not be loaded")
+            )
+            evaluator_loader = mock.Mock(
+                return_value=SimpleNamespace(generate=mock.Mock())
+            )
+            with mock.patch(
+                "experiments.run_case_matrix.select_plan",
+                return_value=[first_spec],
+            ), mock.patch(
+                "experiments.run_case_matrix._run_one_episode"
+            ) as rerun_active, mock.patch(
+                "experiments.run_case_matrix._run_evaluator",
+                return_value=_fake_evaluator_payload(first_spec),
+            ), mock.patch(
+                "experiments.run_case_matrix._resolve_api_key"
+            ) as resolve_key, contextlib.redirect_stdout(io.StringIO()):
+                results = run_matrix(
+                    args,
+                    player_backend_loader=player_loader,
+                    oracle_backend_loader=oracle_loader,
+                    evaluator_backend_loader=evaluator_loader,
+                )
+
+            rerun_active.assert_not_called()
+            player_loader.assert_not_called()
+            oracle_loader.assert_not_called()
+            evaluator_loader.assert_called_once_with()
+            resolve_key.assert_not_called()
+            self.assertEqual(results[0]["status"], "evaluated")
+            self.assertEqual(results[0]["llm_evaluation_status"], "evaluated")
+            self.assertEqual(results[0]["scores"]["predictive_model_pass"], 1.0)
+            self.assertNotIn("predictive_model_pass", results[0]["llm_evaluation"]["scores"])
+
+    def test_invalid_evaluator_output_is_preserved_for_replay(self):
+        class InvalidEvaluatorBackend:
+            def generate(self, request):
+                return GenerationResponse(
+                    text="not-json",
+                    provider="test",
+                    model="judge-model",
+                    usage=TokenUsage(input_tokens=7, output_tokens=2),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "episodes").mkdir()
+            spec = build_plan()[0]
+            log_path = root / "episodes" / (spec.episode_id + ".jsonl")
+            with JSONLRunLog(str(log_path), run_id=spec.episode_id) as writer:
+                writer.append("run.started", {"case": {"case_id": "public.case"}})
+                writer.append("run.ended", {"status": "evaluated"})
+            result = _run_evaluator(
+                _args(root),
+                evaluator_backend=InvalidEvaluatorBackend(),
+                output_dir=root,
+                spec=spec,
+                episode_result={
+                    "run_id": spec.episode_id,
+                    "log_path": str(log_path.relative_to(root)),
+                },
+            )
+
+        self.assertEqual(result["status"], "infrastructure_failed")
+        self.assertEqual(result["error_type"], "LLMEvaluatorOutputError")
+        self.assertIsNotNone(result["request"])
+        self.assertEqual(result["response"]["text"], "not-json")
+        self.assertEqual(result["llm_stats"]["input_tokens"], 7)
+        self.assertEqual(result["llm_stats"]["output_tokens"], 2)
+
+    def test_summaries_include_family_and_final_parameters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = _args(root)
+            prepare_output(root, _config_payload(args, build_plan()))
+            spec = build_plan()[0]
+            payload = _evaluated_payload(spec, root)
+            result_path = root / "results" / (spec.episode_id + ".result.json")
+            result_path.write_text(json.dumps(payload), encoding="utf-8")
+            results = write_summaries(root)
+            self.assertEqual(len(results), 1)
+            summary = json.loads((root / "episodes.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["schema"], EXPERIMENT_SCHEMA)
+            csv_text = (root / "episodes.csv").read_text(encoding="utf-8")
+            self.assertIn("case_family", csv_text)
+            self.assertIn("final_parameters_json", csv_text)
+            self.assertIn("coefficient", csv_text)
+
+    def test_all_runtime_credential_modes_are_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = _args(directory)
+            args.player_api_key = "direct-player"
+            args.oracle_api_key_stdin = True
+            args.evaluator_prompt_api_key = True
+            with mock.patch("sys.stdin", io.StringIO("stdin-oracle\n")), mock.patch(
+                "getpass.getpass", return_value="prompt-evaluator"
+            ):
+                keys = _resolve_api_keys(args)
+            self.assertEqual(
+                keys,
+                {
+                    "player": "direct-player",
+                    "oracle": "stdin-oracle",
+                    "evaluator": "prompt-evaluator",
+                },
+            )
+
+            for role in ("player", "oracle", "evaluator"):
+                setattr(args, role + "_provider", "openai")
+                setattr(args, role + "_thinking", None)
+                setattr(args, role + "_reasoning_effort", "none")
+                setattr(args, role + "_api_key", None)
+                setattr(args, role + "_api_key_stdin", False)
+                setattr(args, role + "_prompt_api_key", False)
+                setattr(args, role + "_api_key_env", None)
+            with mock.patch.dict(
+                "os.environ", {OPENAI_API_KEY_ENV: "shared-openai-env"}
+            ):
+                self.assertEqual(
+                    _resolve_api_key(args, "evaluator"), "shared-openai-env"
+                )
+
+    def test_dry_run_does_not_resolve_a_credential(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch(
+                "experiments.run_case_matrix._resolve_api_key"
+            ) as resolve, contextlib.redirect_stdout(io.StringIO()):
+                status = main(["--output-dir", directory, "--dry-run"])
+            self.assertEqual(status, 0)
+            resolve.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

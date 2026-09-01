@@ -1,0 +1,133 @@
+{
+  "assessment": "The paper presents several quantitative claims. The most clearly abstractable is the parametric resonance frequency scaling in the 3D lattice, given by ν = A√(P/Δ) with A = 34.2 kHz (GHz/mW)^{1/2}, supported by Fig. 3b. This is a closed-form relation with two controllable inputs (power P and detuning Δ) and one output (resonance frequency ν). Other claims, such as lattice lifetimes (54 ms and 220 ms) and trap frequencies (ν_z = 100 kHz, ν_r = 46 kHz for 3D; ν_z = 290 kHz, ν_r = 0.9 kHz for 1D), are also quantitative but are either single-point measurements or not expressed as a functional relationship with controllable inputs. The lifetime data could be modeled as exponential decay, but the paper does not provide a closed-form expression for lifetime as a function of controllable parameters. The trap frequencies are given for specific conditions but not as a general formula. Therefore, only the resonance scaling relation is abstractable under this contract.",
+  "candidates": [
+    {
+      "apparatus": {
+        "description": "A single-beam grating-chip setup that creates a 3D optical lattice for ultracold 87Rb atoms. The lattice is formed by a circularly polarized 780 nm laser beam incident on a binary grating with three sectors. The beam power and detuning are controllable via an AOM and laser current, respectively. Parametric resonance is induced by modulating the lattice beam power.",
+        "name": "Grating-chip 3D optical lattice"
+      },
+      "background": "In a 3D optical lattice formed by a single beam on a grating chip, atoms are trapped in a periodic potential. By modulating the lattice depth at a frequency equal to twice the trap frequency, parametric resonance occurs, leading to heating and atom loss. The primary resonance frequency is expected to scale with the square root of the lattice depth, which in turn scales with power over detuning.",
+      "budget": 10,
+      "claim": "The primary parametric resonance frequency ν in the 3D optical lattice scales as ν = A√(P/Δ) with A = 34.2 kHz (GHz/mW)^{1/2}, where P is the lattice beam power and Δ is the red detuning from the Rb D2 line.",
+      "confidence_threshold": 0.95,
+      "controls": [
+        {
+          "description": "Lattice beam power",
+          "maximum": 1000.0,
+          "minimum": 100.0,
+          "name": "P",
+          "unit": "mW"
+        },
+        {
+          "description": "Red detuning from Rb D2 line (absolute value)",
+          "maximum": 100.0,
+          "minimum": 20.0,
+          "name": "Delta",
+          "unit": "GHz"
+        }
+      ],
+      "counterfactual_change": "Increase the proportionality constant A from 34.2 to 40.0 kHz (GHz/mW)^{1/2}, representing a hypothetical stronger dependence of trap frequency on power and detuning.",
+      "diagnostic_conditions": [
+        {
+          "Delta": 30.0,
+          "P": 200.0
+        },
+        {
+          "Delta": 50.0,
+          "P": 400.0
+        },
+        {
+          "Delta": 78.0,
+          "P": 650.0
+        },
+        {
+          "Delta": 90.0,
+          "P": 800.0
+        },
+        {
+          "Delta": 100.0,
+          "P": 1000.0
+        }
+      ],
+      "family": "Optical lattice parametric resonance",
+      "hidden_conditions": [
+        {
+          "Delta": 40.0,
+          "P": 300.0
+        },
+        {
+          "Delta": 60.0,
+          "P": 500.0
+        },
+        {
+          "Delta": 85.0,
+          "P": 700.0
+        }
+      ],
+      "initial_observations": [
+        "The primary resonance frequency is observed at around 100 kHz for P=650 mW and Δ=-78 GHz.",
+        "The resonance frequency increases with increasing P/Δ.",
+        "The data for different P and Δ collapse onto a single curve when plotted against P/Δ."
+      ],
+      "max_replicates": 3,
+      "notes": [
+        "The paper reports A=34.2 kHz (GHz/mW)^{1/2} from a fit to experimental data.",
+        "The relation is valid for the range of P and Δ tested in the paper (P from ~100 to 1000 mW, Δ from 30 to 78 GHz).",
+        "The counterfactual changes the proportionality constant A to 40.0, representing a hypothetical different lattice geometry or atomic species."
+      ],
+      "oracle": {
+        "counterfactual_parameters": {
+          "A": 40.0
+        },
+        "kind": "closed_form",
+        "outputs": {
+          "nu": {
+            "args": [
+              {
+                "param": "A"
+              },
+              {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "var": "P"
+                      },
+                      {
+                        "var": "Delta"
+                      }
+                    ],
+                    "op": "divide"
+                  },
+                  0.5
+                ],
+                "op": "power"
+              }
+            ],
+            "op": "multiply"
+          }
+        },
+        "paper_parameters": {
+          "A": 34.2
+        }
+      },
+      "readouts": [
+        {
+          "description": "Primary parametric resonance frequency",
+          "name": "nu",
+          "resolution": 1.0,
+          "unit": "kHz"
+        }
+      ],
+      "relative_tolerance": 0.1,
+      "source": {
+        "arxiv_versioned_id": "2405.21065v2",
+        "citation": "Alan Bregazzi et al., Single-Beam Grating-Chip 3D and 1D Optical Lattices, Physical Review Letters (2025), DOI:10.1103/physrevlett.134.013001",
+        "journal_doi": "10.1103/physrevlett.134.013001",
+        "locator": "Fig. 3b and accompanying text",
+        "role": "Experimental fit"
+      },
+      "title": "3D lattice primary resonance frequency scaling with power and detuning"
+    }
+  ]
+}

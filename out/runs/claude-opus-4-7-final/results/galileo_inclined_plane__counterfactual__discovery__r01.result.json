@@ -1,0 +1,188 @@
+{
+  "active_pass": true,
+  "active_pass_category": "pass",
+  "attempts_used": 5,
+  "case_family": "galileo_inclined_plane",
+  "case_id": "inclined_plane.descent.world_b",
+  "elapsed_s": 91.323,
+  "ended_at": "2026-08-26T11:29:34Z",
+  "episode_id": "galileo_inclined_plane__counterfactual__discovery__r01",
+  "error_message": null,
+  "error_type": null,
+  "evaluation_message": "The submitted predictor passed the held-out interventions.",
+  "evaluation_success": true,
+  "failure_analysis": {
+    "coverage": {
+      "controlled_contrasts": 0,
+      "forecast_update_turns": 0,
+      "hypothesis_rewrite_pairs_excluded": 0,
+      "natural_language_judge_used": false,
+      "observed_prediction_points": 0
+    },
+    "first_observed_misstep": null,
+    "incidents": [
+      {
+        "action_index": 1,
+        "code": "model_invariant",
+        "event_refs": [
+          {
+            "event_sequence": 3,
+            "event_type": "action.parse_failed",
+            "json_path": "$.payload.wire_error"
+          },
+          {
+            "event_sequence": 7,
+            "event_type": "action.decoded",
+            "json_path": "$.payload.action"
+          }
+        ],
+        "message": "forecast galilean_sqrt must contain exactly every requested readout",
+        "stage": "action_generation",
+        "status": "recovered"
+      },
+      {
+        "action_index": 2,
+        "code": "missing_field",
+        "event_refs": [
+          {
+            "event_sequence": 11,
+            "event_type": "action.parse_failed",
+            "json_path": "$.payload.wire_error"
+          },
+          {
+            "event_sequence": 15,
+            "event_type": "action.decoded",
+            "json_path": "$.payload.action"
+          }
+        ],
+        "message": "missing field(s): final",
+        "stage": "action_generation",
+        "status": "recovered"
+      },
+      {
+        "action_index": 5,
+        "code": "invalid_json",
+        "event_refs": [
+          {
+            "event_sequence": 29,
+            "event_type": "action.parse_failed",
+            "json_path": "$.payload.wire_error"
+          },
+          {
+            "event_sequence": 33,
+            "event_type": "action.decoded",
+            "json_path": "$.payload.action"
+          }
+        ],
+        "message": "Expecting value: line 1 column 1 (char 0)",
+        "stage": "action_generation",
+        "status": "recovered"
+      }
+    ],
+    "modes": [],
+    "schema": "role_benchmark.failure_analysis",
+    "status": "passed_no_failure",
+    "terminal_failure": null
+  },
+  "final_submission": {
+    "confidence": 0.9,
+    "explanation": "Data: (d=1,a=5)=24.0; (d=4,a=5)=63.3 gives d exponent log(63.3/24)/log4=0.699. (d=0.25,a=5)=9.1 matches d^0.70 (9.06). (d=1,a=10)=17.0; ratio 17/24=0.7083 vs sin(10)/sin(5)^-0.5=(sin5/sin10)^0.5=0.7075. Mass test (d=1,a=2,m=0.5)=37.9 matches k*sin(2)^-0.5=7.087/0.1869^0.5=16.4... let me recompute: k=24*sin(5deg)^0.5=24*0.2954=7.089. At a=2: 7.089/sin(2deg)^0.5=7.089/0.1869^0.5=7.089/0.4324=16.4. Hmm that doesn't match 37.9. Wait: 7.089*sin(2deg)^(-0.5)=7.089/0.4324=16.4 at d=1. But measured 37.9 at m=0.5. This suggests mass matters OR different angle form. Check angle_rad: 7.089/(2*pi/180)^0.5=7.089/0.1869=37.94. Yes! Angle is in radians with exponent -0.5. So water_g = k * d^0.7 * angle_rad^(-0.5). Verify: at a=5deg=0.0873rad, 1/sqrt=3.386, k*3.386=24 → k=7.089. At a=10deg=0.1745rad, k/sqrt(0.1745)=7.089/0.4177=16.97≈17.0 ✓. Mass independent.",
+    "hypothesis_id": "d07_sin05",
+    "model": "expression",
+    "parameters": {
+      "outputs": {
+        "collected_water_g": {
+          "args": [
+            7.089,
+            {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "var": "distance_m"
+                    },
+                    0.7
+                  ],
+                  "op": "power"
+                },
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "var": "incline_angle_deg"
+                        },
+                        0.017453292519943295
+                      ],
+                      "op": "multiply"
+                    },
+                    -0.5
+                  ],
+                  "op": "power"
+                }
+              ],
+              "op": "multiply"
+            }
+          ],
+          "op": "multiply"
+        }
+      }
+    },
+    "scope_conditions": [
+      "distance_m in [0.25,4]",
+      "incline_angle_deg in [2,10]",
+      "ball_mass_kg in [0.05,0.5]",
+      "rolls without slipping, released from rest"
+    ]
+  },
+  "log_path": "episodes/galileo_inclined_plane__counterfactual__discovery__r01.jsonl",
+  "oracle_llm_stats": null,
+  "oracle_model": "case_world_model",
+  "oracle_profile": "oracle_case_world_model",
+  "player_llm_stats": {
+    "decoded_actions": 6,
+    "first_pass_valid_actions": 3,
+    "input_tokens": 43763,
+    "output_tokens": 8029,
+    "player_turns": 6,
+    "primary_calls": 6,
+    "repair_calls": 3
+  },
+  "player_model": "claude-opus-4-7",
+  "player_profile": "player_1",
+  "protocol_completion": true,
+  "provider": "openai_chat",
+  "reason_code": "submitted",
+  "reasoning_effort": null,
+  "repeat": 1,
+  "run_id": "galileo_inclined_plane__counterfactual__discovery__r01",
+  "schedule_index": 63,
+  "schema": "role_benchmark.case_matrix_episode",
+  "scientifically_evaluable": true,
+  "scores": {
+    "collected_water_g_max_scaled_error": 0.02812511941465471,
+    "confidence_threshold_reached": 1.0,
+    "hidden_test_max_scaled_error": 0.02812511941465471,
+    "hidden_test_mean_scaled_error": 0.011196974073319332,
+    "predictive_model_pass": 1.0
+  },
+  "started_at": "2026-08-26T11:28:03Z",
+  "status": "evaluated",
+  "termination_kind": "submitted",
+  "termination_message": "Player committed a protocol-valid final submission.",
+  "thinking": null,
+  "track": "discovery",
+  "trajectory_scores": {
+    "belief_update_aligned_pair_count": 0.0,
+    "belief_update_inert_pair_count": 0.0,
+    "belief_update_opposed_pair_count": 0.0,
+    "duplicate_setup_count": 0.0,
+    "evidence_aligned_belief_update_rate": 0.0,
+    "experiment_discriminativeness_mean": 0.1756936921125857,
+    "forecast_pair_count": 61.0,
+    "hypothesis_rewrite_excluded_pair_count": 16.0,
+    "scorable_belief_pair_count": 0.0,
+    "unsupported_confidence_shift_pair_count": 0.0
+  },
+  "world": "counterfactual"
+}

@@ -1,0 +1,796 @@
+{
+  "assessment": "Independent review confirms the submitted numerical core but cannot close the exact family applicability contract. Frozen-source lines 248-262 derive p_n^*=(exp(n*kappa)-1)/(exp(n*kappa)-exp(-n*gamma)) and the ordering p_{n+1}^*>p_n^*. The submitted ASTs reproduce the n=1 and n=2 specializations exactly: independent evaluation on a 201 by 201 grid (40,401 points per branch) over [0.02,0.42]^2 had zero floating-point discrepancy, finite probabilities in [0.055627395233796104,0.9710746454855945], the stated increasing-kappa/decreasing-gamma directions, and exact agreement for every diagnostic and hidden prediction. Known-truth submissions pass all four cells, public runtime payloads are branch-neutral after opaque-ID normalization, and Oracle calls are deterministic. However, the source does not state this equation for an unconstrained generic quantum-control apparatus or arbitrary quantum-chaotic system. Lines 130-158 define the inverted-harmonic-oscillator squeezing channel S_kappa, measurement-and-feedback attenuation channel C_gamma, and their stochastic mixture T; lines 247-260 derive the eigenoperator threshold specifically for that exact channel. The candidate has no common fixed condition naming this source-defined model/channel, its public apparatus and background are generic, and both Oracle applicability clauses state only kappa,gamma,n>0. That omission makes the exact submitted claim/applicability broader than the frozen source and therefore prevents source closure despite correct arithmetic.",
+  "decision": "source_closure_rejected",
+  "family": "quantum_control_threshold",
+  "issues": [
+    {
+      "code": "family.applicability_context_omitted",
+      "detail": "The source-defined IHO stochastic quantum channel is a necessary applicability condition for p_n^*. Add a branch-neutral common fixed condition stating that operators evolve under T=(1-p)S_kappa+p C_gamma, where S_kappa is the IHO squeezing channel and C_gamma is the measurement-and-feedback attenuation channel; bind it to the public apparatus/background and both Oracle applicability branches. Do not present the exact threshold as a theorem for a generic quantum-control apparatus or arbitrary quantum chaos. Then regenerate the immutable family review material.",
+      "line_ranges": [
+        {
+          "line_end": 158,
+          "line_start": 130
+        },
+        {
+          "line_end": 260,
+          "line_start": 247
+        }
+      ]
+    }
+  ],
+  "paper_id": "paper_2506_10067v2",
+  "review_material": {
+    "candidate": {
+      "apparatus": {
+        "description": "The apparatus exposes an adjustable control and a measurable response. Determine their relationship experimentally.",
+        "name": "quantum_control_apparatus"
+      },
+      "background": "Use controlled measurements to characterize the observed phenomenon.",
+      "budget": 20,
+      "claim": "The critical control probability for order-n operators depends on the control strengths kappa and gamma through an exact formula.",
+      "common_fixed_conditions": [],
+      "confidence_threshold": 0.95,
+      "controls": [
+        {
+          "allowed_values": [],
+          "description": "Strength of the chaotic channel.",
+          "maximum": 0.42,
+          "minimum": 0.02,
+          "name": "kappa",
+          "unit": "dimensionless"
+        },
+        {
+          "allowed_values": [],
+          "description": "Strength of the control channel.",
+          "maximum": 0.42,
+          "minimum": 0.02,
+          "name": "gamma",
+          "unit": "dimensionless"
+        }
+      ],
+      "counterfactual_change": "The operator order n is changed from 1 to 2.",
+      "diagnostic_conditions": [
+        {
+          "gamma": 0.1,
+          "kappa": 0.1
+        },
+        {
+          "gamma": 0.2,
+          "kappa": 0.3
+        }
+      ],
+      "family": "quantum_control_threshold",
+      "hidden_conditions": [
+        {
+          "gamma": 0.05,
+          "kappa": 0.05
+        },
+        {
+          "gamma": 0.4,
+          "kappa": 0.4
+        }
+      ],
+      "initial_observations": [
+        "The system exhibits a measurable critical control probability.",
+        "A measurable response is present under the stated conditions."
+      ],
+      "max_replicates": 1,
+      "notes": [
+        "The readout is a dimensionless probability.",
+        "The controls are dimensionless strengths."
+      ],
+      "oracle": {
+        "counterfactual_applicability": [
+          "Valid for all kappa, gamma > 0 and n>0; here n=2."
+        ],
+        "counterfactual_fixed_conditions": [
+          {
+            "condition_id": "n_order_two",
+            "statement": "Operator order n = 2 for the second claim."
+          }
+        ],
+        "counterfactual_parameters": {
+          "n_order": 1.0,
+          "n_order_one": 1.0,
+          "n_order_two": 2.0,
+          "pstar_numerator_offset": 1.0
+        },
+        "kind": "closed_form",
+        "outputs": {
+          "p_n_star": {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [
+                      1.0,
+                      {
+                        "param": "n_order"
+                      }
+                    ],
+                    "op": "subtract"
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "param": "n_order_one"
+                                  },
+                                  {
+                                    "var": "kappa"
+                                  }
+                                ],
+                                "op": "multiply"
+                              }
+                            ],
+                            "op": "exp"
+                          },
+                          {
+                            "param": "pstar_numerator_offset"
+                          }
+                        ],
+                        "op": "subtract"
+                      },
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "param": "n_order_one"
+                                  },
+                                  {
+                                    "var": "kappa"
+                                  }
+                                ],
+                                "op": "multiply"
+                              }
+                            ],
+                            "op": "exp"
+                          },
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "args": [
+                                      {
+                                        "param": "n_order_one"
+                                      },
+                                      {
+                                        "var": "gamma"
+                                      }
+                                    ],
+                                    "op": "multiply"
+                                  }
+                                ],
+                                "op": "negate"
+                              }
+                            ],
+                            "op": "exp"
+                          }
+                        ],
+                        "op": "subtract"
+                      }
+                    ],
+                    "op": "divide"
+                  }
+                ],
+                "op": "multiply"
+              },
+              {
+                "args": [
+                  {
+                    "param": "n_order"
+                  },
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "param": "n_order_two"
+                                  },
+                                  {
+                                    "var": "kappa"
+                                  }
+                                ],
+                                "op": "multiply"
+                              }
+                            ],
+                            "op": "exp"
+                          },
+                          {
+                            "param": "pstar_numerator_offset"
+                          }
+                        ],
+                        "op": "subtract"
+                      },
+                      {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "param": "n_order_two"
+                                  },
+                                  {
+                                    "var": "kappa"
+                                  }
+                                ],
+                                "op": "multiply"
+                              }
+                            ],
+                            "op": "exp"
+                          },
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "args": [
+                                      {
+                                        "param": "n_order_two"
+                                      },
+                                      {
+                                        "var": "gamma"
+                                      }
+                                    ],
+                                    "op": "multiply"
+                                  }
+                                ],
+                                "op": "negate"
+                              }
+                            ],
+                            "op": "exp"
+                          }
+                        ],
+                        "op": "subtract"
+                      }
+                    ],
+                    "op": "divide"
+                  }
+                ],
+                "op": "multiply"
+              }
+            ],
+            "op": "add"
+          }
+        },
+        "paper_applicability": [
+          "Valid for all kappa, gamma > 0 and n>0; here n=1."
+        ],
+        "paper_fixed_conditions": [
+          {
+            "condition_id": "n_order_one",
+            "statement": "Operator order n = 1 for the first claim."
+          }
+        ],
+        "paper_parameters": {
+          "n_order": 0.0,
+          "n_order_one": 1.0,
+          "n_order_two": 2.0,
+          "pstar_numerator_offset": 1.0
+        }
+      },
+      "readouts": [
+        {
+          "description": "Critical control probability for order-n operators.",
+          "name": "p_n_star",
+          "resolution": null,
+          "resolution_kind": null,
+          "statistic": "Deterministic central value of the source-reported quantitative relation.",
+          "uncertainty": "Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.",
+          "unit": "dimensionless"
+        }
+      ],
+      "relative_tolerance": 0.01,
+      "source": {
+        "arxiv_versioned_id": "2506.10067v2",
+        "citation": "Andrew A. Allocca, Universality of Stochastic Control of Quantum Chaos with Measurement and Feedback, Physical Review Letters (2026), DOI:10.1103/xgfv-p42g",
+        "journal_doi": "10.1103/xgfv-p42g",
+        "locator": "Eq. (pstar), lines 258-260",
+        "role": "source"
+      },
+      "title": "Critical Control Probability in Quantum Chaos"
+    },
+    "counterfactual_derivation": {
+      "counterfactual_claim_ids": [
+        "pstar_n2"
+      ],
+      "counterfactual_value": 1.0,
+      "description": "The two worlds correspond to two reported operator orders n=1 and n=2 in the same exact formula.",
+      "historical_value": 0.0,
+      "kind": "reported_regime_selection",
+      "paper_claim_ids": [
+        "pstar_n1"
+      ],
+      "paper_defined_equations_unchanged": true,
+      "selector_parameter": "n_order",
+      "source_claim_ids": [
+        "pstar_n1",
+        "pstar_n2"
+      ],
+      "source_mechanism_ids": [
+        "exact_quantum_control_threshold"
+      ]
+    },
+    "design_summary": "Two worlds differ in the operator order n (1 vs 2) in the exact quantum control threshold formula. The public controls kappa and gamma are varied over a common interval, and the readout p_n_star is the critical control probability. The worlds are distinguished by the private n parameter, which is not exposed to the player.",
+    "identification_contract": {
+      "counterfactual_values": {
+        "p_n_star_offset": 1.0,
+        "p_n_star_scale": 2.0
+      },
+      "formula": "Expression template: {\"outputs\":{\"p_n_star\":{\"args\":[{\"args\":[{\"args\":[{\"args\":[{\"param\":\"p_n_star_scale\"},{\"var\":\"kappa\"}],\"op\":\"multiply\"}],\"op\":\"exp\"},{\"param\":\"p_n_star_offset\"}],\"op\":\"subtract\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"p_n_star_scale\"},{\"var\":\"kappa\"}],\"op\":\"multiply\"}],\"op\":\"exp\"},{\"args\":[{\"args\":[{\"args\":[{\"param\":\"p_n_star_scale\"},{\"var\":\"gamma\"}],\"op\":\"multiply\"}],\"op\":\"negate\"}],\"op\":\"exp\"}],\"op\":\"subtract\"}],\"op\":\"divide\"}}}",
+      "historical_values": {
+        "p_n_star_offset": 1.0,
+        "p_n_star_scale": 1.0
+      },
+      "model": "case_specific_closed_form",
+      "parameters": [
+        "p_n_star_scale",
+        "p_n_star_offset"
+      ]
+    },
+    "information_boundary": {
+      "identification_only": {
+        "claim_ids": [
+          "pstar_n1",
+          "pstar_n2"
+        ],
+        "fixed_condition_ids": [],
+        "items": [
+          "The readout is the critical control probability for order-n operators, defined by a formula involving the control strengths.",
+          "The formula applies for all positive operator orders and positive control strengths."
+        ],
+        "line_ranges": [
+          {
+            "line_end": 74,
+            "line_start": 74
+          },
+          {
+            "line_end": 260,
+            "line_start": 258
+          },
+          {
+            "line_end": 259,
+            "line_start": 259
+          },
+          {
+            "line_end": 262,
+            "line_start": 262
+          }
+        ],
+        "mechanism_ids": [
+          "exact_quantum_control_threshold"
+        ]
+      },
+      "oracle_only": {
+        "claim_ids": [
+          "pstar_n1",
+          "pstar_n2"
+        ],
+        "fixed_condition_ids": [],
+        "items": [
+          "The exact formula for the critical control probability is p_n_star = (exp(n*kappa) - 1) / (exp(n*kappa) - exp(-n*gamma)).",
+          "For n=1, the formula is p_1_star = (exp(kappa) - 1) / (exp(kappa) - exp(-gamma)).",
+          "For n=2, the formula is p_2_star = (exp(2*kappa) - 1) / (exp(2*kappa) - exp(-2*gamma)).",
+          "The sequence p_{n+1}^* > p_n^* holds for all n>0."
+        ],
+        "line_ranges": [
+          {
+            "line_end": 74,
+            "line_start": 74
+          },
+          {
+            "line_end": 260,
+            "line_start": 258
+          },
+          {
+            "line_end": 259,
+            "line_start": 259
+          },
+          {
+            "line_end": 262,
+            "line_start": 262
+          }
+        ],
+        "mechanism_ids": [
+          "exact_quantum_control_threshold"
+        ]
+      },
+      "shared_player": [
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "title",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "background",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "apparatus",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "control.kappa",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "control.gamma",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "readout.p_n_star",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "initial_observation.0",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "initial_observation.1",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "note.0",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        },
+        {
+          "claim_ids": [
+            "pstar_n1",
+            "pstar_n2"
+          ],
+          "field": "note.1",
+          "fixed_condition_ids": [],
+          "line_ranges": [
+            {
+              "line_end": 74,
+              "line_start": 74
+            },
+            {
+              "line_end": 260,
+              "line_start": 258
+            },
+            {
+              "line_end": 259,
+              "line_start": 259
+            },
+            {
+              "line_end": 262,
+              "line_start": 262
+            }
+          ],
+          "mechanism_ids": [
+            "exact_quantum_control_threshold"
+          ]
+        }
+      ]
+    },
+    "predictions": [
+      {
+        "alternate": {
+          "p_n_star": 0.5498339973124778
+        },
+        "controls": {
+          "gamma": 0.1,
+          "kappa": 0.1
+        },
+        "group": "diagnostic",
+        "index": 0,
+        "paper": {
+          "p_n_star": 0.52497918747894
+        }
+      },
+      {
+        "alternate": {
+          "p_n_star": 0.7137694821097313
+        },
+        "controls": {
+          "gamma": 0.2,
+          "kappa": 0.3
+        },
+        "group": "diagnostic",
+        "index": 1,
+        "paper": {
+          "p_n_star": 0.6587089584387724
+        }
+      },
+      {
+        "alternate": {
+          "p_n_star": 0.52497918747894
+        },
+        "controls": {
+          "gamma": 0.05,
+          "kappa": 0.05
+        },
+        "group": "hidden",
+        "index": 0,
+        "paper": {
+          "p_n_star": 0.5124973964842108
+        }
+      },
+      {
+        "alternate": {
+          "p_n_star": 0.6899744811276125
+        },
+        "controls": {
+          "gamma": 0.4,
+          "kappa": 0.4
+        },
+        "group": "hidden",
+        "index": 1,
+        "paper": {
+          "p_n_star": 0.598687660112452
+        }
+      }
+    ],
+    "relationship_targets": [
+      {
+        "control": "kappa",
+        "counterfactual_direction": "increasing",
+        "counterfactual_shape": "monotonic increasing",
+        "historical_direction": "increasing",
+        "historical_shape": "monotonic increasing",
+        "readout": "p_n_star",
+        "source_claim_ids": [
+          "pstar_n1",
+          "pstar_n2"
+        ]
+      },
+      {
+        "control": "gamma",
+        "counterfactual_direction": "decreasing",
+        "counterfactual_shape": "monotonic decreasing",
+        "historical_direction": "decreasing",
+        "historical_shape": "monotonic decreasing",
+        "readout": "p_n_star",
+        "source_claim_ids": [
+          "pstar_n1",
+          "pstar_n2"
+        ]
+      }
+    ]
+  },
+  "reviewer": "Independent family source reviewer (Codex subagent B)",
+  "source": {
+    "arxiv_versioned_id": "2506.10067v2",
+    "citation": "Andrew A. Allocca, Universality of Stochastic Control of Quantum Chaos with Measurement and Feedback, Physical Review Letters (2026), DOI:10.1103/xgfv-p42g",
+    "journal_doi": "10.1103/xgfv-p42g"
+  }
+}

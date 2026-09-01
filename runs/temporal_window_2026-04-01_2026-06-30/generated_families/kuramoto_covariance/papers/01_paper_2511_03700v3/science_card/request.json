@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2511.03700v3\", \"citation\": \"Oleh E. Omel’chenko, Mean-Field Approach to Finite-Size Fluctuations in the Kuramoto-Sakaguchi Model, Physical Review Letters (2026), DOI:10.1103/95t3-rvxg\", \"journal_doi\": \"10.1103/95t3-rvxg\"}\n\nSource-grounded routing hint from pre-screening:\nExtract only the completely incoherent-state complex-order-parameter covariance R_incoh(tau), the Fourier transform of g(omega), source lines210-227 and1217-1234. Private branches: triangular g gives R=2*(1-cos(tau))/tau^2 for tau>0 with limiting value1 at tau=0; Lorentzian g gives exp(-tau) for tau>=0. To preserve one strict expression skeleton and avoid a piecewise singularity, use a conservative public tau interval bounded away from zero and within the source exact theorem, for example [0.1,10], explicitly as benchmark query range, not reported sampling boundary. Same readout, deterministic analytic central value, completely incoherent N>>1 far from criticality. No partially synchronized covariance, variance, K dependence, or noisy simulation points.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: OmelchenkoGottwald.tex =====\nL000002\t\\documentclass[\nL000003\t reprint,\nL000004\t\nL000005\t\nL000006\t\nL000007\t\nL000008\t\nL000009\t\nL000010\t\nL000011\t\nL000012\t\nL000013\t\nL000014\t amsmath,amssymb,\nL000015\t aps,\nL000016\t\nL000017\t\nL000018\t\nL000019\t\nL000020\t\nL000021\t\nL000022\t]{revtex4-2}\nL000023\t\nL000024\t\\usepackage{graphicx}\nL000025\t\\usepackage{amsmath,amssymb}\nL000026\t\\usepackage{overpic}\nL000027\t\nL000028\t\nL000029\t\nL000030\t\nL000031\t\nL000032\t\\usepackage{xcolor}\nL000033\t\nL000034\t\\newcommand{\\fr}[2]{\\frac{\\displaystyle #1}{\\displaystyle #2}}\nL000035\t\\newcommand{\\df}[2]{\\frac{\\displaystyle d#1}{\\displaystyle d#2}}\nL000036\t\\newcommand{\\ds}[2]{\\frac{\\displaystyle d^2 #1}{\\displaystyle d#2^2}}\nL000037\t\\newcommand{\\pf}[2]{\\frac{\\displaystyle \\partial #1}{\\displaystyle \\partial #2}}\nL000038\t\\newcommand{\\ps}[2]{\\frac{\\displaystyle \\partial^2 #1}{\\displaystyle \\partial #2^2}}\nL000039\t\\newcommand{\\ve}{\\varepsilon}\nL000040\t\nL000041\t\\newcommand{\\Real}{\\mathrm{Re}\\:}\nL000042\t\\newcommand{\\Imag}{\\mathrm{Im}\\:}\nL000043\t\nL000044\t\\newcommand{\\Span}{\\mathrm{span}\\:}\nL000045\t\\newcommand{\\Ker}{\\mathrm{ker}\\:}\nL000046\t\\newcommand{\\Coker}{\\mathrm{coker}\\:}\nL000047\t\\newcommand{\\Det}{\\mathrm{det}\\:}\nL000048\t\\newcommand{\\Range}{\\mathrm{ran}\\:}\nL000049\t\nL000050\t\\newcommand{\\qed}{\\hfill \\rule{2.3mm}{2.3mm}}\nL000051\t\nL000052\t\nL000053\t\nL000054\t\\newtheorem{proposition}{Proposition}\nL000055\t\\newtheorem{remark}{Remark}\nL000056\t\nL000057\t\nL000058\t\\newcommand{\\be}{\\begin{equation}}\nL000059\t\\newcommand{\\ee}{\\end{equation}}\nL000060\t\\newcommand{\\mk}{\\langle k\\rangle}\nL000061\t\\newcommand{\\bk}{\\mathbf{k}}\nL000062\t\nL000063\t\\begin{document}\nL000064\t\nL000065\t\nL000066\t\\title{Mean-field approach to finite-size fluctuations in the Kuramoto-Sakaguchi model}\nL000067\t\nL000068\t\\author{Oleh E. Omel'chenko}\nL000069\t\\email{omelchenko@uni-potsdam.de}\nL000070\t\\address{University of Potsdam,\nL000071\tInstitute of Physics and Astronomy,\nL000072\tKarl-Liebknecht-Str. 24/25,\nL000073\t14476 Potsdam,\nL000074\tGermany}\nL000075\t\nL000076\t\nL000077\t\\author{Georg A. Gottwald}\nL000078\t\\email{georg.gottwald@sydney.edu.au}\nL000079\t\\address{School of Mathematical and Statistics,\nL000080\tUniversity of Sydney, NSW 2006, Australia}\nL000081\t\nL000082\t\nL000083\t\\date{\\today}\nL000084\t\nL000085\t\\keywords{phase oscillators, Kuramoto-Sakaguchi model, finite-size fluctuations, mean-field approach}\nL000086\t\nL000087\t\\begin{abstract}\nL000088\tWe develop an ab initio approach to describe the statistical behavior of finite-size fluctuations in the deterministic Kuramoto-Sakaguchi model. We obtain explicit expressions for the covariance function of fluctuations of the complex order parameter and determine the variance of its magnitude entirely in terms of the equation parameters. Our results rely on an explicit complex-valued formula for the solution of the Adler equation. We present analytical results for both the sub- and the super-critical case. Moreover, our framework does not require any prior knowledge about the structure of the partially synchronized state. We corroborate our results with numerical simulations of the full Kuramoto-Sakaguchi model. The proposed methodology is sufficiently general such that it can be applied to other interacting particle systems.\nL000089\t\\end{abstract}\nL000090\t\nL000091\t\nL000092\t\\maketitle\nL000093\t\nL000094\t\nL000095\t{\\it Introduction.}\nL000096\tSynchronization is a generic phenomenon inherent in interacting oscillators\nL000097\tthat determines their ability to exhibit a wide range of complex dynamical behavior\nL000098\t\\cite{Kuramoto84, Str2000,PikovskyRosenblumKurths01, AceBVRS2005, ArenasEtAl08, DorflerBullo14, RodriguesEtAl16}.\nL000099\tIt has been observed in a plethora of natural and engineered  systems,\nL000100\tincluding pace-maker cells of circadian rhythms \\cite{YamaguchiETAl03},\nL000101\tnetworks of neurons \\cite{BhowmikShanahan12}, chemical oscillators \\cite{KissEtAl02,TaylorEtAl09}\nL000102\tand power grids \\cite{FilatrellaEtAl08}.\nL000103\tThe main features of synchronization are captured\nL000104\tby the paradigmatic Kuramoto-Sakaguchi (KS) model~\\cite{SakK1986}\nL000105\t\\begin{equation}\nL000106\t\\dot{\\psi}_i = \\omega_i + \\fr{K}{N} \\sum\\limits_{j=1}^N \\sin( \\psi_j - \\psi_i - \\lambda )\nL000107\t\\label{Eq:KS:original}\nL000108\t\\end{equation}\nL000109\tfor the collective behavior of a system of $N$ all-to-all coupled phase oscillators.\nL000110\tIn this model, $\\omega_i$ are natural frequencies drawn randomly and independently\nL000111\tfrom a given distribution $g(\\omega)$ and $K$ and $\\lambda$ are real parameters\nL000112\tquantifying the coupling strength and the phase lag, respectively.\nL000113\tIt is often convenient to rewrite Eq.~\\eqref{Eq:KS:original} as\nL000114\t$$\nL000115\t\\dot{\\psi_i} = \\omega_i + K\\: \\mathrm{Im}\\left( Z(t) e^{-i \\psi_i} e^{-i \\lambda} \\right),\nL000116\t$$\nL000117\twhich reveals that each oscillator interacts\nL000118\twith the other oscillators only via the mean field\nL000119\t\\begin{equation}\nL000120\tZ(t) = \\fr{1}{N} \\sum\\limits_{j=1}^N e^{i \\psi_j(t)},\nL000121\t\\label{Def:Z}\nL000122\t\\end{equation}\nL000123\twhich is also coined the complex order parameter and quantifies the degree of synchronization.\nL000124\t\nL000125\tA fully synchronized state with $\\theta_1 = \\theta_2 = \\dots = \\theta_N$ is characterized by $r(t)=|Z(t)|=1$,\nL000126\twhereas a completely disordered (incoherent) state is characterized\nL000127\tby $r(t) = \\mathcal{O}(1/\\sqrt{N})$.\nL000128\tIt is well known that for sufficiently large values of the coupling strength $K$ the system becomes fully synchronized, whereas for sufficiently small values of $K$ the oscillators behave independently and form an incoherent state. For intermediate values of the coupling strength, partially synchronized states are observed in which $r(t)$ fluctuates around a constant value between $0$ and $1$. On a microscopic level the oscillator population splits into two groups: coherent oscillators $\\mathcal{C}$, which are phase locked, and rogue oscillators $\\mathcal{R}$, which drift with respect to the mean field.\nL000129\t\nL000130\tIn the thermodynamic limit of infinitely many oscillators each oscillator interacts with the other oscillators via a constant collective mean. This limit is well understood and described by mean-field theory~\\cite{SakK1986,OmeW2012,OmeW2013,OttA2008}. In particular, the rotation frequency of the coherent oscillators $\\Omega_\\infty$ and the constant order parameter $r_\\infty$ are determined by a self-consistency relation,\nL000131\tfirst derived in~\\cite{SakK1986} and later formulated in a more convenient complex form in~\\cite{OmeW2012},\nL000132\t\\begin{equation}\nL000133\t\\fr{1}{K} e^{i \\lambda} = i \\int_{-\\infty}^\\infty g(\\Omega_\\infty + K r_\\infty s) h(s) ds,\nL000134\t\\label{Eq:SC}\nL000135\t\\end{equation}\nL000136\twhere\nL000137\t\\begin{equation}\nL000138\th(s) = \\left\\{\nL000139\t\\begin{array}{lcl}\nL000140\t( 1 - \\sqrt{1 - s^{-2}} ) s & \\mbox{ for } & |s| > 1 \\\\[1mm]\nL000141\ts - i \\sqrt{1-s^2} & \\mbox{ for } & |s|\\le 1.\nL000142\t\\end{array}\nL000143\t\\right.\nL000144\t\\label{Def:h}\nL000145\t\\end{equation}\nL000146\t\nL000147\tHowever, recently finite-size effects have gained much attention. Numerical experiments have led to a better understanding of finite-size effects and provided clear evidence for their significance~\\cite{Dai1994,Dai1996,CraD1999,NisTHA2012,HonCTP2015,SnyderEtAl21,YueG2024,SumJ2024}. In particular, several finite-size phenomena were observed such as a stochastic drift of oscillators which disappears in the thermodynamic limit \\cite{GiacominPoquet15,Lucon15,Got2015,Gottwald17} and emergent random chimera switching in a deterministic two-population KS model \\cite{IrvG2025}. Capturing finite-size effects analytically is a notoriously hard problem. Relaxation rates and pair correlation functions were obtained using kinetic theory~\\cite{HildebrandEtAl07,BuiceChow07,YoonEtAl15} and the finite-size scaling near criticality has been successfully quantified~\\cite{HongEtAl07,HonCTP2015,HonOS2016,ParkPark24}.\nL000148\tRecently, substantial progress has been made\nL000149\tfor stochastic systems of coupled oscillators \\cite{TyuGKP2018,Bue2025}.\nL000150\tHowever, analytical methods for deterministic\nL000151\tsystems still remain underdeveloped.\nL000152\tA general scheme for analyzing fluctuations in deterministic systems\nL000153\tof coupled phase oscillators was proposed in~\\cite{KurN1987,Daido89,Dai1990}.\nL000154\tIn particular, accurate approximations were obtained in the subcritical case of the KS model~\\eqref{Eq:KS:original} with $\\lambda=0$\nL000155\tand a Lorentzian frequency distribution~\\cite{Dai1990}.\nL000156\tHowever, this approach relies on several approximations\nL000157\twhich do not carry over to the case of more general frequency distributions\nL000158\tsuch as Gaussians as we will show (see Appendix~\\ref{app:daido}).\nL000159\tIn this Letter we will capture finite-size effects in a first principle way\nL000160\tand provide explicit expressions for the covariance function\nL000161\tand the variance of the order parameter.\nL000162\t\nL000163\tOur theory is based on the assumption that fluctuations in the deterministic KS model constitute a Gaussian process decaying with $1/\\sqrt{N}$ and determined entirely by its mean and covariance function (see Appendix~\\ref{app:CLT}\nL000164\tfor numerical evidence for this assumption).\nL000165\tThis assumption would naturally be satisfied if their dynamics were governed\nL000166\tby an underlying functional central limit theorem.\nL000167\tWe will additionally adopt several technical assumptions on replacing finite-size quantities\nL000168\tby their thermodynamic mean-field limits as well as replacing sums\nL000169\tby integrals which requires a sufficiently large system size $N$.\nL000170\t\nL000171\tSpecifically, we consider the modified order parameter\nL000172\t$$\nL000173\tZ_\\mathrm{mod}(t) = Z(t) \\frac{\\overline{Z_\\mathrm{c}(t)}}{|Z_\\mathrm{c}(t)|}\nL000174\t\\quad\\mbox{with}\\quad\nL000175\tZ_\\mathrm{c}(t) = \\frac{1}{N} \\sum\\limits_{j\\in\\mathcal{C}} e^{i \\psi_j(t)},\nL000176\t$$\nL000177\twhere the bar denotes the complex-conjugate. Compared to the original order parameter \\eqref{Def:Z}, the modified order parameter is represented in the frame of reference moving with the synchronized cluster. This ensures that, contrary to $Z(t)$, the modified order parameter does not exhibit phase diffusion~\\cite{PikR1999,PikBI2026} (see Appendix~\\ref{app:phasediff}).\nL000178\tRecently, it was numerically recognized that fluctuations\nL000179\t\\begin{equation}\nL000180\t\\zeta(t) = \\sqrt{N} ( Z_\\mathrm{mod}(t) - \\langle Z_\\mathrm{mod}(t) \\rangle )\nL000181\t\\label{Def:zeta}\nL000182\t\\end{equation}\nL000183\taround the thermodynamic mean $\\langle Z_\\mathrm{mod}(t) \\rangle$,\nL000184\twhere $\\langle\\cdot\\rangle$ denotes time averaging, can be approximated by a Gaussian process \\cite{YueG2024,IrvG2025}.\nL000185\tFluctuations in $Z_\\mathrm{mod}(t)$,\nL000186\twith a variance that decays as $1/N$ and vanishes in the thermodynamic limit,\nL000187\tlead to fluctuations in other macroscopic variables,\nL000188\tincluding the order parameter with fluctuations\nL000189\t\\begin{equation}\nL000190\t\\delta(t) = \\sqrt{N} ( |Z_\\mathrm{mod}(t)| - \\langle |Z_\\mathrm{mod}(t)| \\rangle ) = \\sqrt{N} ( r(t) - \\langle r(t) \\rangle ).\nL000191\t\\label{Def:delta}\nL000192\t\\end{equation}\nL000193\tGaussian processes are entirely determined by their mean, accessible via classical mean-field theory, and their covariance function\nL000194\t\\begin{equation}\nL000195\tR(\\tau) = \\langle \\zeta(t) \\overline{\\zeta(t+\\tau)} \\rangle.\nL000196\t\\label{Def:R}\nL000197\t\\end{equation}\nL000198\tPrevious work~\\cite{YueG2024,IrvG2025} has shown the efficacy of such an approach, however, these works relied on approximating the general Gaussian process by an Ornstein-Uhlenbeck process the parameters of which were estimated only numerically and needed to be recalculated for each set of equation parameters. Moreover, a precise a priori knowledge of which oscillators are synchronized and which are not was required.\nL000199\t\nL000200\tIn this Letter, we find explicit analytical expressions for the covariance function \\eqref{Def:R} and the variance of finite-size fluctuations of the order parameter $V = \\langle \\delta^2(t) \\rangle$, given entirely in terms of equation parameters $K$, $\\lambda$ and $g(\\omega)$. We present expressions for both the partially synchronized and the completely incoherent state. Remarkably, our expressions do not require any a priori knowledge about which oscillators partake in the synchronized cluster and which do not.\nL000201\tThis opens up the way to perform stochastic model reduction\nL000202\tfor deterministic systems of coupled oscillators\nL000203\twhere the drift and diffusion coefficients are given entirely\nL000204\tin terms of the microscopic equation parameters.\nL000205\tSuch reductions have so far been restricted to multi-scale systems \\cite{Givonetal04}.\nL000206\t\nL000207\tOur main results can be formulated as follows. For partially synchronized states we predict\nL000208\t\\begin{equation}\nL000209\tR_\\mathrm{ps}(\\tau) = K r_\\infty \\int\\limits_{-\\infty}^\\infty \\fr{(\\overline{h^2(s)} - 1) ( 1 - |h^2(s)| ) g(\\Omega_\\infty + K r_\\infty s) }{\\overline{h^2(s)} - \\exp(i K r_\\infty s \\sqrt{1 - s^{-2}}\\:\\tau)} ds\nL000210\t\\label{Formula:R:ps}\nL000211\t\\end{equation}\nL000212\tand\nL000213\t\\begin{equation}\nL000214\tV_\\mathrm{ps} = \\fr{1}{2} R_\\mathrm{ps}(0) + \\mathcal{O}\\left(\\fr{1}{\\sqrt{N}}\\right)\nL000215\t\\quad\\mbox{for}\\quad N\\gg 1.\nL000216\t\\label{Formula:V:ps}\nL000217\t\\end{equation}\nL000218\tFor completely incoherent states we find\nL000219\t\\begin{equation}\nL000220\tR_\\mathrm{incoh}(\\tau) = \\int_{-\\infty}^\\infty g(\\omega) e^{-i\\omega\\tau} d\\omega\nL000221\t\\label{Formula:R:incoh}\nL000222\t\\end{equation}\nL000223\tand\nL000224\t\\begin{equation}\nL000225\t\\sqrt{N} \\langle r(t) \\rangle = \\fr{\\sqrt{\\pi}}{2}\\quad\\mbox{and}\\quad\nL000226\tV_\\mathrm{incoh} = 1 - \\fr{\\pi}{4}\\quad\\mbox{for}\\quad N\\gg 1.\nL000227\t\\label{Formula:incoh:r}\nL000228\t\\end{equation}\nL000229\tOur analytical results and their efficacy in capturing finite-size fluctuations\nL000230\tare illustrated in Figs.~\\ref{Fig:Covariances} and~\\ref{Fig:OP:OPVariance},\nL000231\twhere we compare our predictions with simulations of the full KS model \\eqref{Eq:KS:original} for a network of $1,000$ oscillators\nL000232\twith a Gaussian natural frequency distribution $g(\\omega)$ with unit-variance. Fig.~\\ref{Fig:Covariances} shows the covariance function $R(\\tau)$ for a partially synchronized state described by \\eqref{Formula:R:ps}\nL000233\tand for a completely incoherent state described by \\eqref{Formula:R:incoh}. Fig.~\\ref{Fig:OP:OPVariance}(a) shows the averaged order parameter $\\langle r(t) \\rangle$ as a function of the coupling strength $K$. The order parameter of the full KS model \\eqref{Eq:KS:original} is very well reproduced by classical mean-field theory \\eqref{Eq:SC} for values of the coupling strength $K\\ge K_{\\rm{crit}}$. Moreover, our extension of the mean-field results to the completely incoherent state given by \\eqref{Formula:incoh:r} reproduces the order parameter for the subcritical range $K<K_{\\rm{crit}}$. Fig.~\\ref{Fig:OP:OPVariance}(b) shows that the variance of the order parameter is well captured by our analytical expressions~\\eqref{Formula:V:ps} and \\eqref{Formula:incoh:r} for coupling strength away from the bifurcation at $K_{\\rm{crit}}$.\nL000234\tAdditional numerical results and the description\nL000235\tof our numerical setup are provided\nL000236\tin Appendix~\\ref{app:addnum}\nL000237\tand Appendix~\\ref{app:num}, respectively.\nL000238\t\nL000239\t\\begin{figure}\nL000240\t\\begin{center}\nL000241\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K6.pdf}\\hspace{0.02\\columnwidth}\nL000242\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K6.pdf}\\\\[1mm]\nL000243\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K0_5.pdf}\\hspace{0.02\\columnwidth}\nL000244\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K0_5.pdf}\nL000245\t\\end{center}\nL000246\t\\caption{Covariance $R(\\tau)$ of fluctuations $\\zeta(t)$ of the complex order parameter for the KS model \\eqref{Eq:KS:original}. (Top row) Partially synchronized state at $K = 6$ and $\\lambda = \\pi/4$, with theoretical prediction \\eqref{Formula:R:ps}. (Bottom row) Completely incoherent state at $K = 0.5$ and $\\lambda = \\pi/4$, with theoretical prediction \\eqref{Formula:R:incoh}.}\nL000247\t\\label{Fig:Covariances}\nL000248\t\\end{figure}\nL000249\t\nL000250\t\\begin{figure}\nL000251\t\\begin{center}\nL000252\t\\includegraphics[height=0.48\\columnwidth,angle=270]{OP.pdf}\\hspace{0.02\\columnwidth}\nL000253\t\\includegraphics[height=0.48\\columnwidth,angle=270]{OPVariance.pdf}\nL000254\t\\end{center}\nL000255\t\\caption{(a) Averaged order parameter $\\langle r(t) \\rangle$, with theoretical predictions from classical mean-field theory \\eqref{Eq:SC} for $K>K_{\\rm{crit}}\\approx 1.92$ and from our approach \\eqref{Formula:incoh:r} for $K<K_{\\rm{crit}}$, and (b) its variance $V$,\nL000256\twith theoretical predictions~\\eqref{Formula:V:ps}, \\eqref{Formula:incoh:r},\nL000257\tversus coupling strength $K$ in the KS model~\\eqref{Eq:KS:original} with $\\lambda = \\pi/4$.}\nL000258\t\\label{Fig:OP:OPVariance}\nL000259\t\\end{figure}\nL000260\t\nL000261\t\nL000262\t\nL000263\t\nL000264\t{\\it Covariance function for a partially synchronized state.}\nL000265\tOur approach is based on the following prerequisites.\nL000266\t(i) Moving into the corotating frame\nL000267\t$\\theta_i(t) = \\psi_i(t) - \\arg Z_\\mathrm{c}(t)$ and assuming that the rotation frequency and the order parameter are given to leading order by their respective mean-field limits, Eq.~(\\ref{Eq:KS:original}) becomes the so called Adler equation\nL000268\t\\begin{equation}\nL000269\t\\dot{\\theta}_i = \\omega_i - \\Omega_\\infty + K\\: \\mathrm{Im}\\left( Z_\\infty e^{-i \\theta_i} e^{-i \\lambda} \\right).\nL000270\t\\label{eq:Adler0}\nL000271\t\\end{equation}\nL000272\t\nL000273\t(ii)~We use the well-known fact (see Appendix~\\ref{app:MFT} for details)\nL000274\tthat the probability density of the solution of the Adler equation \\eqref{eq:Adler0}\nL000275\tis given by the Ott-Antonson ansatz~\\cite{OttA2008}\nL000276\t\\begin{equation}\nL000277\tf_\\phi(\\theta,\\omega) = \\fr{g(\\omega)}{2\\pi} \\left\\{ 1 + \\sum\\limits_{n=1}^\\infty\nL000278\t\\left[ \\overline{z}_\\phi^n(\\omega) e^{i n \\theta} + z_\\phi^n(\\omega) e^{-i n \\theta} \\right] \\right\\},\nL000279\t\\label{Def:f_phi}\nL000280\t\\end{equation}\nL000281\twhere\nL000282\t\\begin{equation}\nL000283\tz_\\phi(\\omega) = e^{i \\phi} h\\left( \\fr{\\omega - \\Omega_\\infty}{K r_\\infty} \\right).\nL000284\t\\label{Formula:zphi}\nL000285\t\\end{equation}\nL000286\tIt follows directly from (\\ref{Def:f_phi}) that for every non-negative integer~$n$ we have\nL000287\t\\begin{equation}\nL000288\t\\int_0^{2\\pi} \\fr{f_\\phi(\\theta,\\omega)}{g(\\omega)} e^{i n \\theta} d\\theta = z_\\phi^n(\\omega),\nL000289\t\\label{Formula:OA}\nL000290\t\\end{equation}\nL000291\twhich, upon employing (\\ref{Def:Z}) and~(\\ref{Eq:SC}), implies\nL000292\t\\begin{equation}\nL000293\tZ_\\infty = \\int_{-\\infty}^\\infty d\\omega \\int_0^{2\\pi} f_\\phi(\\theta,\\omega) e^{i \\theta} d\\theta\nL000294\t= - r_\\infty i e^{i \\lambda} e^{i \\phi}.\nL000295\t\\label{Z_mod:infty}\nL000296\t\\end{equation}\nL000297\tMoreover, if $\\theta_i(t)$ is a solution of the scalar Adler equation~(\\ref{eq:Adler0}),\nL000298\tthen for any $2\\pi$-periodic function $F(\\theta)$ we have the ergodicity property\nL000299\t\\begin{equation}\nL000300\t\\langle F(\\theta_j(t)) \\rangle = \\int_0^{2\\pi} \\fr{f_\\phi(\\theta,\\omega_j)}{g(\\omega_j)} F(\\theta) d\\theta.\nL000301\t\\label{Ergodicity}\nL000302\t\\end{equation}\nL000303\t(iii)~Finally, we establish an explicit solution of the Adler equation \\eqref{eq:Adler0}.\nL000304\tIntroducing $\\Delta_j = \\omega_j - \\Omega_\\infty$ and $H_\\infty = K Z_\\infty e^{-i \\lambda}$,\nL000305\tsolutions of the Adler equation $\\theta_j(t)$ with initial conditions $\\theta_j(0)$\nL000306\tare given for $|\\Delta_j| \\ne |H_\\infty|$ by\nL000307\t\\begin{equation}\nL000308\te^{i \\theta_j(t)} = W( t, H_\\infty,\\Delta_j, e^{i \\theta_j(0)} ),\nL000309\t\\label{Formula:SolAdler}\nL000310\t\\end{equation}\nL000311\twith\nL000312\t\\begin{equation}\nL000313\tW( t, H, \\Delta, \\sigma ) = H a_1(t) + \\fr{a_2( t) \\sigma}{1 + \\overline{H} a_1( t) \\sigma},\nL000314\t\\label{MainSln}\nL000315\t\\end{equation}\nL000316\twhere\nL000317\t$$\nL000318\ta_1(t) = i (e^{i \\xi t} - 1) / \\chi_1(t)\nL000319\t\\quad\\mbox{and}\\quad\nL000320\ta_2(t) = 4 \\xi^2 e^{i \\xi t} / \\chi_1^2(t)\nL000321\t$$\nL000322\twith $\\chi_1( t ) = (\\Delta - \\xi) e^{i \\xi t} - (\\Delta + \\xi)$ and\nL000323\t\\begin{equation}\nL000324\t\\xi = \\left\\{\nL000325\t\\begin{array}{lcl}\nL000326\t- i \\sqrt{ |H|^2 - \\Delta^2 } & \\mbox{ for } & |\\Delta| \\le |H|,\\\\[2mm]\nL000327\t\\hphantom{-i} \\sqrt{ \\Delta^2 - |H|^2 } & \\mbox{ for } & |\\Delta| > |H|.\nL000328\t\\end{array}\nL000329\t\\right.\nL000330\t\\label{Def:xi}\nL000331\t\\end{equation}\nL000332\tNote that for $|\\Delta_j| < |H_\\infty|$, the $j$th oscillator is coherent\nL000333\tand the dynamics of $\\theta_j(t)$ converges to a fixed point as $t\\to\\infty$,\nL000334\twhile for $|\\Delta_j| > |H_\\infty|$, the oscillator is incoherent with underlying periodic dynamics.\nL000335\tDetails on the derivation of~\\eqref{Formula:SolAdler}, \\eqref{MainSln} are provided in Appendix~\\ref{app:Adler}.\nL000336\t\nL000337\tThe covariance function (\\ref{Def:R}) can be expressed in terms of the fluctuations (\\ref{Def:zeta}) as\nL000338\t\\begin{eqnarray}\nL000339\tR_\\mathrm{ps}(\\tau) &=&  N \\langle\nL000340\tZ_\\mathrm{mod}(t) \\overline{Z_\\mathrm{mod}(t+\\tau)}\nL000341\t\\rangle - N |Z_\\infty|^2\nL000342\t\\nonumber\\\\\nL000343\t&=&\nL000344\t\\fr{1}{N} \\sum\\limits_{j,k=1}^N \\langle e^{i \\theta_j(t)} e^{-i \\theta_k(t+\\tau)} \\rangle - N |Z_\\infty|^2.\nL000345\t\\label{Formula:U:1}\nL000346\t\\end{eqnarray}\nL000347\tIf either $j\\in\\mathcal{C}$ or $k\\in\\mathcal{C}$ the phase asymptotically approaches a fixed point and the summands can be written as\nL000348\t\\begin{equation}\nL000349\t\\langle e^{i \\theta_j(t)}e^{-i \\theta_k(t+\\tau)} \\rangle = \\langle e^{i \\theta_j(t)} \\rangle \\langle e^{-i \\theta_k(t)} \\rangle.\nL000350\t\\label{IndividualCorrealtions:theta}\nL000351\t\\end{equation}\nL000352\tMoreover, the independence identity~\\eqref{IndividualCorrealtions:theta} also holds\nL000353\tif $j,k\\in\\mathcal{R}$ and $\\sqrt{\\Delta_j^2 - |H_\\infty|^2}$\nL000354\tand $\\sqrt{\\Delta_k^2 - |H_\\infty|^2}$ are incommensurable (see Appendix~\\ref{app:indep}),\nL000355\tand hence generically the sum in~\\eqref{Formula:U:1} can be written as\nL000356\t\\begin{eqnarray*}\nL000357\t&&\nL000358\t\\sum\\limits_{j,k=1}^N \\langle e^{i \\theta_j(t)} e^{-i \\theta_k(t+\\tau)} \\rangle\nL000359\t= \\sum\\limits_{j,k=1}^N \\langle e^{i \\theta_j(t)} \\rangle \\langle e^{-i \\theta_k(t)} \\rangle \\\\\nL000360\t&&\nL000361\t+ \\sum\\limits_{j\\in\\mathcal{R}} \\langle e^{i \\theta_j(t)} e^{-i \\theta_j(t+\\tau)} \\rangle\nL000362\t- \\sum\\limits_{j\\in\\mathcal{R}} \\left| \\langle e^{i \\theta_j(t)} \\rangle \\right|^2.\nL000363\t\\end{eqnarray*}\nL000364\tSubstitution into \\eqref{Formula:U:1} yields,\nL000365\tupon using $\\langle Z_\\mathrm{mod}(t)\\rangle = Z_\\infty$,\nL000366\t\\begin{equation}\nL000367\t    R_\\mathrm{ps}(\\tau) =\nL000368\t\\frac{1}{N}\\sum\\limits_{j\\in\\mathcal{R}} \\langle e^{i \\theta_j(t)} e^{-i \\theta_j(t+\\tau)} \\rangle\nL000369\t- \\frac{1}{N} \\sum\\limits_{j\\in\\mathcal{R}} \\left| \\langle e^{i \\theta_j(t)} \\rangle \\right|^2.\nL000370\t\\label{Formula:R:ps2}\nL000371\t\\end{equation}\nL000372\tNow, using~\\eqref{Ergodicity} to replace temporal averages by averages over the phases and the explicit formula~\\eqref{Formula:SolAdler} for $e^{i \\theta_j(t+\\tau)}$, we obtain\nL000373\t\\begin{eqnarray*}\nL000374\t\\langle e^{i \\theta_j(t)} \\rangle\nL000375\t&=& z_\\phi(\\omega_j),\\\\[1mm]\nL000376\t\\left\\langle e^{i \\theta_j(t)} e^{-i \\theta_j(t+\\tau)} \\right\\rangle\nL000377\t&=&\nL000378\t\\int_0^{2\\pi} e^{i \\theta} \\overline{W}( \\tau, H_\\infty,\\Delta_j, e^{i \\theta} ) \\times \\\\\nL000379\t\\times\\fr{f_\\phi(\\theta,\\omega_j)}{g(\\omega_j)} d\\theta\nL000380\t&=& \\fr{\\overline{H a_1(\\tau)}}{\\overline{z_\\phi(\\omega_j)}} ( |z_\\phi(\\omega_j)|^2 - 1 )\nL000381\t+ 1.\nL000382\t\\end{eqnarray*}\nL000383\t(Note that for the second correlation, we used identity~\\eqref{Formula:OA}\nL000384\tafter expanding the solution \\eqref{Formula:SolAdler}--\\eqref{MainSln} in a geometric series.\nL000385\tDetails of the calculations can be found in Appendix~\\ref{app:Adler}.)\nL000386\tAltogether, this yields\nL000387\t$$\nL000388\tR_\\mathrm{ps}(\\tau) =\nL000389\t\\fr{1}{N} \\sum\\limits_{j=1}^N\nL000390\t\\left[ \\fr{\\overline{H a_1(\\tau)}}{\\overline{z_\\phi(\\omega_j)}}\nL000391\t- 1 \\right] \\left( | z_\\phi(\\omega_j) |^2 - 1 \\right).\nL000392\t$$\nL000393\tFinally, to obtain a compact expression, we make the technical assumption that $N\\gg 1$,\nL000394\tand replace  averaging over indices $j$\nL000395\tby averaging over the distribution $g(\\omega)$, and write\nL000396\t\\begin{equation}\nL000397\tR_\\mathrm{ps}(\\tau) = \\int\\limits_{-\\infty}^\\infty\nL000398\t\\left[ \\fr{\\overline{H a_1(\\tau)}}{\\overline{z_\\phi(\\omega)}}\nL000399\t- 1 \\right] \\left( | z_\\phi(\\omega) |^2 - 1 \\right) g(\\omega) d\\omega.\nL000400\t\\label{Formula:U1}\nL000401\t\\end{equation}\nL000402\tAfter some algebraic manipulations (see Appendix~\\ref{app:Derivation}), the covariance function~\\eqref{Formula:U1} simplifies to our expression~\\eqref{Formula:R:ps}. Note that if $|\\omega - \\Omega_\\infty|\\le |H_\\infty| = K r_\\infty$, $|z_\\phi| = 1$. Therefore such a set of $\\omega$ does not contribute to the integral $R_\\mathrm{ps}(\\tau)$. This has the desirable consequence that in order to evaluate the covariance function, no prior knowledge is required about which oscillators are and which are not synchronized.\nL000403\t\nL000404\t\nL000405\t\nL000406\t\nL000407\t\nL000408\t\nL000409\t{\\it Covariance function for a completely incoherent state.}\nL000410\tOur analysis of the completely incoherent state is based on the following prerequisites.\nL000411\t(i) In this state, the phases $\\psi_j$ tend to be uniformly distributed on the interval $[0,2\\pi]$,\nL000412\tand their probability density in the thermodynamic limit is given by\nL000413\t\\begin{equation}\nL000414\tf_\\mathrm{incoh}(\\psi,\\omega,t) = \\fr{g(\\omega)}{2\\pi}.\nL000415\t\\label{Def:f_incoh}\nL000416\t\\end{equation}\nL000417\t(ii) The global order parameter shows no collective oscillations, and $Z(t) = 0$ as $N\\to\\infty$. This implies that the dynamics of each oscillator is approximately described by $\\dot{\\psi}_i = \\omega_i$,\nL000418\tand therefore $\\psi_i(t) = \\omega_i t + \\psi_i(0)$.\nL000419\t\nL000420\tConsider the fluctuations\nL000421\t$$\nL000422\t\\zeta_\\mathrm{incoh}(t) = \\sqrt{N}( Z(t) - \\langle Z(t) \\rangle)\nL000423\t$$\nL000424\tof the complex order parameter in this incoherent state.\nL000425\tThe corresponding covariance function is then given by\nL000426\t\\begin{eqnarray*}\nL000427\tR_\\mathrm{incoh}(\\tau) &=& \\langle \\zeta_\\mathrm{incoh}(t) \\overline{\\zeta_\\mathrm{incoh}(t+\\tau)} \\rangle \\\\\nL000428\t&=& \\fr{1}{N} \\sum\\limits_{j,k = 1}^N \\left\\langle e^{i \\psi_j(t)}e^{-i \\psi_k(t+\\tau)} \\right\\rangle - N | \\langle Z(t) \\rangle |^2.\nL000429\t\\end{eqnarray*}\nL000430\tFor different incommensurable frequencies $\\omega_j$ and $\\omega_k$,\nL000431\tthe variables $e^{i \\psi_j(t)}$ and $e^{i \\psi_k(t)}$ are independent,\nL000432\twhich implies again an identity of the form \\eqref{IndividualCorrealtions:theta}, and we obtain\nL000433\t$$\nL000434\tR_\\mathrm{incoh}(\\tau) = \\fr{1}{N} \\sum\\limits_{j = 1}^N \\left\\langle e^{i \\psi_j(t)} e^{-i \\psi_j(t+\\tau)} \\right\\rangle\nL000435\t- \\fr{1}{N} \\sum\\limits_{j = 1}^N \\left| \\langle e^{i \\psi_j(t)} \\rangle \\right|^2.\nL000436\t$$\nL000437\tMoreover, using the ergodicity property and the stationary density for incoherent oscillators \\eqref{Def:f_incoh}, we find\nL000438\t\\begin{equation}\nL000439\t\\langle e^{i \\psi_j(t)} \\rangle = \\int_0^{2\\pi} e^{i \\psi} \\fr{f_\\mathrm{incoh}(\\psi,\\omega_j,t)}{g(\\omega_j)} d\\psi = 0\nL000440\t\\label{Formula:Incoh}\nL000441\t\\end{equation}\nL000442\tand\nL000443\t$$\nL000444\t\\langle e^{i \\psi_j(t)} e^{-i \\psi_j(t+\\tau)} \\rangle = e^{- i \\omega_j \\tau}.\nL000445\t$$\nL000446\tFinally, in the large-$N$ limit we can replace averaging over indices $j$\nL000447\tby averaging over the distribution $g(\\omega)$\nL000448\tand arrive at our expression~\\eqref{Formula:R:incoh}\nL000449\tfor the covariance function $R_{\\rm{incoh}}(\\tau)$.\nL000450\tNote that due to the normalization condition for $g(\\omega)$, we have\nL000451\t$\\langle \\left| \\zeta_\\mathrm{incoh}(t) \\right|^2 \\rangle = R_\\mathrm{incoh}(0) = 1$.\nL000452\t\nL000453\t\nL000454\t\nL000455\t\nL000456\t{\\it Variance of the order parameter for a partially synchronized state.}\nL000457\tRewriting \\eqref{Def:zeta} as\nL000458\t$$\nL000459\tZ_\\mathrm{mod}(t)\nL000460\t= \\langle Z_\\mathrm{mod}(t) \\rangle + \\fr{1}{\\sqrt{N}} \\zeta(t) = Z_\\infty + \\fr{1}{\\sqrt{N}} \\zeta(t)\nL000461\t$$\nL000462\timplies\nL000463\t$$\nL000464\t|Z_\\mathrm{mod}(t)|^2 = | Z_\\infty |^2 + \\fr{2}{\\sqrt{N}} \\Real\\left( \\overline{Z_\\infty} \\zeta(t) \\right) + \\fr{1}{N} |\\zeta(t)|^2,\nL000465\t$$\nL000466\twhich upon expansion for $N\\gg 1$ becomes\nL000467\t$$\nL000468\t|Z_\\mathrm{mod}(t)| = | Z_\\infty | + \\fr{1}{\\sqrt{N}| Z_\\infty |} \\Real\\left( \\overline{Z_\\infty} \\zeta(t) \\right) + \\mathcal{O}\\left(\\fr{1}{N}\\right).\nL000469\t$$\nL000470\tThis allows to express the fluctuations of the order parameter \\eqref{Def:delta} as\nL000471\t$$\nL000472\t\\delta(t) = \\fr{1}{| Z_\\infty |} \\Real\\left( \\overline{Z_\\infty} \\zeta(t) \\right) + \\mathcal{O}\\left( \\fr{1}{\\sqrt{N}} \\right),\nL000473\t$$\nL000474\tand the variance of the order parameter becomes\nL000475\t$$\nL000476\tV_\\mathrm{ps}\nL000477\t= \\fr{1}{2}\nL000478\t\\Real\\left( \\fr{\\overline{Z_\\infty^2}}{| Z_\\infty |^2} \\tilde{R}_\\mathrm{ps}(0) \\right) + \\fr{1}{2} R_\\mathrm{ps}(0) + \\mathcal{O}\\left( \\fr{1}{\\sqrt{N}} \\right),\nL000479\t$$\nL000480\twhere $\\tilde R_{\\rm{ps}}(t)$ denotes\nL000481\tthe pseudo-covariance\nL000482\t$\\tilde R_{\\rm{ps}}(t) = \\langle \\zeta(t) \\zeta(t+\\tau) \\rangle$.\nL000483\tEmploying calculations similar to those\nL000484\tfor $R_\\mathrm{ps}(t)$ (see Appendix~\\ref{app:Pseudocov} for details),\nL000485\twe can show that $\\tilde{R}_\\mathrm{ps}(\\tau) = 0$ for all $\\tau\\ge 0$.\nL000486\tThe vanishing of the pseudo-covariance can be intuitively understood by evoking a symmetry between the real and imaginary parts of the fluctuations $\\zeta$ and their independence. Using  $\\tilde{R}_\\mathrm{ps}(\\tau) = 0$ for all $\\tau\\ge 0$, leads to our result \\eqref{Formula:V:ps}.\nL000487\t\nL000488\t\nL000489\t\nL000490\t\nL000491\t{\\it Variance of the order parameter for a completely incoherent state.}\nL000492\tIn the large-$N$ limit, for a completely incoherent state\nL000493\twe have $\\langle Z(t) \\rangle = 0$, and therefore\nL000494\t$\nL000495\t|Z(t)| = |\\zeta_\\mathrm{incoh}(t)| / \\sqrt{N}.\nL000496\t$\nL000497\tUsing the definition of $\\zeta_\\mathrm{incoh}(t)$, we write\nL000498\t$$\nL000499\t\\zeta_\\mathrm{incoh}(t) = \\fr{1}{\\sqrt{N}} \\sum\\limits_{j=1}^N \\cos \\psi_j(t) + \\fr{i}{\\sqrt{N}} \\sum\\limits_{j=1}^N \\sin\\psi_j(t).\nL000500\t$$\nL000501\t\nL000502\t\nL000503\t\nL000504\t\nL000505\tIn the completely incoherent state all phases $\\psi_j(t)$ are uniformly distributed in $[0,2\\pi]$. This implies that in the large-$N$ limit fluctuations satisfy a central limit theorem, and $\\zeta_\\mathrm{incoh}(t)$ is a two-dimensional random vector\nL000506\tdistributed according to a bivariate normal distribution. The mean and variances are readily determined. For each $t\\ge 0$ the function $\\cos \\psi_j(t)$ is a random variable with zero expected value $\\langle \\cos\\psi_j \\rangle_\\mathrm{ens} = 0$ and variance\nL000507\t$$\nL000508\t\\left\\langle \\cos^2\\psi_j \\right\\rangle_\\mathrm{ens} =\nL000509\t\\fr{1}{2\\pi} \\int_0^{2\\pi} \\cos^2 \\psi\\: d\\psi = \\fr{1}{2},\nL000510\t$$\nL000511\twhere $\\langle \\cdot \\rangle_\\mathrm{ens}$ denotes the ensemble average. Similarly, $\\sin\\psi_j(t)\\sim\\mathcal{N}(0,1/2)$. Moreover, the random variables $\\cos\\psi_j(t)$ and $\\sin\\psi_j(t)$ are uncorrelated since\nL000512\t$$\nL000513\t\\langle \\cos\\psi_j \\sin\\psi_j \\rangle_\\mathrm{ens}\nL000514\t= \\fr{1}{2\\pi} \\int_0^{2\\pi} \\cos\\psi \\sin\\psi\\:d\\psi = 0.\nL000515\t$$\nL000516\tHence $\\Real(\\zeta_\\mathrm{incoh}(t))\\sim\\mathcal{N}(0,1/2)$ and $\\Imag(\\zeta_\\mathrm{incoh}(t))\\sim\\mathcal{N}(0,1/2)$, and $\\left| \\zeta_\\mathrm{incoh}(t) \\right|$ has a Rayleigh distribution with expected value\nL000517\t$$\nL000518\t\\langle \\left| \\zeta_\\mathrm{incoh}(t) \\right| \\rangle = \\sqrt{\\pi}/2\nL000519\t$$\nL000520\tand variance\nL000521\t$$\nL000522\tV_\\mathrm{incoh} = \\langle \\left| \\zeta_\\mathrm{incoh}(t) \\right|^2 \\rangle - \\langle \\left| \\zeta_\\mathrm{incoh}(t) \\right| \\rangle^2 = 1 - \\pi/4.\nL000523\t$$\nL000524\tNote that the value $\\langle \\left| \\zeta_\\mathrm{incoh}(t) \\right|^2 \\rangle = 1$, which follows from the last two identities, agrees with the value $\\langle \\left| \\zeta_\\mathrm{incoh}(t) \\right|^2 \\rangle = R_\\mathrm{incoh}(0)$ obtained above.\nL000525\t\nL000526\t\nL000527\t\nL000528\t\nL000529\t{\\it Discussion and outlook.}\nL000530\tIn this Letter, we have proposed a fully analytical approach\nL000531\tto capture the statistical behavior of finite-size fluctuations\nL000532\tin the deterministic KS model~\\eqref{Eq:KS:original}.\nL000533\tIn particular, our approach provides\nL000534\t\nL000535\t(i) expressions for the covariance function of fluctuations of the complex order parameter\nL000536\tand the variance of the order parameter entirely in terms of the KS model parameters,\nL000537\t\nL000538\t(ii) expressions for both sub- and super-critical coupling strengths,\nL000539\t\nL000540\t(iii) expressions that do not require prior knowledge\nL000541\tabout which oscillators are synchronized and which are not.\nL000542\t\nL000543\tOur theory relies on two main assumptions:\nL000544\t(a) finite-size fluctuations of the deterministic KS model~\\eqref{Eq:KS:original}\nL000545\tare governed by a Gaussian process and (b) the phase dynamics can be approximated\nL000546\tby the Adler equation~\\eqref{eq:Adler0}, where we neglect fluctuations\nL000547\tand approximate the mean values of the rotation frequency\nL000548\tand the order parameter by their mean-field limits.\nL000549\tRemarkably, the statistical independence of fluctuations of distinct oscillators,\nL000550\twhich were essential for finding explicit expressions,\nL000551\tfollows directly from our solution of the Adler equation.\nL000552\tThe assumption of Gaussian statistics of finite-size fluctuations would naturally follow,\nL000553\tif one could show that the KS model supports an underlying functional central limit theorem.\nL000554\tThis would in turn require large system sizes $N$ -- an assumption\nL000555\twe had already employed in~\\eqref{Formula:U1} when replacing sums by integrals.\nL000556\t\nL000557\tSimulations for the full KS model showed\nL000558\tthat our theory performs well away from criticality.\nL000559\tOn the other hand, our approximations were less accurate\nL000560\twhen approaching the critical coupling strength $K_{\\rm{crit}}$,\nL000561\tdemarcating the transition from a desynchronized to a partially synchronized state.\nL000562\tThe explicit expressions for the covariance function rely\nL000563\ton the explicit solution of the Adler equation.\nL000564\tHence, the quality of our theory crucially depends on the Adler equation\nL000565\tbeing a good approximation of the full system.\nL000566\tThis is only guaranteed if fluctuations can be neglected in Eq.~(\\ref{Eq:KS:original}),\nL000567\tand breaks down when approaching criticality\nL000568\t(see Appendix~\\ref{app:lim} for details).\nL000569\tWe envisage extensions of our framework to the near critical case\nL000570\tusing a perturbative approach around the expressions derived in this work.\nL000571\t\nL000572\tOur approach is sufficiently general to allow for further applications\nL000573\tto other interacting particle systems such as $\\theta$-neuron models\nL000574\tand more complex network topologies\nL000575\tgoing beyond the all-to-all coupling considered in this Letter.\nL000576\tThe mathematical tools developed here can potentially be adapted\nL000577\tto study finite-size fluctuations in noisy coupled oscillator systems~\\cite{MasKK2010,Luc2014,Gottwald17,TyuGKP2018,PikDG2019,DelgadinoEtAl21,ZagliEtAl23,Bue2025}\nL000578\tfinite-size sampling effects \\cite{PetP2018,PetGP2019,FialkowskiEtAl23}\nL000579\tand dynamics of complexified KS models~\\cite{ThuSST2023,LeeBBSTT2024}.\nL000580\tFurther, it is known that the incoherent state and partially synchronized states\nL000581\tin the KS model are weakly chaotic attractors,\nL000582\twhere the chaoticity can be attributed to the presence of finite-size fluctuations.\nL000583\tTherefore, it is natural to expect that knowing the characteristics of finite-size fluctuations,\nL000584\tmay aid in computing  finite-size corrections of Lyapunov exponents~\\cite{CarGP2018}.\nL000585\t\nL000586\tIn summary, our results fully specify the statistical behavior\nL000587\tof finite-size fluctuations in the KS model\nL000588\twhich have been numerically shown to be Gaussian processes.\nL000589\tThis opens up the way to perform systematic stochastic model reductions\nL000590\tfor such interacting particle systems from first principles\nL000591\tand to construct reduced stochastic equations\nL000592\tfor designated collective variables \\cite{Givonetal04,SmithGottwald20}.\nL000593\t\nL000594\t\nL000595\t\nL000596\t\nL000597\t\\section*{Acknowledgements}\nL000598\tThe work of O.E.O. was partly supported by the Deutsche Forschungsgemeinschaft under Grant No. OM 99/2-3.\nL000599\tO.E.O acknowledges the financial support and hospitality of the Sydney Mathematical Research Institute (SMRI), where parts of this work was completed on an International Visitor Program.\nL000600\tThe authors are grateful for insightful discussions with A. Pikovsky.\nL000601\t\nL000602\t\nL000603\t\nL000604\t\nL000605\t\nL000606\t\\appendix\nL000607\t\nL000608\t\nL000609\t\nL000610\t\\section{Thermodynamic limit for the KS model~(\\ref{Eq:KS:original})}\nL000611\t\\label{app:MFT}\nL000612\t\nL000613\tMost of the dynamical states found in the KS model~(\\ref{Eq:KS:original}) with finite $N$, have complex chaotic behavior. However, in the thermodynamic limit $N\\to\\infty$, they admit a simple analytic representation. If $N\\gg 1$, the state of the phase oscillators $\\{\\psi_i(t)\\}$ can be described by a probability density function $f(\\psi,\\omega,t)$, which obeys the continuity equation\nL000614\t\\begin{equation}\nL000615\t\\pf{f}{t} + \\pf{}{\\psi}(f v) = 0,\nL000616\t\\label{Eq:Continuity}\nL000617\t\\end{equation}\nL000618\twhere\nL000619\t$$\nL000620\tv(\\psi,\\omega,t) = \\omega + \\fr{K}{2i} \\left[ e^{-i\\lambda} \\mathcal{Z} (t) e^{-i\\psi} - e^{i \\lambda} \\overline{\\mathcal{Z}}(t) e^{i \\psi} \\right]\nL000621\t$$\nL000622\tis the continuum version of the velocity field in Eq.~(\\ref{Eq:KS:original}), and\nL000623\t\\begin{equation}\nL000624\t\\mathcal{Z}(t) = \\int_{-\\infty}^\\infty d\\omega \\int_0^{2\\pi} f(\\psi,\\omega,t) e^{i \\psi} d\\psi\nL000625\t\\label{Def:W}\nL000626\t\\end{equation}\nL000627\tis the continuum version of the complex order parameter~\\eqref{Def:Z}.\nL000628\t\nL000629\tIt is well-known~\\cite{OttA2008,OttA2009} that the long-term dynamics of the continuity equation (\\ref{Eq:Continuity}) asymptotically approaches the Ott-Antonsen manifold for $t\\to\\infty$, consisting of distributions of the form\nL000630\t$$\nL000631\tf(\\psi,\\omega,t) = \\fr{g(\\omega)}{2\\pi} \\left\\{ 1 + \\sum\\limits_{n=1}^\\infty\nL000632\t\\left[ \\overline{z}^n(\\omega,t) e^{i n \\psi} + z^n(\\omega,t) e^{-i n \\psi} \\right] \\right\\},\nL000633\t$$\nL000634\twhere $z(\\omega,t)$ satisfies the inequality $|z|\\le 1$\nL000635\tand solves the integro-differential equation\nL000636\t\\begin{equation}\nL000637\t\\pf{z}{t} = i \\omega z(\\omega,t) + \\fr{K}{2} e^{-i\\lambda} \\mathcal{G}z - \\fr{K}{2} e^{i \\lambda} z^2(\\omega,t) \\mathcal{G}\\overline{z}\nL000638\t\\label{Eq:OA}\nL000639\t\\end{equation}\nL000640\twith the integral operator\nL000641\t$$\nL000642\t(\\mathcal{G} z)(t) = \\int_{-\\infty}^\\infty g(\\omega) z(\\omega,t) d\\omega.\nL000643\t$$\nL000644\tRemarkably, all statistically stationary states of the KS model~(\\ref{Eq:KS:original}) lie on the Ott-Antonsen manifold~\\cite{OmeW2012,OmeW2013}. In particular, the zero solution $z(\\omega,t) = 0$ of Eq.~(\\ref{Eq:OA}) corresponds to the completely incoherent state in~(\\ref{Eq:KS:original}), while all stationary partially synchronized states in~(\\ref{Eq:KS:original}) are represented by rotating waves\nL000645\t\\begin{equation}\nL000646\tz(\\omega,t) = h\\left( \\fr{\\omega - \\Omega_\\infty}{K r_\\infty} \\right) e^{i \\Omega_\\infty t},\nL000647\t\\label{Ansatz:Wave}\nL000648\t\\end{equation}\nL000649\twhere $h(s)$ is defined by~\\eqref{Def:h} and $(r_\\infty,\\Omega_\\infty)\\in(0,1)\\times\\mathbb{R}$ is a pair of numbers satisfying the self-consistency equation~\\eqref{Eq:SC}.\nL000650\t\nL000651\tThe physical meaning of the parameters $r_\\infty$ and $\\Omega_\\infty$ can be understood by inserting the probability density function $f(\\psi,\\omega,t)$ corresponding to~(\\ref{Ansatz:Wave}) into Eq.~(\\ref{Def:W}). This yields\nL000652\t\\begin{equation}\nL000653\t\\mathcal{Z}(t) = - r_\\infty i e^{i \\lambda} e^{i \\Omega_\\infty t},\nL000654\t\\label{Z_infty}\nL000655\t\\end{equation}\nL000656\tand therefore\nL000657\t\\begin{equation}\nL000658\t|\\mathcal{Z}(t)| = r_\\infty\nL000659\t\\label{Z_infty_}\nL000660\t\\end{equation}\nL000661\tis the magnitude of the order parameter, while $\\Omega_\\infty$ is the angular speed of its phase.\nL000662\t\nL000663\tIf in the KS model~(\\ref{Eq:KS:original})\nL000664\twe move into the corotating frame\nL000665\t\\begin{equation}\nL000666\t\\theta_i(t) = \\psi_i(t) - \\Omega_\\infty t + \\phi\nL000667\t\\quad\\mbox{with some}\\quad\\phi\\in\\mathbb{R},\nL000668\t\\label{Def:Frame:phi}\nL000669\t\\end{equation}\nL000670\tthe probability density function in the new frame will take on the time-independent form~\\eqref{Def:f_phi}, which is used for the calculations in the main text.\nL000671\tImportantly, for an appropriately chosen value of $\\phi$,\nL000672\twe can guarantee that (\\ref{Z_mod:infty})\nL000673\tyields the thermodynamic limit of the modified order parameter $Z_\\mathrm{mod}(t)$.\nL000674\t\nL000675\t\nL000676\t\nL000677\t\nL000678\t\\section{Explicit solutions of the Adler equation}\nL000679\t\\label{app:Adler}\nL000680\t\nL000681\tLet us consider the Adler equation written in complex form,\nL000682\t\\begin{equation}\nL000683\t\\dot{\\theta} = \\Delta + \\Imag\\left( H e^{-i \\theta} \\right)\nL000684\t= \\Delta + \\fr{H e^{-i \\theta} - \\overline{H} e^{i \\theta}}{2i}\nL000685\t\\label{Eq:Adler}\nL000686\t\\end{equation}\nL000687\twith arbitrary $\\Delta \\in \\mathbb{R}$ and $H\\in \\mathbb{C}$.\nL000688\t\\begin{proposition}\nL000689\tIf $|\\Delta|\\ne|H|$, the solution of the Adler equation (\\ref{Eq:Adler}) is of the form\nL000690\t$$\nL000691\te^{i \\theta(t)} = W( t, H, \\Delta, e^{i \\theta(0)} )\nL000692\t:= \\fr{ i H ( e^{i \\xi t} - 1 ) - \\chi_2(t) e^{i \\theta(0)} }{ i \\overline{H} ( e^{i \\xi t} - 1 ) e^{i \\theta(0)} + \\chi_1(t) },\nL000693\t$$\nL000694\twhere $\\xi$ is defined in Eq. \\eqref{Def:xi}, and\nL000695\t$$\nL000696\t\\chi_1( t ) = (\\Delta - \\xi) e^{i \\xi t} - (\\Delta + \\xi),\nL000697\t\\quad\nL000698\t\\chi_2( t ) = (\\Delta + \\xi) e^{i \\xi t} - (\\Delta - \\xi).\nL000699\t$$\nL000700\tIn addition, in the degenerate case $|\\Delta|=|H|$, the solution of the Adler equation (\\ref{Eq:Adler}) is given by\nL000701\t$$\nL000702\te^{i \\theta(t)} = W_0( t, H, \\Delta, e^{i \\theta(0)} )\nL000703\t:= z_* + \\fr{e^{i \\theta(0)} - z_*}{1 + ( e^{i \\theta(0)} - z_* ) \\overline{H} t / 2},\nL000704\t$$\nL000705\twhere $z_* = i \\Delta / H$. (For brevity of notation, we do not specify that $\\xi$, $\\chi_1(t)$, $\\chi_2(t)$ and $z_*$ depend on $\\Delta$ and $H$.)\nL000706\t\\label{Prop:Adler}\nL000707\t\\end{proposition}\nL000708\t\nL000709\t{\\bf Proof:}\nL000710\tMultiplying Eq.~(\\ref{Eq:Adler}) by $i e^{i \\theta}$,\nL000711\twe obtain a complex differential equation for $z = e^{i \\theta}$:\nL000712\t\\begin{equation}\nL000713\t\\dot{z} = \\fr{1}{2} H + i \\Delta z - \\fr{1}{2} \\overline{H} z^2.\nL000714\t\\label{Eq:Adler:Complex}\nL000715\t\\end{equation}\nL000716\tFor $|\\Delta|\\ne |H|$, the right-hand side of this equation can be written as\nL000717\t$$\nL000718\t\\fr{1}{2} H + i \\Delta z - \\fr{1}{2} \\overline{H} z^2\nL000719\t= - \\fr{1}{2} \\overline{H} ( z - z_+ ) ( z - z_- ),\nL000720\t$$\nL000721\twhere $z_\\pm = i ( \\Delta \\pm \\xi ) / \\overline{H}$.\nL000722\tUsing the method of separation of variables and the initial condition $z(0) = \\sigma$, we obtain\nL000723\t$$\nL000724\tz(t) = \\fr{z_+ ( \\sigma - z_- ) e^{i \\xi t} - z_- ( \\sigma - z_+ )}{ ( \\sigma - z_- ) e^{i \\xi t} - ( \\sigma - z_+ )},\nL000725\t$$\nL000726\tor equivalently $e^{i \\theta(t)} = W( t, H, \\Delta, e^{i \\theta(0)} )$.\nL000727\t\nL000728\tIn the degenerate case $|\\Delta|=|H|$, we have $z_+ = z_- = z_*$. Integrating Eq.~(\\ref{Eq:Adler:Complex}), we obtain $e^{i \\theta(t)} = W_0( t, H, \\Delta, e^{i \\theta(0)} )$.\nL000729\t\\qed\nL000730\t\\\\\nL000731\t\nL000732\t\\begin{remark}\nL000733\tIn the case $|\\Delta| \\ne |H|$, we can write\nL000734\t$$\nL000735\tW( t, H, \\Delta, \\sigma ) = H a_1(t) + \\fr{a_2( t) \\sigma}{1 + \\overline{H} a_1( t) \\sigma},\nL000736\t$$\nL000737\twith\nL000738\t$$\nL000739\ta_1(t) = \\fr{i (e^{i \\xi t} - 1)}{\\chi_1(t)}\nL000740\t\\quad\\mbox{and}\\quad\nL000741\ta_2(t) = \\fr{4 \\xi^2 e^{i \\xi t}}{\\chi_1^2(t)}.\nL000742\t$$\nL000743\tMoreover, in this case, we have $|H a_1(t)| < 1$, and hence\nL000744\t$$\nL000745\tW(t, H, \\Delta, \\sigma) = H a_1(t) + a_2(t) \\sum\\limits_{n=0}^\\infty (-1)^n \\overline{H}^n a_1^n(t) \\sigma^{n+1}\nL000746\t$$\nL000747\tis an absolutely convergent series for $|\\sigma|\\le 1$.\nL000748\t\\label{Remark:W}\nL000749\t\\end{remark}\nL000750\t\nL000751\t\\begin{remark}\nL000752\tIf $(r_\\infty,\\Omega_\\infty)\\in(0,1)\\times\\mathbb{R}$ satisfy\nL000753\tthe self-consistency equation~\\eqref{Eq:SC}, it can be easily verified\nL000754\tthat $z_\\varphi(\\omega)$ defined by~\\eqref{Formula:zphi} is a fixed point\nL000755\tof the Adler equation~(\\ref{Eq:Adler}) with $\\Delta = \\omega - \\Omega_\\infty$\nL000756\tand $H = - i K r_\\infty e^{i \\phi}$. Therefore,\nL000757\t$$\nL000758\tW\\left(t, - i K r_\\infty e^{i \\phi}, \\omega - \\Omega_\\infty, z_\\phi(\\omega) \\right) = z_\\phi(\\omega)\nL000759\t$$\nL000760\tfor all $t,\\omega,\\phi\\in\\mathbb{R}$.\nL000761\t\\label{Remark:W_z0}\nL000762\t\\end{remark}\nL000763\t\nL000764\t\\begin{remark}\nL000765\tUnder the assumptions of Remark~\\ref{Remark:W_z0},\nL000766\tusing Remark~\\ref{Remark:W} and formula~\\eqref{Formula:OA}, we can show\nL000767\t\\begin{eqnarray*}\nL000768\t&&\nL000769\t\\int_0^{2\\pi} e^{i \\theta} \\overline{W}( t, H, \\Delta, e^{i \\theta} ) \\fr{f_\\phi(\\theta,\\omega)}{g(\\omega)} d\\theta\nL000770\t= \\int_0^{2\\pi} \\left[ \\overline{H a_1(t)} e^{i \\theta} \\vphantom{\\sum\\limits_{n=0}^\\infty} \\right. \\\\\nL000771\t&&\nL000772\t\\left. + \\overline{a_2(t)} \\sum\\limits_{n=0}^\\infty (-1)^n H^n \\overline{a_1^n(t)} e^{-i n \\theta} \\right]\nL000773\t\\fr{f_\\phi(\\theta,\\omega)}{g(\\omega)} d\\theta \\\\\nL000774\t&&\nL000775\t= \\overline{H a_1(t)} z_\\phi(\\omega) + \\overline{a_2(t)} \\sum\\limits_{n=0}^\\infty (-1)^n H^n \\overline{a_1^n(t)} \\overline{z}_\\phi^n(\\omega) \\\\\nL000776\t&&\nL000777\t= \\overline{H a_1(t)} \\left( z_\\phi(\\omega) - \\fr{1}{\\overline{z_\\phi(\\omega)}} \\right) + \\fr{1}{\\overline{z_\\phi(\\omega)}} \\overline{W( t, H, \\Delta, z_\\phi(\\omega) )} \\\\\nL000778\t&&\nL000779\t= \\fr{\\overline{H a_1(t)}}{\\overline{z_\\phi(\\omega)}} ( |z_\\phi(\\omega)|^2 - 1 ) + 1.\nL000780\t\\end{eqnarray*}\nL000781\t\\label{Remark:Integral}\nL000782\t\\end{remark}\nL000783\t\nL000784\t\nL000785\t\nL000786\t\nL000787\t\nL000788\t\\section{Derivation of Eq.~\\eqref{Formula:R:ps} from Eq.~\\eqref{Formula:U1}}\nL000789\t\\label{app:Derivation}\nL000790\t\nL000791\tUsing~\\eqref{Def:h} it is easy to verify that\nL000792\t\\begin{equation}\nL000793\t|H|\\,  h\\left( \\fr{\\Delta}{|H|} \\right) = \\left\\{\nL000794\t\\begin{array}{lcl}\nL000795\t\\Delta - \\xi\\:\\mathrm{sgn}(\\Delta) & \\mbox{ for } & |\\Delta| > |H|,\\\\[2mm]\nL000796\t\\Delta + \\xi & \\mbox{ for } & |\\Delta|\\le |H|,\nL000797\t\\end{array}\nL000798\t\\right.\nL000799\t\\label{Formula:H:h}\nL000800\t\\end{equation}\nL000801\twhere $\\xi$ is given by~\\eqref{Def:xi}.\nL000802\tNote that formula~\\eqref{Formula:H:h} holds for all $\\Delta\\in\\mathbb{R}$ and $H\\in\\mathbb{C}$.\nL000803\t\nL000804\t\nL000805\t\\begin{figure*}\nL000806\t\\begin{center}\nL000807\t\\begin{overpic}\nL000808\t[width=0.32\\textwidth,angle=0]{Gauss_zeta_Re_K3p0.png}\nL000809\t     \\put(47,-7){\\small (a)}\nL000810\t\\end{overpic}\nL000811\t\\begin{overpic}\nL000812\t[width=0.32\\textwidth,angle=0]{Gauss_zeta_Im_K3p0.png}\nL000813\t     \\put(47,-7){\\small (b)}\nL000814\t\\end{overpic}\\begin{overpic}\nL000815\t[width=0.32\\textwidth,angle=0]{Gauss_dpsic_K3p0.png}\nL000816\t     \\put(47,-7){\\small (c)}\nL000817\t\\end{overpic}\nL000818\t\\end{center}\nL000819\t\\caption{\nL000820\tEmpirical histograms of the real (a) and imaginary (b) part of the fluctuations $\\zeta$\nL000821\tand of $d[{\\rm{arg}}Z_\\mathrm{c}(t)]/dt$ centered around $\\Omega_\\infty\\approx -1.71$\nL000822\t(c) for the KS model (\\ref{Eq:KS:original}) with $N=1,000$ oscillators,\nL000823\tphase lag $\\lambda=\\pi/4$, and $K=3$.\nL000824\tThe continuous lines (online red) show a best-fit Gaussian with the same variance.\nL000825\t}\nL000826\t\\label{Fig:Gaussianity}\nL000827\t\\end{figure*}\nL000828\t\nL000829\tNow, we consider the integrand of Eq.~\\eqref{Formula:U1},\nL000830\trecalling that $H = K Z_\\infty e^{-i \\lambda} = - i K r_\\infty e^{i \\phi}$.\nL000831\tRecognizing that in this case\nL000832\t$$\nL000833\t\\fr{H}{z_\\phi(\\omega)} = - \\fr{i K r_\\infty e^{i \\phi}}{e^{i \\phi} h\\left(\\fr{\\omega-\\Omega_\\infty}{K r_\\infty}\\right)}\nL000834\t= - \\fr{i |H|}{h\\left(\\fr{\\Delta}{|H|}\\right)}\nL000835\t$$\nL000836\tdoes not depend on $\\phi$, we find\nL000837\t\\begin{eqnarray}\nL000838\t&&\nL000839\t\\fr{H a_1(\\tau)}{z_\\phi(\\omega)} - 1 =\nL000840\t- \\fr{i |H|}{h\\left(\\fr{\\Delta}{|H|}\\right)} \\fr{i (e^{i \\xi t} - 1)}{\\chi_1(t)} - 1 \\nonumber\\\\[2mm]\nL000841\t&&\nL000842\t=\nL000843\t\\fr{|H|^2}{|H| h\\left(\\fr{\\Delta}{|H|}\\right)} \\fr{e^{i \\xi t} - 1}{(\\Delta - \\xi) e^{i \\xi t} - (\\Delta + \\xi)} - 1.\nL000844\t\\label{Formula:H:a:z_phi}\nL000845\t\\end{eqnarray}\nL000846\tFor $\\Delta > |H|$, upon using~\\eqref{Formula:H:h} and the identity $\\Delta^2 - \\xi^2 = |H|^2$,\nL000847\t\\eqref{Formula:H:a:z_phi} is written as\nL000848\t\\begin{eqnarray*}\nL000849\t&&\nL000850\t\\fr{H a_1(\\tau)}{z_\\phi(\\omega)} - 1 =\nL000851\t\\fr{|H|^2 ( e^{i \\xi t} - 1 )}{(\\Delta - \\xi)^2 e^{i \\xi t} - (\\Delta + \\xi) (\\Delta - \\xi)} - 1 \\\\[2mm]\nL000852\t&&\nL000853\t= \\fr{e^{i \\xi t} - 1}{h^2(\\Delta/|H|) e^{i \\xi t} - 1} - 1\nL000854\t= \\fr{1 - h^2(\\Delta/|H|)}{h^2(\\Delta/|H|) - e^{-i \\xi t}}.\nL000855\t\\end{eqnarray*}\nL000856\tSimilarly, for $\\Delta \\le |H|$ we obtain\nL000857\t$$\nL000858\t\\fr{H a_1(\\tau)}{z_\\phi(\\omega)} - 1\nL000859\t= \\fr{1 - h^2(\\Delta/|H|)}{h^2(\\Delta/|H|) - e^{i \\xi t}},\nL000860\t$$\nL000861\tand thus in both cases we have\nL000862\t$$\nL000863\t\\fr{H a_1(\\tau)}{z_\\phi(\\omega)} - 1\nL000864\t= \\fr{1 - h^2(\\Delta/|H|)}{h^2(\\Delta/|H|) - e^{-i \\Delta \\sqrt{1 - |H|^2/\\Delta^2} t}}.\nL000865\t$$\nL000866\tSubstituting into Eq.~\\eqref{Formula:U1}, we obtain Eq.~\\eqref{Formula:R:ps}.\nL000867\t\nL000868\t\nL000869\t\nL000870\t\nL000871\t\\section{Pseudo-covariance function for a partially synchronized state}\nL000872\t\\label{app:Pseudocov}\nL000873\t\nL000874\tUsing the definition of the pseudo-covariance function $\\tilde R_{\\rm{ps}}(t) = \\langle \\zeta(t) \\zeta(t+\\tau) \\rangle$\nL000875\tand employing the established independence of the functions $e^{i \\theta_j(t)}$ and $e^{i \\theta_k(t)}$ for $j\\ne k$,\nL000876\tby analogy with \\eqref{Formula:R:ps2}, we obtain\nL000877\t$$\nL000878\t\\tilde{R}_\\mathrm{ps}(\\tau) = \\frac{1}{N}\nL000879\t\\sum\\limits_{j\\in\\mathcal{R}} \\langle e^{i \\theta_j(t)} e^{i \\theta_j(t+\\tau)} \\rangle\nL000880\t- \\frac{1}{N}\nL000881\t\\sum\\limits_{j\\in\\mathcal{R}} \\langle e^{i \\theta_j(t)} \\rangle^2.\nL000882\t$$\nL000883\tUsing the ergodicity property~\\eqref{Ergodicity}\nL000884\tand performing calculations as in Remark~\\ref{Remark:Integral}, we find\nL000885\t\\begin{eqnarray*}\nL000886\t&&\nL000887\t\\langle e^{i \\theta_j(t)} e^{i \\theta_j(t+\\tau)} \\rangle\nL000888\t=\nL000889\t\\int\\limits_0^{2\\pi} e^{i \\theta} W( \\tau, H_\\infty,\\Delta_j, e^{i \\theta} ) \\fr{f_\\phi(\\theta,\\omega_j)}{g(\\omega_j)} d\\theta \\\\\nL000890\t&&\nL000891\t= z_\\phi(\\omega_j) W( \\tau, H_\\infty, \\Delta_j, z_\\phi(\\omega_j) ) = z_\\phi^2(\\omega_j).\nL000892\t\\end{eqnarray*}\nL000893\tRecalling that $\\langle e^{i \\theta_j(t)} \\rangle = z_\\phi(\\omega_j)$,\nL000894\twe obtain $\\tilde{R}_\\mathrm{ps}(\\tau) = 0$.\nL000895\tNote that this relation is valid regardless of the choice of $\\phi$\nL000896\tin the definition of the corotating frame~\\eqref{Def:Frame:phi}.\nL000897\t\nL000898\t\nL000899\t\nL000900\t\nL000901\t\\section{Details of the numerical setup}\nL000902\t\\label{app:num}\nL000903\t\nL000904\tGiven a distribution $g(\\omega)$, we generate a set of $N$ natural frequencies $\\omega_j$ according to\nL000905\t$$\nL000906\t\\int_{-\\infty}^{\\omega_j} g(\\omega) d\\omega = \\fr{j}{N + 1},\nL000907\t\\qquad\nL000908\tj=1,\\dots,N.\nL000909\t$$\nL000910\tThis equiprobable sampling avoids finite-size effects such as randomly clustered natural frequencies leading to small synchronized clusters with non-zero mean frequencies and their respective interactions~\\cite{PetP2018,FialkowskiEtAl23}. For each pair of parameters $K$ and $\\lambda$, we perform simulations using a standard Runge-Kutta solver with constant time step $dt = 0.02$. We start from initial conditions chosen randomly from the interval $[0,2\\pi]$, discard a transient period of $T_\\mathrm{transient} = 10^5$ time units and use the subsequent interval of length $T_\\mathrm{max} = 10^5$ time units to calculate statistical quantities such as means, variances, and covariances.\nL000911\t\nL000912\t\nL000913\t\nL000914\t\nL000915\t\\section{Numerical evidence for the assumption on the Gaussianity of fluctuations}\nL000916\t\\label{app:CLT}\nL000917\t\nL000918\tPrevious work \\cite{YueG2024,IrvG2025} has shown numerically\nL000919\tthat finite-size fluctuations in the Kuramoto-Sakaguchi model (\\ref{Eq:KS:original})\nL000920\tconstitute a Gaussian process, consistent with an underlying central limit theorem.\nL000921\tFor completeness, we provide here further numerical evidence.\nL000922\tFig.~\\ref{Fig:Gaussianity}(a) and (b) show the empirical histogram\nL000923\tof the real and the imaginary part of the fluctuations $\\zeta$\nL000924\tobtained from a long time simulation over $50,000$ time units\nL000925\twith a sampling time of $dt=0.05$ of the KS model together\nL000926\twith a best fit Gaussian clearly establishing the Gaussian character of the fluctuations.\nL000927\tFor $K=3$ we find a value of the skewness for the real and imaginary part\nL000928\tof the fluctuations $\\zeta$ of $-0.058$ and $-0.051$, respectively,\nL000929\tand a kurtosis of $2.98$ for both. We further show in Fig.~\\ref{Fig:Gaussianity}(c)\nL000930\tthe empirical histogram for the temporal derivative of the mean phase\nL000931\tof the entrained oscillators $\\tfrac{d}{dt}{\\rm{arg}} Z_c(t)$,\nL000932\twhich also shows a clear Gaussian statistics,\nL000933\tconsistent with the phase diffusion discussed below.\nL000934\t\nL000935\t\\begin{figure*}\nL000936\t\\begin{center}\nL000937\t\\begin{overpic}\nL000938\t    [width=0.32\\textwidth,angle=0]{Var_N_r.png}\nL000939\t     \\put(47,-7){\\small (a)}\nL000940\t\\end{overpic}\nL000941\t\\begin{overpic}\nL000942\t[width=0.32\\textwidth,angle=0]{Var_N_Rezeta.png}\nL000943\t     \\put(47,-7){\\small (b)}\nL000944\t\\end{overpic}\\begin{overpic}\nL000945\t[width=0.32\\textwidth,angle=0]{Var_N_Imzeta.png}\nL000946\t     \\put(47,-7){\\small (c)}\nL000947\t\\end{overpic}\nL000948\t\\end{center}\nL000949\t\\caption{\nL000950\tVariance of the order parameter $r(t)$ (a) and of the real (b) and imaginary (c) part of the fluctuations $\\tilde \\zeta(t) =  Z_{\\rm{mod}}(t)-\\langle Z_{\\rm{mod}} \\rangle$ as a function of the non-entrained oscillators $N_r$ for the KS model (\\ref{Eq:KS:original}) with phase lag $\\lambda=\\pi/4$ and $K=3$ for $N=60, 125, 250, 500, 1000$. The continuous lines (online red) are lines of best fit indicating a scaling law of $N_r^{-0.96}$, $N_r^{-0.96}$ and $N_r^{-0.95}$, respectively.\nL000951\t}\nL000952\t\\label{Fig:V_N}\nL000953\t\\end{figure*}\nL000954\t\nL000955\t\nL000956\tTo further establish numerical evidence for an underlying central limit theorem\nL000957\twe show in Fig.~\\ref{Fig:V_N} that the variance of the fluctuations $\\zeta/\\sqrt{N}$\nL000958\tscales with the number of non-entrained oscillators $N_r$ as $1/N_r$,\nL000959\tas expected for Gaussian fluctuations described by an underlying central limit theorem.\nL000960\tWe show the scaling for the variance of the order parameter in Fig.~\\ref{Fig:V_N}(a)\nL000961\tand of the real and imaginary part of the fluctuations $\\zeta$ in Fig.~\\ref{Fig:V_N} (b)\nL000962\tand (c), respectively.\nL000963\t\nL000964\t\\begin{figure}[b]\nL000965\t\\begin{center}\nL000966\t\\includegraphics[width=0.9\\columnwidth,angle=0]{Cov_K_N1000.png}\nL000967\t\\end{center}\nL000968\t\\caption{\nL000969\tNormalized covariance $R_{\\rm{ps}}(\\tau)/R_{\\rm{ps}}(0)$ (real part only)\nL000970\tof the KS model~(\\ref{Eq:KS:original}) for partially synchronized states\nL000971\twith $N=1,000$ oscillators at $\\lambda = \\pi/4$\nL000972\tfor various values of the coupling strength $K$.\nL000973\t}\nL000974\t\\label{Fig:Cov_K}\nL000975\t\\end{figure}\nL000976\t\nL000977\t\nL000978\tWe remark that the central limit theorem holds\nL000979\tfor all values of the coupling strength $K>K_{\\rm{crit}}$.\nL000980\tFor $K=1.98$ we find a value of the skewness for the real and imaginary part\nL000981\tof the fluctuations $\\zeta$ of $-0.024$ and $-0.007$,\nL000982\tand a kurtosis of $2.98$ and $3.04$, respectively, suggestive of a Gaussian distribution.\nL000983\tThe Gaussian character of the empirical probability density function of the fluctuations alone,\nL000984\thowever, is not sufficient for the existence of a functional central limit theorem\nL000985\twhich is concerned with convergence to a stochastic process\nL000986\trather than to just random variables.\nL000987\tWe show in Figure~\\ref{Fig:Cov_K} plots of the covariance function of the real part\nL000988\tof the fluctuations, $\\mathrm{Re}\\, R_\\mathrm{ps}(\\tau)$\nL000989\twhich decays to zero for all $K> K_{\\rm{crit}}$\nL000990\twith the decay of correlation time increasing when approaching criticality.\nL000991\t\nL000992\t\nL000993\t\nL000994\t\nL000995\t\\section{Validity and limitations of the theory}\nL000996\t\\label{app:lim}\nL000997\t\nL000998\t\nL000999\t\\begin{figure}[h]\nL001000\t\\begin{center}\nL001001\t\\includegraphics[height=0.9\\columnwidth,angle=270]{VarScalingN.pdf}\\\\[4mm]\nL001002\t\\includegraphics[height=0.9\\columnwidth,angle=270]{L2ScalingN.pdf}\nL001003\t\\end{center}\nL001004\t\\caption{\nL001005\t(a) Scaling of the variance~$V$\nL001006\twith system size $N$\nL001007\tfor three different values of the coupling strength $K$, with $\\lambda=\\pi/4$.\nL001008\tSymbols show empirical values\nL001009\tobtained from numerical simulations\nL001010\tof the KS model~(\\ref{Eq:KS:original}).\nL001011\tThick lines show the theoretical predictions given by formulas~(\\ref{Formula:V:ps}) and~(\\ref{Formula:incoh:r}).\nL001012\t(b) $L^2$-distance between the empirical\nL001013\tcovariance $R_N(\\tau)$ and its theoretical prediction $R(\\tau)$ given by formulas~(\\ref{Formula:R:ps}) and~(\\ref{Formula:R:incoh}).\nL001014\tParameters as in panel~(a).\nL001015\t}\nL001016\t\\label{Fig:VarL2ScalingN}\nL001017\t\\end{figure}\nL001018\t\nL001019\tThe analytical results obtained in the main text\nL001020\tare approximate in two respects.\nL001021\tOn the one hand, if we fix the parameters $K$\nL001022\tand $\\lambda$ in the KS model~(\\ref{Eq:KS:original})\nL001023\tand vary the system size~$N$,\nL001024\twe observe that the empirical value of the variance~$V_N$\nL001025\tchanges slightly with increasing $N$\nL001026\tand then remains almost constant for $N\\ge 1,000$,\nL001027\tsee Fig.~\\ref{Fig:VarL2ScalingN}(a).\nL001028\tMoreover, for large values of~$K$\nL001029\tthese changes exhibit a power law scaling\nL001030\tshown in Fig.~\\ref{Fig:ScalingK6_0}. Recall that the classical scaling $1/N$ of the variance has already been explicitly used in the definition of the fluctuations (cf. (\\ref{Def:zeta}) and (\\ref{Def:delta})).\nL001031\tOn the other hand, even for large~$N$\nL001032\tthere is a small discrepancy\nL001033\tbetween the theoretical predictions~(\\ref{Formula:V:ps}) and~(\\ref{Formula:incoh:r})\nL001034\tand the empirical characteristics of the fluctuations\nL001035\tin the KS model~(\\ref{Eq:KS:original}). This discrepancy, however,\nL001036\tdecreases the further the parameter $K$\nL001037\tis from its critical value at $K\\approx 1.92$,\nL001038\tsee Fig.~\\ref{Fig:VarScalingK_rel}.\nL001039\tA similar scaling behavior also holds for the $L^2$-distance between\nL001040\tthe empirical covariance $R_N(\\tau)$\nL001041\tand its theoretical prediction $R(\\tau)$\nL001042\tgiven by formulas~(\\ref{Formula:R:ps}) and~(\\ref{Formula:R:incoh}),\nL001043\tsee Fig.~\\ref{Fig:VarL2ScalingN}(b).\nL001044\tThus, we conjecture that our analytical results\nL001045\tare accurate only in the asymptotic regime\nL001046\tof large system sizes $N$ and equation parameters $K$ and $\\lambda$, far from the synchronization transition point.\nL001047\tOutside this regime, we expect our results\nL001048\tto provide only good approximations of the actual values.\nL001049\t\nL001050\t\nL001051\t\nL001052\t\\begin{figure}[ht]\nL001053\t\\begin{center}\nL001054\t\\includegraphics[height=0.9\\columnwidth,angle=270]{ScalingK6_0.pdf}\nL001055\t\\end{center}\nL001056\t\\caption{\nL001057\tScaling of the discrepancy between the empirical value of the variance $V_N$ and the average~$\\tilde{V}$\nL001058\tof the last four points\nL001059\tfor $K = 6$ and $\\lambda=\\pi/4$.\nL001060\tThe line shows a best linear fit suggesting $|V_N-\\tilde V| \\sim 1/N^{0.86}$.\nL001061\t}\nL001062\t\\label{Fig:ScalingK6_0}\nL001063\t\\end{figure}\nL001064\t\nL001065\t\nL001066\t\nL001067\t\\begin{figure}[ht]\nL001068\t\\begin{center}\nL001069\t\\includegraphics[height=0.9\\columnwidth,angle=270]{VarScalingK_rel.pdf}\nL001070\t\\end{center}\nL001071\t\\caption{\nL001072\tRelative discrepancy between the empirical value of the variance $V_N$ and its theoretical prediction~$V$\nL001073\tgiven by formulas~(\\ref{Formula:V:ps}) and~(\\ref{Formula:incoh:r}) as function of the coupling strength $K$. The critical coupling strength is approximately given by $K_\\mathrm{crit}\\approx 1.92$.\nL001074\tParameters: $\\lambda=\\pi/4$.\nL001075\t}\nL001076\t\\label{Fig:VarScalingK_rel}\nL001077\t\\end{figure}\nL001078\t\nL001079\t\nL001080\tIn the following we will further investigate the requirement for sufficiently large system sizes $N$ and the requirement of being sufficiently far from criticality, and how it relates to our assumptions of Gaussian fluctuations and the replacement of the time-varying rotation frequency and order parameter by their stationary thermodynamic limits in the Adler equation.\nL001081\tFrom the previous Appendix~\\ref{app:CLT} it is clear that in order for the central limit theorem to be valid we require sufficiently large values of $N$. Indeed, for small values of $N=50$ we only have $N_r=6$ for $K=4$. Figure~\\ref{Fig:GaussianityN50}(a) and (b) clearly show that the empirical histograms of the real and imaginary parts of fluctuations $\\zeta$ are far from Gaussian. The speed of the phase of the synchronized order parameter $d[{\\rm{arg}}Z_\\mathrm{c}(t)]/dt$ is still Gaussian, illustrating the phase diffusion discussed below.\nL001082\t\nL001083\t\\begin{figure*}[t]\nL001084\t\\begin{center}\nL001085\t\\begin{overpic}\nL001086\t    [width=0.32\\textwidth,angle=0]{Gauss_zeta_Re_K4p0_N50.png}\nL001087\t     \\put(47,-7){\\small (a)}\nL001088\t\\end{overpic}\nL001089\t\\begin{overpic}\nL001090\t[width=0.32\\textwidth,angle=0]{Gauss_zeta_Im_K4p0_N50.png}\nL001091\t     \\put(47,-7){\\small (b)}\nL001092\t\\end{overpic}\\begin{overpic}\nL001093\t[width=0.32\\textwidth,angle=0]{Gauss_dpsic_K4p0_N50.png}\nL001094\t     \\put(47,-7){\\small (c)}\nL001095\t\\end{overpic}\\end{center}\nL001096\t\\caption{\nL001097\tEmpirical histograms of the real (a) and imaginary (b) part of the fluctuations $\\zeta$ and of $d[{\\rm{arg}}Z_\\mathrm{c}(t)]/dt$ centered around $\\Omega_\\infty\\approx  -2.39$ (c) for the KS model (\\ref{Eq:KS:original}) with $N=50$ oscillators,\nL001098\tphase lag $\\lambda=\\pi/4$, and $K=4$.\nL001099\tThe continuous lines (online red) show a best-fit Gaussian with the same variance.\nL001100\t}\nL001101\t\\label{Fig:GaussianityN50}\nL001102\t\\end{figure*}\nL001103\t\nL001104\t\\begin{figure}\nL001105\t\\begin{center}\nL001106\t\\includegraphics[width=0.45\\columnwidth,angle=270]{FluctuationsN1000.pdf}\nL001107\t\\end{center}\nL001108\t\\caption{\nL001109\tRatio of the standard deviation of the fluctuations $\\sqrt{V}$ of the order parameter $r(t)$ and its mean $\\langle r(t)\\rangle$ for $N=1,000$ oscillators at $\\lambda=\\pi/4$ as a function of the coupling strength $K$.\nL001110\t}\nL001111\t\\label{Fig:ratio_K}\nL001112\t\\end{figure}\nL001113\t\nL001114\tThe explicit expressions for the covariance functions crucially depends\nL001115\ton the explicit solution of the Adler equation (\\ref{eq:Adler0}).\nL001116\tTo obtain the Adler equation we neglected fluctuations of the modified order parameter,\nL001117\treplacing $Z_\\mathrm{mod}(t)$ by its constant thermodynamic limit.\nL001118\tThis is only valid provided the fluctuations are small in size\nL001119\tcompared to the thermodynamic mean values.\nL001120\tApproaching criticality, however, the size of fluctuations increases.\nL001121\tFigure~\\ref{Fig:ratio_K} shows the ratio of the standard deviation\nL001122\tof the fluctuations $\\sqrt{V}$ of the order parameter $r(t)$\nL001123\tand its mean as a function of the coupling strength $K$.\nL001124\tIt is clearly seen how fluctuations increase rapidly in size\nL001125\twhen approaching criticality at $K_{\\rm{crit}}\\approx 1.92$.\nL001126\tThis implies that the Adler equation and its solution become less valid closer to criticality.\nL001127\tHence, the quality of our theory depends on the value of the coupling strength $K$.\nL001128\tIndeed, Figure 2(c) in the main text illustrates that our theory works well\nL001129\tfor coupling strengths sufficiently far from criticality,\nL001130\tand gets worse the closer we approach criticality.\nL001131\t\nL001132\t\nL001133\t\nL001134\t\nL001135\t\\section{Additional numerical results}\nL001136\t\\label{app:addnum}\nL001137\tTo demonstrate how the accuracy of our method changes\nL001138\tas we approach the critical coupling strength $K_\\mathrm{crit} \\approx 1.92$,\nL001139\twe show in Figs.~\\ref{Fig:Covariances:K5}--\\ref{Fig:Covariances:K2} additional results\nL001140\tfor partially synchronized states at $K = 5, 4, 3, 2$ for $\\lambda = \\pi/4$,\nL001141\tand in Fig.~\\ref{Fig:Covariances:K1} additional results\nL001142\tfor a completely incoherent state at $K = 1$ and $\\lambda = \\pi/4$.\nL001143\tWe plot results from numerical simulations of the the KS model~(\\ref{Eq:KS:original})\nL001144\tand of our theory, Eq.~(\\ref{Formula:R:ps}) for the partially synchronized case\nL001145\tand Eq.~(\\ref{Formula:R:incoh}) for the incoherent state, respectively.\nL001146\t\nL001147\t\\begin{figure}\nL001148\t\\begin{center}\nL001149\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K5.pdf}\\hspace{0.02\\columnwidth}\nL001150\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K5.pdf}\\\\[1mm]\nL001151\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K5_.pdf}\\hspace{0.02\\columnwidth}\nL001152\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K5_.pdf}\nL001153\t\\end{center}\nL001154\t\\caption{Covariance $R(\\tau)$ and pseudo-covariance $\\tilde{R}(\\tau)$\nL001155\tof the complex order parameter fluctuation $\\zeta(t)$\nL001156\tfor a partially synchronized state at $K = 5$ and $\\lambda = \\pi/4$\nL001157\tin the KS model \\eqref{Eq:KS:original}.\nL001158\tNumerical simulations (solid curve) vs. theoretical prediction \\eqref{Formula:R:ps} (dashed curve).}\nL001159\t\\label{Fig:Covariances:K5}\nL001160\t\\end{figure}\nL001161\t\nL001162\t\\begin{figure}\nL001163\t\\begin{center}\nL001164\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K4.pdf}\\hspace{0.02\\columnwidth}\nL001165\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K4.pdf}\\\\[1mm]\nL001166\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K4_.pdf}\\hspace{0.02\\columnwidth}\nL001167\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K4_.pdf}\nL001168\t\\end{center}\nL001169\t\\caption{The same fluctuation characteristics as in Fig.~\\ref{Fig:Covariances:K5}\nL001170\tbut for a partially synchronized state at $K = 4$ and $\\lambda = \\pi/4$.}\nL001171\t\\label{Fig:Covariances:K4}\nL001172\t\\end{figure}\nL001173\t\nL001174\t\\begin{figure}\nL001175\t\\begin{center}\nL001176\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K3.pdf}\\hspace{0.02\\columnwidth}\nL001177\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K3.pdf}\\\\[1mm]\nL001178\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K3_.pdf}\\hspace{0.02\\columnwidth}\nL001179\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K3_.pdf}\nL001180\t\\end{center}\nL001181\t\\caption{The same fluctuation characteristics as in Fig.~\\ref{Fig:Covariances:K5}\nL001182\tbut for a partially synchronized state at $K = 3$ and $\\lambda = \\pi/4$.}\nL001183\t\\label{Fig:Covariances:K3}\nL001184\t\\end{figure}\nL001185\t\nL001186\t\\begin{figure}\nL001187\t\\begin{center}\nL001188\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K2.pdf}\\hspace{0.02\\columnwidth}\nL001189\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K2.pdf}\\\\[1mm]\nL001190\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K2_.pdf}\\hspace{0.02\\columnwidth}\nL001191\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K2_.pdf}\nL001192\t\\end{center}\nL001193\t\\caption{The same fluctuation characteristics as in Fig.~\\ref{Fig:Covariances:K5}\nL001194\tbut for a partially synchronized state at $K = 2$ and $\\lambda = \\pi/4$.}\nL001195\t\\label{Fig:Covariances:K2}\nL001196\t\\end{figure}\nL001197\t\nL001198\t\\begin{figure}\nL001199\t\\begin{center}\nL001200\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K1.pdf}\\hspace{0.02\\columnwidth}\nL001201\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K1.pdf}\\\\[1mm]\nL001202\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ReR_K1_.pdf}\\hspace{0.02\\columnwidth}\nL001203\t\\includegraphics[height=0.48\\columnwidth,angle=270]{ImR_K1_.pdf}\nL001204\t\\end{center}\nL001205\t\\caption{Covariance $R(\\tau)$ and pseudo-covariance $\\tilde{R}(\\tau)$\nL001206\tof the complex order parameter fluctuation $\\zeta(t)$\nL001207\tfor a completely incoherent state at $K = 1$ and $\\lambda = \\pi/4$\nL001208\tin the KS model \\eqref{Eq:KS:original}.\nL001209\tNumerical simulations (solid curve) vs. theoretical prediction \\eqref{Formula:R:incoh} (dashed curve).}\nL001210\t\\label{Fig:Covariances:K1}\nL001211\t\\end{figure}\nL001212\t\nL001213\tIn addition, to demonstrate the effectiveness\nL001214\tof our theoretical formulas for other system parameters,\nL001215\twe present results\nL001216\tfor different values of the phase lag $\\lambda$\nL001217\tand different frequency distributions $g(\\omega)$.\nL001218\tFig.~\\ref{Fig:Others} shows how the variance $V$\nL001219\tof order parameter depends on the coupling strength $K$\nL001220\tfor a unit variance Gaussian distribution (top row),\nL001221\tfor a triangular distribution (middle row)\nL001222\t$$\nL001223\tg(\\omega) = \\left\\{\nL001224\t\\begin{array}{lcl}\nL001225\t1 - |\\omega| & \\mbox{ if } & |\\omega|\\le 1,\\\\[1mm]\nL001226\t0 & \\mbox{ if } & |\\omega| > 1,\nL001227\t\\end{array}\nL001228\t\\right.\nL001229\t$$\nL001230\tand for a Lorentzian distribution (bottom row)\nL001231\t$$\nL001232\tg(\\omega) = \\frac{1}{\\pi (1 + \\omega^2)},\nL001233\t$$\nL001234\tfor several values of the phase lag $\\lambda$.\nL001235\tIt is seen that the quality of our approximations does not significantly depend on neither the frequency distribution nor on the value of the phase lag.\nL001236\t\nL001237\t\\begin{figure*}[t]\nL001238\t\\begin{center}\nL001239\t\\includegraphics[height=0.25\\textwidth,angle=270]{Gaussian_lambda0_2.pdf}\\hspace{0.05\\columnwidth}\nL001240\t\\includegraphics[height=0.25\\textwidth,angle=270]{Gaussian_lambda0_4.pdf}\\hspace{0.05\\columnwidth}\nL001241\t\\includegraphics[height=0.25\\textwidth,angle=270]{Gaussian_lambda0_6.pdf}\\\\[3mm]\nL001242\t\\includegraphics[height=0.25\\textwidth,angle=270]{Triangular_lambda0_2.pdf}\\hspace{0.05\\columnwidth}\nL001243\t\\includegraphics[height=0.25\\textwidth,angle=270]{Triangular_lambda0_4.pdf}\\hspace{0.05\\columnwidth}\nL001244\t\\includegraphics[height=0.25\\textwidth,angle=270]{Triangular_lambda0_6.pdf}\\\\[3mm]\nL001245\t\\includegraphics[height=0.25\\textwidth,angle=270]{Lorentzian_lambda0_2.pdf}\\hspace{0.05\\columnwidth}\nL001246\t\\includegraphics[height=0.25\\textwidth,angle=270]{Lorentzian_lambda0_4.pdf}\\hspace{0.05\\columnwidth}\nL001247\t\\includegraphics[height=0.25\\textwidth,angle=270]{Lorentzian_lambda0_6.pdf}\nL001248\t\\end{center}\nL001249\t\\caption{\nL001250\tVariance~$V$ of the order parameter~$r(t)$\nL001251\tas a function of the coupling strength~$K$\nL001252\tfor different values of the phase lag $\\lambda$ for three frequency distributions $g(\\omega)$:\nL001253\tGaussian (a)--(c), Triangular (d)--(f),\nL001254\tand Lorentzian (g)--(i).\nL001255\tNumerical simulations for the KS model~(\\ref{Eq:KS:original})\nL001256\twith $N = 1,000$ (blue squares)\nL001257\tvs. theoretical predictions (\\ref{Formula:V:ps}) and (\\ref{Formula:incoh:r}) (solid curves).\nL001258\t}\nL001259\t\\label{Fig:Others}\nL001260\t\\end{figure*}\nL001261\t\nL001262\tFinally, in Figure~\\ref{Fig:Comparison:N10000} we show\nL001263\tthat the results for the full KS model~(\\ref{Eq:KS:original}) are indistinguishable by eye\nL001264\twhen a larger network with $10,000$ oscillators is simulated,\nL001265\tindicative that $N=1,000$ are sufficient to study the thermodynamic limit.\nL001266\t\\begin{figure*}[t]\nL001267\t\\begin{center}\nL001268\t\\includegraphics[width=0.2\\textwidth,angle=270]{ReR_K6_mod.pdf}\\hspace{0.05\\textwidth}\nL001269\t\\includegraphics[width=0.2\\textwidth,angle=270]{ImR_K6_mod.pdf}\\hspace{0.05\\textwidth}\nL001270\t\\includegraphics[width=0.2\\textwidth,angle=270]{OPVariance_mod.pdf}\nL001271\t\\end{center}\nL001272\t\\caption{\nL001273\tComparison of the results from numerical simulations\nL001274\tof the KS model~(\\ref{Eq:KS:original}) for $N=1,000$ and $N=10,000$.\nL001275\t(a)-(b): The solid curves show the covariance $R_\\mathrm{ps}(\\tau)$\nL001276\tof fluctuations $\\zeta(t)$ of the modified order parameter $Z_\\mathrm{mod}(t)$\nL001277\tfor a partially synchronized state at $K = 6$ and $\\lambda=\\pi/4$.\nL001278\tDashed curves show the theoretical prediction~(\\ref{Formula:R:ps}).\nL001279\t(c): Variance of the order parameter $V$ as a function of the coupling strength $K$ (squares and crosses).\nL001280\tThe theoretical predictions~(\\ref{Formula:R:ps}) and (\\ref{Formula:V:ps}) are shown as solid curves.\nL001281\t}\nL001282\t\\label{Fig:Comparison:N10000}\nL001283\t\\end{figure*}\nL001284\t\nL001285\t\nL001286\t\nL001287\t\nL001288\t\\section{Phase diffusion}\nL001289\t\\label{app:phasediff}\nL001290\tMean-field theory for partially synchronized states\nL001291\tpredicts that the argument of the complex order parameter\nL001292\t$$\nL001293\tZ(t) = \\frac{1}{N} \\sum\\limits_{j=1}^N e^{i \\psi_j(t)},\nL001294\t$$\nL001295\tuniformly increases or decreases with time.\nL001296\tTo subtract this drift, we can move into the corotating frame of reference and consider $\\arg(Z(t)e^{-i\\Omega t})$,\nL001297\twhere $\\Omega$ is the average speed. However, this quantity experiences non-stationary irregular behaviour,\nL001298\tresembling Brownian motion, as shown in Fig.~\\ref{Fig:Diffusion}.\nL001299\tThis phenomenon is known as {\\it phase diffusion}~\\cite{PikR1999,PikBI2026}.\nL001300\tDue to this phase diffusion, the function $Z(t)e^{-i \\Omega t}$ is difficult to characterize.\nL001301\tTherefore, in our study we work with a modified order parameter\nL001302\t$$\nL001303\tZ_\\mathrm{mod}(t) = Z(t) \\frac{\\overline{Z_\\mathrm{c}(t)}}{|Z_\\mathrm{c}(t)|},\nL001304\t$$\nL001305\twhere\nL001306\t$$\nL001307\tZ_\\mathrm{c}(t) = \\frac{1}{N} \\sum\\limits_{j\\in\\mathcal{C}} e^{i \\psi_j(t)}\nL001308\t$$\nL001309\tis the order parameter, defined as the sum over the coherent\nL001310\t(locked) oscillators only.\nL001311\tIn numerical simulations,\nL001312\twe identify the $j$th oscillator as coherent\nL001313\tif its natural frequency $\\omega_j$ satisfies\nL001314\tthe locking condition\nL001315\t$|\\omega_j - \\Omega| \\le K \\langle |Z(t)| \\rangle$.\nL001316\tIt turns out, that the argument\nL001317\tof the modified order parameter $Z_\\mathrm{mod}(t)$\nL001318\tdoes not exhibit phase diffusion phenomenon,\nL001319\tand the behavior of this complex function\nL001320\tis nicely approximated\nL001321\tby a two-dimensional Gaussian process~\\cite{YueG2024}.\nL001322\tThis numerical observation is crucial for our analytical approach.\nL001323\t\nL001324\t\\begin{figure}[t]\nL001325\t\\begin{center}\nL001326\t\\includegraphics[width=0.9\\columnwidth,angle=0]{Diffusion.pdf}\nL001327\t\\end{center}\nL001328\t\\caption{\nL001329\tPhase diffusion in the KS model~(\\ref{Eq:KS:original}).\nL001330\tThe argument of the complex order parameter\nL001331\tin the uniformly corotating frame (black curve)\nL001332\texhibits non-stationary random walk behavior.\nL001333\tContrary, the argument of the modified\nL001334\torder parameter $Z_\\mathrm{mod}(t)$ (red curve)\nL001335\texhibits stationary statistical behaviour.\nL001336\tShown are numerical results for the KS model~(\\ref{Eq:KS:original})\nL001337\twith $N = 1,000$, $K = 2$, $\\lambda = \\pi/4$,\nL001338\tand a unit width Gaussian frequency distribution $g(\\omega)$.\nL001339\t}\nL001340\t\\label{Fig:Diffusion}\nL001341\t\\end{figure}\nL001342\t\nL001343\t\nL001344\t\nL001345\t\nL001346\t\nL001347\t\\section{Pairwise covariances of rogue oscillators}\nL001348\t\\label{app:indep}\nL001349\tIn Proposition~\\ref{Prop:Adler}, we derived an explicit formula\nL001350\tfor the solutions of the Adler equation~(\\ref{Eq:Adler}).\nL001351\tSimple calculations show that this formula has the equivalent form\nL001352\t$$\nL001353\te^{i \\theta(t)} e^{- i \\theta(0)}\nL001354\t= \\fr{ \\chi_+ e^{i \\xi t} - \\chi_- }{- \\overline{\\chi}_- e^{i \\xi t} + \\overline{\\chi}_+}\nL001355\t= \\fr{ \\chi_+ - \\chi_- e^{-i \\xi t} }{- \\overline{\\chi}_- + \\overline{\\chi}_+ e^{-i \\xi t}},\nL001356\t$$\nL001357\twhere\nL001358\t$$\nL001359\t\\chi_- = i H e^{- i \\theta(0)} - ( \\Delta - \\xi ),\\quad\nL001360\t\\chi_+ = i H e^{- i \\theta(0)} - ( \\Delta + \\xi ).\nL001361\t$$\nL001362\tWe use this form to justify the following statements.\nL001363\t\nL001364\t\\begin{proposition}\nL001365\tIf $\\Delta > |H|$, we have $| \\chi_- / \\chi_+ | < 1$\nL001366\tand the following expansion holds\nL001367\t\\begin{eqnarray}\nL001368\te^{i \\theta(t)}\nL001369\t&=& - \\fr{\\chi_-}{\\overline{\\chi}_+} e^{i \\theta(0)}\nL001370\t+ \\fr{ |\\chi_+|^2 - |\\chi_-|^2 }{ \\overline{\\chi}_+ \\overline{\\chi}_- } e^{i \\theta(0)}\nL001371\t\\sum\\limits_{n=1}^\\infty \\left( \\fr{\\overline{\\chi}_-}{\\overline{\\chi}_+} \\right)^n e^{i n \\xi t}\nL001372\t\\nonumber\\\\[2mm]\nL001373\t&=& \\left\\langle e^{i \\theta(t)} \\right\\rangle - \\fr{2 i \\xi}{\\overline{H}}\nL001374\t\\sum\\limits_{n=1}^\\infty \\left( \\fr{i \\overline{H} e^{i \\theta(0)} + \\Delta - \\xi}{i \\overline{H} e^{i \\theta(0)} + \\Delta + \\xi} \\right)^n e^{i n \\xi t},\nL001375\t\\label{Formula:exp_theta:plus}\nL001376\t\\end{eqnarray}\nL001377\twhere $\\left\\langle e^{i \\theta(t)} \\right\\rangle$\nL001378\tdenotes the time average of $e^{i \\theta(t)}$.\nL001379\tOn the other hand, if $\\Delta < - |H|$, then $| \\chi_+ / \\chi_- | < 1$ and\nL001380\t\\begin{eqnarray*}\nL001381\te^{i \\theta(t)}\nL001382\t&=& - \\fr{\\chi_+}{\\overline{\\chi}_-} e^{i \\theta(0)}\nL001383\t+ \\fr{ |\\chi_-|^2 - |\\chi_+|^2 }{ \\overline{\\chi}_+ \\overline{\\chi}_- } e^{i \\theta(0)}\nL001384\t\\sum\\limits_{n=1}^\\infty \\left( \\fr{\\overline{\\chi}_+}{\\overline{\\chi}_-} \\right)^n e^{-i n \\xi t} \\\\[2mm]\nL001385\t&=& \\left\\langle e^{i \\theta(t)} \\right\\rangle + \\fr{2 i \\xi}{\\overline{H}}\nL001386\t\\sum\\limits_{n=1}^\\infty \\left( \\fr{i \\overline{H} e^{i \\theta(0)} + \\Delta + \\xi}{i \\overline{H} e^{i \\theta(0)} + \\Delta - \\xi} \\right)^n e^{-i n \\xi t}.\nL001387\t\\end{eqnarray*}\nL001388\t\\label{Proposition:Expansions}\nL001389\t\\end{proposition}\nL001390\t\nL001391\t{\\bf Proof:} For brevity, we denote $\\zeta = i H e^{- i \\theta(0)}$.\nL001392\tThen $e^{i \\theta(0)} = i \\overline{\\zeta} / \\overline{H}$.\nL001393\tNext, using the definition $\\xi = \\sqrt{ \\Delta^2 - |H|^2 }$, we obtain\nL001394\t\\begin{eqnarray*}\nL001395\t| \\chi_+ |^2 &=& ( \\zeta - \\Delta - \\xi ) ( \\overline{\\zeta} - \\Delta - \\xi ) \\\\[2mm]\nL001396\t&=& ( \\Delta + \\xi ) ( 2 \\Delta - \\zeta - \\overline{\\zeta} ),\\\\[2mm]\nL001397\t| \\chi_- |^2 &=& ( \\zeta - \\Delta + \\xi ) ( \\overline{\\zeta} - \\Delta + \\xi ) \\\\[2mm]\nL001398\t&=& ( \\Delta - \\xi ) ( 2 \\Delta - \\zeta - \\overline{\\zeta} ),\nL001399\t\\end{eqnarray*}\nL001400\tand\nL001401\t\\begin{eqnarray*}\nL001402\t\\left( |\\chi_+|^2 - |\\chi_-|^2 \\right) e^{i \\theta(0)} &=&\nL001403\t2 \\xi ( 2 \\Delta - \\zeta - \\overline{\\zeta} ) i \\overline{\\zeta} / \\overline{H} \\\\[2mm]\nL001404\t&=& - 2 i \\xi ( \\overline{\\zeta}^2 - 2 \\Delta \\overline{\\zeta} + |H|^2 ) / \\overline{H},\\\\[2mm]\nL001405\t\\overline{\\chi}_+ \\overline{\\chi}_- &=&\nL001406\t( \\overline{\\zeta} - \\Delta - \\xi ) ( \\overline{\\zeta} - \\Delta + \\xi ) \\\\[2mm]\nL001407\t&=& \\overline{\\zeta}^2 - 2 \\Delta \\overline{\\zeta} + |H|^2.\nL001408\t\\end{eqnarray*}\nL001409\tTherefore,\nL001410\t$$\nL001411\t\\fr{ |\\chi_+|^2 - |\\chi_-|^2 }{ \\overline{\\chi}_+ \\overline{\\chi}_- } e^{i \\theta(0)}\nL001412\t= -\\fr{2 i \\xi}{\\overline{H}}.\nL001413\t$$\nL001414\tOn the other hand, we have\nL001415\t$$\nL001416\t\\fr{\\overline{\\chi}_-}{\\overline{\\chi}_+} = \\fr{\\overline{\\zeta} - \\Delta + \\xi}{\\overline{\\zeta} - \\Delta - \\xi} = \\fr{i \\overline{H} e^{i \\theta(0)} + \\Delta - \\xi}{i \\overline{H} e^{i \\theta(0)} + \\Delta + \\xi}.\nL001417\t$$\nL001418\tSummarizing, this gives formula~(\\ref{Formula:exp_theta:plus}).\nL001419\tThe other formula in the proposition can be checked similarly.~\\qed\nL001420\t\nL001421\t\\begin{proposition}\nL001422\tSuppose that $\\theta_j(t)$ and $\\theta_k(t)$\nL001423\tare two solutions of Eq.~(\\ref{Eq:Adler})\nL001424\twith $\\Delta = \\Delta_j$ and $\\Delta = \\Delta_k$, respectively.\nL001425\tThe complex parameter $H$ in Eq.~(\\ref{Eq:Adler})\nL001426\tis assumed to be the same for both indices $j$ and $k$.\nL001427\tIf $|\\Delta_j| > |H|$ and $|\\Delta_k| > |H|$, then\nL001428\t\\begin{eqnarray*}\nL001429\t&&\nL001430\t\\hspace{-7mm}\nL001431\t\\langle e^{i \\theta_j(t)} e^{-i \\theta_k(t+\\tau)} \\rangle\nL001432\t- \\langle e^{i \\theta_j(t)} \\rangle\\: \\langle e^{-i \\theta_k(t)} \\rangle\nL001433\t= \\\\[2mm]\nL001434\t&&\nL001435\t= \\fr{4 \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j\\:\\xi_k\\: \\mathrm{sgn}\\:\\Delta_k}{|H|^2} \\times\\\\[2mm]\nL001436\t&&\nL001437\t\\times \\sum\\limits_{n,m=1}^\\infty\nL001438\t\\left( \\fr{i \\overline{H} e^{i \\theta_j(0)} + \\Delta_j - \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j}{i \\overline{H} e^{i \\theta_j(0)} + \\Delta_j + \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j} \\right)^n \\times\\\\[2mm]\nL001439\t&&\nL001440\t\\times\\left( \\fr{i H e^{-i \\theta_k(0)} - \\Delta_k + \\xi_k\\: \\mathrm{sgn}\\:\\Delta_k}{i H e^{-i \\theta_k(0)} - \\Delta_k - \\xi_k\\: \\mathrm{sgn}\\:\\Delta_k} \\right)^m \\times\\\\[2mm]\nL001441\t&&\nL001442\t\\times e^{- i m \\xi_k \\tau\\: \\mathrm{sgn}\\:\\Delta_k}\nL001443\t\\delta( n \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j - m \\xi_k\\: \\mathrm{sgn}\\:\\Delta_k ),\nL001444\t\\end{eqnarray*}\nL001445\tand\nL001446\t\\begin{eqnarray*}\nL001447\t&&\nL001448\t\\hspace{-7mm}\nL001449\t\\langle e^{i \\theta_j(t)} e^{i \\theta_k(t+\\tau)} \\rangle\nL001450\t- \\langle e^{i \\theta_j(t)} \\rangle\\: \\langle e^{i \\theta_k(t)} \\rangle = \\\\[2mm]\nL001451\t&&\nL001452\t= - \\fr{4 \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j\\:\\xi_k\\: \\mathrm{sgn}\\:\\Delta_k}{\\overline{H}^2} \\times\\\\[2mm]\nL001453\t&&\nL001454\t\\times \\sum\\limits_{n,m=1}^\\infty\nL001455\t\\left( \\fr{i \\overline{H} e^{i \\theta_j(0)} + \\Delta_j - \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j}{i \\overline{H} e^{i \\theta_j(0)} + \\Delta_j + \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j} \\right)^n \\times\\\\[2mm]\nL001456\t&&\nL001457\t\\times\nL001458\t\\left( \\fr{i \\overline{H} e^{i \\theta_k(0)} + \\Delta_k - \\xi_k\\: \\mathrm{sgn}\\:\\Delta_k}{i \\overline{H} e^{i \\theta_k(0)} + \\Delta_k + \\xi_k\\: \\mathrm{sgn}\\:\\Delta_k} \\right)^m \\times\\\\[2mm]\nL001459\t&&\nL001460\t\\times e^{i m \\xi_k \\tau\\: \\mathrm{sgn}\\:\\Delta_k}\nL001461\t\\delta( n \\xi_j\\: \\mathrm{sgn}\\:\\Delta_j + m \\xi_k\\: \\mathrm{sgn}\\:\\Delta_k ),\nL001462\t\\end{eqnarray*}\nL001463\twhere $\\xi_j = \\sqrt{\\Delta_j^2 - |H|^2}$\nL001464\tand $\\xi_k = \\sqrt{\\Delta_k^2 - |H|^2}$.\nL001465\t\\label{Proposition:Covariances}\nL001466\t\\end{proposition}\nL001467\t\nL001468\t{\\bf Proof:} The above formulas are straightforward consequences\nL001469\tof Proposition~\\ref{Proposition:Expansions}\nL001470\tand the identity $\\langle e^{i \\nu t} \\rangle = \\delta(\\nu)$.~\\qed\nL001471\t\nL001472\t\\begin{remark}\nL001473\tIf $\\xi_j$ and $\\xi_k$ in Proposition~\\ref{Proposition:Covariances}\nL001474\tare incommensurable, then\nL001475\t$$\nL001476\t\\langle e^{i \\theta_j(t)} e^{- i \\theta_k(t + \\tau)} \\rangle\nL001477\t=\nL001478\t\\langle e^{i \\theta_j(t)} \\rangle\\: \\langle e^{- i \\theta_k(t + \\tau)} \\rangle\nL001479\t$$\nL001480\tand\nL001481\t$$\nL001482\t\\langle e^{i \\theta_j(t)} e^{i \\theta_k(t + \\tau)} \\rangle\nL001483\t=\nL001484\t\\langle e^{i \\theta_j(t)} \\rangle\\: \\langle e^{i \\theta_k(t + \\tau)} \\rangle.\nL001485\t$$\nL001486\t\\end{remark}\nL001487\t\nL001488\t\nL001489\t\nL001490\t\nL001491\t\nL001492\t\\section{Daido's theory}\nL001493\t\\label{app:daido}\nL001494\tIn~\\cite{Dai1990}, H. Daido proposed an analytical approach to approximate finite-size fluctuations\nL001495\tin the KS model~\\eqref{Eq:KS:original} with $\\lambda = 0$.\nL001496\tIn particular, for the subcritical case he obtained explicit expressions\nL001497\tfor the covariance function and the variance of the complex order parameter.\nL001498\tWe follow here his approach and determine expressions for $\\lambda\\ne 0$\nL001499\tin the subcritical case, and show that unlike for a Lorentz distribution of the natural frequencies\nL001500\tthis method is not well suited for a Gaussian frequency distribution.\nL001501\t\nL001502\tLet us assume that the dynamics of the $i$th oscillator can be represented as\nL001503\t\\begin{equation}\nL001504\t\\psi_i(t) = \\Theta_i(t) + \\fr{1}{\\sqrt{N}} \\vartheta_i(t),\nL001505\t\\label{Ansatz:Daido}\nL001506\t\\end{equation}\nL001507\twhere $\\Theta_i, \\vartheta_i = \\mathcal{O}(1)$ for $N\\to\\infty$.\nL001508\tUpon substitution into the unnumbered equation\nL001509\tbelow (\\ref{Eq:KS:original}) in the main text,\nL001510\twhich we recall for convenience here,\nL001511\t$$\nL001512\t\\dot{\\psi}_i = \\omega_i + K\\: \\mathrm{Im}\\left( Z(t) e^{-i \\psi_i} e^{-i \\lambda} \\right),\nL001513\t$$\nL001514\twe obtain\nL001515\t$$\nL001516\t\\dot{\\Theta}_i + \\fr{1}{\\sqrt{N}} \\dot{\\vartheta}_i = \\omega_i + K\\: \\mathrm{Im}\\left( Z(t) e^{-i ( \\Theta_i + \\vartheta_i / \\sqrt{N} )} e^{-i \\lambda} \\right).\nL001517\t$$\nL001518\tNext, assuming that $\\langle Z(t)\\rangle = 0$ and hence $Z(t) = \\mathcal{O}(1/\\sqrt{N})$,\nL001519\tand equating separately the terms of order $\\mathcal{O}(1)$\nL001520\tand the terms of order $\\mathcal{O}(1/\\sqrt{N})$, we obtain\nL001521\t\\begin{equation}\nL001522\t\\dot{\\Theta}_i = \\omega_i\nL001523\t\\label{Eq:Theta_i}\nL001524\t\\end{equation}\nL001525\tand\nL001526\t\\begin{equation}\nL001527\t\\fr{1}{\\sqrt{N}} \\dot{\\vartheta}_i = K\\: \\mathrm{Im}\\left( Z(t) e^{-i \\Theta_i} e^{-i \\lambda} \\right).\nL001528\t\\label{Eq:vartheta_i}\nL001529\t\\end{equation}\nL001530\tEq.~\\eqref{Eq:Theta_i} is solved by $\\Theta_i(t) = \\omega_i t + \\Theta_i(0)$.\nL001531\tSubstituting this into Eq.~\\eqref{Eq:vartheta_i}, we obtain\nL001532\t$$\nL001533\t\\fr{1}{\\sqrt{N}} \\dot{\\vartheta}_i(t) = K \\int_0^t \\mathrm{Im}\\left( Z(t') e^{-i ( \\omega_i t' + \\Theta_i(0) )} e^{-i \\lambda} \\right) dt'\nL001534\t$$\nL001535\twith $\\vartheta_i(0) = 0$.\nL001536\tFinally, substituting the expressions for the solution to Eqs.~\\eqref{Eq:Theta_i}\nL001537\tand~\\eqref{Eq:vartheta_i} into~\\eqref{Ansatz:Daido}\nL001538\tand then substituting $\\theta_i(t) = \\psi_i(t)$\nL001539\tinto the definition of the complex order parameter~\\eqref{Def:Z},\nL001540\twe obtain a self-consistency equation for $Z(t)$:\nL001541\t\\begin{eqnarray}\nL001542\tZ(t) &=& \\fr{1}{N} \\sum\\limits_{j=1}^N e^{i ( \\omega_i t + \\Theta_i(0) )} \\times\\\\\nL001543\t&\\times& \\left( 1 + i K \\int_0^t \\mathrm{Im}\\left( Z(t') e^{-i ( \\omega_i t' + \\Theta_i(0) )} e^{-i \\lambda} \\right) dt' \\right) \\nonumber\\\\\nL001544\t&=& \\fr{1}{N} \\sum\\limits_{j=1}^N e^{i ( \\omega_j t + \\Theta_j(0) )}\\nonumber\\\\\nL001545\t&+& \\fr{K}{2} e^{-i \\lambda} \\int_0^t Z(t') \\fr{1}{N} \\sum\\limits_{j=1}^N e^{i \\omega_j (t - t')} dt' \\nonumber\\\\\nL001546\t&-& \\fr{K}{2} e^{i \\lambda} \\int_0^t \\overline{Z}(t') \\fr{1}{N} \\sum\\limits_{j=1}^N e^{i ( \\omega_j (t + t') + 2 \\Theta_j(0) )} dt',\nL001547\t\\label{Eq:Z:Daido}\nL001548\t\\end{eqnarray}\nL001549\twhere we employed a Taylor expansion of the exponential function for $|Z(t)|\\ll 1$.\nL001550\t\nL001551\tIn the next step, we will obtain an asymptotic formula for $Z(t)$ as $t\\to\\infty$.\nL001552\tFor this, we first notice that the function\nL001553\t$$\nL001554\t\\fr{1}{N} \\sum\\limits_{j=1}^N e^{i ( \\omega_j (t + t') + 2 \\Theta_j(0) )}\nL001555\t$$\nL001556\tis vanishing as $t\\to\\infty$ and hence can be neglected.\nL001557\tFurthermore, for $N\\gg 1$ we have\nL001558\t$$\nL001559\t\\fr{1}{N} \\sum\\limits_{j=1}^N e^{i \\omega_j t} \\mapsto \\int_{-\\infty}^\\infty g(\\omega) e^{i \\omega t} d\\omega\nL001560\t= \\hat{g}(t).\nL001561\t$$\nL001562\tThus, the complex order parameter $Z(t)$ given in~\\eqref{Eq:Z:Daido}\nL001563\tis the solution of the following Volterra integral equation\nL001564\t\\begin{eqnarray}\nL001565\tZ(t) &=& \\fr{1}{N} \\sum\\limits_{j=1}^N e^{i ( \\omega_j t + \\Theta_j(0) )} \\nonumber\\\\\nL001566\t&+& \\fr{K}{2} e^{-i \\lambda} \\int_0^t \\hat{g}(t - t') Z(t') dt'.\nL001567\t\\label{Eq:Daido}\nL001568\t\\end{eqnarray}\nL001569\tThis equation can be solved using the Laplace transformation\nL001570\t$$\nL001571\t\\mathcal{L}\\::\\: f(t) \\mapsto F(s) = \\int_0^\\infty e^{- s t} f(t) dt.\nL001572\t$$\nL001573\tIn particular, due to the convolution theorem, Eq.~\\eqref{Eq:Daido} we write\nL001574\t$$\nL001575\t(\\mathcal{L}Z)(s) = \\fr{1}{N} \\sum\\limits_{j=1}^N \\fr{e^{i \\Theta_j(0)}}{s - i \\omega_j} + \\fr{K}{2} e^{-i \\lambda} (\\mathcal{L}\\hat{g})(s) (\\mathcal{L}Z)(s),\nL001576\t$$\nL001577\tand therefore obtain\nL001578\t$$\nL001579\t(\\mathcal{L}Z)(s) = \\fr{1}{N} \\sum\\limits_{j=1}^N \\left( 1 - \\fr{K}{2} e^{-i \\lambda} (\\mathcal{L}\\hat{g})(s) \\right)^{-1} \\fr{e^{i \\Theta_j(0)}}{s - i \\omega_j}.\nL001580\t$$\nL001581\tNow, assuming that\nL001582\t$$\nL001583\tQ(s) := 1 - \\fr{K}{2} e^{-i \\lambda} (\\mathcal{L}\\hat{g})(s) \\ne 0\nL001584\t\\quad\\mbox{for all}\\quad \\mathrm{Re}(s)\\ge 0\nL001585\t$$\nL001586\tand that $1/Q(s)$ is a meromorphic function in the half-plane $\\mathrm{Re}(s) < 0$ that satisfies\nL001587\t\\begin{equation}\nL001588\t\\lim\\limits_{p\\to\\infty} \\max\\limits_{\\pi/2\\le |\\phi| \\le \\pi} |1/Q( p e^{i \\phi} )| = 0,\nL001589\t\\label{Condition:Q}\nL001590\t\\end{equation}\nL001591\twe apply the inverse Laplace transformation and find that the long-term asymptotics of $Z(t)$ is given by\nL001592\t$$\nL001593\tZ(t) = \\fr{1}{N} \\sum\\limits_{j=1}^N \\fr{e^{i ( \\omega_j t + \\Theta_j(0) )}}{Q(i \\omega_j)}.\nL001594\t$$\nL001595\t\nL001596\tThe covariance function of the complex order parameter $Z(t)$ is now evaluated as\nL001597\t\\begin{eqnarray*}\nL001598\tR_\\mathrm{Daido}(\\tau) &=& N \\langle Z(t) \\overline{Z(t+\\tau)} \\rangle \\\\\nL001599\t&=& \\fr{1}{N} \\sum\\limits_{j,k=1}^N \\fr{e^{-i ( \\omega_k \\tau + \\Theta_k(0) - \\Theta_j(0) )}}{Q(i \\omega_j) \\overline{Q(i \\omega_k)}} \\langle e^{i ( \\omega_j - \\omega_k ) t} \\rangle \\\\\nL001600\t&=& \\fr{1}{N} \\sum\\limits_{j=1}^N \\fr{e^{-i \\omega_j \\tau}}{|Q(i \\omega_j)|^2}\nL001601\t\\approx \\int_{-\\infty}^\\infty g(\\omega) \\fr{e^{-i \\omega \\tau}}{|Q(i \\omega)|^2} d\\omega,\nL001602\t\\end{eqnarray*}\nL001603\twhere we used $\\langle e^{i ( \\omega_j - \\omega_k ) t} \\rangle = \\delta_{jk}$.\nL001604\tThe variance of the order parameter $r(t) = |Z(t)|$ in the subcritical case is then given by\nL001605\t\\begin{equation}\nL001606\tV_\\mathrm{Daido} = N \\langle |Z(t)|^2 \\rangle - N \\langle |Z(t)| \\rangle^2 = R_\\mathrm{Daido}(0) - \\fr{\\pi}{4},\nL001607\t\\label{Formula:V:Daido}\nL001608\t\\end{equation}\nL001609\twhere we used our result~\\eqref{Formula:incoh:r} for $\\langle |Z(t)| \\rangle$.\nL001610\t\\begin{figure}\nL001611\t\\begin{center}\nL001612\t\\includegraphics[height=0.6\\columnwidth,angle=270]{OPVariance_Daido.pdf}\nL001613\t\\end{center}\nL001614\t\\caption{Variance $V$ of the order parameter $r(t)$ versus coupling strength $K$\nL001615\tin the subcritical case of the KS model~\\eqref{Eq:KS:original}\nL001616\twith $\\lambda = \\pi/4$ and a Gaussian distribution.\nL001617\tTheoretical predictions from our approach~\\eqref{Formula:incoh:r} (thick line)\nL001618\tand from Daido's theory~\\eqref{Formula:V:Daido} (circles)\nL001619\tare compared with the results of numerical simulations\nL001620\twith $N=1,000$ phase oscillators (squares).\nL001621\tThe vertical dashed line indicates the critical coupling strength.\nL001622\t}\nL001623\t\\label{Fig:OPVariance_Daido}\nL001624\t\\end{figure}\nL001625\tAlthough the above formulas have been shown to be in good agreement with the numerical observations obtained from the full KS model~\\eqref{Eq:KS:original} with a Lorentzian frequency distribution and $\\lambda = 0$,\nL001626\tin the case of a Gaussian frequency distribution they fail to reproduce the observed behavior as seen in Fig.~\\ref{Fig:OPVariance_Daido}.\nL001627\tIn particular, they can be worse than our $(K,\\lambda)$-independent formulas~\\eqref{Formula:R:incoh} and~\\eqref{Formula:incoh:r}.\nL001628\tNote that condition~\\eqref{Condition:Q} is not satisfied for a Gaussian frequency distribution.\nL001629\t\nL001630\t\nL001631\t\nL001632\t\\bibliographystyle{apsrev4-2}\nL001633\t\nL001634\t\nL001635\t\\bibliography{refs}\nL001636\t\nL001637\t\\end{document}\nL001638\t===== END FILE: OmelchenkoGottwald.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

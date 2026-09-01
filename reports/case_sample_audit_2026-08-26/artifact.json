@@ -1,0 +1,970 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "当前 case 与 DeepSeek 80-cell bench sample 复核",
+    "description": "20 个 matched family、当前四格定义与 DeepSeek 80-cell 开发 run 的科学与评测漏斗复核。",
+    "generatedAt": "2026-08-26T12:24:35Z",
+    "cards": [],
+    "charts": [
+      {
+        "id": "evaluation_funnel",
+        "title": "DeepSeek 80-cell 评测漏斗",
+        "subtitle": "80 个 terminal outcomes 中，50 个有协议有效 final，21 个通过科学 evaluator。",
+        "type": "funnel",
+        "dataset": "funnel",
+        "sourceId": "audit_sql",
+        "encodings": {
+          "x": {
+            "field": "stage",
+            "type": "ordinal",
+            "label": "stage"
+          },
+          "y": {
+            "field": "episode_count",
+            "type": "quantitative",
+            "label": "episodes"
+          },
+          "tooltip": [
+            {
+              "field": "episode_count",
+              "type": "quantitative",
+              "label": "episodes"
+            }
+          ]
+        },
+        "valueFormat": "number"
+      }
+    ],
+    "tables": [
+      {
+        "id": "failure_reasons",
+        "title": "未进入科学 evaluator 的直接原因",
+        "subtitle": "30/80 个 terminal outcomes；精确 episode 见后续明细。",
+        "dataset": "failure_reasons",
+        "sourceId": "audit_sql",
+        "defaultSort": {
+          "field": "episode_count",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "reason",
+            "label": "reason",
+            "type": "text"
+          },
+          {
+            "field": "episode_count",
+            "label": "episodes",
+            "type": "number"
+          },
+          {
+            "field": "share_of_80",
+            "label": "share of 80",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "case_audit",
+        "title": "20 个 family 的当前科学与公开条件判定",
+        "subtitle": "阻塞表示修复前不宜把该 family 纳入新的可比 run。",
+        "dataset": "case_audit",
+        "sourceId": "audit_sql",
+        "density": "comfortable",
+        "defaultSort": {
+          "field": "priority",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "priority",
+            "label": "priority",
+            "type": "number"
+          },
+          {
+            "field": "family",
+            "label": "family",
+            "type": "text"
+          },
+          {
+            "field": "verdict",
+            "label": "verdict",
+            "type": "text"
+          },
+          {
+            "field": "finding",
+            "label": "finding",
+            "type": "text"
+          },
+          {
+            "field": "minimum_fix",
+            "label": "minimum fix",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "version_drift",
+        "title": "旧 run 与当前 Player-visible case 的漂移",
+        "subtitle": "16/20 个 family、62/80 个 cell 的公开 payload 已变化。",
+        "dataset": "version_drift",
+        "sourceId": "audit_sql",
+        "density": "compact",
+        "defaultSort": {
+          "field": "changed_cells",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "family",
+            "label": "family",
+            "type": "text"
+          },
+          {
+            "field": "changed_cells",
+            "label": "changed cells",
+            "type": "number"
+          },
+          {
+            "field": "unique_changed_fields",
+            "label": "changed fields",
+            "type": "number"
+          },
+          {
+            "field": "example_fields",
+            "label": "example fields",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "cell_breakdown",
+        "title": "四格提交与通过计数",
+        "subtitle": "每格 20 个 family、每个 family 仅一个 repeat；只作描述，不作统计推断。",
+        "dataset": "cell_breakdown",
+        "sourceId": "audit_sql",
+        "defaultSort": {
+          "field": "active_pass",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "world",
+            "label": "world",
+            "type": "text"
+          },
+          {
+            "field": "track",
+            "label": "track",
+            "type": "text"
+          },
+          {
+            "field": "episodes",
+            "label": "episodes",
+            "type": "number"
+          },
+          {
+            "field": "scientifically_evaluable",
+            "label": "scientific input",
+            "type": "number"
+          },
+          {
+            "field": "active_pass",
+            "label": "pass",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "id": "no_science_detail",
+        "title": "30 个未进入科学 evaluator 的 episode",
+        "subtitle": "所有行都有 terminal result；此表说明缺少的是 case-specific scientific score。",
+        "dataset": "no_science_detail",
+        "sourceId": "audit_sql",
+        "density": "compact",
+        "defaultSort": {
+          "field": "schedule_index",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "schedule_index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "field": "episode_id",
+            "label": "episode",
+            "type": "text"
+          },
+          {
+            "field": "category",
+            "label": "category",
+            "type": "text"
+          },
+          {
+            "field": "reason",
+            "label": "reason",
+            "type": "text"
+          },
+          {
+            "field": "attempts_used",
+            "label": "experiments",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "episodes_summary",
+        "label": "DeepSeek 80-cell canonical episode summary",
+        "path": "runs/deepseek_20_family_80_20260825/episodes.json"
+      },
+      {
+        "id": "episode_logs",
+        "label": "DeepSeek Player/Oracle JSONL trajectories",
+        "path": "runs/deepseek_20_family_80_20260825/episodes/"
+      },
+      {
+        "id": "case_sources",
+        "label": "Current matched family source files",
+        "path": "src/role_benchmark/cases/"
+      },
+      {
+        "id": "contract_tests",
+        "label": "Current benchmark tests",
+        "path": "tests/"
+      },
+      {
+        "id": "audit_builder",
+        "label": "Reproducible audit extraction",
+        "path": "reports/case_sample_audit_2026-08-26/build_report_artifact.py"
+      },
+      {
+        "id": "audit_sql",
+        "label": "Reviewed report dataset queries",
+        "path": "reports/case_sample_audit_2026-08-26/report_queries.sql"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# 当前 case 与 DeepSeek 80-cell bench sample 复核"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "body": "## 结论：历史公式基本可靠，但当前 matched pack 与旧 80-cell run 均不能直接作为正式结果\n\n当前 20 个 family 的历史 executable truth 没有发现实质公式或 SI 标定错误；然而按共享公开信息是否中性、两 world 是否逻辑相容来判定，只有 **5 个可直接保留**，**7 个需措辞或命名收紧**，另有 **8 个阻塞项**。此外，固定 `.world_a/.world_b` 映射在公开代码中可被反查，不满足正式 blind pack。\n\nDeepSeek smoke 的 80 个 episode 全都有 terminal result；其中 **50 个**提交了协议有效 final 并进入 case-specific evaluator，**30 个**只得到协议层失败记录。旧 run 的 62/80 个 Player-visible case payload 已与当前源码不同，因此 21/80 pass 只能描述当时的开发快照。"
+      },
+      {
+        "id": "funnel_finding",
+        "type": "markdown",
+        "sourceId": "episodes_summary",
+        "body": "## 30 个样本不是文件缺失，而是没有协议有效 final\n\n主分母是全部 80 个 terminal outcomes。协议完成率为 **50/80（62.5%）**，全分母科学通过率为 **21/80（26.25%）**；仅在已提交样本中计算的条件通过率是 **21/50（42%）**，不能替代主指标。"
+      },
+      {
+        "id": "funnel_chart",
+        "type": "chart",
+        "chartId": "evaluation_funnel"
+      },
+      {
+        "id": "failure_reason_interpretation",
+        "type": "markdown",
+        "sourceId": "episodes_summary",
+        "body": "### 大多数 non-completion 来自生成/协议结构，而不是 Oracle\n\n20 个是 Player action 无法严格解码，10 个是已解码 action 被 episode invariant 拒绝。14 个 malformed JSON 中只有 2 个碰到 8192-token 上限；其余主要是少括号、重复 key 或模型级 invariant。9 个 final confidence mismatch 来自 final 与 portfolio 的重复置信度字段不一致。"
+      },
+      {
+        "id": "failure_reason_table",
+        "type": "table",
+        "tableId": "failure_reasons"
+      },
+      {
+        "id": "case_finding",
+        "type": "markdown",
+        "sourceId": "case_sources",
+        "body": "## 8 个 family 的 shared public surface 需要先修\n\n最明确的直接泄露是 Torricelli、Beer、Brownian 和 Poiseuille 的共享 note 写出了历史关系；Newton cooling、Ohm、radioactive decay 和 Stefan–Boltzmann 则用公开定义或固定条件锁定历史机制，同时又声明不相容的反事实 truth。"
+      },
+      {
+        "id": "case_table",
+        "type": "table",
+        "tableId": "case_audit"
+      },
+      {
+        "id": "global_case_issue",
+        "type": "markdown",
+        "sourceId": "case_sources",
+        "body": "### 全局 blind-world 问题\n\n当前 factory 固定将 historical 映射为 `.world_a`、counterfactual 映射为 `.world_b`。开发 pack 中可接受，但正式私有评测应使用与 world 无关的 opaque case ID，映射仅由隔离的 case service 持有。"
+      },
+      {
+        "id": "drift_finding",
+        "type": "markdown",
+        "sourceId": "audit_builder",
+        "body": "## 旧 80-cell run 不是当前 case pack 的量化结果\n\n逐 cell 比较 JSONL 首条 `run.started.case` 与当前 factory，发现 **16/20 family、62/80 cell** 的 Player-visible payload 已变化。部分变化不只是措辞：Poiseuille 的控制域与 reference、Rutherford 的 control 语义、Photoelectric 的 control/parameter 命名均已改变。"
+      },
+      {
+        "id": "drift_table",
+        "type": "table",
+        "tableId": "version_drift"
+      },
+      {
+        "id": "cell_finding",
+        "type": "markdown",
+        "sourceId": "episodes_summary",
+        "body": "### 四格差异只能作为旧快照的描述\n\nhistorical identification 的提交率和通过数最高，counterfactual discovery 最低；但每个 family×cell 只有一个 episode，且 case 定义已漂移，不能据此估计稳定模型差异或 difference-in-differences。"
+      },
+      {
+        "id": "cell_table",
+        "type": "table",
+        "tableId": "cell_breakdown"
+      },
+      {
+        "id": "oracle_finding",
+        "type": "markdown",
+        "sourceId": "episode_logs",
+        "body": "## Oracle 不是这 30 个样本缺少科学评分的原因\n\n对 81 个 log attempts（含一次已恢复的 provider attempt）中的 **441** 条链路逐字段核对：authoritative response → LLM-presented Oracle response → Player-visible transition 的 status/evidence 均为 **0 mismatch**。LLM 只参与 message 表达，测量、单位和不确定度仍来自 deterministic world model。"
+      },
+      {
+        "id": "method_definitions",
+        "type": "markdown",
+        "sourceId": "audit_builder",
+        "body": "## 口径与检查方法\n\n- **family**：一套历史/反事实 truth、统一实验资源和两个 track。\n- **cell**：family × world × track；当前注册表应有 20×2×2=80。\n- **terminal outcome recorded**：Player-side episode 已结束并写 result，不等于科学 evaluator 已调用。\n- **scientifically evaluable**：存在协议有效 final，case-specific evaluator 实际运行。\n- **科学复核**：检查历史公式、单位、reference 数值、公开固定条件、反事实内部一致性和 source credit；counterfactual 不要求在现实世界存在。\n\n当前完整测试套件 **226 项通过**，证明结构、四格实例化、Oracle/evaluator 契约和 wire 行为一致；这些测试不能替代语义科学审查。"
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "body": "## 限制与稳健性\n\n这是一轮源码、日志和 primary/authoritative source 的一致性复核，不是对历史实验的复现。反事实 world 的判据是明确标注、内部可执行、与共享公开条件相容；它不声称是真实自然规律。本 run 标记为 `public_development_fixture`，不是隔离的 private formal evaluation。config 保存了 5-repeat/400-episode 完整计划，但当前目录实际只包含 r01 的 80-cell smoke；其余 320 个是未执行，不是失败。"
+      },
+      {
+        "id": "recommendations",
+        "type": "markdown",
+        "body": "## 最小下一步\n\n1. 先修 8 个阻塞 family、7 个轻微问题和 opaque world ID，再冻结新的 80-cell development pack。\n2. 删除 `FinalSubmission.confidence` 与 portfolio confidence 的重复来源；final 阶段允许 portfolio 收敛为一个 hypothesis。\n3. 只要 final model/parameters 可严格解码，就运行 scientific evaluator；portfolio/commitment 矛盾另记 process/protocol score。malformed JSON 仍不猜测补全。\n4. failure-mode analyzer 对所有已有 experiment turns 做 evidence–belief 分析，再附 terminal failure；不要因 final 未提交而把过程 coverage 清零。\n5. 在新 run directory 重跑当前 80 cells；通过后再补 3–5 repeats。"
+      },
+      {
+        "id": "details",
+        "type": "markdown",
+        "sourceId": "episodes_summary",
+        "body": "## 逐 episode 查找\n\n下表列出全部 30 个科学未评分 episode。它们都已有 terminal result，`reason` 是未进入 case-specific evaluator 的最直接机器原因。"
+      },
+      {
+        "id": "detail_table",
+        "type": "table",
+        "tableId": "no_science_detail"
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## 仍需明确的研究选择\n\n最关键的问题是反事实 world 的语义边界：允许改变基本定律，但 shared public surface 应只描述操作对象、可控量和定性现象，不应使用定义上已经蕴含历史定律的标签。采用这一条最小规则后，当前 8 个阻塞项都有直接、局部的修法。"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-26T12:24:35Z",
+    "status": "ready",
+    "datasets": {
+      "funnel": [
+        {
+          "stage_order": 1,
+          "stage": "terminal outcome recorded",
+          "episode_count": 80
+        },
+        {
+          "stage_order": 2,
+          "stage": "scientific evaluator input",
+          "episode_count": 50
+        },
+        {
+          "stage_order": 3,
+          "stage": "scientific pass",
+          "episode_count": 21
+        }
+      ],
+      "failure_reasons": [
+        {
+          "reason": "invalid_json",
+          "episode_count": 14,
+          "share_of_80": 0.175
+        },
+        {
+          "reason": "final_confidence_mismatch",
+          "episode_count": 9,
+          "share_of_80": 0.1125
+        },
+        {
+          "reason": "model_invariant",
+          "episode_count": 5,
+          "share_of_80": 0.0625
+        },
+        {
+          "reason": "duplicate_key",
+          "episode_count": 1,
+          "share_of_80": 0.0125
+        },
+        {
+          "reason": "experiment_budget_exhausted",
+          "episode_count": 1,
+          "share_of_80": 0.0125
+        }
+      ],
+      "outcomes": [
+        {
+          "category": "pass",
+          "episode_count": 21,
+          "share_of_80": 0.2625
+        },
+        {
+          "category": "scientific_failure",
+          "episode_count": 29,
+          "share_of_80": 0.3625
+        },
+        {
+          "category": "player_generation_failure",
+          "episode_count": 20,
+          "share_of_80": 0.25
+        },
+        {
+          "category": "player_protocol_failure",
+          "episode_count": 10,
+          "share_of_80": 0.125
+        }
+      ],
+      "case_audit": [
+        {
+          "priority": 1,
+          "family": "beer_lambert",
+          "verdict": "阻塞",
+          "finding": "历史指数与数值正确；共享 note 直接给出 historical path exponent=1 和 0.6 标定。",
+          "minimum_fix": "删除共享历史答案，只保留中性单位和仪器条件。"
+        },
+        {
+          "priority": 2,
+          "family": "boyle_j_tube",
+          "verdict": "需收紧",
+          "finding": "反比律正确；理想气体、准静态、无 dead volume 等精确适用条件未写全，thermal_condition 只有一个可选值。",
+          "minimum_fix": "补固定理想条件；把单值 thermal_condition 从 control 移到 fixed condition。"
+        },
+        {
+          "priority": 1,
+          "family": "brownian_diffusion",
+          "verdict": "阻塞",
+          "finding": "历史 MSD 和半径标度正确；公开文本定义为 Brownian 且明写 historical 4Dt，却以 t² 作为反事实。",
+          "minimum_fix": "改为中性 stochastic tracer motion，移除共享历史公式并固定温度、黏度和有效时间域。"
+        },
+        {
+          "priority": 2,
+          "family": "coulomb_force",
+          "verdict": "需收紧",
+          "finding": "22.47 µN 标定正确；共享 note 暴露 historical branch，交换位置后 deflection reverses 的装置语义含混。",
+          "minimum_fix": "删除 branch 提示并改写初始观察。"
+        },
+        {
+          "priority": 3,
+          "family": "faraday_induction",
+          "verdict": "可保留",
+          "finding": "20 mV 标定、单位、线性 ramp、均匀法向磁场与 readout 一致。",
+          "minimum_fix": "无必改项。"
+        },
+        {
+          "priority": 3,
+          "family": "galileo_inclined_plane",
+          "verdict": "可保留",
+          "finding": "滚动球、水钟代理及 t∝sqrt(s/sinθ) 的历史关系和单位一致。",
+          "minimum_fix": "无必改项。"
+        },
+        {
+          "priority": 2,
+          "family": "hooke_spring",
+          "verdict": "需收紧",
+          "finding": "历史 x=F/k 与 5 cm 标定正确；反事实下 calibrated stiffness 不再等于零载荷 tangent stiffness。",
+          "minimum_fix": "将 control 明确为 nominal stiffness scale。"
+        },
+        {
+          "priority": 3,
+          "family": "kepler_orbit",
+          "verdict": "可保留",
+          "finding": "固定中心星下 P∝a^(3/2) 且与 eccentricity 无关；单位和表达式一致。",
+          "minimum_fix": "无必改项。"
+        },
+        {
+          "priority": 2,
+          "family": "michaelis_menten",
+          "verdict": "需收紧",
+          "finding": "历史饱和律和 substrate-inhibition twin 正确；字段 _um_per_min 实际单位是 uM/min，和微米命名冲突。",
+          "minimum_fix": "改为 micromolar_per_min。"
+        },
+        {
+          "priority": 1,
+          "family": "newton_cooling",
+          "verdict": "阻塞",
+          "finding": "历史单指数正确；共享 spatially uniform、constant coefficient/capacity 条件与双指数反事实不相容，并暴露 historical model class。",
+          "minimum_fix": "共享背景改成可含多个线性热 mode 的 aggregate readout；单 mode 仅保留为私有历史 truth。"
+        },
+        {
+          "priority": 1,
+          "family": "ohm_circuit",
+          "verdict": "阻塞",
+          "finding": "历史 I=V/R 和 10 mA 标定正确；ideal ohmic resistor/calibrated resistance 的定义与 R^-1/2 反事实冲突。",
+          "minimum_fix": "改用不含定义关系的 material/construction setting，或更换反事实机制。"
+        },
+        {
+          "priority": 3,
+          "family": "pendulum",
+          "verdict": "可保留",
+          "finding": "小角理想化、长度平方根和质量零指数正确；10° 有限振幅误差低于当前读数分辨率尺度。",
+          "minimum_fix": "无必改项。"
+        },
+        {
+          "priority": 3,
+          "family": "photoelectric",
+          "verdict": "可保留",
+          "finding": "阈值、stopping potential、absorbed photon flux 电流关系和 h/e 数值一致。",
+          "minimum_fix": "无必改项。"
+        },
+        {
+          "priority": 1,
+          "family": "poiseuille_flow",
+          "verdict": "阻塞",
+          "finding": "历史数值正确；共享 Newtonian/no-slip/steady/fully-developed circular 条件锁定 r^4，却以 r^3 为反事实；入口段定义也需收紧。",
+          "minimum_fix": "用 pressure taps 明确充分发展测量段；共享描述中移除分支决定性前提，或给出具体非牛顿/滑移机制。"
+        },
+        {
+          "priority": 1,
+          "family": "radioactive_decay",
+          "verdict": "阻塞",
+          "finding": "历史指数衰变正确；same specific activity、固定效率、无自吸收/死时间与 mass^0.7 反事实定义性冲突。",
+          "minimum_fix": "改动时间规律，或明确引入质量依赖探测机制。"
+        },
+        {
+          "priority": 2,
+          "family": "rc_discharge",
+          "verdict": "需收紧",
+          "finding": "广义指数表达式和 RC 单位换算正确；β=2 不应称 stretched exponential。",
+          "minimum_fix": "模型名改为 generalized_rc_discharge 或 weibull_rc_discharge。"
+        },
+        {
+          "priority": 2,
+          "family": "rutherford_scattering",
+          "verdict": "需收紧",
+          "finding": "Z²、areal density 和 csc^4(θ/2) 正确；exposure_relative 不应改变 count rate。",
+          "minimum_fix": "改为 incident_alpha_flux_relative，并补充弹性、非相对论、未屏蔽适用域。"
+        },
+        {
+          "priority": 1,
+          "family": "stefan_boltzmann",
+          "verdict": "阻塞",
+          "finding": "历史 σA(T⁴-Ta⁴) 和面积换算正确；公开 ideal blackbody/emissivity-one/radiation-only 条件强烈锁定 T⁴，却以 T³ 为反事实。",
+          "minimum_fix": "共享对象改成未知谱律的 radiative emitter，或明确反事实改变 density of states/dispersion。"
+        },
+        {
+          "priority": 1,
+          "family": "torricelli_efflux",
+          "verdict": "阻塞",
+          "finding": "4.43 m/s 标定正确；Player-visible note 明写 sqrt(2gh)，同时反事实 truth 使用 h¹。",
+          "minimum_fix": "立即删除公开公式，并把共享前提改成不预先决定分支的操作条件。"
+        },
+        {
+          "priority": 2,
+          "family": "young_double_slit",
+          "verdict": "需收紧",
+          "finding": "历史 λL/d 与 1.10 mm 标定正确；blocking either slit removes the regular band pattern 过于绝对。",
+          "minimum_fix": "改为 removes the fine two-slit fringe train, leaving any single-slit envelope。"
+        }
+      ],
+      "version_drift": [
+        {
+          "family": "beer_lambert",
+          "changed_cells": 4,
+          "unique_changed_fields": 5,
+          "example_fields": "$.background, $.resources.controls[1].maximum, $.resources.controls[1].minimum, $.resources.notes.length"
+        },
+        {
+          "family": "brownian_diffusion",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.background, $.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "coulomb_force",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.background, $.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "faraday_induction",
+          "changed_cells": 4,
+          "unique_changed_fields": 7,
+          "example_fields": "$.background, $.resources.controls[2].description, $.resources.controls[3].description, $.resources.notes.length"
+        },
+        {
+          "family": "galileo_inclined_plane",
+          "changed_cells": 4,
+          "unique_changed_fields": 3,
+          "example_fields": "$.resources.notes.length, $.resources.notes[1], $.resources.notes[2]"
+        },
+        {
+          "family": "michaelis_menten",
+          "changed_cells": 2,
+          "unique_changed_fields": 1,
+          "example_fields": "$.resources.notes[2]"
+        },
+        {
+          "family": "newton_cooling",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.background, $.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "ohm_circuit",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.background, $.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "photoelectric",
+          "changed_cells": 4,
+          "unique_changed_fields": 10,
+          "example_fields": "$.background, $.resources.controls[1].description, $.resources.controls[1].name, $.resources.instruments[0].controls[1]"
+        },
+        {
+          "family": "poiseuille_flow",
+          "changed_cells": 4,
+          "unique_changed_fields": 12,
+          "example_fields": "$.background, $.resources.controls[0].maximum, $.resources.controls[0].minimum, $.resources.controls[1].maximum"
+        },
+        {
+          "family": "radioactive_decay",
+          "changed_cells": 4,
+          "unique_changed_fields": 6,
+          "example_fields": "$.background, $.resources.controls[1].description, $.resources.notes.length, $.resources.notes[0]"
+        },
+        {
+          "family": "rc_discharge",
+          "changed_cells": 4,
+          "unique_changed_fields": 2,
+          "example_fields": "$.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "rutherford_scattering",
+          "changed_cells": 4,
+          "unique_changed_fields": 11,
+          "example_fields": "$.background, $.resources.controls[2].description, $.resources.controls[2].maximum, $.resources.controls[2].minimum"
+        },
+        {
+          "family": "stefan_boltzmann",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.background, $.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "torricelli_efflux",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.background, $.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[2]"
+        },
+        {
+          "family": "young_double_slit",
+          "changed_cells": 4,
+          "unique_changed_fields": 4,
+          "example_fields": "$.resources.instruments[0].description, $.resources.notes.length, $.resources.notes[0], $.resources.notes[1]"
+        }
+      ],
+      "cell_breakdown": [
+        {
+          "world": "counterfactual",
+          "track": "discovery",
+          "episodes": 20,
+          "scientifically_evaluable": 10,
+          "active_pass": 1
+        },
+        {
+          "world": "counterfactual",
+          "track": "identification",
+          "episodes": 20,
+          "scientifically_evaluable": 11,
+          "active_pass": 4
+        },
+        {
+          "world": "historical",
+          "track": "discovery",
+          "episodes": 20,
+          "scientifically_evaluable": 12,
+          "active_pass": 4
+        },
+        {
+          "world": "historical",
+          "track": "identification",
+          "episodes": 20,
+          "scientifically_evaluable": 17,
+          "active_pass": 12
+        }
+      ],
+      "no_science_detail": [
+        {
+          "schedule_index": 1,
+          "episode_id": "kepler_orbit__counterfactual__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 3,
+          "episode_id": "boyle_j_tube__counterfactual__discovery__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 5,
+          "episode_id": "torricelli_efflux__counterfactual__identification__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 8,
+          "episode_id": "galileo_inclined_plane__counterfactual__identification__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 9
+        },
+        {
+          "schedule_index": 10,
+          "episode_id": "brownian_diffusion__counterfactual__identification__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 4
+        },
+        {
+          "schedule_index": 11,
+          "episode_id": "kepler_orbit__historical__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 13,
+          "episode_id": "radioactive_decay__historical__discovery__r01",
+          "category": "player_protocol_failure",
+          "reason": "experiment_budget_exhausted",
+          "attempts_used": 8
+        },
+        {
+          "schedule_index": 15,
+          "episode_id": "stefan_boltzmann__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 16,
+          "episode_id": "radioactive_decay__counterfactual__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "model_invariant",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 17,
+          "episode_id": "beer_lambert__counterfactual__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 21,
+          "episode_id": "stefan_boltzmann__counterfactual__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 1
+        },
+        {
+          "schedule_index": 22,
+          "episode_id": "poiseuille_flow__historical__discovery__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 8
+        },
+        {
+          "schedule_index": 25,
+          "episode_id": "rutherford_scattering__historical__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 2
+        },
+        {
+          "schedule_index": 28,
+          "episode_id": "brownian_diffusion__counterfactual__discovery__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 29,
+          "episode_id": "michaelis_menten__historical__identification__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 36,
+          "episode_id": "newton_cooling__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 39,
+          "episode_id": "photoelectric__historical__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "duplicate_key",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 47,
+          "episode_id": "faraday_induction__historical__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 48,
+          "episode_id": "radioactive_decay__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 8
+        },
+        {
+          "schedule_index": 49,
+          "episode_id": "rutherford_scattering__counterfactual__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 50,
+          "episode_id": "poiseuille_flow__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 6
+        },
+        {
+          "schedule_index": 51,
+          "episode_id": "photoelectric__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 0
+        },
+        {
+          "schedule_index": 52,
+          "episode_id": "rc_discharge__counterfactual__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "model_invariant",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 53,
+          "episode_id": "rutherford_scattering__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 2
+        },
+        {
+          "schedule_index": 58,
+          "episode_id": "young_double_slit__historical__discovery__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 64,
+          "episode_id": "hooke_spring__historical__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "model_invariant",
+          "attempts_used": 4
+        },
+        {
+          "schedule_index": 65,
+          "episode_id": "beer_lambert__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "invalid_json",
+          "attempts_used": 7
+        },
+        {
+          "schedule_index": 75,
+          "episode_id": "galileo_inclined_plane__historical__discovery__r01",
+          "category": "player_protocol_failure",
+          "reason": "final_confidence_mismatch",
+          "attempts_used": 8
+        },
+        {
+          "schedule_index": 78,
+          "episode_id": "faraday_induction__counterfactual__discovery__r01",
+          "category": "player_generation_failure",
+          "reason": "model_invariant",
+          "attempts_used": 10
+        },
+        {
+          "schedule_index": 80,
+          "episode_id": "galileo_inclined_plane__historical__identification__r01",
+          "category": "player_generation_failure",
+          "reason": "model_invariant",
+          "attempts_used": 8
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "episodes_summary",
+      "label": "DeepSeek 80-cell canonical episode summary",
+      "path": "runs/deepseek_20_family_80_20260825/episodes.json"
+    },
+    {
+      "id": "episode_logs",
+      "label": "DeepSeek Player/Oracle JSONL trajectories",
+      "path": "runs/deepseek_20_family_80_20260825/episodes/"
+    },
+    {
+      "id": "case_sources",
+      "label": "Current matched family source files",
+      "path": "src/role_benchmark/cases/"
+    },
+    {
+      "id": "contract_tests",
+      "label": "Current benchmark tests",
+      "path": "tests/"
+    },
+    {
+      "id": "audit_builder",
+      "label": "Reproducible audit extraction",
+      "path": "reports/case_sample_audit_2026-08-26/build_report_artifact.py"
+    },
+    {
+      "id": "audit_sql",
+      "label": "Reviewed report dataset queries",
+      "path": "reports/case_sample_audit_2026-08-26/report_queries.sql"
+    }
+  ],
+  "package_info": {
+    "chart_map": [
+      {
+        "section": "evaluation funnel",
+        "question": "How many terminal outcomes reached scientific evaluation and passed?",
+        "type": "funnel",
+        "fields": [
+          "stage",
+          "episode_count"
+        ],
+        "takeaway": "80 terminal outcomes narrowed to 50 scientific inputs and 21 passes.",
+        "palette_policy": "single-root preferred"
+      }
+    ],
+    "notes": [
+      "Exact case and episode audit questions use tables; additional charts were omitted because they would obscure exact lookup.",
+      "Required technical-report structure is preserved; key findings are split into case validity, evaluation funnel, version drift, and Oracle integrity."
+    ]
+  }
+}

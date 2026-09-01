@@ -1,0 +1,759 @@
+{
+  "assessment": "The source provides a quantitative study of disorder-free localization (DFL) in a non-Abelian SU(2) lattice gauge theory. The best quantitative cluster is the entanglement entropy scaling in the SS and GI sectors at fixed mass m=1 and gauge coupling g^2=15, with fits S_SS = 2.94(2) log(t) + 1.33(3) and S_GI = 0.386(6) t + 0.43(2). This provides a numeric control (time t), a single shared numeric readout (time-averaged half-chain bipartite entropy), quantitative mechanisms (logarithmic and linear growth), and an explicit domain (t in [2,5] from reviewer evidence). The case is authoring-ready.",
+  "drafts": [
+    {
+      "candidate": {
+        "apparatus": {
+          "description": "The apparatus exposes the listed experimental controls and readouts.",
+          "name": "su2_lattice_gauge_simulator"
+        },
+        "background": "Use controlled measurements to characterize the observed phenomenon.",
+        "budget": 8,
+        "claim": "The time-averaged half-chain entanglement entropy grows with time, and the growth law depends on the initial-state sector.",
+        "common_fixed_conditions": [
+          {
+            "condition_id": "n8_pbc",
+            "statement": "Chain of N=8 SU(2) dressed sites with periodic boundary conditions."
+          },
+          {
+            "condition_id": "mass_fixed_1",
+            "statement": "Fixed mass m=1."
+          },
+          {
+            "condition_id": "g2_fixed_15",
+            "statement": "Fixed gauge coupling g^2=15."
+          },
+          {
+            "condition_id": "hardcore_gluon_truncation",
+            "statement": "Hardcore-gluon truncation restricting gauge link spin to {0,1/2} and background charge spin to {0,1/2}."
+          },
+          {
+            "condition_id": "half_chain_entropy_definition",
+            "statement": "Half-chain bipartite von Neumann entanglement entropy in base two, defined as S = -Tr[rho_A log rho_A] with A being half of the chain."
+          },
+          {
+            "condition_id": "time_averaging_window",
+            "statement": "Time-averaged entanglement entropy over a window Delta t = 2.5."
+          }
+        ],
+        "confidence_threshold": 0.95,
+        "controls": [
+          {
+            "allowed_values": [],
+            "description": "Time in the time-averaged entanglement entropy evolution.",
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "t",
+            "unit": "dimensionless (lattice units)"
+          }
+        ],
+        "counterfactual_change": "The initial state is changed from the superposition of superselection sectors to the gauge-invariant state without background charges.",
+        "diagnostic_conditions": [
+          {
+            "t": 2.0
+          },
+          {
+            "t": 5.0
+          }
+        ],
+        "family": "entanglement_growth_su2_lgt",
+        "hidden_conditions": [
+          {
+            "t": 2.5
+          },
+          {
+            "t": 3.5
+          },
+          {
+            "t": 4.5
+          }
+        ],
+        "initial_observations": [
+          "The system exhibits a measurable time-averaged half-chain entanglement entropy that changes with time."
+        ],
+        "max_replicates": 1,
+        "notes": [
+          "The readout is a time-averaged quantity; ensure the time window is consistent with the fixed conditions."
+        ],
+        "oracle": {
+          "counterfactual_applicability": [
+            "The linear growth is observed across all coupling regimes compatible with ergodicity at fixed mass m=1, with the explicit fit at g^2=15. The fit is valid for the GI initial state under periodic boundary conditions."
+          ],
+          "counterfactual_fixed_conditions": [
+            {
+              "condition_id": "gi_initial_state",
+              "statement": "Initial state is the gauge-invariant state without background charges, as defined in Eq. (4)."
+            }
+          ],
+          "counterfactual_parameters": {
+            "initial_state_sector": 1.0,
+            "intercept_gi_linear_fit": 0.43,
+            "intercept_ss_log_fit": 1.33,
+            "slope_gi_linear_fit": 0.386,
+            "slope_ss_log_fit": 2.94
+          },
+          "kind": "closed_form",
+          "outputs": {
+            "time_averaged_half_chain_entropy": {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "args": [
+                        1.0,
+                        {
+                          "param": "initial_state_sector"
+                        }
+                      ],
+                      "op": "subtract"
+                    },
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "param": "slope_ss_log_fit"
+                            },
+                            {
+                              "args": [
+                                {
+                                  "var": "t"
+                                }
+                              ],
+                              "op": "log"
+                            }
+                          ],
+                          "op": "multiply"
+                        },
+                        {
+                          "param": "intercept_ss_log_fit"
+                        }
+                      ],
+                      "op": "add"
+                    }
+                  ],
+                  "op": "multiply"
+                },
+                {
+                  "args": [
+                    {
+                      "param": "initial_state_sector"
+                    },
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "param": "slope_gi_linear_fit"
+                            },
+                            {
+                              "var": "t"
+                            }
+                          ],
+                          "op": "multiply"
+                        },
+                        {
+                          "param": "intercept_gi_linear_fit"
+                        }
+                      ],
+                      "op": "add"
+                    }
+                  ],
+                  "op": "multiply"
+                }
+              ],
+              "op": "add"
+            }
+          },
+          "paper_applicability": [
+            "The logarithmic growth is observed across almost all coupling values in [0,15] at fixed mass m=1, but the explicit fit is at g^2=15. The fit is valid for the SS initial state under periodic boundary conditions."
+          ],
+          "paper_fixed_conditions": [
+            {
+              "condition_id": "ss_initial_state",
+              "statement": "Initial state is the equal superposition of all gauge superselection sectors (SS) as defined in Eq. (3)."
+            }
+          ],
+          "paper_parameters": {
+            "initial_state_sector": 0.0,
+            "intercept_gi_linear_fit": 0.43,
+            "intercept_ss_log_fit": 1.33,
+            "slope_gi_linear_fit": 0.386,
+            "slope_ss_log_fit": 2.94
+          }
+        },
+        "readouts": [
+          {
+            "description": "Time-averaged half-chain bipartite von Neumann entanglement entropy in base two.",
+            "name": "time_averaged_half_chain_entropy",
+            "resolution": null,
+            "resolution_kind": null,
+            "statistic": "Deterministic central value of the source-reported quantitative relation.",
+            "uncertainty": "Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.",
+            "unit": "dimensionless (bits)"
+          }
+        ],
+        "relative_tolerance": 0.05,
+        "source": {
+          "arxiv_versioned_id": "2505.04704v2",
+          "citation": "Giovanni Cataldi, Disorder-Free Localization and Fragmentation in a Non-Abelian Lattice Gauge Theory, Physical Review Letters (2026), DOI:10.1103/fhfy-dh85",
+          "journal_doi": "10.1103/fhfy-dh85",
+          "locator": "Figure 4 and surrounding text",
+          "role": "source"
+        },
+        "title": "Interactive measurement study"
+      },
+      "counterfactual_derivation": {
+        "counterfactual_claim_ids": [
+          "GI_entropy_linear_growth"
+        ],
+        "counterfactual_value": 1.0,
+        "description": "The two branches correspond to two different initial-state sectors reported in the same paper: the SS sector (superposition of superselection sectors) and the GI sector (gauge-invariant without background charges). The selector parameter chooses which sector is active.",
+        "historical_value": 0.0,
+        "kind": "reported_regime_selection",
+        "paper_claim_ids": [
+          "SS_entropy_log_growth"
+        ],
+        "paper_defined_equations_unchanged": true,
+        "selector_parameter": "initial_state_sector",
+        "source_claim_ids": [
+          "SS_entropy_log_growth",
+          "GI_entropy_linear_growth"
+        ],
+        "source_mechanism_ids": [
+          "log_entropy_growth_SS",
+          "linear_entropy_growth_GI"
+        ]
+      },
+      "design_summary": "The case contrasts two initial-state sectors of the same SU(2) lattice gauge theory: the SS sector exhibits logarithmic entanglement growth, while the GI sector exhibits linear growth. The player controls time and measures the time-averaged half-chain entanglement entropy, with all other parameters fixed.",
+      "information_boundary": {
+        "identification_only": {
+          "claim_ids": [
+            "SS_entropy_log_growth",
+            "GI_entropy_linear_growth"
+          ],
+          "fixed_condition_ids": [
+            "N8_PBC",
+            "mass_fixed_1",
+            "g2_fixed_15",
+            "hardcore_gluon_truncation",
+            "half_chain_entropy_definition",
+            "time_averaging_window"
+          ],
+          "items": [
+            "The system is a one-dimensional SU(2) lattice gauge theory with dynamical matter on a chain of eight dressed sites with periodic boundary conditions.",
+            "The dynamics are simulated by exact diagonalization with a hardcore-gluon truncation restricting gauge link spin to zero or one-half.",
+            "The readout is the time-averaged half-chain bipartite von Neumann entanglement entropy in base two.",
+            "The control is time, and the readout is measured as a function of time."
+          ],
+          "line_ranges": [
+            {
+              "line_end": 140,
+              "line_start": 140
+            },
+            {
+              "line_end": 157,
+              "line_start": 157
+            },
+            {
+              "line_end": 161,
+              "line_start": 161
+            },
+            {
+              "line_end": 261,
+              "line_start": 261
+            },
+            {
+              "line_end": 263,
+              "line_start": 263
+            },
+            {
+              "line_end": 764,
+              "line_start": 764
+            },
+            {
+              "line_end": 767,
+              "line_start": 767
+            },
+            {
+              "line_end": 775,
+              "line_start": 775
+            },
+            {
+              "line_end": 776,
+              "line_start": 776
+            }
+          ],
+          "mechanism_ids": [
+            "log_entropy_growth_SS",
+            "linear_entropy_growth_GI"
+          ]
+        },
+        "oracle_only": {
+          "claim_ids": [
+            "SS_entropy_log_growth",
+            "GI_entropy_linear_growth"
+          ],
+          "fixed_condition_ids": [
+            "N8_PBC",
+            "mass_fixed_1",
+            "g2_fixed_15",
+            "hardcore_gluon_truncation",
+            "half_chain_entropy_definition",
+            "time_averaging_window"
+          ],
+          "items": [
+            "For the SS initial state, the time-averaged half-chain entanglement entropy grows logarithmically with time, with a fitted relation S_SS = 2.94(2) log(t) + 1.33(3).",
+            "For the GI initial state, the time-averaged half-chain entanglement entropy grows linearly with time, with a fitted relation S_GI = 0.386(6) t + 0.43(2).",
+            "The two relations are valid for time t in the interval [2,5] at fixed mass m=1 and gauge coupling g^2=15."
+          ],
+          "line_ranges": [
+            {
+              "line_end": 140,
+              "line_start": 140
+            },
+            {
+              "line_end": 157,
+              "line_start": 157
+            },
+            {
+              "line_end": 161,
+              "line_start": 161
+            },
+            {
+              "line_end": 261,
+              "line_start": 261
+            },
+            {
+              "line_end": 263,
+              "line_start": 263
+            },
+            {
+              "line_end": 764,
+              "line_start": 764
+            },
+            {
+              "line_end": 767,
+              "line_start": 767
+            },
+            {
+              "line_end": 775,
+              "line_start": 775
+            },
+            {
+              "line_end": 776,
+              "line_start": 776
+            }
+          ],
+          "mechanism_ids": [
+            "log_entropy_growth_SS",
+            "linear_entropy_growth_GI"
+          ]
+        },
+        "shared_player": [
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "title",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "background",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "apparatus",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "control.t",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              },
+              {
+                "line_end": 803,
+                "line_start": 801
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "readout.time_averaged_half_chain_entropy",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 775,
+                "line_start": 775
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "initial_observation.0",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "fixed_condition.n8_pbc",
+            "fixed_condition_ids": [
+              "N8_PBC"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 161,
+                "line_start": 161
+              },
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "fixed_condition.mass_fixed_1",
+            "fixed_condition_ids": [
+              "mass_fixed_1"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 775,
+                "line_start": 775
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "fixed_condition.g2_fixed_15",
+            "fixed_condition_ids": [
+              "g2_fixed_15"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "fixed_condition.hardcore_gluon_truncation",
+            "fixed_condition_ids": [
+              "hardcore_gluon_truncation"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 140,
+                "line_start": 140
+              },
+              {
+                "line_end": 157,
+                "line_start": 157
+              },
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "fixed_condition.half_chain_entropy_definition",
+            "fixed_condition_ids": [
+              "half_chain_entropy_definition"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 261,
+                "line_start": 261
+              },
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 775,
+                "line_start": 775
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "fixed_condition.time_averaging_window",
+            "fixed_condition_ids": [
+              "time_averaging_window"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 767,
+                "line_start": 767
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          },
+          {
+            "claim_ids": [
+              "SS_entropy_log_growth",
+              "GI_entropy_linear_growth"
+            ],
+            "field": "note.0",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 263,
+                "line_start": 263
+              },
+              {
+                "line_end": 764,
+                "line_start": 764
+              },
+              {
+                "line_end": 776,
+                "line_start": 776
+              }
+            ],
+            "mechanism_ids": [
+              "log_entropy_growth_SS",
+              "linear_entropy_growth_GI"
+            ]
+          }
+        ]
+      },
+      "relationship_targets": [
+        {
+          "control": "t",
+          "counterfactual_direction": "increasing",
+          "counterfactual_shape": "linear growth",
+          "historical_direction": "increasing",
+          "historical_shape": "logarithmic growth",
+          "readout": "time_averaged_half_chain_entropy",
+          "source_claim_ids": [
+            "SS_entropy_log_growth",
+            "GI_entropy_linear_growth"
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

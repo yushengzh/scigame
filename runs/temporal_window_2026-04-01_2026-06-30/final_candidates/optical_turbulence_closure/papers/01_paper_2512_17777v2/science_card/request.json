@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2512.17777v2\", \"citation\": \"T. Torres, Irreversible Thermalization vs Reversible Dynamics Mediated by Anomalous Correlators: Wave Turbulence Theory and Experiments in Optical Fibers, Physical Review Letters (2026), DOI:10.1103/tgtw-qnyq\", \"journal_doi\": \"10.1103/tgtw-qnyq\"}\n\nSource-grounded routing hint from pre-screening:\nAuthor exactly one theoretical matched family for the dimensionless instability growth g=Re(lambda(0))*L_nl versus public x=Delta N0/N on the nonnegative source-supported subdomain [0,1], with fixed dimensionless a=alpha*L_nl=0.2. Standard WT closure keeps the anomalous correlator m equal to zero at every propagation distance and gives g=0. AC-KE retains m and gives g=2*sqrt(max(0,a*((2/3)*x-a))). Add standard_wt_closure_active and ac_ke_anomalous_closure_active as mutually exclusive source-anchored fixed conditions and bind one to each claim; all physical/model/NLSE conditions shared by both remain common. State theoretical/model prediction with NLSE validation, not direct fiber measurement. Anchor x definition to N=Nx+Ny and Delta N=Ny-Nx; explain [0,1] as a conservative nonnegative benchmark subdomain of |x|<=1. No extra claims.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: article_01.tex =====\nL000002\t\nL000003\t\nL000004\t\nL000005\t\\documentclass[pra,twocolumn,preprintnumbers,amsmath,amssymb]{revtex4}\nL000006\t\nL000007\t\nL000008\t\\usepackage{graphicx}\nL000009\t\\usepackage{dcolumn}\nL000010\t\\usepackage{bm}\nL000011\t\\usepackage{color}\nL000012\t\\usepackage{epstopdf}\nL000013\t\\usepackage{float}\nL000014\t\\usepackage{ulem}\nL000015\t\\usepackage{lipsum,babel}\nL000016\t\nL000017\t\\def\\eps{\\varepsilon}\nL000018\t\\def\\bk{{\\bm \\kappa}}\nL000019\t\\def\\vfi{\\varphi}\nL000020\t\nL000021\t\nL000022\t\\newcommand{\\red}{ \\textcolor{red}}\nL000023\t\\newcommand{\\blue}{}\nL000024\t\\newcommand{\\br}{ {\\bm r}}\nL000025\t\\newcommand{\\bX}{ {\\bm X}}\nL000026\t\\newcommand{\\bK}{ {\\bm K}}\nL000027\t\nL000028\t\nL000029\t\\def\\bA{{\\bm A}}\nL000030\t\\def\\EE{{\\mathbb{E}}}\nL000031\t\\def\\bbeta{{\\boldsymbol{\\beta}}}\nL000032\t\\def\\bsigma{{\\boldsymbol{\\sigma}}}\nL000033\t\\def\\bl{{\\boldsymbol{l}}}\nL000034\t\\def\\bPi{{\\boldsymbol{\\Pi}}}\nL000035\t\\def\\bGamma{\\boldsymbol{\\Gamma}}\nL000036\t\\def\\bxi{\\boldsymbol{\\xi}}\nL000037\t\nL000038\t\nL000039\t\\def\\eps{\\varepsilon}\nL000040\t\\def\\bk{{\\bm k}}\nL000041\t\\def\\bx{{\\bm x}}\nL000042\t\\def\\by{{\\bm y}}\nL000043\t\\def\\bK{{\\bm K}}\nL000044\t\\def\\bX{{\\bm X}}\nL000045\t\\def\\bY{{\\bm Y}}\nL000046\t\\def\\bu{{\\bm u}}\nL000047\t\\def\\br{{\\bm r}}\nL000048\t\nL000049\t\nL000050\t\nL000051\t\nL000052\t\nL000053\t\nL000054\t\\begin{document}\nL000055\t\nL000056\t\nL000057\t\nL000058\t\nL000059\t\nL000060\t\nL000061\t\nL000062\t\\title{Irreversible thermalization vs reversible dynamics mediated by anomalous correlators: Wave turbulence theory and experiments in optical fibers}\nL000063\t\\author{T. Torres$^{1}$, J. Garnier$^{2}$, L. Zanaglia$^{3}$, M. Ferraro$^{1,4}$, C. Michel$^{3}$, V. Doya$^{3}$,\\\\ J. Fatome$^{1}$, B. Kibler$^{1}$, S. Wabnitz$^{5}$, A. Picozzi$^{1}$, G. Millot$^{1}$}\nL000064\t\\affiliation{$^{1}$ Universit\\'e Bourgogne Europe, CNRS, Laboratoire Interdisciplinaire Carnot de Bourgogne ICB UMR 6303, 21000 Dijon, France}\nL000065\t\\affiliation{$^{2}$CMAP, CNRS, Ecole polytechnique, Institut Polytechnique de Paris, 91120 Palaiseau, France}\nL000066\t\\affiliation{$^{3}$Universit\\'e C\\^ote d'Azur, CNRS, Institut de Physique de Nice, Nice, France}\nL000067\t\\affiliation{$^{4}$Department of Physics, University of Calabria, Via P. Bucci, Rende, 87036, (CS), Italy}\nL000068\t\\affiliation{$^{5}$Department of Information Engineering, Electronics, and Telecommunications, Sapienza University of Rome, Via Eudossiana 18, Rome, 00184, Italy}\nL000069\t\nL000070\t\nL000071\t\nL000072\t\nL000073\t\nL000074\t\nL000075\t\nL000076\t\nL000077\t\nL000078\t\nL000079\t\nL000080\t\nL000081\t\nL000082\t\\begin{abstract}\nL000083\tWe theoretically and experimentally investigate spontaneous self-organization in a conservative (Hamiltonian) turbulent wave system, operating far from thermodynamic equilibrium. Our system is governed by two coherently coupled nonlinear Schr\\\"odinger equations, describing the polarization evolution of light in a dispersive nonlinear optical fiber. The analysis reveals the emergence of two fundamentally distinct turbulent regimes. In a first regime, the waves undergo a slow, irreversible thermalization process, which is accurately described by the wave turbulence kinetic equation and the associated $H-$theorem of entropy growth. In stark contrast with this expected irreversible process, we identify a second different regime, where strong phase-correlations spontaneously emerge, giving rise to a fast reversible oscillatory dynamics of the normal correlator and anomalous phase-correlator. Experimental observations confirm the occurrence of both irreversible thermalization and reversible dynamics mediated by the anomalous correlated fluctuations.\nL000084\t\nL000085\t\nL000086\t\\end{abstract}\nL000087\t\nL000088\t\nL000089\t\nL000090\t\\maketitle\nL000091\t\nL000092\t\nL000093\t{\\it Introduction.}\nL000094\tNon-integrable Hamiltonian systems of random waves generally undergo thermalization -- an irreversible evolution toward thermodynamic equilibrium, characterized by a state of maximum entropy. In the weakly nonlinear regime, this process is accurately described by the wave turbulence (WT) theory \\cite{zakharov92,zakharov04,nazarenko11,Newell_Rumpf,galtier22,onorato23}, which has been successfully applied to various physical systems \\cite{lvov97,rumpf09,nazarenko25,nazarenko17,onorato20,onorato15}, including optical waves \\cite{laurie12,babin07,turitsyn13,churkin15,PRL10,PR14}.\nL000095\t\nL000096\tThe WT kinetic equation (KE) describes the actual irreversible evolution to the Rayleigh-Jeans equilibrium distribution, which is expressed by a $H-$theorem of entropy growth.\nL000097\tInterestingly, light thermalization has recently been studied theoretically \\cite{PRL19,christodoulides19,podivilov22} and experimentally \\cite{podivilov22,PRL20,pourbeyram22,mangini22} in multimode fibers, thus spurring the emerging field of optical thermodynamics \\cite{christodoulides19,PRL23,muniz23,ferraro24,kirsch25,PRL22,lu24,kottos20,kottos23,kottos24,efremidis24,ferraro25_rev}.\nL000098\t\nL000099\t\nL000100\t\nL000101\t\nL000102\t\nL000103\t\nL000104\t\nL000105\t\nL000106\tAlthough rigorous derivations of the WT KE have been accomplished for certain partial differential equations (PDEs) \\cite{deng23full,deng23long,staffilani21}, the broader validity of the WT theory across a wide range of nonlinear wave-interacting PDEs remains unclear. A central requirement in deriving the KE is the demonstration that {\\it phase-correlations} among the random waves can be neglected.\nL000107\t\nL000108\t\nL000109\t\nL000110\tPhase-correlations are known to underlie\nL000111\t\nL000112\tlarge-scale coherent structures, such as solitons or condensates, which emerge from strongly nonlinear turbulent regimes \\cite{zakharov04,nazarenko11,Newell_Rumpf,galtier22,onorato23,laurie12,lvov97,rumpf09,turitsyn12,Turitsyna13,mordant23,delre16,delre24}. These coherent structures are, by their nature, phase-correlated entities. In contrast, we will focus here on phase-correlations in the\nL000113\t{\\it weakly nonlinear regime} of random dispersive waves.\nL000114\t\nL000115\t\nL000116\t\nL000117\t\nL000118\t\nL000119\tPhase-correlations -- also referred to as `anomalous correlations' -- were central to the original Bardeen–Cooper–Schrieffer theory of superconductivity \\cite{bcs57}. They have since been extensively studied within the framework of $S-$theory \\cite{zakharov71,zakharov75,lvov94}, where anomalous correlations arise from an external forcing (pumping) that parametrically excites a dissipative magnetic system \\cite{lvov94}.\nL000120\t\\blue{Anomalous correlators connected to optical polarization were originally introduced in Ref.~\\cite{kuznetsov78} to study\nL000121\tturbulence of electromagnetic waves in isotropic plasma.}\nL000122\t\nL000123\tFrom a different perspective, recent theoretical advances revealed the presence of phase-correlations in conservative (unforced) wave systems.\nL000124\t\nL000125\tAnomalous phase-correlations have been identified in Fermi–Pasta–Ulam–Tsingou chains~\\cite{zaleski20}, or in the coupled nonlinear Schr\\\"odinger equation (NLSE), arising from strong convection between wave components~\\cite{guasoni17}.\nL000126\t\nL000127\tIn {\\it scalar} wave systems, the mechanism underlying the emergence of phase-correlations between different frequencies has been recently elucidated, by showing that they may only arise from Hamiltonian terms that break phase invariance, whereas systems that preserve phase invariance preclude such anomalous correlations~\\cite{villois25}.\nL000128\t\nL000129\t\nL000130\tIn this Letter, we investigate a {\\it vector} system of coherently coupled NLSEs, which describe the polarization evolution of temporally incoherent light waves in optical fibers. We identify two fundamentally different regimes: an irreversible thermalization, and a reversible turbulent dynamics driven by phase-correlations.\nL000131\t\nL000132\tUnlike recent 2D spatial studies in multimode optical fibers~\\cite{podivilov22,PRL20,pourbeyram22,mangini22},\nL000133\t\nL000134\twe examine here the\nL000135\t\nL000136\t1D temporal dynamics of incoherent waves propagating in a single-mode fiber~\\cite{babin07,turitsyn13,churkin15,PRL10,PR14}.\nL000137\t\nL000138\tBy using the standard WT theory (neglecting phase-correlations), we\nL000139\t\nL000140\tdescribe nonequilibrium thermalization accurately.\nL000141\t\nL000142\tIn contrast to this expected irreversible process, we show that phase-correlations can grow exponentially from fully uncorrelated initial random waves, leading to a reversible oscillatory turbulent dynamics.\nL000143\tThese anomalous phase-correlations emerge among different wave components in a phase-invariant vector system, hence they are of different nature from those investigated in Ref.\\cite{villois25}.\nL000144\t\nL000145\tExperimental results provide evidence of both irreversible thermalization and reversible phase-correlated dynamics. From a broader perspective, this work advances our understanding of far-from-equilibrium self-organization processes in closed (Hamiltonian) turbulent wave systems.\nL000146\t\nL000147\t\nL000148\t\nL000149\t\nL000150\t{\\it Model.}\nL000151\tWe consider a generic model for vector phenomena based on coherently coupled NLSEs. It describes spinor Bose–Einstein condensates with\nL000152\tfield-induced\nL000153\tspin-flip coupling \\cite{stringari16}, allowing studies of\nL000154\t\nL000155\t\nL000156\tquantum phase transitions \\cite{cominotti23}, or bubble nucleation in\nL000157\tferromagnetic superfluids \\cite{zenesini23}.\nL000158\t\nL000159\t\nL000160\tThe coherently coupled NLSEs also describe the polarization dynamics of an optical wave propagating in  a weakly birefringent fiber \\cite{millot_prl97,agrawal}:\nL000161\t\nL000162\t\nL000163\t\nL000164\t\nL000165\t\nL000166\t\nL000167\t\nL000168\t\nL000169\t\nL000170\t\nL000171\t\nL000172\t\nL000173\t\nL000174\t\nL000175\t\\begin{eqnarray}\nL000176\ti\\partial_z {\\bm u} = - \\beta \\partial_{tt} {\\bm u} + \\alpha {\\bm \\sigma} {\\bm u} +\\gamma\\big(\\kappa {\\bm u}^\\dag {\\bm u} {\\bm u}+ \\rho {\\bm u}^T {\\bm u} {\\bm u}^*\\big),\nL000177\t\\label{eq:nls}\nL000178\t\\end{eqnarray}\nL000179\t\nL000180\t\nL000181\t\nL000182\t\nL000183\t\nL000184\t\nL000185\t\nL000186\t\nL000187\twhere ${\\bm u}(t,z)=(u_{x}, u_{y})^T$ is the vector field in the linear polarization basis, and the superscripts $(T,\\dag)$ stand for the transpose, and conjugate transpose, operations. As usual in optics, the distance $z$ of propagation plays the role of an evolution `time' variable, while $t$ denotes the retarded time in a reference frame moving with the waves.\nL000188\t\nL000189\t$\\gamma$ is the non-linear parameter, $\\beta$ is the group-velocity dispersion, while $\\kappa$ and $\\rho$ are dimensionless interaction coefficients; we will consider the case $\\kappa=2\\rho$ relevant to our experiments.\nL000190\t\nL000191\t\nL000192\tThe coherent coupling parameter $\\alpha$ originates from the weak birefringence of the optical fiber, with the matrix ${\\bm \\sigma}={\\rm diag}(+1,-1)$. We assume $\\alpha>0$ without loss of generality.\nL000193\t\nL000194\t\nL000195\t\nL000196\t\nL000197\t\nL000198\t\nL000199\t\nL000200\t\nL000201\t\nL000202\tThe vector NLSE (\\ref{eq:nls}) conserves the power (particle number) $N=\\sum_\\mu N_{\\mu}$, where $N_{\\mu}(z)=\\frac{1}{T}\\int_0^T |u_{\\mu}|^2 dt$, with $T$ the size of the numerical window, and $\\mu=x,y$. It also conserves the Hamiltonian $H = E+U$, with a linear $E$, and a nonlinear $U$, contribution~\\cite{supplement}.\nL000203\t\nL000204\tLet us introduce the usual normal correlators $n_{\\mu}(\\omega,t,z)=\\int \\left<u_\\mu(t+\\tau/2,z)u_\\mu^*(t-\\tau/2,z)\\right> \\exp(-i\\omega \\tau)d\\tau$ ($\\mu=x, y$). The dependence of $n_\\mu$ on the (`spatial') variable $t$ accounts for possible statistical inhomogeneities in the random waves, while the angle brackets denote an average over the random initial conditions. Furthermore, the theorem in Ref.\\cite{villois25} for phase-invariant scalar systems can be extended to vector systems such as the vector NLSE (\\ref{eq:nls}), which implies the absence of anomalous correlations among distinct frequencies. However, as we show below, phase-correlations may emerge between different  wave (i.e., polarization) components at the same frequency: these will be characterized by the anomalous correlator $m(\\omega,t,z)=\\int \\left<u_y(t+\\tau/2,z)u_x^*(t-\\tau/2,z)\\right> \\exp(-i\\omega \\tau)d\\tau$.\nL000205\t\nL000206\t\nL000207\t\nL000208\t\nL000209\t\nL000210\t\nL000211\t\\medskip\nL000212\t\\noindent\nL000213\t{\\it Standard WT theory: Irreversible thermalization.}\nL000214\tWe consider the weakly nonlinear regime, where linear effects dominate over nonlinear effects  $|E/U| \\gg 1$. Using the standard WT theory \\cite{zakharov92,zakharov04,nazarenko11,Newell_Rumpf,galtier22,laurie12,onorato23,PR14}, we derive the KE under the usual assumptions: (i) statistical homogeneity, so that $n_\\mu$ are $t-$independent, and (ii) absence of phase-correlations between $u_x$ and $u_y$, i.e., the anomalous correlator is zero at any `time' $z$, $m(\\omega,t,z)=0$.\nL000215\t\nL000216\t\nL000217\t\nL000218\t\nL000219\tThe KE governing the evolution of the averaged spectra ${\\bm n}(\\omega,z)=(n_x, n_y)^T$ then takes the usual form\nL000220\t\\begin{align}\nL000221\t\\partial_z {\\bm n}(\\omega,z) = \\kappa^2 \\, {\\cal C}oll_i[{\\bm n}] + \\rho^2 \\, {\\cal C}oll_c[{\\bm n}].\nL000222\t\\label{eq:wtkin}\nL000223\t\\end{align}\nL000224\tThe collision terms are rather cumbersome, see \\cite{supplement}. They are cubic nonlinear terms ${\\cal C}oll_{i,c}[{\\bm n}] \\sim n^3$, describing the four-wave interaction as a collisional gas of `particles'. The KE (\\ref{eq:wtkin}) conserves\nL000225\t\nL000226\t$N=\\sum_\\mu N_\\mu$, with ${N}_\\mu(z)= \\frac{1}{2\\pi}\\int {n}_\\mu(\\omega,z) d\\omega$ ($\\mu=x,y$), and the linear energy $E$ \\cite{supplement}.\nL000227\t\nL000228\t\nL000229\t\nL000230\t\nL000231\t\nL000232\t\nL000233\t\nL000234\tAt variance with the NLSE~(\\ref{eq:nls}), the KE (\\ref{eq:wtkin}) is irreversible, as expressed by a $H$-theorem of entropy growth, $d{\\cal S}/dz \\geq 0$, where ${\\cal S}=\\sum_\\mu {\\cal S}_\\mu$, and ${\\cal S}_{\\mu}(z)=\\frac{1}{2\\pi}\\int \\log\\big({n}_\\mu(\\omega,z)\\big) d\\omega$  is the nonequilibrium entropy of the $\\mu-$th component ($\\mu=x,y$).\nL000235\t\nL000236\t\nL000237\t\nL000238\t\nL000239\t\nL000240\t\\begin{figure}[t!]\nL000241\t    \\centering\nL000242\t    \\includegraphics[trim = 0.5cm 0 0 0,width=1\\linewidth]{figures/FIG1_theory_v2.pdf}\nL000243\t    \\caption{{\\bf Irreversible thermalization.} Evolution during the propagation of \\blue{of the power fraction $N_{x,y}(z)/N$} (a), and corresponding degree of polarization ${\\cal P}(z)$ [Eq.(\\ref{eq:P})] (b), obtained from the simulation of the NLSE (\\ref{eq:nls}) (5 realizations, dark and light blue lines), and the simulation of the WT KE (\\ref{eq:wtkin}) (red lines).\nL000244\t\nL000245\t\nL000246\t    Parameters: $\\alpha L_{nl}=1, \\Delta N^0=0, \\sigma \\tau_0=0.8 \\pi, \\kappa=2/3$, with $L_{nl}=1/(\\gamma N)$ the nonlinear length and $\\tau_0=\\sqrt{|\\beta| L_{nl}}$ the `healing time' ($|E/U| \\simeq (\\sigma \\tau_0)^2$).\nL000247\t\nL000248\t    }\nL000249\t    \\label{fig:fig1}\nL000250\t\\end{figure}\nL000251\t\nL000252\t\nL000253\t\nL000254\t\nL000255\tWe have performed numerical simulations of NLSE (\\ref{eq:nls}).\nL000256\t\nL000257\tAs initial condition, we consider two {\\it uncorrelated} random waves $u_{x,y}(t,z=0)$ with zero mean, Gaussian statistics and Gaussian-shaped initial spectrum $n_{x}^0(\\omega)=n_{y}^0(\\omega)$, i.e., $N_x^0=N_y^0$, with $n_{\\mu}^0(\\omega)= \\sqrt{2\\pi} N_{\\mu}^0 \\exp\\big(-\\omega^2/(2\\sigma^2)\\big)/\\sigma$.\nL000258\tLet us introduce the degree of polarization of the optical wave \\cite{mandel}:\nL000259\t\\begin{eqnarray}\nL000260\t{\\cal P}(z)=\\sqrt{\\Delta N(z)^2 + 4|M(z)|^2 }/N,\nL000261\t\\label{eq:P}\nL000262\t\\end{eqnarray}\nL000263\twhere $M(z)=\\frac{1}{2\\pi}\\int m(\\omega,z) d\\omega = \\left< u_y(t,z) u_x^*(t,z) \\right>$ denotes the integrated anomalous correlator, and $\\Delta N(z)=N_y(z)-N_x(z)$ the unbalanced power distribution. Note that ${\\cal P}$ is bounded by 0 and 1, which correspond to unpolarized, and fully polarized, waves, respectively.\nL000264\t\nL000265\tWe have also performed numerical simulations of the WT KE~(\\ref{eq:wtkin}): as shown in Fig.~\\ref{fig:fig1}, a good agreement (without adjustable parameters) is obtained with direct simulations of the NLSE (\\ref{eq:nls}).\nL000266\t\nL000267\tRecalling that the KE neglects phase-correlations, such an agreement means that anomalous correlations do not grow, i.e., $M(z) \\simeq 0$ and ${\\cal P}(z) \\simeq \\Delta N(z)/N$. Accordingly, the thermalization process is characterized by an irreversible transfer of power from $N_x$ to $N_y$,\nL000268\t\nL000269\tthus leading to the emergence of a non-vanishing degree of polarization \\cite{supplement}.\nL000270\t\nL000271\t\nL000272\t\nL000273\t\nL000274\t\nL000275\t\nL000276\t\nL000277\t\nL000278\t\nL000279\t\nL000280\t\nL000281\t\nL000282\t\nL000283\t\nL000284\t\nL000285\t\nL000286\t\nL000287\t\nL000288\t\\medskip\nL000289\t\\noindent\nL000290\t{\\it Reversible dynamics mediated by phase-correlations.}\nL000291\t\nL000292\tWe now show that the thermalization process can be inhibited by the spontaneous emergence of phase-correlations. To clarify this regime in a general framework, we do not implicitly assume the waves to obey homogeneous statistics, i.e., we leave $n_{\\mu}(\\omega,t,z)$ and $m(\\omega,t,z)$ to depend on a slow non-homogeneous variation in the $t$ variable.\nL000293\t\nL000294\tStarting from the NLSE (\\ref{eq:nls}), we derive in the Supplementary Mayerial  the equations governing the coupled evolution of the normal and anomalous correlators \\cite{supplement}:\nL000295\t\\begin{widetext}\nL000296\t\\begin{align}\nL000297\t\\partial_z n_x(\\omega,t) =& - 2\\beta \\omega \\partial_t n_x\nL000298\t+ \\gamma \\partial_t \\big(2 N_x(t) + \\kappa N_y(t) \\big)\\partial_\\omega n_x\nL000299\t+2\\gamma\\kappa \\partial_t M^r(t) \\partial_\\omega m^r\nL000300\t+4 \\gamma\\kappa M^r(t) m^i  ,\nL000301\t\\label{eq:nx_vl} \\\\\nL000302\t\nL000303\t\nL000304\t\nL000305\t\nL000306\t\\partial_z m(\\omega,t) =& -2\\beta \\omega \\partial_t m\nL000307\t+\\gamma(1+\\kappa/2) \\partial_t \\big( N_x(t)+N_y(t) \\big) \\partial_\\omega m\nL000308\t+\\gamma\\kappa \\partial_t M^r(t)\\partial_\\omega \\big( n_x+n_y \\big)\nL000309\t\\nonumber \\\\\nL000310\t&-i m \\Big( \\gamma(2-\\kappa)\\big(N_y(t)-N_x(t)\\big)-2\\alpha   \\Big)\nL000311\t- 2i\\gamma\\kappa \\big( n_x - n_y \\big) M^r(t)   ,\nL000312\t\\label{eq:m_vl}\nL000313\t\\end{align}\nL000314\t\\end{widetext}\nL000315\twith ${M}(t,z)=\\frac{1}{2\\pi}\\int m(\\omega,t,z)d\\omega$, ${N}_{\\mu}(t,z)=\\frac{1}{2\\pi}\\int n_{\\mu}(\\omega,t,z)d\\omega$, while the superscripts $m^{r,i}$ ($M^{r,i}$) denote the real and imaginary parts of $m$ ($M$).\nL000316\tThe equation for $n_y$ follows from Eq.(\\ref{eq:nx_vl}) by exchanging $x\\leftrightarrow y$ and reversing the sign of the last term.\nL000317\t\nL000318\tThe first two terms on the right-hand side of Eq.(\\ref{eq:nx_vl})\nL000319\t\nL000320\tcorrespond to the well-established Vlasov coupling between two {\\it uncorrelated} random waves. Here, the generalized Vlasov-like Eqs.(\\ref{eq:nx_vl}-\\ref{eq:m_vl}) provide an original extension accounting for phase-correlations, $m(\\omega,t)$. In contrast to the KE (\\ref{eq:wtkin}), the system (\\ref{eq:nx_vl}-\\ref{eq:m_vl}) is formally reversible in `time' $z$ \\cite{supplement}. To avoid confusion with the usual KE~(\\ref{eq:wtkin}), we shall refer to Eqs.(\\ref{eq:nx_vl}-\\ref{eq:m_vl}) (and Eq.(\\ref{eq:s_dyn}) below) as the anomalous-correlator kinetic equation (AC-KE).\nL000321\t\nL000322\t\nL000323\t\nL000324\t\nL000325\tWe consider an initial condition of two uncorrelated random waves, of zero mean, with homogeneous statistics and spectra $n_{\\mu}(\\omega,z=0)=n_{\\mu}^0(\\omega)$, so that the initial anomalous correlator is zero, $m(\\omega,t,z=0)=0$. We carry out a linear stability analysis of Eqs.(\\ref{eq:nx_vl}-\\ref{eq:m_vl}) around this state. Using the Laplace-Fourier transform ${\\hat m}(\\omega, \\Omega,\\lambda)=\\int_0^z dz \\int m(\\omega,t,z)\\exp(-\\lambda z-i\\Omega t) dt$, we obtain the dispersion relation\nL000326\t$\\lambda(\\Omega)$ of the anomalous correlator \\cite{supplement}:\nL000327\t\\begin{eqnarray*}\nL000328\t\nL000329\t\nL000330\t\\frac{2\\pi}{\\gamma\\kappa} = \\sum_{s} \\int\nL000331\t\\frac{ n_x^0(\\omega)-n_y^0(\\omega)-s\\Omega \\partial_\\omega\\big(n_x^{0}(\\omega)+n_y^{0}(\\omega)\\big)/2}{is \\lambda-2s\\beta\\omega \\Omega - \\gamma(2-\\kappa)\\Delta N^0+2\\alpha} d\\omega  ,\nL000332\t\nL000333\t\\end{eqnarray*}\nL000334\twhere $\\Delta N^0=N_y^0-N_x^0$, and $s=\\pm 1$.\nL000335\t\nL000336\tAssuming the initial spectra Gaussian-shaped,\nL000337\t\nL000338\t\nL000339\twe compute the corresponding growth-rate ${\\rm Re}[\\lambda(\\Omega)]$.\nL000340\t\nL000341\tThe analysis reveals that, in general, the homogeneous mode with $\\Omega=0$ is the most unstable, with the maximum growth rate of the anomalous correlator:\nL000342\t\nL000343\t\nL000344\t\\begin{align}\nL000345\t\\lambda(\\Omega=0)=  2\\sqrt{\\alpha(2 \\gamma \\Delta N^0/3-\\alpha )},\nL000346\t\nL000347\t\nL000348\t\\label{eq:lambda_0}\nL000349\t\\end{align}\nL000350\twhere we have considered the case $\\kappa=2/3$ relevant to our experiments.\nL000351\t\nL000352\t\nL000353\tThe instability criterion then reads\nL000354\t\\begin{align}\nL000355\t\\alpha L_{nl} < (2/3) \\Delta N^0/N.\nL000356\t\\label{eq:threshold}\nL000357\t\\end{align}\nL000358\t\nL000359\t\nL000360\t\nL000361\tSimulations of NLSE [Eq. (\\ref{eq:nls})] confirm the theoretical prediction [Eq. (\\ref{eq:lambda_0})], \\blue{as illustrated in Fig. \\ref{fig:fig2}(a). The figure shows 100 independent realizations of the initial uncorrelated random waves $u_{x,y}(t,z=0)$ (black lines); whose ensemble average (green line) agrees with the instability growth-rate (\\ref{eq:lambda_0}) (red line).}\nL000362\t\nL000363\t\nL000364\t\\begin{figure}\nL000365\t    \\centering\nL000366\t    \\includegraphics[trim = 0.3cm 0 0 0,width=\\linewidth]{figures/FIG2_theory.pdf}\nL000367\t    \\caption{{\\bf Reversible turbulent dynamics.} (a) Exponential growth of the anomalous correlator starting from initially uncorrelated random waves $|M(z=0)| \\simeq 0$: Simulations of the NLSE (\\ref{eq:nls}) (100 realizations, black lines), and corresponding average (green line). The red line reports the theoretical prediction Eq.(\\ref{eq:lambda_0}). (b) Nonlinear dynamics on the Poincar\\'e sphere: Simulation of the NLSE (\\ref{eq:nls}) (red  line), and corresponding theoretical prediction from the simulation of AC-KE~(\\ref{eq:s_dyn}) (black line), showing the periodic exchange among the normal and anomalous correlators. The blue line reports the homoclinic orbit emanating from the unstable fixed point $S_1=+S_0$, i.e., $|M|=0$. Parameters: $\\alpha L_{nl}=0.2, \\sigma \\tau_0=4\\pi, \\Delta N^0/N=0.6, \\kappa=2/3, L_{nl}=1/(\\gamma N), \\tau_0=\\sqrt{|\\beta| L_{nl}}$ ($|E/U| \\simeq (\\sigma \\tau_0)^2$).\nL000368\t\nL000369\t    }\nL000370\t    \\label{fig:fig2}\nL000371\t\\end{figure}\nL000372\t\nL000373\t\nL000374\tThe fact that the homogeneous mode $\\Omega=0$ is the most unstable, indicates that the subsequent nonlinear dynamics described by Eqs.(\\ref{eq:nx_vl}-\\ref{eq:m_vl}) preserves the homogeneous statistics, i.e., $n_{\\mu}(\\omega,t)$ and $m(\\omega,t)$ are $t-$independent. In this limit, the  dynamics for the normal and anomalous correlators (\\ref{eq:nx_vl}-\\ref{eq:m_vl}) can be recast in the form of a Stokes vector ${\\bm S}(z)=\\big(\\Delta N, 2 M^r, 2 M^i \\big)^T$ that rotates on the surface of the Poincar\\'e sphere \\cite{supplement}:\nL000375\t\\begin{align}\nL000376\t\\partial_z {\\bm S}(\\tau,z)= {\\bm R}(z) \\times  {\\bm S}(z),\nL000377\t\\label{eq:s_dyn}\nL000378\t\nL000379\t\\end{align}\nL000380\twith ${\\bm R}(z)=\\big( 2\\alpha-\\blue{\\gamma}(2-\\kappa) S_1(z),  -2\\blue{\\gamma}\\kappa S_2(z), 0  \\big)^T$.\nL000381\tThis formalism differs substantially from that commonly used to describe polarization effects for fully coherent stationary waves \\cite{agrawal,daino85}.\nL000382\t\\blue{Conversely, a related kinetic approach for random waves accounting for anomalous correlations was originally developed in the context of isotropic plasma turbulence, where nonlinear interactions due to stimulated scattering drive the electromagnetic field toward complete polarization \\cite{kuznetsov78} (we recall that classical Thomson scattering\nL000383\tlikewise produces fully polarized light at a scattering angle $\\pi/2$ \\cite{landau}).\nL000384\tNote however that the increase of ${\\cal P}(z)$ discussed above through Fig.~\\ref{fig:fig1} is of different nature, since it is associated with the thermalization process that neglects anomalous correlations. Furthermore, at variance with Ref.\\cite{kuznetsov78}, the kinetic Eq.(\\ref{eq:s_dyn}) accounting for anomalous correlators, conserves the degree of polarization during evolution ${\\cal P}(z)=$const, as it is fixed by the radius of the Poincar\\'e sphere $S_0=\\big(\\sum_{j=1}^3 S_j^2\\big)^{1/2}={\\cal P} N$. It turns out that} the nonlinear dynamics described by the AC-KE~(\\ref{eq:s_dyn}) is essentially periodic, featuring oscillations that involve a reversible exchange between the normal correlator $\\Delta N(z)$ and the anomalous correlator $M(z)$, while conserving\nL000385\t\\begin{align}\nL000386\t{\\cal P}^2 N^2 =\\Delta N^2(z)+4|M(z)|^2={\\rm const}.\nL000387\t\\label{eq:invar}\nL000388\t\\end{align}\nL000389\tThis reversible dynamics is in agreement with the simulations of the NLSE (\\ref{eq:nls}), see Fig.~\\ref{fig:fig2}(b).\nL000390\tNote that the {\\it fast}, reversible dynamics, governed by the quadratic nonlinearities\nL000391\t\nL000392\tin the AC-KE~(\\ref{eq:nx_vl}-\\ref{eq:m_vl}) and (\\ref{eq:s_dyn}) in Fig.~\\ref{fig:fig2}, stands in contrast to the {\\it slow}, irreversible thermalization driven by the cubic nonlinear KE~(\\ref{eq:wtkin}) in Fig.~\\ref{fig:fig1}.\nL000393\t\nL000394\t\nL000395\t\nL000396\t\nL000397\t\nL000398\t\nL000399\t\\medskip\nL000400\t\\noindent\nL000401\t{\\it Experiments.}\nL000402\tWe have experimentally investigated the two different turbulent regimes that we have previously described. We use $100$-ps long pulses made of temporally incoherent optical waves with a near Gaussian beam shape and the following spectro-temporal features: $558$-nm central wavelength, full width at half maximum (FWHM) of about $1.93$ THz~\\cite{supplement}.\nL000403\tThe temporally incoherent pulse is then divided into two linear polarization states with relative tunable power and temporal delay (much larger than their coherence time). The incoherent waves are then injected into a 6.2-m-long weakly birefringent\nL000404\t\nL000405\tsilica fiber ($\\alpha \\approx 0.565 \\ \\rm{m}^{-1}$ at $558\\ \\rm{nm}$)\nL000406\t\nL000407\twhose propagation is governed by Eq.(\\ref{eq:nls})~\\cite{agrawal}. The complex anomalous correlator $M$, as well as the optical powers $N_{x,y}$ and spectra, along $x$ and $y$ axes, are measured at the input and output of the fiber using an optical spectrum analyzer and a polarimeter.\nL000408\t\nL000409\t\\noindent\nL000410\t\\blue{\\it{Experiments on the thermalization regime.}}\nL000411\t\nL000412\tThis regime is obtained when injecting the same power along both axes $x$ and $y$, i.e., $\\Delta N^0 =0$.\nL000413\t\nL000414\tFig.~\\ref{fig:fig3}(a) shows the measurements of the power difference $\\Delta N/N$ and degree of polarization ${\\cal P}$ at the fiber output, as a function of the input power. We observe that the degree of polarization is effectively determined by the power imbalance ${\\cal P} \\simeq \\Delta N/N$ (see Eq.(\\ref{eq:P})), since the measured anomalous correlator is negligible ($|M| \\simeq 0$), as expected for the thermalization regime under investigation.\nL000415\t\nL000416\t\nL000417\t\nL000418\tIn Fig.~\\ref{fig:fig3}(a) we can see that, as the input power increases, the degree of polarization ${\\cal P}$ at the fiber output\nL000419\t\nL000420\tgrows larger. This behavior is found to be in agreement with the numerical simulations of NLSE~(\\ref{eq:nls}), performed by faithfully reproducing the details of the experimental conditions \\cite{supplement}. As predicted by \\blue{the criterion (\\ref{eq:threshold})}, a sufficiently large power difference may render the anomalous correlator unstable. It is worth emphasizing, however, that even for the largest power difference recorded at the fiber output in Fig.~\\ref{fig:fig3}(a), the anomalous correlator remains stable (which is consistent with \\blue{the criterion (\\ref{eq:threshold})}, as $\\alpha L_{nl} \\approx 0.19 > (2/3)\\Delta N/N \\approx 0.12$).\nL000421\t\nL000422\tFigure~\\ref{fig:fig3}(b) shows the measured input and output spectra along the $x-$axis of the fiber (similar results are obtained along the $y-$axis), together with the spectrum obtained from NLSE simulations. The results show the formation of a spectral tail decaying with the power law $\\sim \\omega^{-2}$, which is a signature of light thermalization reflecting energy equipartition among the modes~\\cite{zakharov92,zakharov04,nazarenko11,galtier22,Newell_Rumpf,PR14}.\nL000423\t\nL000424\t\nL000425\t\\begin{figure}[t!]\nL000426\t    \\centering\nL000427\t    \\includegraphics[trim = 0.5cm 0cm 0cm 0cm, width = \\linewidth]{figures/fig_repolarisation_horizontal.pdf}\nL000428\t    \\caption{\\textbf{Observation of optical repolarization.} (a) Experimental measurements of the normalized power difference $\\Delta N/N$ (blue dots), and degree of polarization ${\\cal P}$  (red crosses), vs input power: In the thermalization regime, the anomalous correlator $M$ is negligible, and ${\\cal P} \\simeq \\Delta N/N$, see Eq.(\\ref{eq:P}). The measured repolarization is in good agreement with the simulations of NLSE~(\\ref{eq:nls}) (dashed black lines). (b) Measured power spectrum at the input (blue line), and output (orange line), of the fiber. The experimental spectra agree well with\nL000429\t\nL000430\t    the simulation of NLSE~(\\ref{eq:nls}) (black lines), and exhibit a power-law signature of light thermalization $\\sim \\omega^{-2}$ in the spectral tail.}\nL000431\t    \\label{fig:fig3}\nL000432\t\\end{figure}\nL000433\t\nL000434\t\\begin{figure*}[t!]\nL000435\t    \\centering\nL000436\t    \\includegraphics[trim = 0cm 0 0 0, width=\\linewidth]{figures/FIG4.pdf}\nL000437\t\\caption{\\textbf{Observation of the reversible turbulent regime}.\nL000438\tMeasurements, at the fiber output and as a function of the input power, of (a) the power difference $\\Delta N/N$ and (b) the real and imaginary parts of the normalized anomalous correlator $M/N$.\nL000439\t\nL000440\t\nL000441\t\nL000442\t\nL000443\t\nL000444\t\nL000445\tThe insets in (a)-(b) show the dynamics along the fiber length $L=6.2$m for $\\Delta N/N$ and $M^i/N$ with an input power of $50\\ \\rm{ W}$ ($L_{nl}\\approx 0.83$ m) in the strongly nonlinear regime $|E/U| \\approx 1$: The blue and red lines report the simulations of NLSE (\\ref{eq:nls}) and AC-KE (\\ref{eq:s_dyn}), respectively.\nL000446\t(c) Corresponding field evolution on the Poincar\\'e sphere\nL000447\t\nL000448\tfor the NLSE (blue) and the AC-KE (\\ref{eq:s_dyn}) (red).\nL000449\t\nL000450\t\nL000451\t\nL000452\t\nL000453\tNote in the insets (a)-(b) and in panel (c) that the AC-KE (\\ref{eq:s_dyn}) (valid in the weakly nonlinear regime $|E/U| \\gg 1$) still provides a qualitative description of the oscillatory dynamics even in the strongly nonlinear regime $|E/U| \\approx 1$.\nL000454\t}\nL000455\t\\label{fig:fig4}\nL000456\t\\end{figure*}\nL000457\t\nL000458\t\nL000459\t\nL000460\t\nL000461\t\\noindent\nL000462\t\\blue{{\\it Experiments on the reversible turbulent regime.}\nL000463\t\nL000464\tFor small initial anomalous correlations  $|M(z=0)| \\simeq 0$, we have seen through the criterion (\\ref{eq:threshold}) that $|M|$ can be unstable. Experimental constraints, however, prevent simultaneously launching a strong  unbalanced population $S_1 \\simeq S_0$ with a small phase-correlation $|M|\\simeq 0$, precluding a direct experimental test of criterion (\\ref{eq:threshold}).\nL000465\tNevertheless, in addition to the instability of the fixed point $(M=0, S_1 = +S_0 )$, the AC-KE~(\\ref{eq:s_dyn})\nL000466\talso predicts a general nonlinear coupling between normal and anomalous correlators for arbitrary initial conditions on the sphere ${\\bm S}(z=0)$, even if the criterion (\\ref{eq:threshold}) is not fulfilled.\nL000467\tHere, we probe this nonlinear dynamics experimentally starting from $S_1(z=0) \\simeq 0$ with a large phase correlation $|M|$.}\nL000468\t\nL000469\tWe thus restore a large anomalous correlator by means of a polarizer, placed before injection of the laser beam into the fiber.\nL000470\t\nL000471\t\nL000472\tFigs.~\\ref{fig:fig4}(a-b) report the experimental measurements of the power difference $\\Delta N/N$ and complex anomalous correlator $M/N$ at the fiber output, as functions of the input power. Their non-monotonic evolutions agree well with the simulations of the NLSE~(\\ref{eq:nls}).\nL000473\tSuch an agreement has been obtained by using a single adjustable parameter, namely the initial relative phase between $u_x$ and $u_y$, which accounts for a minor, uncontrolled elliptical polarization of the injected incoherent optical beam.\nL000474\t\\blue{We have deliberately chosen to limit the number of adjustable parameters in order to highlight the physical mechanism at play. The quantitative discrepancy between simulations and experiments in Fig.~\\ref{fig:fig4}(b) can also be attributed to the phase-sensitive nature of the anomalous correlator $M/N$, which makes it more vulnerable to experimental uncertainties and noise than $\\Delta N/N$ shown in Fig.~\\ref{fig:fig4}(a).}\nL000475\t\nL000476\t\nL000477\tThe  analysis of the evolution of $\\Delta N/N$ and $M/N$ along the fiber length $L=6.2$m uncovers the underlying oscillatory turbulent dynamics. This is illustrated in the insets of Fig.~\\ref{fig:fig4}(a-b) for an input power of 50W, which corresponds to a strongly nonlinear regime with $|E/U| \\simeq 1$.\nL000478\tThe blue and red curves refer to simulations of the NLSE~(\\ref{eq:nls}) and the AC-KE~(\\ref{eq:s_dyn}), respectively, whose  corresponding evolution is also reported on the Stokes sphere, see Fig.~\\ref{fig:fig4}(c).\nL000479\tThese results show that the AC-KE~(\\ref{eq:s_dyn}), which is rigorously valid in the weakly nonlinear regime $|E/U| \\ll 1$ remains robust in describing qualitatively the oscillatory turbulent behavior even in the strongly nonlinear regime $|E/U| \\simeq 1$.\nL000480\t\nL000481\t\nL000482\t\nL000483\t\nL000484\t\nL000485\t\nL000486\t\\medskip\nL000487\t\\noindent\nL000488\t{\\it Conclusion and perspectives.}\nL000489\tWe have revealed, both theoretically and experimentally, that a phase-invariant Hamiltonian system of coupled waves may exhibit two distinct  turbulent regimes:  irreversible thermalization and reversible dynamics mediated by phase-correlations.\nL000490\t\nL000491\tThe experiments provide\nL000492\t\nL000493\tthe first evidence of such contrasting turbulent behaviors in conservative (Hamiltonian) systems of dispersive nonlinear waves.\nL000494\t\nL000495\t\nL000496\t\nL000497\tOur study establishes a basis for future advances in understanding the interplay of these fundamentally different regimes. Until now, turbulent regimes dominated by slow, irreversible thermalization and those governed by fast, correlation-driven reversible dynamics have been separately explored, leaving open the fundamental question about the role of anomalous correlators on thermalization, and the reciprocal impact of irreversible processes on the reversible dynamics. A key challenge for future research is therefore the development of a generalized theory that unifies these two aspects -- reversible dynamics associated to anomalous correlators and irreversible thermalization -- fully accounting for phase-correlations.\nL000498\t\nL000499\t\\medskip \\noindent\nL000500\t{\\it Acknowledgement.}\nL000501\tFunding was provided by Agence Nationale de la Recherche (Grants No. ANR-23-CE30-0021, No. ANR-21-ESRE-0040, No. ANR-21-CE42-0026), by the Marie Sklodowska-Curie Actions project BESCLING (Grant No. 101209943), and by the Italian Ministry of University and Research (MUR) through the Italian Science Fund (FIS2), project SOFT (H53C24001530001). Calculations were performed using HPC resources from Universit\\'e C\\^ote d’Azur’s Center Azzura, and DNUM-CCUB (Universit\\'e de Bourgogne Europe). S.W. acknowledges support from the European Innovation Council, project MULTISCOPE (101185664).\nL000502\t\nL000503\t\nL000504\t\nL000505\t\nL000506\t\nL000507\t\nL000508\t\nL000509\t\nL000510\t\nL000511\t\nL000512\t\nL000513\t\nL000514\t\nL000515\t\nL000516\t\nL000517\t\nL000518\t\nL000519\t\nL000520\t\nL000521\t\nL000522\t\nL000523\t\nL000524\t\nL000525\t\nL000526\t\nL000527\t\nL000528\t\nL000529\t\nL000530\t\nL000531\t\nL000532\t\nL000533\t\nL000534\t\nL000535\t\nL000536\t\nL000537\t\nL000538\t\nL000539\t\nL000540\t\nL000541\t\\begin{thebibliography}{99}\nL000542\t\nL000543\t\nL000544\t\nL000545\t\nL000546\t\\bibitem{zakharov92}\nL000547\tV.E. Zakharov, V.S. L'vov, G. Falkovich,\nL000548\t{\\it Kolmogorov Spectra of Turbulence I} (Springer, Berlin, 1992).\nL000549\t\nL000550\t\nL000551\t\nL000552\t\nL000553\t\nL000554\t\nL000555\t\\bibitem{zakharov04}\nL000556\tV. Zakharov, F. Dias, and A. Pushkarev, One-Dimensional\nL000557\tWave Turbulence, Phys. Rep. {\\bf 398}, 1 (2004).\nL000558\t\nL000559\t\nL000560\t\\bibitem{nazarenko11}\nL000561\tS. Nazarenko,\nL000562\t{\\it Wave Turbulence} (Springer, Lectures Notes in Physics, 2011).\nL000563\t\nL000564\t\\bibitem{Newell_Rumpf}\nL000565\tA.C. Newell, B. Rumpf,\nL000566\tWave Turbulence,\nL000567\tAnnu. Rev. Fluid Mech. {\\bf 43}, 59 (2011).\nL000568\t\nL000569\t\nL000570\t\\bibitem{galtier22}\nL000571\tS. Galtier, {\\it Physics of Wave Trubulence} (Cambridge University Press, 2022).\nL000572\t\nL000573\t\nL000574\t\nL000575\t\nL000576\t\nL000577\t\nL000578\t\nL000579\t\\bibitem{onorato23}\nL000580\tM. Onorato, Y.V. Lvov, G. Dematteis, S. Chibbaro,\nL000581\tWave Turbulence and thermalization in one-dimensional chains,\nL000582\tPhysics Reports {\\bf 1040}, 1 (2023).\nL000583\t\nL000584\t\\bibitem{lvov97}\nL000585\tV.S. L’vov, Y.V. Lvov, A.C. Newell, and V.E. Zakharov,\nL000586\tStatistical Description of Acoustic Turbulence,\nL000587\tPhys. Rev. E {\\bf 56}, 390 (1997).\nL000588\t\nL000589\t\\bibitem{rumpf09}\nL000590\tB. Rumpf, A.C. Newell, and V.E. Zakharov, Turbulent\nL000591\tTransfer of Energy by Radiating Pulses,\nL000592\tPhys. Rev. Lett. {\\bf 103}, 074502 (2009).\nL000593\t\nL000594\t\\bibitem{nazarenko25}\nL000595\tV. Labarre, G. Krstulovic, S. Nazarenko,\nL000596\tWave-Kinetic Dynamics of Forced-Dissipated Turbulent Internal Gravity Waves,\nL000597\tPhys. Rev. Lett. {\\bf 135}, 014101 (2025).\nL000598\t\nL000599\t\nL000600\t\nL000601\t\nL000602\t\nL000603\t\nL000604\t\nL000605\t\nL000606\t\nL000607\t\nL000608\t\nL000609\t\nL000610\t\nL000611\t\nL000612\t\nL000613\t\nL000614\t\\bibitem{nazarenko17}\nL000615\tS. Galtier, S. Nazarenko,\nL000616\tTurbulence of Weak Gravitational Waves in the Early Universe,\nL000617\tPhys. Rev. Lett. {\\bf 119}, 221101 (2017).\nL000618\t\nL000619\t\\bibitem{onorato20}\nL000620\tG. Dematteis, L. Rondoni, D. Proment, F. De Vita, M. Onorato,\nL000621\tCoexistence of Ballistic and Fourier Regimes in the $\\beta-$Fermi-Pasta-Ulam-Tsingou Lattice,\nL000622\tPhys. Rev. Lett. {\\bf 125}, 024101 (2020).\nL000623\t\nL000624\t\\bibitem{onorato15}\nL000625\tM. Onorato, L. Vozella, D. Proment, Y.V. Lvov,\nL000626\tRoute to thermalization in the $\\alpha-$Fermi–Pasta–Ulam system,\nL000627\tProc. Natl. Acad. Sci. (PNAS) {\\bf 112}, 4208 (2015).\nL000628\t\nL000629\t\nL000630\t\\bibitem{laurie12}\nL000631\tJ. Laurie, U. Bortolozzo, S. Nazarenko, S. Residori,\nL000632\tOne-dimensional optical wave turbulence: experiment and theory,\nL000633\tPhysics Reports {\\bf 514}, 121-175 (2012).\nL000634\t\nL000635\t\nL000636\t\nL000637\t\nL000638\t\nL000639\t\nL000640\t\\bibitem{babin07}\nL000641\tS.A. Babin, D.V. Churkin, A.E. Ismagulov, S.I. Kablukov, E.V. Podivilov,\nL000642\tFour-wave-mixing-induced turbulent spectral broadening in a long Raman fiber laser,\nL000643\tJ. Opt. Soc. Am. B {\\bf 24}, 1729-1738 (2007).\nL000644\t\nL000645\t\\bibitem{turitsyn13}\nL000646\tS.K. Turitsyn, S.A. Babin, E.G. Turitsyna, G.E. Falkovich, E. Podivilov, D. Churkin, Optical Wave Turbulence, in Advances in Wave Turbulence (World Scientific, Singapore, 2013).\nL000647\t\nL000648\t\\bibitem{churkin15}\nL000649\tD. Churkin, I. Kolokolov, E. Podivilov, I. Vatnik, S. Vergeles, I. Terekhov,\nL000650\tV. Lebedev, G. Falkovich, M. Nikulin, S. Babin, S. Turitsyn,\nL000651\tWave kinetics of a random fibre laser,\nL000652\tNature Communications {\\bf 2}, 6214 (2015).\nL000653\t\nL000654\t\\bibitem{PRL10}\nL000655\tP. Suret, S. Randoux, H. Jauslin, A. Picozzi, Anomalous thermalization of nonlinear wave systems, Phys. Rev. Lett. {\\bf 104}, 054101 (2010).\nL000656\t\nL000657\t\\bibitem{PR14}\nL000658\tA. Picozzi, J. Garnier, T. Hansson, P. Suret, S. Randoux, G. Millot,  D.N. Christodoulides,\nL000659\tOptical wave turbulence: Toward a unified nonequilibrium thermodynamic formulation of statistical nonlinear optics,\nL000660\tPhysics Reports {\\bf 542}, 1-132 (2014).\nL000661\t\nL000662\t\nL000663\t\nL000664\t\nL000665\t\nL000666\t\nL000667\t\nL000668\t\nL000669\t\nL000670\t\nL000671\t\nL000672\t\nL000673\t\nL000674\t\\bibitem{christodoulides19}\nL000675\tF.O. Wu, A.U. Hassan, D.N. Christodoulides,\nL000676\tThermodynamic theory of highly multimoded nonlinear optical systems,\nL000677\tNature Photonics {\\bf 13}, 776 (2019).\nL000678\t\nL000679\t\\bibitem{PRL19}\nL000680\tA. Fusaro, J. Garnier, K. Krupa, G. Millot, A. Picozzi,\nL000681\tDramatic acceleration of wave condensation mediated by disorder in multimode fibers,\nL000682\tPhys. Rev. Lett. {\\bf 122}, 123902 (2019).\nL000683\t\nL000684\t\nL000685\t\\bibitem{podivilov22}\nL000686\tE.V. Podivilov, F. Mangini, O.S. Sidelnikov, M. Ferraro, M. Gervaziev, D.S.\nL000687\tKharenko, M. Zitelli, M.P. Fedoruk, S.A. Babin, S. Wabnitz,\nL000688\tThermalization of orbital angular momentum beams in multimode optical fibers,\nL000689\tPhys. Rev. Lett. {\\bf 128}, 243901 (2022).\nL000690\t\nL000691\t\\bibitem{PRL20}\nL000692\tK. Baudin, A. Fusaro, K. Krupa, J. Garnier, S. Rica, G. Millot, A. Picozzi,\nL000693\tClassical Rayleigh-Jeans condensation of light waves:\nL000694\tObservation and thermodynamic characterization,\nL000695\tPhys. Rev. Lett. {\\bf 125}, 244101 (2020).\nL000696\t\nL000697\t\nL000698\t\nL000699\t\nL000700\t\nL000701\t\nL000702\t\\bibitem{pourbeyram22}\nL000703\tH. Pourbeyram, P. Sidorenko, F. Wu, L. Wright, D. Christodoulides, F. Wise, Direct\nL000704\tobservations of thermalization to a Rayleigh–Jeans distribution in multimode\nL000705\toptical fibres, Nature Physics {\\bf 18}, 685 (2022).\nL000706\t\nL000707\t\\bibitem{mangini22}\nL000708\tF. Mangini, M. Gervaziev, M. Ferraro, D. S. Kharenko, M. Zitelli, Y. Sun, V. Couderc, E.V. Podivilov, S.A. Babin, and S. Wabnitz,\nL000709\tStatistical mechanics of beam self-cleaning in GRIN multimode optical fibers,\nL000710\tOpt. Exp. {\\bf 30}, 10850 (2022).\nL000711\t\nL000712\t\nL000713\t\nL000714\t\nL000715\t\nL000716\t\nL000717\t\nL000718\t\nL000719\t\nL000720\t\nL000721\t\nL000722\t\nL000723\t\nL000724\t\nL000725\t\nL000726\t\nL000727\t\nL000728\t\nL000729\t\nL000730\t\nL000731\t\nL000732\t\nL000733\t\nL000734\t\nL000735\t\nL000736\t\nL000737\t\nL000738\t\nL000739\t\nL000740\t\nL000741\t\\bibitem{ferraro24}\nL000742\tM. Ferraro, F. Mangini, F.O. Wu, M. Zitelli, D.N. Christodoulides, S. Wabnitz,\nL000743\tCalorimetry of photon gases in nonlinear multimode optical fibers,\nL000744\tPhys. Rev. X {\\bf 14}, 021020 (2024).\nL000745\t\nL000746\t\nL000747\t\nL000748\t\nL000749\t\\bibitem{muniz23}\nL000750\tA.L. Muniz, F. Wu, P. Jung, M. Khajavikhan, D. Christodoulides, U. Peschel,\nL000751\tObservation of photon-photon thermodynamic processes under negative optical temperature conditions,\nL000752\tScience {\\bf 379}, 1019 (2023).\nL000753\t\nL000754\t\\bibitem{kirsch25}\nL000755\tM.S. Kirsch, G.G. Pyrialakos, R. Altenkirch, M.A. Selim, J. Beck, T.A.W. Wolterink, H. Ren, P.S. Jung, M. Khajavikhan, A. Szameit, M. Heinrich, D.N. Christodoulides, Observation of Joule–Thomson photon-gas expansion, Nat. Phys. 21, 214–220 (2025)\nL000756\t\nL000757\t\nL000758\t\\bibitem{PRL22}\nL000759\tN. Berti, K. Baudin, A. Fusaro, G. Millot, A. Picozzi, J. Garnier,\nL000760\tInterplay of thermalization and strong disorder: Wave turbulence theory, numerical simulations, and experiments in multimode optical fibers,\nL000761\tPhys. Rev. Lett. {\\bf 129}, 063901 (2022).\nL000762\t\nL000763\t\\bibitem{PRL23}\nL000764\tK. Baudin, J. Garnier, A. Fusaro, N. Berti, C. Michel, K. Krupa, G. Millot, A. Picozzi,\nL000765\tObservation of light thermalization to negative temperature Rayleigh-Jeans equilibrium states in multimode optical fibers,\nL000766\tPhys. Rev. Lett. {\\bf 130}, 063801 (2023).\nL000767\t\nL000768\t\\bibitem{lu24}\nL000769\tM. Lian, Y. Geng, Y.-J. Chen, Y. Chen, J.-T. L\\\"u,\nL000770\tCoupled Thermal and Power Transport of Optical Waveguide Arrays: Photonic Wiedemann-Franz Law and Rectification Effect,\nL000771\tPhys. Rev. Lett. {\\bf 133}, 116303 (2024).\nL000772\t\nL000773\t\\bibitem{kottos20}\nL000774\tA. Ramos , L. Fern\\'andez-Alc\\'azar, T. Kottos, B. Shapiro,\nL000775\tOptical Phase Transitions in Photonic Networks: a Spin-System Formulation\nL000776\tPhys. Rev. X {\\bf 10}, 031024 (2020).\nL000777\t\nL000778\t\\bibitem{kottos23}\nL000779\tA.Y. Ramos, C. Shi, L.J. Fernandez-Alcazar, D.N. Christodoulides, T. Kottos,\nL000780\tTheory of localization-hindered thermalization in nonlinear multimode photonics,\nL000781\tCommunications Physics {\\bf 6}, 189 (2023).\nL000782\t\nL000783\t\\bibitem{kottos24}\nL000784\tA. Kurnosov, L.J. Fern\\'andez-Alc\\'azar, A. Ramos, B. Shapiro, T. Kottos,\nL000785\tOptical Kinetic Theory of Nonlinear Multimode Photonic Networks,\nL000786\tPhys. Rev. Lett. {\\bf 132}, 193802 (2024).\nL000787\t\nL000788\t\nL000789\t\\bibitem{efremidis24}\nL000790\tG. Yang, D. Bongiovanni, D. Song, R. Morandotti, Z. Chen, N.K. Efremidis,\nL000791\tThermalization dynamics in photonic lattices of different geometries,\nL000792\tAPL Photonics {\\bf 9}, 066115 (2024).\nL000793\t\nL000794\t\nL000795\t\nL000796\t\nL000797\t\nL000798\t\nL000799\t\nL000800\t\nL000801\t\nL000802\t\nL000803\t\\bibitem{ferraro25_rev}\nL000804\tM. Ferraro, K. Baudin, M. Gervaziev, A. Fusaro, A. Picozzi, J. Garnier, G. Millot, D. Kharenko, E. Podivilov, S. Babin, F. Mangini, S. Wabnitz,\nL000805\tWave turbulence, thermalization and multimode locking in optical fibers,\nL000806\tPhysica D {\\bf 481}, 134758 (2025).\nL000807\t\nL000808\t\nL000809\t\nL000810\t\nL000811\t\nL000812\t\nL000813\t\nL000814\t\nL000815\t\nL000816\t\nL000817\t\nL000818\t\nL000819\t\nL000820\t\nL000821\t\nL000822\t\nL000823\t\nL000824\t\nL000825\t\nL000826\t\nL000827\t\nL000828\t\nL000829\t\nL000830\t\nL000831\t\nL000832\t\nL000833\t\nL000834\t\nL000835\t\nL000836\t\nL000837\t\nL000838\t\nL000839\t\nL000840\t\nL000841\t\nL000842\t\nL000843\t\nL000844\t\nL000845\t\nL000846\t\nL000847\t\nL000848\t\nL000849\t\nL000850\t\nL000851\t\nL000852\t\nL000853\t\nL000854\t\nL000855\t\nL000856\t\nL000857\t\nL000858\t\nL000859\t\nL000860\t\nL000861\t\nL000862\t\nL000863\t\nL000864\t\nL000865\t\nL000866\t\nL000867\t\nL000868\t\nL000869\t\nL000870\t\nL000871\t\nL000872\t\nL000873\t\nL000874\t\nL000875\t\nL000876\t\nL000877\t\nL000878\t\nL000879\t\nL000880\t\nL000881\t\nL000882\t\nL000883\t\nL000884\t\nL000885\t\nL000886\t\nL000887\t\nL000888\t\nL000889\t\nL000890\t\nL000891\t\nL000892\t\nL000893\t\nL000894\t\nL000895\t\nL000896\t\nL000897\t\nL000898\t\nL000899\t\nL000900\t\nL000901\t\nL000902\t\nL000903\t\nL000904\t\nL000905\t\nL000906\t\nL000907\t\nL000908\t\nL000909\t\nL000910\t\nL000911\t\nL000912\t\nL000913\t\nL000914\t\nL000915\t\nL000916\t\nL000917\t\nL000918\t\nL000919\t\nL000920\t\nL000921\t\nL000922\t\nL000923\t\nL000924\t\nL000925\t\nL000926\t\nL000927\t\nL000928\t\nL000929\t\nL000930\t\nL000931\t\nL000932\t\nL000933\t\nL000934\t\nL000935\t\nL000936\t\nL000937\t\nL000938\t\nL000939\t\nL000940\t\nL000941\t\nL000942\t\nL000943\t\nL000944\t\nL000945\t\nL000946\t\nL000947\t\\bibitem{deng23full}\nL000948\tY. Deng, Z. Hani,\nL000949\tFull derivation of the wave kinetic equation,\nL000950\tInvent. math. 233, 543–724 (2023).\nL000951\t\nL000952\t\nL000953\t\\bibitem{deng23long}\nL000954\tY. Deng and Z. Hani,\nL000955\tLong time justification of wave turbulence theory,\nL000956\tarXiv:2311.10082 (2023).\nL000957\t\nL000958\t\nL000959\t\nL000960\t\nL000961\t\nL000962\t\nL000963\t\\bibitem{staffilani21}\nL000964\tG. Staffilani and M.-B. Tran, On the wave turbulence\nL000965\ttheory for stochastic and random multidimensional KdV type equations,\nL000966\tarXiv:2106.09819 (2021).\nL000967\t\nL000968\t\nL000969\t\nL000970\t\nL000971\t\nL000972\t\nL000973\t\nL000974\t\\bibitem{turitsyn12}\nL000975\tE. Turitsyna, G. Falkovich, A. El-Taher, X. Shu, P. Harper, and\nL000976\tS. Turitsyn, Optical turbulence and spectral condensate in long\nL000977\tfibre lasers, Proc. R. Soc. London Ser. A {\\bf 468}, 2145 (2012).\nL000978\t\nL000979\t\nL000980\t\nL000981\t\nL000982\t\nL000983\t\nL000984\t\nL000985\t\nL000986\t\nL000987\t\nL000988\t\nL000989\t\nL000990\t\nL000991\t\nL000992\t\nL000993\t\nL000994\t\nL000995\t\nL000996\t\\bibitem{Turitsyna13}\nL000997\tE. Turitsyna, S. Smirnov, S. Sugavanam, N. Tarasov,\nL000998\tX. Shu, S. Babin, E. Podivilov, D. Churkin, G. Falkovich,\nL000999\tand S. Turitsyn, The Laminar-Turbulent Transition in a\nL001000\tFibre Laser, Nat. Photonics 7, 783 (2013).\nL001001\t\nL001002\t\\bibitem{mordant23}\nL001003\tC. Rodda, C. Savaro, V. Bouillaut, P. Augier, J. Sommeria, T. Valran, S. Viboud, N. Mordant,\nL001004\tFrom Internal Waves to Turbulence in a Stably Stratified Fluid,\nL001005\tPhys. Rev. Lett. {\\bf 131}, 264101 (2023).\nL001006\t\nL001007\t\\bibitem{delre16}\nL001008\tD. Pierangeli, F. Di Mei, G. Di Domenico, A. J. Agranat, C. Conti, and E. DelRe,\nL001009\tTurbulent Transitions in Optical Wave Propagation,\nL001010\tPhys. Rev. Lett. {\\bf 117}, 183902 (2016).\nL001011\t\nL001012\t\\bibitem{delre24}\nL001013\tL. Dieli, D. Pierangeli, E. DelRe, C. Conti,\nL001014\tObservation of Two-Dimensional Dam Break Flow and a Gaseous Phase of Solitons in a Photon Fluid,\nL001015\tPhys. Rev. Lett. {\\bf 133}, 183801 (2024).\nL001016\t\nL001017\t\nL001018\t\nL001019\t\nL001020\t\nL001021\t\nL001022\t\nL001023\t\nL001024\t\nL001025\t\nL001026\t\nL001027\t\nL001028\t\nL001029\t\nL001030\t\nL001031\t\nL001032\t\nL001033\t\nL001034\t\\bibitem{bcs57}\nL001035\tJ. Bardeen, L.N. Cooper, and J.R. Schrieffer,\nL001036\t\nL001037\t\nL001038\tTheory of superconductivity,\nL001039\tPhys. Rev. {\\bf 108}, 1175 (1957).\nL001040\t\nL001041\t\\bibitem{zakharov71}\nL001042\tV.E. Zakharov, V.S. L'Vov, and S.S. Starobinets,\nL001043\tStationary nonlinear theory of parametric excitation of waves,\nL001044\tSovient Physics JETP {\\bf 32}, 656 (1971).\nL001045\t\nL001046\t\\bibitem{zakharov75}\nL001047\tV.E. Zakharov, V.S. Lvov, and S.S. Starobinets,\nL001048\tSpin-wave turbulence beyond the parametric excitation\nL001049\tthreshold, Sov. Phys. Usp. {\\bf 17}, 896 (1975).\nL001050\t\nL001051\t\\bibitem{lvov94}\nL001052\tV.S. L'vov, Wave Turbulence Under Parametric\nL001053\tExcitation -- Application to Magnets\nL001054\t(Springer, Berlin, 1994).\nL001055\t\nL001056\t\\bibitem{kuznetsov78}\nL001057\t\\blue{E.A. Kuznetsov and N.N. Noskov, Polarization effects in stimulated\nL001058\tscattering of electromagnetic waves, Sov. Phys. JETP {\\bf 48}, 57 (1978).}\nL001059\t\nL001060\t\\bibitem{zaleski20}\nL001061\tJ. Zaleski, M. Onorato, Y.V. Lvov,\nL001062\tAnomalous Correlators in Nonlinear Dispersive Wave Systems,\nL001063\tPhys. Rev. X {\\bf 10}, 021043 (2020).\nL001064\t\nL001065\t\\bibitem{guasoni17}\nL001066\tM. Guasoni, J. Garnier, B. Rumpf, D. Sugny, J. Fatome, F. Amrani, G. Millot, A. Picozzi,\nL001067\tIncoherent Fermi-Pasta-Ulam Recurrences and Unconstrained Thermalization Mediated by Strong Phase Correlations,\nL001068\tPhys. Rev. X {\\bf 7}, 011025 (2017).\nL001069\t\nL001070\t\nL001071\t\\bibitem{villois25}\nL001072\tA. Villois, G. Dematteis, Y.V. Lvov, M. Onorato, and J. Shatah,\nL001073\tAnomalous correlators, negative frequencies and non-phase-invariant Hamiltonians in random waves,\nL001074\tPhys. Rev. Lett. {\\bf 135}, 167201 (2025).\nL001075\tConsidering a scalar wave equation, it was proven in this work that phase invariant systems cannot develop anomalous correlations. The theorem can be extended to vector equations such as NLSE~(\\ref{eq:nls}), for which phase invariance implies that, for given initial data ${\\bm u}_0$, the solution ${\\bm u}(z)={\\bm F}(z,{\\bm u}_0)$, verifies $e^{i\\theta}{\\bm F}(z,{\\bm u}_0)={\\bm F}(z,e^{i\\theta}{\\bm u}_0)$, $\\theta \\in \\mathbb{R}$. Consequently, neither the $u_x$ component nor the $u_y$ component can individually develop anomalous correlations in the NLSE~(\\ref{eq:nls}).\nL001076\t\nL001077\t\nL001078\t\nL001079\t\nL001080\t\nL001081\t\nL001082\t\nL001083\t\nL001084\t\nL001085\t\nL001086\t\nL001087\t\nL001088\t\nL001089\t\nL001090\t\\bibitem{stringari16}\nL001091\tL. Pitaevskii and S. Stringari, {\\it Bose-Einstein Condensation\nL001092\tand Superfluidity} (Oxford University Press, 2016).\nL001093\t\nL001094\t\nL001095\t\nL001096\t\nL001097\t\nL001098\t\nL001099\t\\bibitem{cominotti23}\nL001100\tR. Cominotti, A. Berti, C. Dulin, C. Rogora, G. Lamporesi, I. Carusotto, A. Recati, A. Zenesini, and G. Ferrari,\nL001101\tFerromagnetism in an Extended Coherently Coupled Atomic Superfluid,\nL001102\tPhys. Rev. X {\\bf 13}, 021037 (2023).\nL001103\t\nL001104\t\\bibitem{zenesini23}\nL001105\tA. Zenesini, A. Berti, R. Cominotti, C. Rogora, I.G. Moss, T.P. Billam, I. Carusotto,\nL001106\tG. Lamporesi, A. Recati, G. Ferrari,\nL001107\tFalse vacuum decay via bubble formation in ferromagnetic superfluids,\nL001108\tNature Physics {\\bf 20}, 558 (2024).\nL001109\t\nL001110\t\nL001111\t\nL001112\t\nL001113\t\nL001114\t\nL001115\t\\bibitem{millot_prl97}\nL001116\tG. Millot, E. Seve, S. Wabnitz\nL001117\tPolarization Symmetry Breaking and Pulse Train Generation from the Modulation of Light Waves,\nL001118\tPhys. Rev. Lett. {\\bf 79}, 661 (1997).\nL001119\t\nL001120\t\nL001121\t\nL001122\t\nL001123\t\nL001124\t\nL001125\t\nL001126\t\\bibitem{agrawal}\nL001127\tG. Agrawal, Nonlinear Fiber Optics (sixth Ed., Academic Press, New York, 2019).\nL001128\t\nL001129\t\\bibitem{supplement}\nL001130\tThe Supplementary Material presents the derivation of a reduced form of the WT KE (\\ref{eq:wtkin}), as well as the derivation of the AC-KE (\\ref{eq:nx_vl}-\\ref{eq:m_vl})-(\\ref{eq:s_dyn}) and the corresponding stability analysis, Eq.(\\ref{eq:lambda_0}). It also provides technical details regarding the experimental procedures and measurements, as well as additional numerical simulations.\nL001131\t\nL001132\t\\bibitem{mandel}\nL001133\tThe definition of the degree of polarization in Eq.(\\ref{eq:P}) is equivalent to the usual one: ${\\cal P}(z)=\\big(1-4 {\\rm det}({\\bf J})/{\\rm tr}({\\bf J})^2 \\big)^{1/2}$, where ${\\bf J}_{ij}=\\left<u_i u_j^* \\right>$ is the 2$\\times$2 coherence matrix ($j=x,y$), with `det' and `tr' the determinant and trace operations, see, e.g., L. Mandel and E. Wolf, Optical Coherence and Quantum Optics (Cambridge University Press, New York, 1995).\nL001134\t\nL001135\t\\bibitem{daino85}\nL001136\tB. Daino, G. Gregori, S. Wabnitz,\nL001137\tStability analysis of nonlinear coherent coupling,\nL001138\tJournal of Applied Physics {\\bf 58}, 4512 (1985).\nL001139\t\nL001140\t\\bibitem{landau}\nL001141\t\\blue{L. D. Landau and E.M. Lifshitz,\nL001142\t{\\it The Classical Theory of Fields} (4th ed., Pergamon Press, Oxford, 1975), see section 78.}\nL001143\t\nL001144\t\nL001145\t\nL001146\t\nL001147\t\nL001148\t\nL001149\t\nL001150\t\nL001151\t\nL001152\t\nL001153\t\nL001154\t\nL001155\t\nL001156\t\nL001157\t\nL001158\t\nL001159\t\nL001160\t\nL001161\t\nL001162\t\nL001163\t\nL001164\t\nL001165\t\nL001166\t\nL001167\t\nL001168\t\nL001169\t\nL001170\t\nL001171\t\nL001172\t\nL001173\t\nL001174\t\nL001175\t\nL001176\t\nL001177\t\nL001178\t\nL001179\t\nL001180\t\nL001181\t\nL001182\t\nL001183\t\nL001184\t\nL001185\t\nL001186\t\nL001187\t\nL001188\t\nL001189\t\nL001190\t\nL001191\t\nL001192\t\nL001193\t\nL001194\t\nL001195\t\nL001196\t\nL001197\t\nL001198\t\nL001199\t\nL001200\t\nL001201\t\nL001202\t\nL001203\t\nL001204\t\nL001205\t\nL001206\t\nL001207\t\nL001208\t\nL001209\t\nL001210\t\nL001211\t\nL001212\t\nL001213\t\nL001214\t\nL001215\t\nL001216\t\nL001217\t\nL001218\t\nL001219\t\nL001220\t\nL001221\t\nL001222\t\nL001223\t\nL001224\t\nL001225\t\nL001226\t\nL001227\t\nL001228\t\nL001229\t\nL001230\t\nL001231\t\nL001232\t\nL001233\t\nL001234\t\nL001235\t\nL001236\t\nL001237\t\nL001238\t\nL001239\t\nL001240\t\nL001241\t\nL001242\t\nL001243\t\nL001244\t\nL001245\t\nL001246\t\nL001247\t\nL001248\t\nL001249\t\nL001250\t\nL001251\t\nL001252\t\nL001253\t\nL001254\t\nL001255\t\nL001256\t\nL001257\t\nL001258\t\nL001259\t\nL001260\t\nL001261\t\nL001262\t\nL001263\t\nL001264\t\nL001265\t\nL001266\t\nL001267\t\nL001268\t\nL001269\t\nL001270\t\nL001271\t\nL001272\t\nL001273\t\nL001274\t\nL001275\t\nL001276\t\nL001277\t\nL001278\t\nL001279\t\nL001280\t\nL001281\t\nL001282\t\nL001283\t\nL001284\t\nL001285\t\nL001286\t\nL001287\t\nL001288\t\nL001289\t\nL001290\t\nL001291\t\nL001292\t\nL001293\t\nL001294\t\nL001295\t\nL001296\t\nL001297\t\nL001298\t\nL001299\t\nL001300\t\nL001301\t\nL001302\t\nL001303\t\nL001304\t\nL001305\t\nL001306\t\nL001307\t\nL001308\t\nL001309\t\nL001310\t\nL001311\t\nL001312\t\nL001313\t\nL001314\t\nL001315\t\nL001316\t\nL001317\t\nL001318\t\nL001319\t\nL001320\t\nL001321\t\nL001322\t\nL001323\t\nL001324\t\nL001325\t\nL001326\t\nL001327\t\nL001328\t\nL001329\t\nL001330\t\nL001331\t\nL001332\t\nL001333\t\nL001334\t\nL001335\t\nL001336\t\nL001337\t\nL001338\t\nL001339\t\nL001340\t\nL001341\t\nL001342\t\nL001343\t\nL001344\t\nL001345\t\nL001346\t\nL001347\t\nL001348\t\nL001349\t\nL001350\t\nL001351\t\nL001352\t\nL001353\t\nL001354\t\nL001355\t\nL001356\t\nL001357\t\nL001358\t\nL001359\t\nL001360\t\nL001361\t\nL001362\t\nL001363\t\nL001364\t\nL001365\t\nL001366\t\nL001367\t\nL001368\t\nL001369\t\nL001370\t\nL001371\t\nL001372\t\nL001373\t\nL001374\t\nL001375\t\nL001376\t\nL001377\t\nL001378\t\nL001379\t\nL001380\t\nL001381\t\nL001382\t\nL001383\t\nL001384\t\nL001385\t\nL001386\t\nL001387\t\nL001388\t\nL001389\t\nL001390\t\nL001391\t\nL001392\t\nL001393\t\nL001394\t\nL001395\t\nL001396\t\nL001397\t\nL001398\t\nL001399\t\nL001400\t\nL001401\t\nL001402\t\nL001403\t\nL001404\t\nL001405\t\nL001406\t\nL001407\t\nL001408\t\nL001409\t\nL001410\t\nL001411\t\nL001412\t\nL001413\t\nL001414\t\nL001415\t\nL001416\t\nL001417\t\nL001418\t\nL001419\t\nL001420\t\nL001421\t\nL001422\t\nL001423\t\nL001424\t\nL001425\t\nL001426\t\nL001427\t\nL001428\t\nL001429\t\nL001430\t\nL001431\t\nL001432\t\nL001433\t\nL001434\t\nL001435\t\nL001436\t\nL001437\t\nL001438\t\nL001439\t\nL001440\t\nL001441\t\nL001442\t\nL001443\t\nL001444\t\nL001445\t\nL001446\t\nL001447\t\nL001448\t\nL001449\t\nL001450\t\nL001451\t\nL001452\t\nL001453\t\nL001454\t\nL001455\t\nL001456\t\nL001457\t\nL001458\t\nL001459\t\nL001460\t\nL001461\t\nL001462\t\nL001463\t\nL001464\t\nL001465\t\nL001466\t\nL001467\t\nL001468\t\nL001469\t\nL001470\t\nL001471\t\nL001472\t\nL001473\t\nL001474\t\nL001475\t\nL001476\t\nL001477\t\nL001478\t\nL001479\t\nL001480\t\nL001481\t\nL001482\t\nL001483\t\nL001484\t\nL001485\t\nL001486\t\nL001487\t\nL001488\t\nL001489\t\nL001490\t\nL001491\t\nL001492\t\nL001493\t\nL001494\t\nL001495\t\nL001496\t\nL001497\t\nL001498\t\nL001499\t\nL001500\t\nL001501\t\nL001502\t\nL001503\t\nL001504\t\nL001505\t\nL001506\t\nL001507\t\nL001508\t\nL001509\t\nL001510\t\nL001511\t\nL001512\t\nL001513\t\nL001514\t\nL001515\t\nL001516\t\nL001517\t\nL001518\t\nL001519\t\nL001520\t\nL001521\t\nL001522\t\nL001523\t\nL001524\t\nL001525\t\nL001526\t\nL001527\t\nL001528\t\nL001529\t\nL001530\t\nL001531\t\nL001532\t\nL001533\t\nL001534\t\nL001535\t\nL001536\t\nL001537\t\nL001538\t\nL001539\t\nL001540\t\nL001541\t\nL001542\t\nL001543\t\nL001544\t\nL001545\t\nL001546\t\nL001547\t\nL001548\t\nL001549\t\nL001550\t\nL001551\t\nL001552\t\nL001553\t\nL001554\t\nL001555\t\nL001556\t\nL001557\t\nL001558\t\nL001559\t\nL001560\t\nL001561\t\nL001562\t\nL001563\t\nL001564\t\nL001565\t\nL001566\t\nL001567\t\nL001568\t\nL001569\t\nL001570\t\nL001571\t\nL001572\t\nL001573\t\nL001574\t\nL001575\t\nL001576\t\nL001577\t\nL001578\t\nL001579\t\nL001580\t\nL001581\t\nL001582\t\nL001583\t\nL001584\t\nL001585\t\nL001586\t\nL001587\t\nL001588\t\nL001589\t\nL001590\t\nL001591\t\nL001592\t\nL001593\t\nL001594\t\nL001595\t\nL001596\t\nL001597\t\nL001598\t\nL001599\t\nL001600\t\nL001601\t\nL001602\t\nL001603\t\nL001604\t\nL001605\t\nL001606\t\nL001607\t\nL001608\t\nL001609\t\nL001610\t\nL001611\t\nL001612\t\nL001613\t\nL001614\t\nL001615\t\nL001616\t\nL001617\t\nL001618\t\nL001619\t\nL001620\t\nL001621\t\nL001622\t\nL001623\t\nL001624\t\nL001625\t\nL001626\t\nL001627\t\nL001628\t\nL001629\t\nL001630\t\nL001631\t\nL001632\t\nL001633\t\nL001634\t\nL001635\t\nL001636\t\nL001637\t\nL001638\t\nL001639\t\nL001640\t\nL001641\t\nL001642\t\nL001643\t\nL001644\t\nL001645\t\nL001646\t\nL001647\t\nL001648\t\nL001649\t\nL001650\t\nL001651\t\nL001652\t\nL001653\t\nL001654\t\nL001655\t\nL001656\t\nL001657\t\nL001658\t\nL001659\t\nL001660\t\nL001661\t\nL001662\t\nL001663\t\nL001664\t\nL001665\t\nL001666\t\nL001667\t\nL001668\t\nL001669\t\nL001670\t\nL001671\t\nL001672\t\nL001673\t\nL001674\t\nL001675\t\nL001676\t\nL001677\t\nL001678\t\nL001679\t\nL001680\t\nL001681\t\nL001682\t\nL001683\t\nL001684\t\nL001685\t\nL001686\t\nL001687\t\nL001688\t\nL001689\t\nL001690\t\nL001691\t\nL001692\t\nL001693\t\nL001694\t\nL001695\t\nL001696\t\nL001697\t\nL001698\t\nL001699\t\nL001700\t\nL001701\t\nL001702\t\nL001703\t\nL001704\t\nL001705\t\nL001706\t\nL001707\t\nL001708\t\nL001709\t\nL001710\t\nL001711\t\nL001712\t\nL001713\t\nL001714\t\nL001715\t\nL001716\t\nL001717\t\nL001718\t\nL001719\t\nL001720\t\nL001721\t\nL001722\t\nL001723\t\nL001724\t\nL001725\t\nL001726\t\nL001727\t\nL001728\t\nL001729\t\nL001730\t\nL001731\t\nL001732\t\nL001733\t\nL001734\t\nL001735\t\nL001736\t\nL001737\t\nL001738\t\nL001739\t\nL001740\t\nL001741\t\nL001742\t\nL001743\t\nL001744\t\nL001745\t\nL001746\t\nL001747\t\nL001748\t\nL001749\t\nL001750\t\nL001751\t\nL001752\t\nL001753\t\nL001754\t\nL001755\t\nL001756\t\nL001757\t\nL001758\t\nL001759\t\nL001760\t\nL001761\t\nL001762\t\nL001763\t\nL001764\t\nL001765\t\nL001766\t\nL001767\t\nL001768\t\nL001769\t\nL001770\t\nL001771\t\nL001772\t\nL001773\t\nL001774\t\nL001775\t\nL001776\t\nL001777\t\nL001778\t\nL001779\t\nL001780\t\nL001781\t\nL001782\t\nL001783\t\nL001784\t\nL001785\t\nL001786\t\nL001787\t\nL001788\t\nL001789\t\nL001790\t\nL001791\t\nL001792\t\nL001793\t\nL001794\t\nL001795\t\nL001796\t\nL001797\t\nL001798\t\nL001799\t\nL001800\t\nL001801\t\nL001802\t\nL001803\t\nL001804\t\nL001805\t\nL001806\t\nL001807\t\nL001808\t\nL001809\t\nL001810\t\nL001811\t\nL001812\t\nL001813\t\nL001814\t\nL001815\t\nL001816\t\nL001817\t\nL001818\t\nL001819\t\nL001820\t\nL001821\t\nL001822\t\nL001823\t\nL001824\t\nL001825\t\nL001826\t\nL001827\t\nL001828\t\nL001829\t\nL001830\t\nL001831\t\nL001832\t\nL001833\t\nL001834\t\nL001835\t\nL001836\t\nL001837\t\nL001838\t\nL001839\t\nL001840\t\nL001841\t\nL001842\t\nL001843\t\nL001844\t\nL001845\t\nL001846\t\nL001847\t\nL001848\t\nL001849\t\nL001850\t\nL001851\t\nL001852\t\nL001853\t\nL001854\t\nL001855\t\nL001856\t\nL001857\t\nL001858\t\nL001859\t\nL001860\t\nL001861\t\nL001862\t\nL001863\t\nL001864\t\nL001865\t\nL001866\t\nL001867\t\nL001868\t\nL001869\t\nL001870\t\nL001871\t\nL001872\t\nL001873\t\nL001874\t\nL001875\t\nL001876\t\nL001877\t\nL001878\t\nL001879\t\nL001880\t\nL001881\t\nL001882\t\nL001883\t\nL001884\t\nL001885\t\nL001886\t\nL001887\t\nL001888\t\nL001889\t\nL001890\t\nL001891\t\\end{thebibliography}\nL001892\t\nL001893\t\nL001894\t\nL001895\t\\newpage\\quad\nL001896\t\\newpage\nL001897\t\\baselineskip 11pt\nL001898\t\nL001899\t\nL001900\t\\onecolumngrid\nL001901\t\nL001902\t\\section*{ Supplementary information on the article:}\nL001903\t\nL001904\t\\section{Thermalization: Derivation of a reduced wave turbulence kinetic equation for simulations}\nL001905\t\nL001906\tIn Fig.~1 (main text), we report numerical simulations of the WT KE~(2) (main text). The one-dimensional interaction allows the KE~(2)  (main text) to be written in a simplified form, which greatly improves the efficiency of its numerical integration. In the following, we derive the simplified version of KE~(2) (main text).\nL001907\t\nL001908\tWe start from the coherently coupled NLSE (1) (main text):\nL001909\t\\begin{eqnarray}\nL001910\ti\\partial_z u_x &=& - \\beta \\partial_{tt} u_x + \\alpha u_x + \\gamma (|u_x|^2+ \\kappa |u_y|^2)u_x + \\gamma \\rho u_x^* u_y^2,\nL001911\t\\label{eq:nls_x}\\\\\nL001912\ti\\partial_z u_y  &=& - \\beta \\partial_{tt} u_y - \\alpha u_y + \\gamma(|u_y|^2+ \\kappa |u_x|^2)u_y  + \\gamma \\rho u_y^* u_x^2.\nL001913\t\\label{eq:nls_y}\nL001914\t\\end{eqnarray}\nL001915\tThe corresponding dispersion relations read $k_{x}(\\omega)=\\beta \\omega^2+\\alpha$ and $k_{y}(\\omega)=\\beta \\omega^2-\\alpha$.\nL001916\tThe NLSE conserves the power (particle number) $N=N_x+N_y$, with $N_\\mu=\\frac{1}{T}\\int_0^T |u_\\mu|^2 dt$ ($\\mu=x,y$), where $T$ denotes the size of the numerical window. It also conserves the Hamiltonian  $H = E+U$, which has a linear and a nonlinear contribution. The linear contribution $E=E_k+E_c$ can be split into a kinetic contribution and a resonant coupling contribution:\nL001917\t\\begin{eqnarray}\nL001918\tE_k=\\frac{1}{T}  \\int_0^T  \\beta (|\\partial_t u_x|^2+|\\partial_t u_y|^2)dt,\nL001919\t\\quad\nL001920\tE_c=\\frac{1}{T}  \\int_0^T  \\alpha (|u_x|^2-|u_y|^2)dt.\nL001921\t\\label{eq:E_lin}\nL001922\t\\end{eqnarray}\nL001923\tThe  nonlinear contribution reads\nL001924\t\\begin{eqnarray}\nL001925\tU=\\frac{1}{T} \\int_0^T \\frac{\\gamma}{2}\\big(|u_x|^4+|u_y|^4\\big) + \\gamma \\kappa |u_x|^2 |u_y|^2\nL001926\t+\\frac{\\gamma \\rho}{2} \\big(u_x^{* 2} u_y^2 + u_x^{2} u_y^{* 2}\\big) dt.\nL001927\t\\end{eqnarray}\nL001928\t\\medskip\nL001929\tFollowing the standard wave turbulence theory \\cite{zakharov92,zakharov04,nazarenko11}, we derive from the vector NLSE (\\ref{eq:nls_x}-\\ref{eq:nls_y}) the following kinetic equations\nL001930\t\nL001931\t\\begin{align}\nL001932\t\\partial_z n_{x}(\\omega,z) &= \\kappa^2 {\\cal C}oll_i[n_{x},n_{y}] + \\rho^2 {\\cal C}oll_c[n_{x},n_{y}],\nL001933\t\\\\\nL001934\t\\partial_z n_{y}(\\omega,z) &= \\kappa^2 {\\cal C}oll_i[n_{y},n_{x}] + \\rho^2 {\\cal C}oll_c[n_{y},n_{x}],\nL001935\t\\end{align}\nL001936\twhere $\\left< {\\tilde u}_\\mu(\\omega_1,z) {\\tilde u}_\\mu^*(\\omega_2,z) \\right>=2\\pi n_\\mu(\\omega_1,z) \\delta(\\omega_1-\\omega_2)$ under the assumption of homogeneous statistics, where ${\\tilde u}_\\mu(\\omega,z)=\\int u_\\mu(t,z) \\exp(-i\\omega t) dt$ is the Fourier transform, for $\\mu=x,y$.\nL001937\t\nL001938\t\nL001939\t\nL001940\t\nL001941\tThe collision term for the non-resonant interaction reads:\nL001942\t\\begin{eqnarray}\nL001943\t&&\\hspace*{-0.2in}\nL001944\t{\\cal C}oll_i[n_{x},n_{y}] = \\frac{ \\gamma^2}{2\\pi} \\iiint d\\omega_{1-3} \\,\nL001945\t n_{x}(\\omega_1) \\, n_{y}(\\omega_2)\\,n_{y}(\\omega_3)\\,n_{x}(\\omega)  \\left( n_{x}^{-1}(\\omega)+n_{y}^{-1}(\\omega_3)-n_{y}^{-1}(\\omega_2)-n_{x}^{-1}(\\omega_1)\\right) \\nonumber\\\\\nL001946\t&&\\hspace*{2.3in}\nL001947\t\\times \\, \\delta\\big(k_x(\\omega_1)+k_y(\\omega_2)-k_y(\\omega_3)-k_x(\\omega)\\big) \\\nL001948\t\\delta(\\omega_1+\\omega_2-\\omega_3-\\omega),\nL001949\t\\label{eq:wtcollu}\\\\\nL001950\t&&\\hspace*{-0.2in}\nL001951\t{\\cal C}oll_i[n_{y},n_{x}] = \\frac{ \\gamma^2}{2\\pi} \\iiint d\\omega_{1-3} \\,\nL001952\t n_{y}(\\omega_1) \\, n_{x}(\\omega_2)\\,n_{x}(\\omega_3)\\,n_{y}(\\omega)  \\left( n_{y}^{-1}(\\omega)+n_{x}^{-1}(\\omega_3)-n_{x}^{-1}(\\omega_2)-n_{y}^{-1}(\\omega_1)\\right) \\nonumber \\\\\nL001953\t&&\\hspace*{2.3in}\nL001954\t\\times \\, \\delta\\big(k_y(\\omega_1)+k_x(\\omega_2)-k_x(\\omega_3)-k_y(\\omega)\\big) \\\nL001955\t\\delta(\\omega_1+\\omega_2-\\omega_3-\\omega),\nL001956\t\\label{eq:wtcollv}\nL001957\t\\end{eqnarray}\nL001958\twith $d\\omega_{1-3}=d\\omega_1 d\\omega_2 d\\omega_3$.\nL001959\tThe collision term for the resonant interaction reads:\nL001960\t\\begin{eqnarray}\nL001961\t&&\\hspace*{-0.2in}\nL001962\t{\\cal C}oll_c[n_{x},n_{y}] = \\frac{ 2\\gamma^2}{2\\pi} \\iiint d\\omega_{1-3} \\,\nL001963\t n_{y}(\\omega_1) \\, n_{y}(\\omega_2)\\,n_{x}(\\omega_3)\\,n_{x}(\\omega)  \\left( n_{x}^{-1}(\\omega)+n_{x}^{-1}(\\omega_3)-n_{y}^{-1}(\\omega_2)-n_{y}^{-1}(\\omega_1)\\right) \\nonumber\\\\\nL001964\t&&\\hspace*{2.3in}\nL001965\t\\times \\, \\delta\\big(k_y(\\omega_1)+k_y(\\omega_2)-k_x(\\omega_3)-k_x(\\omega)\\big) \\\nL001966\t\\delta(\\omega_1+\\omega_2-\\omega_3-\\omega),\nL001967\t\\label{eq:wtcollu}\\\\\nL001968\t&&\\hspace*{-0.2in}\nL001969\t{\\cal C}oll_c[n_{y},n_{x}] = \\frac{ 2\\gamma^2}{2\\pi} \\iiint d\\omega_{1-3} \\,\nL001970\t n_{x}(\\omega_1) \\, n_{x}(\\omega_2)\\,n_{y}(\\omega_3)\\,n_{y}(\\omega)  \\left( n_{y}^{-1}(\\omega)+n_{y}^{-1}(\\omega_3)-n_{x}^{-1}(\\omega_2)-n_{x}^{-1}(\\omega_1)\\right) \\nonumber \\\\\nL001971\t&&\\hspace*{2.3in}\nL001972\t\\times \\, \\delta\\big(k_x(\\omega_1)+k_x(\\omega_2)-k_y(\\omega_3)-k_y(\\omega)\\big) \\\nL001973\t\\delta(\\omega_1+\\omega_2-\\omega_3-\\omega).\nL001974\t\\label{eq:wtcollv}\nL001975\t\\end{eqnarray}\nL001976\tNote that, because of the degenerate resonances inherent to the purely one-dimensional problem considered here, the collision term describing the self-interaction (first nonlinear term in Eqs.(\\ref{eq:nls_x}-\\ref{eq:nls_y})) vanishes identically, see \\cite{zakharov92,zakharov04,nazarenko11}.\nL001977\tWe focus on the analysis of the resonant collision term.\nL001978\tTwo integrals can be computed owing to the Dirac $\\delta-$functions, which gives:\nL001979\t\\begin{eqnarray}\nL001980\t&&\\hspace*{-0.2in}\nL001981\t\\partial_z n_{x}(\\omega,z) = \\kappa^2 {\\cal C}oll_i[n_{x},n_{y}] + \\frac{2 \\rho^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL001982\t n_{y}(\\omega +\nL001983\t {\\omega'}) \\, n_{y}(\\omega-\\nu/{\\omega'})\\,n_{x}(\\omega +{\\omega'}-\\nu/{\\omega'})\\,n_{x}(\\omega) \\nonumber\\\\\nL001984\t&&\\hspace*{2.2in}\nL001985\t \\times \\left( n_{x}^{-1}(\\omega)+n_{x}^{-1}(\\omega  + {\\omega'}-\\nu/{\\omega'})-n_{y}^{-1}(\\omega +{\\omega'})-n_{y}^{-1}(\\omega-\\nu/{\\omega'})\\right) \\frac{d{\\omega'}}{|{\\omega'}|} , \\\\\nL001986\t&&\\hspace*{-0.2in}\nL001987\t\\partial_z n_{y}(\\omega,z) = \\kappa^2 {\\cal C}oll_i[n_{y},n_{x}] +\\frac{2 \\rho^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL001988\t n_{x}(\\omega +{\\omega'}) \\, n_{x}(\\omega + \\nu/{\\omega'})\\,n_{y}(\\omega +{\\omega'} +\nL001989\t \\nu/{\\omega'})\\,n_{y}(\\omega) \\nonumber\\\\\nL001990\t&&\\hspace*{2.2in}\nL001991\t \\times  \\left( n_{y}^{-1}(\\omega)+n_{y}^{-1}(\\omega +{\\omega'} +\\nu/{\\omega'})-n_{x}^{-1}(\\omega +{\\omega'})-n_{x}^{-1}(\\omega +\\nu/{\\omega'})\\right) \\frac{d{\\omega'}}{|{\\omega'}|} ,\nL001992\t\\end{eqnarray}\nL001993\twhere $\\nu = 2 \\alpha/\\beta$.\nL001994\t\\begin{eqnarray}\nL001995\t&&\\hspace*{-0.2in}\nL001996\t\\partial_z n_{x}(\\omega,z) = \\frac{\\kappa^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL001997\t n_{x}({\\omega'}) \\, n_{y}(\\omega)\\,n_{y}({\\omega'})\\,n_{x}(\\omega)  \\left( n_{x}^{-1}(\\omega)+n_{y}^{-1}({\\omega'})-n_{y}^{-1}(\\omega)-n_{x}^{-1}({\\omega'})\\right)  \\frac{d{\\omega'}}{|{\\omega'}-\\omega|} \\nonumber\\\\\nL001998\t&&\\hspace*{0.3in}+ \\frac{2 \\rho^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL001999\t n_{y}(\\omega + \\sqrt{|\\nu|} {\\eta})\nL002000\t \\, n_{y}(\\omega-\\sqrt{|\\nu|}\\sigma /{\\eta} )\\,n_{x}(\\omega + \\sqrt{|\\nu|} {\\eta}-\\sqrt{|\\nu|} \\sigma /{\\eta} )\\,n_{x}(\\omega) \\nonumber\\\\\nL002001\t&&\\hspace*{0.3in}\nL002002\t\\times \\left( n_{x}^{-1}(\\omega)+n_{x}^{-1}(\\omega +\\sqrt{|\\nu|} {\\eta}- \\sqrt{|\\nu|} \\sigma / {\\eta})-n_{y}^{-1} (\\omega +\\sqrt{|\\nu|} {\\eta})-n_{y}^{-1}(\\omega-\\sqrt{|\\nu|} \\sigma / {\\eta})\\right) \\frac{d{\\eta}}{|{\\eta}|} , \\\\\nL002003\t&&\\hspace*{-0.2in}\nL002004\t\\partial_z n_{y}(\\omega,z) = \\frac{\\kappa^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL002005\t n_{x}({\\omega'}) \\, n_{y}(\\omega)\\,n_{y}({\\omega'})\\,n_{x}(\\omega)  \\left( n_{x}^{-1}(\\omega)+n_{y}^{-1}({\\omega'})-n_{y}^{-1}(\\omega)-n_{x}^{-1}({\\omega'})\\right)  \\frac{d{\\omega'}}{|{\\omega'}-\\omega|} \\nonumber\\\\\nL002006\t&&\\hspace*{0.3in}+\\frac{2 \\rho^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL002007\t n_{x}(\\omega + \\sqrt{|\\nu|} {\\eta}) \\, n_{x}(\\omega + \\sqrt{|\\nu|} \\sigma/ {\\eta})\\,n_{y}(\\omega + \\sqrt{|\\nu|} {\\eta} +\nL002008\t\\sqrt{|\\nu|} \\sigma /{\\eta} )\\,n_{y}(\\omega) \\nonumber\\\\\nL002009\t&&\\hspace*{0.3in}\nL002010\t\\times  \\left( n_{y}^{-1}(\\omega)+n_{y}^{-1}(\\omega +\\sqrt{|\\nu|} {\\eta} +\\sqrt{|\\nu|} \\sigma/ {\\eta})\nL002011\t -n_{x}^{-1}(\\omega + \\sqrt{|\\nu|} {\\eta})-n_{x}^{-1}(\\omega +\\sqrt{|\\nu|} \\sigma /{\\eta} )\\right) \\frac{d{\\eta}}{|{\\eta}|} ,\nL002012\t\\end{eqnarray}\nL002013\twith $\\sigma={\\rm sgn}(\\nu)$.\nL002014\t\nL002015\t\nL002016\t\nL002017\t\nL002018\tThe singularity in the resonant collision terms (proportional to $\\rho^2$) can be rewritten in a convenient form by the change of variable $\\eta \\to s e^\\theta$, $s=\\pm 1$, so that the kinetic equations take the form\nL002019\t\nL002020\t\\begin{eqnarray}\nL002021\t&&\\hspace*{-0.2in}\nL002022\t\\partial_z n_{x}(\\omega,z) =\nL002023\t\nL002024\t\\frac{\\kappa^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL002025\t n_{x}({\\omega'}) \\, n_{y}(\\omega)\\,n_{y}({\\omega'})\\,n_{x}(\\omega)  \\left( n_{x}^{-1}(\\omega)+n_{y}^{-1}({\\omega'})-n_{y}^{-1}(\\omega)-n_{x}^{-1}({\\omega'})\\right)  \\frac{d{\\omega'}}{|{\\omega'}-\\omega|} \\nonumber\\\\\nL002026\t&&\\hspace*{0.3in}\nL002027\t+ \\frac{2\\rho^2 \\gamma^2}{4\\pi |\\beta|} \\sum_s\nL002028\t\\int\nL002029\t n_{y}(\\omega + \\sqrt{|\\nu|} s e^\\theta)\nL002030\t \\, n_{y}(\\omega-\\sqrt{|\\nu|}\\sigma s e^{-\\theta} )\\,n_{x}(\\omega + \\sqrt{|\\nu|} s e^\\theta-\\sqrt{|\\nu|} \\sigma s e^{-\\theta} )\\,n_{x}(\\omega) \\nonumber\\\\\nL002031\t&&\\hspace*{0.3in}\nL002032\t\\times \\left( n_{x}^{-1}(\\omega)+n_{x}^{-1}(\\omega +\\sqrt{|\\nu|} s e^\\theta - \\sqrt{|\\nu|} \\sigma s  e^{-\\theta})-n_{y}^{-1}(\\omega +\\sqrt{|\\nu|} s  e^\\theta )-n_{y}^{-1}(\\omega-\\sqrt{|\\nu|} \\sigma s  e^{-\\theta})\\right) d\\theta  ,\nL002033\t\\label{eq:red_wtkin_{x}}\nL002034\t\\\\\nL002035\t&&\\hspace*{-0.2in}\nL002036\t\\partial_z n_{y}(\\omega,z) =\nL002037\t\nL002038\t\\frac{\\kappa^2 \\gamma^2}{4\\pi |\\beta|} \\int\nL002039\t n_{y}({\\omega'}) \\, n_{x}(\\omega)\\,n_{x}({\\omega'})\\,n_{y}(\\omega)  \\left( n_{y}^{-1}(\\omega)+n_{x}^{-1}({\\omega'})-n_{x}^{-1}(\\omega)-n_{y}^{-1}({\\omega'})\\right) \\frac{d{\\omega'}}{|{\\omega'}-\\omega|} \\nonumber\\\\\nL002040\t&&\\hspace*{0.3in}\nL002041\t+\\frac{2 \\rho^2 \\gamma^2}{4\\pi |\\beta|} \\sum_s  \\int\nL002042\t n_{x}(\\omega + \\sqrt{|\\nu|} s e^{\\theta}  ) \\, n_{x}(\\omega + \\sqrt{|\\nu|} \\sigma s e^{-\\theta} )\\,n_{y}(\\omega + \\sqrt{|\\nu|} s e^{\\theta}  +\nL002043\t\\sqrt{|\\nu|} \\sigma s e^{-\\theta}  )\\,n_{y}(\\omega)\nL002044\t\\nonumber\\\\\nL002045\t&&\\hspace*{0.3in}\nL002046\t\\times \\left( n_{y}^{-1}(\\omega)+n_{y}^{-1}(\\omega +\\sqrt{|\\nu|} s  e^{\\theta}+\\sqrt{|\\nu|} \\sigma s e^{-\\theta} )\nL002047\t -n_{x}^{-1}(\\omega + \\sqrt{|\\nu|} s e^{\\theta} )-n_{x}^{-1}(\\omega +\\sqrt{|\\nu|} \\sigma s e^{-\\theta}  )\\right) d\\theta.\nL002048\t\\label{eq:red_wtkin_{y}}\nL002049\t \\end{eqnarray}\nL002050\t\nL002051\t\nL002052\t\nL002053\t\nL002054\t\nL002055\t\nL002056\t\nL002057\t\nL002058\t\nL002059\t\nL002060\t\nL002061\t\nL002062\t\nL002063\t\nL002064\t\nL002065\t\nL002066\t\nL002067\t\nL002068\t\nL002069\t\nL002070\t\nL002071\t\nL002072\t\nL002073\t\nL002074\t\nL002075\t\nL002076\t\nL002077\t\nL002078\t\nL002079\tThe kinetic equations conserve the total power (density) $N=\\frac{1}{2\\pi}\\sum_\\mu \\int n_{\\mu}(\\omega,z) d\\omega$, with $\\mu=x,y$. Note that if $\\sigma=1$, then\nL002080\t\\begin{eqnarray}\nL002081\t&&\\hspace*{-0.2in}\nL002082\t\\partial_z N_{x}(z) = \\frac{2\\rho^2 \\gamma^2}{2\\pi |\\beta|}  \\int d\\omega  \\int d\\theta\nL002083\t n_{y}(\\omega+\\sqrt{|\\nu|}  \\cosh \\theta) \\, n_{y}(\\omega -\\sqrt{|\\nu|}  \\cosh \\theta)\\,n_{x}(\\omega +\\sqrt{|\\nu|}  \\sinh \\theta)\\,n_{x}(\\omega-\\sqrt{|\\nu|}  \\sinh \\theta) \\nonumber\\\\\nL002084\t&&\\hspace*{0.3in}\nL002085\t\\times \\left( n_{x}^{-1} (\\omega +\\sqrt{|\\nu|}  \\sinh \\theta)+n_{x}^{-1} (\\omega -\\sqrt{|\\nu|}  \\sinh \\theta)-n_{y}^{-1}(\\omega +\\sqrt{|\\nu|}  \\cosh \\theta)-n_{y}^{-1} (\\omega - \\sqrt{|\\nu|}  \\cosh \\theta)\\right) ,\nL002086\t\\label{eq:dzNx} \\\\\nL002087\t&&\\hspace*{-0.2in}\nL002088\t\\partial_z N_{y}(z) =  - \\partial_z N_{x}(z)   .\nL002089\t\\label{eq:dzNy}\nL002090\t\\end{eqnarray}\nL002091\tIf $\\sigma=-1$, the same result is obtained by changing $\\cosh(\\theta)$ and $\\sinh(\\theta)$. The kinetic equation also conserves the linear energy $E=\\frac{1}{2\\pi}\\sum_\\mu \\int k_{\\mu}(\\omega)n_{\\mu}(\\omega,z) d\\omega$, with $\\mu=x,y$.\nL002092\t\nL002093\t\\newpage\nL002094\t\nL002095\tThe reduced form of the wave turbulence KE (\\ref{eq:red_wtkin_{x}}-\\ref{eq:red_wtkin_{y}}) has been numerically integrated. The results have been compared with the simulations of the NLSE (\\ref{eq:nls_x}-\\ref{eq:nls_y}), and a good agreement is obtained without using adjustable parameters, see Fig.~1 (main text), and Fig.~\\ref{fig:thermal}.\nL002096\t\\blue{\nL002097\tFor the numerical simulations, we have normalized the NLSE (\\ref{eq:nls_x}-\\ref{eq:nls_y}) and the wave turbulence KE (\\ref{eq:red_wtkin_{x}}-\\ref{eq:red_wtkin_{y}}). The dimensionless variables are ${\\tilde z}=z/L_{nl}$, ${\\tilde t}=t/\\tau_0$, ${\\tilde u}_\\mu=u_\\mu/\\sqrt{N}$, with $\\mu=x,y$, and $L_{nl}=1/(\\gamma N)$ the nonlinear length, $\\tau_0=\\sqrt{|\\beta| L_{nl}}$ the `healing time'. With this normalization, we have ${\\tilde N}_\\mu=N_\\mu/N$, ${\\tilde E}_k=E_k L_{nl}/N$, ${\\tilde E}_c=E_c L_{nl}/N$, ${\\tilde U}=U L_{nl}/N$, ${\\tilde n}_\\mu={n}_\\mu/(N \\tau_0)$, ${\\tilde \\omega}=\\omega \\tau_0$, ${\\tilde S}({\\tilde z})=\\frac{1}{2\\pi} \\int \\log({\\tilde n}({\\tilde \\omega},{\\tilde z})) d{\\tilde \\omega}$, ${\\tilde \\sigma}=\\sigma \\tau_0$, and ${\\tilde \\alpha}=\\alpha L_{nl}$.\nL002098\tThe corresponding evolution during propagation of the energies ${\\tilde E}_k({\\tilde z})$ and  ${\\tilde E}_c({\\tilde z})$ are reported in Fig.~\\ref{fig:thermal}(a).}\nL002099\t\nL002100\t\nL002101\t\nL002102\tWe remark that, unlike conventional nonlinear systems where the kinetic energy \\blue{${\\tilde E}_k$} is the sole contribution to the linear energy \\blue{${\\tilde E}$}, our system includes an additional contribution arising from the coherent coupling, \\blue{${\\tilde E}={\\tilde E}_k+{\\tilde E}_c$, which is conserved  ${\\tilde E} \\simeq$~const in the weakly nonlinear regime $|{\\tilde E}/{\\tilde U}| \\gg 1$}. Consequently, the growth in the kinetic energy \\blue{${\\tilde E}_k$} is no longer constrained, since it can be offset by a corresponding decrease in \\blue{${\\tilde E}_c$}, as illustrated in Fig.~\\ref{fig:thermal}(a) \\cite{OE08}. \\blue{Recalling that ${\\tilde E}_c(z) = {\\tilde \\alpha} ({\\tilde N}_x-{\\tilde N}_y)$ [see Eq.(\\ref{eq:E_lin})], thermalization manifests itself by an irreversible transfer of power from the $x-$axis to the $y-$axis, thus leading to the emergence of a nonvanishing degree of polarization, as illustrated in Fig.~1(a)-(b) in the main text.}\nL002103\t\nL002104\t\nL002105\t\\begin{figure}\nL002106\t    \\centering\nL002107\t    \\includegraphics[width=0.9\\linewidth]{figures/FIG_supp_1_v2.pdf}\nL002108\t    \\caption{\nL002109\t    \\baselineskip 10pt\nL002110\t    {\\bf Irreversible thermalization.} Numerical simulations of the NLSE (\\ref{eq:nls_x}-\\ref{eq:nls_y}) \\blue{(blue and green  lines)}, and \\blue{numerical simulations of} the wave turbulence KE (\\ref{eq:red_wtkin_{x}}-\\ref{eq:red_wtkin_{y}}) (red lines): (a) Evolution of the \\blue{normalized kinetic contribution to the energy ${\\tilde E}_k({\\tilde z})$ (blue line)}, and \\blue{the normalized coherent coupling contribution ${\\tilde E}_c({\\tilde z})$} (green line). The inset \\blue{in (a) shows the corresponding evolution of the normalized entropy ${\\tilde S}({\\tilde z})$ obtained from the simulation of the KE (\\ref{eq:red_wtkin_{x}}-\\ref{eq:red_wtkin_{y}}) (red line)}. Spectra of the waves \\blue{${\\tilde n}_x({\\tilde \\omega})$ (b), and ${\\tilde n}_y({\\tilde \\omega})$ (c) at ${\\tilde z}=3000$, from NLSE (blue lines), and KE (red lines), simulations}.\nL002111\t    The thermalization process is characterized by a growth of the kinetic energy \\blue{${\\tilde E}_k({\\tilde z})$}, which entails a decrease of \\blue{${\\tilde E}_c({\\tilde z})$, because the total linear energy is conserved ${\\tilde E}={\\tilde E}_k({\\tilde z})+{\\tilde E}_c({\\tilde z}) \\simeq$~const, in the considered weakly nonlinear regime $|{\\tilde E}/{\\tilde U}| \\gg 1$}. Recalling that \\blue{${\\tilde E}_c({\\tilde z}) = {\\tilde \\alpha} ({\\tilde N}_x-{\\tilde N}_y)$}, thermalization is characterized by a power transfer from the $x$-to-$y$ axis, which entails  the increase of the degree of polarization ${\\cal P}$, see Fig.~1 (main text).\nL002112\t    \\blue{In panels (a)-(c), variables marked with a tilde ($\\sim$) denote normalized quantities, as defined in the text.}\nL002113\t    An average over 5 realizations of the initial condition (i.e., initial random spectral phases) has been considered for the NLSE simulations. \\blue{Parameters are the same as in Fig.~1 (main text): ${\\tilde \\alpha}=1, {\\tilde N}_x^0={\\tilde N}_y^0=0.5, {\\tilde \\sigma}=0.8 \\pi, \\kappa=2/3$, $|{\\tilde E}/{\\tilde U}| \\simeq {\\tilde \\sigma}^2$.}\nL002114\t    }\nL002115\t    \\label{fig:thermal}\nL002116\t\\end{figure}\nL002117\t\nL002118\t\nL002119\t\nL002120\t\nL002121\t\nL002122\t\nL002123\t\nL002124\t\nL002125\t\nL002126\t\nL002127\t\nL002128\t\nL002129\t\nL002130\t\nL002131\t\nL002132\t\nL002133\t\nL002134\t\nL002135\t\nL002136\t\nL002137\t\nL002138\t\nL002139\t\nL002140\t\nL002141\t\nL002142\t\\section{Anomalous correlator kinetic equation}\nL002143\t\nL002144\t\\subsection{Derivation of Eqs.(4-5) (main text)}\nL002145\t\nL002146\tWe start from the NLSE (\\ref{eq:nls_x}-\\ref{eq:nls_y}) and define the normal correlator\nL002147\t$U_\\mu(t_1,t_2,z)=\\left< u_\\mu(t_1,z)u_\\mu(t_2,z)^* \\right>$ for $\\mu=x,y$, and the anomalous correlator describing a correlation among the waves $u_x$ and $u_y$: $W(t_1,t_2,z)=\\left< u_y(t_1,z)u_x^*(t_2,z) \\right>$.\nL002148\tFollowing the usual procedure, we derive the equations for the correlators $U_\\mu$ and $W$, which involve fourth-order moments of the waves that can be expanded into products of second-order moments in the weakly nonlinear regime of Gaussian statistics. Here, caution should be exercized in keeping all anomalous correlations between the waves. We obtain\nL002149\t\\begin{align}\nL002150\ti\\partial_z U_x^{12} =& - \\beta(\\partial_{t_1}^2-\\partial_{t_2}^2)U_x^{12}\nL002151\t+ \\gamma U_x^{12}[2(U_x^{11}-U_x^{22})+\\kappa(U_y^{11}-U_y^{22})]\nL002152\t+ \\gamma \\kappa \\big[ W^{12}(W^{11}+W^{11*}) - W^{21*}(W^{22}+W^{22*}) \\big],\nL002153\t\\nonumber \\\\\nL002154\ti\\partial_z U_y^{12} =& - \\beta(\\partial_{t_1}^2-\\partial_{t_2}^2)U_y^{12}\nL002155\t+\\gamma U_y^{12}[2(U_y^{11}-U_y^{22})+\\kappa(U_x^{11}-U_x^{22})]\nL002156\t+ \\gamma \\kappa \\big[ W^{21*}(W^{11}+W^{11*}) - W^{12}(W^{22}+W^{22*}) \\big],\nL002157\t\\nonumber \\\\\nL002158\ti\\partial_z W^{12} =& - \\beta(\\partial_{t_1}^2-\\partial_{t_2}^2)W^{12}\nL002159\t-2\\alpha W^{12}\nL002160\t+\\gamma W^{12} \\big[2(U_y^{11}-U_x^{22})+\\kappa(U_x^{11}-U_y^{22})\\big]\nL002161\t\\nonumber \\\\\nL002162\t&+\\gamma \\kappa \\big[U_x^{12}(W^{11}+W^{11*})-U_y^{12}(W^{22}+W^{22*}) \\big]  ,\nL002163\t\\nonumber\nL002164\t\\end{align}\nL002165\twhere  $U_\\mu^{ij}=U_\\mu(t_i,t_j,z)$ for $\\mu=x,y$, and $W^{ij}=W(t_i,t_j,z)$.\nL002166\tIntroducing the variables $t=(t_1+t_2)/2, \\tau=t_1-t_2$, this also reads\nL002167\t\\begin{align}\nL002168\ti\\partial_z U_x =& - 2 \\beta \\partial_{t \\tau} U_x + \\gamma {\\cal L}^{U_x} ,\\\\\nL002169\ti\\partial_z U_y =& - 2 \\beta \\partial_{t \\tau} U_y + \\gamma {\\cal L}^{U_y} ,\\\\\nL002170\ti\\partial_z W =& - 2 \\beta\\partial_{t \\tau}  W\nL002171\t-2\\alpha W + \\gamma {\\cal L}^{W} ,\nL002172\t\\end{align}\nL002173\twith the three nonlinear terms\nL002174\t\\begin{align}\nL002175\t{\\cal L}^{U_x} (t,\\tau) =&\nL002176\tU_x(t,\\tau) [ (2U_x+\\kappa U_y)(t+\\tau/2,0)-(2U_x+\\kappa U_y)(t-\\tau/2,0)]\nL002177\t\\nonumber\nL002178\t\\\\\nL002179\t&\nL002180\t+ 2 \\kappa \\big[ W(t,\\tau) W^r(t+\\tau/2,0) - W(t,-\\tau)^* W^r(t-\\tau/2,0)  \\big],\\\\\nL002181\t{\\cal L}^{U_y} (t,\\tau) =&\nL002182\tU_y(t,\\tau) [ (2U_y+\\kappa U_x)(t+\\tau/2,0)-(2U_y+\\kappa U_x)(t-\\tau/2,0)]\nL002183\t\\nonumber\nL002184\t\\\\\nL002185\t&\nL002186\t+ 2 \\kappa \\big[ W(t,-\\tau)^* W^r(t+\\tau/2,0) - W(t,\\tau) W^r(t-\\tau/2,0)  \\big], \\\\\nL002187\t{\\cal L}^W(t,\\tau)=&  W(t,\\tau) \\big[(2U_y+\\kappa U_x)(t+\\tau/2,0)-(2U_x+\\kappa U_y)(t-\\tau/2,0)\\big]\nL002188\t\\nonumber\nL002189\t\\\\\nL002190\t&\nL002191\t+2 \\kappa \\big[U_x(t,\\tau) W^r(t+\\tau/2) -U_y (t,\\tau) W^r(t-\\tau/2,0) \\big]  ,\nL002192\t\\end{align}\nL002193\twhere $W^r={\\rm Re}(W)$.\nL002194\tWe can make use of the assumption of quasi-stationary statistics, that is to say the time correlation $t_c$ (i.e. the microscopic time scale of random fluctuations) is much smaller than the macroscopic time scale $t_s$ of stationary (homogeneous) statistics. In the regime $\\varepsilon = t_c/t_s \\ll 1$, the three nonlinear terms can be expanded up to first order as\nL002195\t\\begin{align}\nL002196\t{\\cal L}^{U_x} (t,\\tau) =&\nL002197\tU_x(t,\\tau)  \\tau \\partial_t (2U_x+\\kappa U_y)(t,0)\nL002198\t+ 2 \\kappa  W^r(t,0)  \\big[ W(t,\\tau) - W(t,-\\tau)^* \\big]\nL002199\t+ \\kappa \\tau \\partial_t W^r(t,0) \\big[ W(t,\\tau) + W(t,-\\tau)^* \\big] ,\\\\\nL002200\t{\\cal L}^{U_y} (t,\\tau) =&\nL002201\tU_y(t,\\tau) \\tau \\partial_t  (2U_y+\\kappa U_x)(t,0)\nL002202\t- 2 \\kappa W^r(t,0)  \\big[  W(t,\\tau) - W(t,-\\tau)^*   \\big]\nL002203\t+  \\kappa \\tau \\partial_t W^r(t,0)  \\big[ W(t,\\tau) +W(t,-\\tau)^*  \\big]\nL002204\t, \\\\\nL002205\t\\nonumber\nL002206\t{\\cal L}^W(t,\\tau)=& (2-\\kappa) W(t,\\tau) ( U_y -U_x)(t,0)\nL002207\t+(2+\\kappa)W(t,\\tau) \\frac{\\tau}{2}\\partial_t (U_y+U_x)(t,0) \\\\\nL002208\t&\nL002209\t+ 2\\kappa W^r(t,0) (U_x - U_y)(t,\\tau)\nL002210\t +\\kappa \\tau \\partial_t W^r(t,0) (U_x+U_y)(t,\\tau) .\nL002211\t\\end{align}\nL002212\tThis gives\nL002213\t\\begin{align}\nL002214\ti\\partial_z U_x(t,\\tau,z) =& - 2 \\beta\\partial_{t \\tau} U_x +\nL002215\t\\gamma\\tau U_x \\partial_t \\big( 2 N_x(t) + \\kappa N_y(t) \\big)\nL002216\t-2\\gamma\\kappa W_0^r(t) \\big( W^*(t,-\\tau) - W(t,\\tau) \\big)\\nonumber\nL002217\t\\\\\nL002218\t&\nL002219\t+ \\gamma \\kappa \\tau \\partial_t W_0^r(t) \\big[ W(t,\\tau) + W(t,-\\tau)^* \\big]  ,\nL002220\t\\label{eq:U_x}  \\\\\nL002221\ti\\partial_z U_y(t,\\tau,z) =& - 2 \\beta \\partial_{t \\tau} U_y +\nL002222\t\\gamma\\tau U_y \\partial_t \\big( 2 N_y(t) + \\kappa N_x(t) \\big)\nL002223\t-2\\gamma\\kappa W_0^r(t) \\big( W(t,\\tau)-W^*(t,-\\tau) \\big)\nL002224\t\\nonumber\nL002225\t\\\\\nL002226\t& + \\gamma \\kappa \\tau \\partial_t W_0^r(t) \\big[ W(t,\\tau) + W(t,-\\tau)^* \\big] ,\nL002227\t\\label{eq:U_y}  \\\\\nL002228\ti\\partial_z W(t,\\tau,z) =& - 2\\beta \\partial_{t \\tau} W\nL002229\t+W\\Big( \\gamma(2-\\kappa)\\big(N_y(t)-N_x(t)\\big)-2\\alpha   \\Big)\nL002230\t- 2\\gamma\\kappa \\big( U_y-U_x \\big) W_0^r(t) \\nonumber \\\\\nL002231\t&+\\gamma(1+\\kappa/2)\\tau W \\partial_t \\big( N_y(t)+N_x(t) \\big)\nL002232\t+\\gamma\\kappa \\tau \\big( U_y+U_x \\big) \\partial_t W_0^r(t)  ,\nL002233\t\\label{eq:W}\nL002234\t\\end{align}\nL002235\twhere $W_0(t,z)=W(t,\\tau=0,z)$, and $N_\\mu(t,z)=U_\\mu(t,\\tau=0,z)$.\nL002236\t\nL002237\tThe equations for the normal correlator $n_\\mu(t,\\omega,z)=\\int U_\\mu(t,\\tau,z) \\exp(-i\\omega \\tau) d\\tau$, and the anomalous correlator $m(t,\\omega,z)=\\int W(t,\\tau,z) \\exp(-i\\omega \\tau) d\\tau$, are obtained by taking the Fourier transform of Eqs.(\\ref{eq:U_x}-\\ref{eq:W}), leading to the set of Eqs.(4-5) (main text):\nL002238\t\\begin{align}\nL002239\t\\partial_z n_x(\\omega,t) =& - 2\\beta \\omega \\partial_t n_x\nL002240\t+ \\gamma \\partial_t \\big(2 N_x(t) + \\kappa N_y(t) \\big)\\partial_\\omega n_x\nL002241\t+2\\gamma\\kappa \\partial_t M^r(t) \\partial_\\omega m^r(\\omega,t)\nL002242\t+4 \\gamma\\kappa M^r(t) m^i(\\omega,t) ,\nL002243\t\\label{eq:nx_vl_supp} \\\\\nL002244\t\\partial_z n_y(\\omega,t) =& - 2 \\beta\\omega \\partial_t n_y + \\gamma \\partial_t \\big(2 N_y(t) + \\kappa N_x(t) \\big)\\partial_\\omega n_y\nL002245\t+2\\gamma\\kappa \\partial_t M^r(t) \\partial_\\omega m^r(\\omega,t)\nL002246\t-4 \\gamma\\kappa M^r(t) m^i(\\omega,t)  ,\nL002247\t\\label{eq:ny_vl_supp} \\\\\nL002248\t\\partial_z m(\\omega,t) =& -2\\beta \\omega \\partial_t m\nL002249\t+\\gamma(1+\\kappa/2) \\partial_t \\big( N_x(t)+N_y(t) \\big) \\partial_\\omega m\nL002250\t+\\gamma\\kappa \\partial_t M^r(t)\\partial_\\omega \\big( n_x+n_y \\big)\nL002251\t\\nonumber \\\\\nL002252\t&-i m \\Big( \\gamma(2-\\kappa)\\big(N_y(t)-N_x(t)\\big)-2\\alpha   \\Big)\nL002253\t- 2i\\gamma\\kappa \\big( n_x - n_y \\big) M^r(t)   ,\nL002254\t\\label{eq:m_vl_supp}\nL002255\t\\end{align}\nL002256\twhere $M(t,z)=W_0(t,z)=\\frac{1}{2\\pi}\\int m(t,\\omega,z)d\\omega$, and ${N}_{\\mu}(t,z)=\\frac{1}{2\\pi}\\int n_{\\mu}(t,\\omega,z)d\\omega$, while $m^{r,i}$ ($M^{r,i}$) denote the real and imaginary parts of $m$ ($M$).\nL002257\t\nL002258\tNote that the system of Eqs.(\\ref{eq:nx_vl_supp}-\\ref{eq:m_vl_supp}) is formally reversible in the `time' variable $z$, i.e., it is invariant under the transformation: $(z \\to -z, \\omega \\to -\\omega, m \\to m^*)$.\nL002259\t\nL002260\t\\subsection{Stability analysis for the emergence of phase-correlations: Derivation of Eq.(6) (main text)}\nL002261\t\nL002262\tWe assume that the initial random waves $u_\\mu(t,z=0)$ have a homogeneous statistics with spectra $n_\\mu^0(\\omega)$, and are uncorrelated with each other, so that the initial anomalous correlator is zero, $m(\\omega,t,z=0)=0$. We perform a linear stability analysis of Eqs.(\\ref{eq:nx_vl_supp}-\\ref{eq:m_vl_supp}) around this solution with\nL002263\t\\begin{align}\nL002264\tn_\\mu(t,\\omega,z) &= n_\\mu^0(\\omega) + \\delta n_\\mu(t,\\omega,z), \\quad \\mu=x,y ,\nL002265\t\\label{eq:pert_n}\\\\\nL002266\tm(t,\\omega,z) &= \\delta m(t,\\omega,z),\nL002267\t\\label{eq:pert_m}\nL002268\t\\end{align}\nL002269\twith $\\delta n_\\mu(t,\\omega,z) \\ll n_\\mu^0(\\omega)$ and $|\\delta m(t,\\omega,z)| \\ll n_\\mu^0(\\omega)$.\nL002270\tIntroducing (\\ref{eq:pert_n}-\\ref{eq:pert_m}) into Eqs.(\\ref{eq:nx_vl_supp}-\\ref{eq:m_vl_supp}), we obtain after linearization\nL002271\t\\begin{align}\nL002272\t\\partial_z \\delta n_x(t,\\omega) =& - 2\\beta \\omega \\partial_t \\delta n_x + \\gamma\\partial_\\omega n_x^0 \\partial_t \\big(2 \\delta N_x(t) + \\kappa \\delta N_y(t) \\big),\nL002273\t\\label{eq:deltanx_vl_supp} \\\\\nL002274\t\\partial_z \\delta n_y(t,\\omega) =& - 2 \\beta\\omega \\partial_t \\delta n_y + \\gamma\\partial_\\omega n_y^0 \\partial_t \\big(2 \\delta N_y(t) + \\kappa \\delta N_x(t) \\big),\nL002275\t\\label{eq:deltany_vl_supp} \\\\\nL002276\t\\partial_z \\delta m(t,\\omega) =& -2\\beta \\omega \\partial_t \\delta m\nL002277\t-i \\delta m \\Big( \\gamma(2-\\kappa)\\big(N_y^0-N_x^0\\big)-2\\alpha   \\Big)\nL002278\t- 2i\\gamma\\kappa \\big( n_x^0 - n_y^0 \\big) \\delta M^r(t) \\nonumber \\\\\nL002279\t& +\\gamma\\kappa\\partial_\\omega \\big( n_x^0+n_y^0 \\big) \\partial_t \\delta M^r(t),\nL002280\t\\label{eq:deltam_vl_supp}\nL002281\t\\end{align}\nL002282\twhere $N_\\mu^0 = \\frac{1}{2\\pi}\\int n_\\mu^0(\\omega) d\\omega$, $\\delta N_\\mu(t,z) = \\frac{1}{2\\pi}\\int \\delta n_\\mu(t,\\omega,z) d\\omega$, $\\delta M(t,z) = \\frac{1}{2\\pi}\\int \\delta m(t,\\omega,z) d\\omega$. Note that the evolution of $\\delta n_\\mu$ in (\\ref{eq:deltanx_vl_supp}-\\ref{eq:deltany_vl_supp}) is decoupled from the evolution $\\delta m$ in (\\ref{eq:deltam_vl_supp}). In the following we study separately the stability analysis for the anomalous correlator, and the normal correlators.\nL002283\t\nL002284\t\\subsubsection{Stability analysis of the anomalous correlator, Eq.(\\ref{eq:deltam_vl_supp})}\nL002285\t\nL002286\tWe perform the stability analysis of the anomalous correlator by  introducing $\\delta {\\tilde m}(\\Omega,\\omega,z)=\\int \\delta m(t,\\omega,z)\\exp(-i\\Omega t) dt$, we obtain from Eq.(\\ref{eq:m_vl_supp})\nL002287\t\\begin{align*}\nL002288\ti\\partial_z \\delta {\\tilde m}(\\Omega,\\omega,z) =&\nL002289\t\\big( 2\\beta \\omega \\Omega + \\gamma (2-\\kappa)(N_y^0-N_x^0) -2 \\alpha  \\big)\\delta {\\tilde m}\nL002290\t\\\\\nL002291\t&+ \\frac{\\gamma \\kappa}{2\\pi}\nL002292\t\\big(n_x^0(\\omega)- n_y^0(\\omega)-\\frac{\\Omega}{2}\\partial_\\omega n_y^{0}(\\omega)-\\frac{\\Omega}{2}\\partial_\\omega n_x^{0}(\\omega) \\big)\nL002293\t \\int \\big(  \\delta {\\tilde m}(\\Omega,\\omega_1,z) +  \\delta {\\tilde m}^*(-\\Omega,\\omega_1,z) \\big) d\\omega_1.\nL002294\t\\end{align*}\nL002295\tTo derive the dispersion relation, it proves convenient to introduce the function $\\delta {\\tilde p}(\\Omega,\\omega,z)=\\delta {\\tilde m}^*(\\Omega,-\\omega,z)$, which gives the system\nL002296\t\\begin{align*}\nL002297\ti\\partial_z \\delta {\\tilde m}(\\Omega,\\omega,z) =&\nL002298\t\\big( 2\\beta \\omega \\Omega + \\gamma (2-\\kappa)(N_y^0-N_x^0) -2 \\alpha  \\big)\\delta {\\tilde m}\nL002299\t\\\\\nL002300\t&+ \\frac{\\gamma \\kappa}{2\\pi}\nL002301\t\\big(n_x^0(\\omega)- n_y^0(\\omega)-\\frac{\\Omega}{2}\\partial_\\omega n_y^0(\\omega)-\\frac{\\Omega}{2}\\partial_\\omega n_x^0(\\omega) \\big)\nL002302\t \\int \\big(  \\delta {\\tilde m}(\\Omega,\\omega_1,z) +  \\delta {\\tilde p}(\\Omega,\\omega_1,z) \\big) d\\omega_1   , \\\\\nL002303\t-i\\partial_z \\delta {\\tilde p}(\\Omega,\\omega,z) =&\nL002304\t\\big( -2\\beta \\omega \\Omega + \\gamma (2-\\kappa)(N_y^0-N_x^0) -2 \\alpha  \\big)\\delta {\\tilde m}\nL002305\t\\\\\nL002306\t&+ \\frac{\\gamma \\kappa}{2\\pi}\nL002307\t\\big(n_y^0(\\omega)- n_x^0(\\omega)+\\frac{\\Omega}{2}\\partial_\\omega n_y^0(\\omega)+\\frac{\\Omega}{2}\\partial_\\omega n_x^0(\\omega) \\big)\nL002308\t \\int \\big(  \\delta {\\tilde m}(\\Omega,\\omega_1,z) +  \\delta {\\tilde p}(\\Omega,\\omega_1,z) \\big) d\\omega_1   .\nL002309\t\\end{align*}\nL002310\tIntroducing the Laplace transforms of the anomalous correlator\nL002311\t$\\delta {\\hat m}(\\Omega,\\omega,\\lambda)=\\int_0^z ds \\delta {\\tilde m}(\\Omega,\\omega,s) \\exp(-\\lambda s)$, $\\delta {\\hat p}(\\Omega,\\omega,\\lambda)=\\int_0^z ds \\delta {\\tilde p}(\\Omega,\\omega,s) \\exp(-\\lambda s)$, we obtain the dispersion relation for the instability growth-rate of the anomalous correlator ${\\rm Re}[\\lambda(\\Omega)]$:\nL002312\t\\begin{eqnarray}\nL002313\t\\frac{2\\pi}{\\gamma\\kappa} = \\int\nL002314\t\\frac{n_x^0(\\omega)-n_y^0(\\omega)-(\\Omega/2)\\partial_\\omega \\big(n_x^0(\\omega)+n_y^0(\\omega)\\big)}{i \\lambda-2\\beta\\omega \\Omega - \\gamma(2-\\kappa)(N_y^0-N_x^0)+2\\alpha}\nL002315\t+\\frac{n_x^0(\\omega)-n_y^0(\\omega)+(\\Omega/2)\\partial_\\omega \\big(n_x^0(\\omega)+n_y^0(\\omega)\\big)}{-i \\lambda+2\\beta\\omega \\Omega - \\gamma(2-\\kappa)(N_y^0-N_x^0)+2\\alpha}\nL002316\td\\omega.\nL002317\t\\label{eq:disp_rel_supp}\nL002318\t\\end{eqnarray}\nL002319\tWe have considered initial Gaussian spectra of the form: $n_\\mu^0(\\omega)=\\frac{\\sqrt{2\\pi}}{\\sigma} N_\\mu^0 \\exp(-\\omega^2/(2 \\sigma^2))$. The analysis shows that, in general, ${\\rm Re}[\\lambda(\\Omega)]$ is peaked on $\\Omega=0$, i.e., the homogeneous mode is the most unstable. Note in this respect that the growth-rate of the homogeneous mode does not depend on the initial spectrum: Regardless of the particular form of $n_\\mu^0(\\omega)$, the growth-rate for the homogeneous mode reads:\nL002320\t\\begin{equation}\nL002321\t\\lambda(\\Omega=0)=\nL002322\t \\sqrt{\\big(\\gamma(2-\\kappa)\\Delta N^0-2\\alpha\\big)\\big( \\gamma(3\\kappa-2)\\Delta N^0+2\\alpha\\big)}.\nL002323\t\\end{equation}\nL002324\tNote that this expression recovers Eq.(6) (main text) for $\\kappa=2/3$.\nL002325\t\nL002326\tFig.~\\ref{fig:stability} shows the influence of the various parameters on $\\rm{Re}[\\lambda]$. We can see that in most cases, the maximum growth, i.e. the maximum of $\\rm{Re}[\\lambda]$, is achieved for $\\Omega = 0$. Increasing the spectral width, $\\sigma$, reduces the range of frequencies $\\Omega$ that are unstable without changing the maximum instability rate. Decreasing the initial power difference, $\\Delta N^0$, reduces both the range of unstable modes $\\Omega$ and the instability growth-rate. The influence of $\\alpha$ is more subtle and reducing $\\alpha$ can lead to a shift of the maximum instability rate from $\\Omega = 0$ to $\\Omega \\neq 0$.\nL002327\t\\begin{figure}[!h]\nL002328\t    \\centering\nL002329\t    \\includegraphics[width=0.95\\linewidth]{figures/supplemental_stability.pdf}\nL002330\t    \\caption{\nL002331\t    \\baselineskip 10pt\nL002332\t    \\textbf{Impact of the various parameters on $\\rm{Re}[\\lambda]$.}\nL002333\t\nL002334\t    Panel (a) shows the influence of varying $\\alpha L_{nl}$ while keeping $\\Delta N^0/N=1$ and $\\sigma \\tau_0 = 2 \\pi$. Panel (b) shows the influence of varying $\\Delta N^0/N$ while keeping $\\alpha L_{nl}=1/3$ and $\\sigma \\tau_0 = 2 \\pi $. Panel (c) shows the influence of varying $\\sigma \\tau_0$ while keeping $\\alpha L_{nl}=1/3$ and $\\Delta N^0 /N= 1$.}\nL002335\t    \\label{fig:stability}\nL002336\t\\end{figure}\nL002337\t\\subsubsection{Stability analysis of the normal correlators, Eqs.(\\ref{eq:deltanx_vl_supp}-\\ref{eq:deltany_vl_supp})}\nL002338\t\nL002339\tFollowing a procedure similar to that for the anomalous correlator, we now carry out the stability analysis for the normal correlators whose evolution is governed by the linearized Eqs.(\\ref{eq:deltanx_vl_supp}-\\ref{eq:deltany_vl_supp}).\nL002340\tDefining $\\delta {\\hat n}_\\mu(\\Omega,\\omega,\\lambda_n)=\\int_0^z ds \\int dt \\delta {n}_\\mu(t,\\omega,z) \\exp(-i\\Omega t -\\lambda_n s)$, we obtain the set of coupled equations:\nL002341\t\\begin{align}\nL002342\t\\delta {\\hat n}_x(\\Omega,\\omega,\\lambda_n) &=\nL002343\t\\frac{i\\gamma \\Omega \\partial_\\omega n_x^0(\\omega)}{2\\pi(\\lambda_n + 2 i \\beta \\omega \\Omega)}\nL002344\t\\int  2\\delta {\\hat n}_x(\\Omega,\\omega_1,\\lambda_n)+\\kappa \\delta {\\hat n}_y(\\Omega,\\omega_1,\\lambda_n) d\\omega_1,\\\\\nL002345\t\\delta {\\hat n}_y(\\Omega,\\omega,\\lambda_n) &=\nL002346\t\\frac{i\\gamma \\Omega \\partial_\\omega n_y^0(\\omega)}{2\\pi(\\lambda_n + 2 i \\beta \\omega \\Omega)}\nL002347\t\\int  2\\delta {\\hat n}_y(\\Omega,\\omega_1,\\lambda_n)+\\kappa \\delta {\\hat n}_x(\\Omega,\\omega_1,\\lambda_n) d\\omega_1,\nL002348\t\\end{align}\nL002349\tThe dispersion relation $\\lambda_n(\\Omega)$ for the normal correlator is obtained by solving the integral equation:\nL002350\t\\begin{align}\nL002351\t&\\big(1-2{\\cal I}_x(\\Omega,\\lambda_n) \\big) \\big(1-2{\\cal I}_y(\\Omega,\\lambda_n) \\big)=\\kappa^2 {\\cal I}_x(\\Omega,\\lambda_n) {\\cal I}_y(\\Omega,\\lambda_n),\nL002352\t\\label{eq:lambda_n}\nL002353\t\\end{align}\nL002354\twhere the integrals ${\\cal I}_\\mu(\\Omega,\\lambda_n)$ are given by\nL002355\t\\begin{align}\nL002356\t{\\cal I}_\\mu(\\Omega,\\lambda_n)=\\frac{i\\gamma \\Omega }{2\\pi}\\int \\frac{\\partial_\\omega n_\\mu^0(\\omega)}{\\lambda_n + 2 i \\beta \\omega \\Omega} d\\omega = -\\frac{\\gamma \\beta \\Omega^2 }{\\pi}\\int \\frac{n_\\mu^0(\\omega)}{(\\lambda_n + 2 i \\beta \\omega \\Omega)^2} d\\omega, \\quad \\mu=x,y.\nL002357\t\\end{align}\nL002358\tWe consider initial Gaussian spectra of the form: $n_\\mu^0(\\omega)=\\frac{\\sqrt{2\\pi}}{\\sigma} N_\\mu^0 \\exp(-\\omega^2/(2 \\sigma^2))$. We have solved numerically Eq.(\\ref{eq:lambda_n}) to compute the dispersion relation $\\lambda_n(\\Omega)$. In the weakly nonlinear regime verifying $L_{lin} \\sim (\\beta \\sigma^2)^{-1} \\ll L_{nl} \\sim (\\gamma N)^{-1}$, the numerical analysis shows that the normal correlator is always stable, ${\\rm Re}\\big(\\lambda_n(\\Omega)\\big) <0$.\nL002359\t\nL002360\t\\subsection{Nonlinear dynamics with homogeneous statistics: Derivation of Eq.(8) (main text)}\nL002361\t\nL002362\tThe analysis of the dispersion relation has revealed that, in general, the homogeneous mode $\\Omega=0$ is the most unstable mode, see Fig.~\\ref{fig:stability}. Here, we analyze the nonlinear dynamics of Eq.(\\ref{eq:nx_vl_supp}-\\ref{eq:m_vl_supp}) in the limit of stationary statistics:\nL002363\t\\begin{align}\nL002364\t\\partial_z n_x(\\omega,z) =& +4 \\gamma\\kappa M^r m^i(\\omega)  ,\nL002365\t\\label{eq:nx_vl_stat} \\\\\nL002366\t\\partial_z n_y(\\omega,z) =& -4 \\gamma\\kappa M^r m^i(\\omega)  ,\nL002367\t\\label{eq:ny_vl_stat} \\\\\nL002368\t\\partial_z m(\\omega,z) =&\nL002369\t-i  \\big( \\gamma(2-\\kappa)(N_y-N_x)-2\\alpha   \\big) m\nL002370\t- 2i\\gamma\\kappa \\big( n_x - n_y \\big) M^r .\nL002371\t\\label{eq:m_vl_stat}\nL002372\t\\end{align}\nL002373\tNote that, $\\left< {\\tilde u}_y(\\omega_1,z) {\\tilde u}_x^*(\\omega_2,z) \\right>=2\\pi m(\\omega_1,z) \\delta(\\omega_1-\\omega_2)$ under the assumption of homogeneous statistics (${\\tilde u}_\\mu(\\omega,z)=\\int u_\\mu(t,z) \\exp(-i\\omega t) dt$ being the Fourier transform of the field), so that anomalous correlations between $u_x$ and $u_y$ arise only at the same frequency.\nL002374\t\nL002375\tBy integration over $\\omega$, we get the following system for the normal and anomalous correlators:\nL002376\t\\begin{align}\nL002377\t\\partial_z \\Delta N &= -8 \\gamma \\kappa M^r M^i ,\nL002378\t\\label{eq:DelaN_red}\\\\\nL002379\t\\partial_z M^r &= \\big( \\gamma (2- \\kappa)\\Delta N -2\\alpha \\big) M^i ,\nL002380\t\\label{eq:Mr_red}\\\\\nL002381\t\\partial_z M^i &= - \\big(\\gamma (2- 3 \\kappa)\\Delta N -2\\alpha \\big) M^r .\nL002382\t\\label{eq:Mi_red}\nL002383\t\\end{align}\nL002384\twhere $\\Delta N(z)=N_y(z)-N_x(z)$, and we recall that $N_\\mu(z) = \\frac{1}{2\\pi}\\int n_\\mu(\\omega,z) d\\omega$, $M(z) = \\frac{1}{2\\pi}\\int m(\\omega,z) d\\omega$.\nL002385\tIntroducing the Stokes vector ${\\bm S}(z)=\\big( \\Delta N(z), 2 M^r(z), 2 M^i(z) \\big)^T$, the dynamics (\\ref{eq:DelaN_red}-\\ref{eq:Mi_red}) can be recast as a rotation of this vector on the Poincar\\'e sphere (see Eq.(8) in the main text):\nL002386\t\\begin{align}\nL002387\t&\\partial_z {\\bm S}(\\tau,z) = {\\bm R}(z) \\times  {\\bm S}(z),\nL002388\t\\label{eq:S_dyn}\\\\\nL002389\t&{\\bm R}(z) = \\big( 2\\alpha-\\gamma (2-\\kappa) S_1(z), \\ -2\\gamma \\kappa S_2(z), \\ 0  \\big)^T.\nL002390\t\\label{eq:S_R_dyn}\nL002391\t\\end{align}\nL002392\tBecause ${\\bm S}.\\partial_z {\\bm S}=0$, the vector ${\\bm S}(z)$ evolves on the surface of the Poincar\\'e sphere of constant radius\nL002393\t\\begin{align}\nL002394\tS_0=\\Big( \\sum_{j=1}^3 S_j^2  \\Big)^{1/2}=\\sqrt{\\Delta N(z)^2 + 4|M(z)|^2}= {\\rm const}.\nL002395\t\\label{eq:S_0}\nL002396\t\\end{align}\nL002397\tConsequently, the degree of polarization is conserved during  evolution,  ${\\cal P}(z)=S_0/N=$const.\nL002398\t\nL002399\tConsidering the case $\\kappa=2/3$ relevant to our experiments: The fixed point $S_1=-S_0$ is stable. Conversely, as discussed in the main text through Eq.(8), the fixed point $S_1=+S_0$ becomes unstable for $\\alpha < \\alpha_c = \\frac{2}{3}\\gamma S_1$, giving rise to two new stable fixed points located at $S_1=3\\alpha/(2\\gamma), S_2=0, S_3=\\pm \\sqrt{S_0^2-S_1^{2}}$.\nL002400\t\nL002401\t\nL002402\t\nL002403\tThe Poincar\\'e–Stokes formalism employed here differs fundamentally from the one commonly used to describe the polarization dynamics of fully coherent stationary waves \\cite{agrawal}. First, the Stokes vector represents the  correlation functions of an incoherent random wave, rather than the coherent field amplitudes. Second, in the  coherent stationary case, the radius of the Poincar\\'e sphere $S_0$, is determined solely by the total power $N$; consequently, all solutions with fixed power $N$ evolve on the surface of a single sphere. In contrast, in the present formulation the sphere radius also depends on the degree of polarization, $S_0 = {\\cal P} N$. As a result, $S_0$ varies with the initial conditions even when the total power is held fixed ($N=$const): The full set of solutions is not described by a single sphere, but instead by an ensemble of spheres with different radii.\nL002404\t\nL002405\t\nL002406\t\nL002407\t\\section{Experimental set-up}\nL002408\t\nL002409\tThe experimental set-up is presented in Fig.~\\ref{fig:set-up}.\nL002410\t\\begin{figure}[!h]\nL002411\t    \\centering\nL002412\t    \\includegraphics[width=0.7\\linewidth]{figures/set-up.pdf}\nL002413\t    \\caption{\nL002414\t    \\baselineskip 10pt\nL002415\t    \\textbf{Experimental set-up.} Laser source (Nd:YAG), halfwave plate ($\\lambda/2$), polarizer (P), microscope objectives (MO), multimode fiber (MMF), spectral filter (SF), polarization beam splitter (PBS), retroreflector (RR), optical spectrum analyzer (OSA) polarimeter (PM).}\nL002416\t    \\label{fig:set-up}\nL002417\t\\end{figure}\nL002418\t\nL002419\tThe source is a Nd:YAG laser delivering subnanosecond pulses (400ps) at $\\lambda$ =532nm. Using a microscope objective ($\\times20$), the beam is first injected into a standard GRIN multimode fiber \\cite{krupa16}.\nL002420\tDuring the nonlinear propagation, a temporally incoherent pulse is generated via the Raman beam clean-up effect which allows to produce Stokes beam with good spatial beam quality \\cite{terry,pourbeyram}. At the output of the multimode fiber (MMF), we spectrally filter the second Raman Stokes, centered around $\\lambda = 558\\ \\rm{nm}$ with FWHM of $2\\ \\rm{nm}$ and characterized by a nearly Gaussian beam shape.\nL002421\tThe beam is then passed through a half-wave plate to control the power on each polarization axis before a polarization beam splitter (PBS). The half-wave plate is oriented such that there is an equal amount of power on the two orthogonal polarization axes. Each polarization propagates for a different time $\\tau_0$ and $\\tau_1$ using free-space delay lines before being recombined through the PBS. We introduce a time delay, $\\Delta\\tau = \\tau_1 - \\tau_0 \\approx 15\\ \\rm{ps}$ which is larger than the coherence time of the pulse ($<1\\ \\rm{ps}$), hence removing the mutual coherence between the two polarization axes, i.e. $|M| \\approx 0$.\nL002422\tThe beam is then passed through another half-wave plate in order to align the two polarizations with the principal axes of the weakly birefringent fiber. The weak birefringence is obtained by carefully winding a spun fiber onto a spool with a diameter of $14.5$ cm. Spun fibers are made by rapidly spinning a preform during the drawing process. This results in a fast rotation of the slow and fast axis of the fiber, leading the averaged net birefringence to be zero. The mechanical torsion from the winding introduces a weak, controlled linear birefringence $dn \\approx 10^{-7}$.\nL002423\tThe axes of the weakly birefringent fiber were identified by measuring the polarization modulation instability of the coherent Nd:YAG beam directly injected \\cite{millot_josab98}.\nL002424\tMicroscope objectives ($\\times 40$) were used to inject and collect light in and out of the fiber.\nL002425\tAt the output of the fiber, we measure the optical spectrum and the power on each polarization axis. To characterize optical spectra, we used the OSA YOKOGAWA-AQ6374.\nL002426\tFurthermore, the temporal profile of the pulse was monitored before the injection into the weakly birefringent fiber using a high-speed oscilloscope combined with 12-GHz photodiode.\nL002427\tTo measure the complex anomalous correlator, we used a homemade polarimeter made of a combination of quarter-wave, half-wave plates, polarizers, and powermeter as commonly applied in standard polarization measurement.\nL002428\t\nL002429\t\nL002430\t\nL002431\t\\section{Numerical simulations of the experimental regime}\nL002432\t\nL002433\t\nL002434\t\nL002435\t\nL002436\t\nL002437\t\nL002438\t\nL002439\t\nL002440\tTo interpret the experimental observations, we have numerically integrated the coupled NLS Eqs.~(\\ref{eq:nls_x}-\\ref{eq:nls_y}), where  $\\beta=\\beta_2/2$, with $\\beta_2$ the group-velocity dispersion coefficient \\cite{agrawal}. The coherent coupling parameter $\\alpha=\\Delta \\beta/2$ is related to the fiber birefringence $\\Delta \\beta=(2\\pi/\\lambda_0) dn$, with $dn=|n_x-n_y|$  the refractive index difference among the axes\nL002441\t\nL002442\tand $\\lambda_0$ the pulse central wavelength. Furthermore, in the numerical simulations of the experiments we have included the minor correction provided by the group-velocity difference of the waves $u_x$ and $u_y$, which was found to have a negligible impact.\nL002443\tThe fiber used in the experiment was the same as in Ref.\\cite{millot_josab98,millot_ol98}, with parameters $dn\\approx1\\times10^{-7}$, effective area $A_{\\rm{eff}} \\approx 15\\ \\mathrm{\\mu m^2}$ and $\\beta_2 \\approx 60 \\ \\mathrm{fs^2/mm}$ at $\\lambda_0 \\approx 558 \\ \\mathrm{nm}$, nonlinear refractive index $n_2 = 3.2 \\times 10^{-20}$m$^2/$W, and corresponding nonlinear parameter $\\gamma = 2 \\pi n_2 /(\\lambda_0 A_{\\rm{eff}}) \\approx 0.024\\ \\rm{W^{-1}m^{-1}}$.\\\\\nL002444\tThe spectrum and temporal profile of the initial pulses were recorded experimentally before injection into the fiber and served as initial conditions in the numerical simulations (spectrum with a FWHM of $\\approx 2$-nm and $100$-ps long pulses). A random phase was added on each spectral component to generate an incoherent temporal wave.\nL002445\t\nL002446\t\\subsection{Thermalization in the experimental regime}\nL002447\t\nL002448\tIn the main text, we have reported the repolarization effect. Due to experimental limitations, we have been able to investigate the early stage of the thermalization process. As discussed in \\cite{zanaglia2025spatio}, the optical field approaches at each $z$ a local quasi-equilibrium within a limited spectral window. As $z$ increases, this spectral window grows and the spectral distribution follows, locally, an equilibrium state, characterized by the power-law decay $\\sim \\omega^{-2}$ in the spectral tail. This is illustrated in Fig.~\\ref{fig:S2}, which shows the evolution of the spectrum as $z$ increases. We can see that the spectral window of local equilibrium increases as the field propagates over large propagation lengths, exhibiting the thermalization process in the experimental configuration. This confirms that the experimental results reported through Fig.~3 (main text) provide a signature of the thermalization process.\nL002449\t\nL002450\t\\begin{figure}[!h]\nL002451\t    \\centering\nL002452\t    \\includegraphics[width=0.4\\linewidth]{figures/supplement_local_RJ_P020.pdf}\nL002453\t    \\caption{\nL002454\t    \\baselineskip 10pt\nL002455\t    Local quasi-equilibrium in the experimental regime. Numerical simulation of the NLSE in the experimental configuration for a peak power of $\\approx 18\\ \\rm{W}$. The spectral window in which the field is in local quasi-equilibrium increases as $z$ increases.}\nL002456\t    \\label{fig:S2}\nL002457\t\\end{figure}\nL002458\t\nL002459\t\nL002460\t\nL002461\t\nL002462\t\nL002463\t\nL002464\t\nL002465\t\nL002466\t\nL002467\t\\begin{thebibliography}{99}\nL002468\t\nL002469\t\\bibitem{zakharov92}\nL002470\tV.E. Zakharov, V.S. L'vov, G. Falkovich,\nL002471\t{\\it Kolmogorov Spectra of Turbulence I} (Springer, Berlin, 1992).\nL002472\t\nL002473\t\\bibitem{zakharov04}\nL002474\tV. Zakharov, F. Dias, A. Pushkarev,\nL002475\t\nL002476\tPhys. Rep. {\\bf 398}, 1 (2004).\nL002477\t\nL002478\t\\bibitem{nazarenko11}\nL002479\tS. Nazarenko,\nL002480\t{\\it Wave Turbulence} (Springer, Lectures Notes in Physics, 2011).\nL002481\t\nL002482\t\\bibitem{OE08}\nL002483\tA. Picozzi,\nL002484\t\nL002485\tOpt. Express {\\bf 16}, 17171 (2008).\nL002486\t\nL002487\t\\bibitem{millot_josab98}\nL002488\tG. Millot, E. Seve, S. Wabnitz, M. Haelterman,\nL002489\t\nL002490\tJ. Opt. Soc. Am. B {\\bf 15}, 1266 (1998).\nL002491\t\nL002492\t\\bibitem{millot_ol98}\nL002493\tG. Millot, E. Seve, S. Wabnitz, M. Haelterman,\nL002494\t\nL002495\tOpt. Lett {\\bf 23}, 511 (1998).\nL002496\t\nL002497\t\nL002498\t\\bibitem{zanaglia2025spatio}\nL002499\tL. Zanaglia, J. Garnier, I. Carusotto, V. Doya, C. Michel, A. Picozzi,\nL002500\t\nL002501\tPhys. Rev. Lett. {\\bf 136}, 053802 (2026).\nL002502\t\nL002503\t\\bibitem{krupa16}\nL002504\tK. Krupa, A. Tonello, A. Barth\\'el\\'emy, V. Couderc, B.M. Shalaby, A. Bendahmane, G. Millot, S. Wabnitz,\nL002505\t\nL002506\tPhys. Rev. Lett. {\\bf 116}, 183901 (2016).\nL002507\t\nL002508\t\\bibitem{agrawal}\nL002509\tG. Agrawal, {\\it Nonlinear Fiber Optics} (sixth Ed., Academic Press, New York, 2019).\nL002510\t\nL002511\t\\bibitem{terry}\nL002512\tN. B. Terry, T. G. Alley, and T. H. Russell,\nL002513\tOptics express, 15(26), 17509-17519 (2007).\nL002514\t\nL002515\t\\bibitem{pourbeyram}\nL002516\tH. Pourbeyram, G. P. Agrawal, A. Mafi,\nL002517\t\nL002518\tAppl. Phys. Lett. 102 (20):201107 (2013).\nL002519\t\\end{thebibliography}\nL002520\t\nL002521\t\nL002522\t\nL002523\t\\end{document}\nL002524\t===== END FILE: article_01.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

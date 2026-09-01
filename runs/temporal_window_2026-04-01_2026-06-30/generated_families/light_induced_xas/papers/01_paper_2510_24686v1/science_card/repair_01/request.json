@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2510.24686v1\", \"citation\": \"Hari Padma, Light-Induced Charge Order Mode in a Metastable Cuprate Ladder, Physical Review Letters (2026), DOI:10.1103/wdcf-jly6\", \"journal_doi\": \"10.1103/wdcf-jly6\"}\n\nSource-grounded routing hint from pre-screening:\nConstruct exactly one matched temporal ScienceCard around the source-contained trXAS fit law, and nothing else. Historical branch is Equilibrium; alternate source branch is t = 0.4 ps. Use only source_packet lines 213-235: I(omega) is the sum of three Lorentzians plus a linear term, with L(omega; A, omega0, sigma) = (A/pi) * sigma / ((omega-omega0)^2 + sigma^2). Use exactly the central Table values for those two rows only, ignore parenthetical uncertainties, and use no stochastic noise. Public input omega has the finite domain [527.89, 529.70] eV. The readout is fitted XAS intensity. Both branches must use the identical expression AST; branch identity and all branch-specific fit parameters are private. Preserve the relevant experimental fixed conditions only when directly supported by lines 514-525, including sample/material, 100 K, O K-edge trXAS fluorescence-yield geometry, pump and polarization/fluence conditions as applicable. Do not use the 3 ps or 101 ps rows, trRIXS dispersion, or any unrelated claim. Every quantitative form, condition, and locator must be source-grounded. If these constraints cannot be met, fail closed rather than inventing information.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: SM_v1.tex =====\nL000002\t\nL000003\t\nL000004\t\nL000005\t\nL000006\t\nL000007\t\nL000008\t\nL000009\t\nL000010\t\nL000011\t\nL000012\t\nL000013\t\nL000014\t\nL000015\t\nL000016\t\nL000017\t\nL000018\t\nL000019\t\nL000020\t\nL000021\t\nL000022\t\\documentclass[aps, prl, preprint, superscriptaddress]{revtex4-2}\nL000023\t\nL000024\t\\usepackage{etoolbox}\nL000025\t\\makeatletter\nL000026\t\nL000027\t\\patchcmd{\\section}\nL000028\t  {\\@hangfrom{\\hskip #1\\relax\\uppercase{#8}}}\nL000029\t  {\\@hangfrom{\\hskip #1\\relax #8}}\nL000030\t  {}{}\nL000031\t\nL000032\t\nL000033\t\\patchcmd{\\subsection}\nL000034\t  {\\@hangfrom{\\hskip #1\\relax\\uppercase{#8}}}\nL000035\t  {\\@hangfrom{\\hskip #1\\relax #8}}\nL000036\t  {}{}\nL000037\t\\makeatother\nL000038\t\nL000039\t\nL000040\t\\usepackage{graphicx}\nL000041\t\\usepackage{dcolumn}\nL000042\t\\usepackage{bm}\nL000043\t\nL000044\t\nL000045\t\nL000046\t\nL000047\t\nL000048\t\nL000049\t\nL000050\t\nL000051\t\nL000052\t\nL000053\t\nL000054\t\nL000055\t\\usepackage{graphicx}\nL000056\t\\usepackage{multirow}\nL000057\t\nL000058\t\nL000059\t\nL000060\t\nL000061\t\nL000062\t\nL000063\t\nL000064\t\nL000065\t\nL000066\t\\usepackage{booktabs}\nL000067\t\\usepackage[utf8]{inputenc}\nL000068\t\\usepackage[T1]{fontenc}\nL000069\t\\usepackage[english]{babel}\nL000070\t\\usepackage{amsmath}\nL000071\t\\usepackage{amssymb}\nL000072\t\\usepackage{amsfonts}\nL000073\t\nL000074\t\nL000075\t\nL000076\t\nL000077\t\nL000078\t\nL000079\t\nL000080\t\nL000081\t\nL000082\t\nL000083\t\nL000084\t\nL000085\t\nL000086\t\\makeatletter\nL000087\t\\renewcommand{\\thefigure}{S\\arabic{figure}}\nL000088\t\\renewcommand{\\fnum@figure}{FIG.~\\thefigure}\nL000089\t\\makeatother\nL000090\t\nL000091\t\nL000092\t\nL000093\t\nL000094\t\nL000095\t\nL000096\t\nL000097\t\nL000098\t\nL000099\t\nL000100\t\nL000101\t\nL000102\t\nL000103\t\nL000104\t\nL000105\t\nL000106\t\nL000107\t\nL000108\t\nL000109\t\nL000110\t\nL000111\t\nL000112\t\nL000113\t\nL000114\t\nL000115\t\nL000116\t\nL000117\t\\preprint{APS/123-QED}\nL000118\t\nL000119\t\\begin{document}\nL000120\t\nL000121\t\\title{\\textbf{A light-induced charge order mode in a metastable cuprate ladder}\nL000122\t}\nL000123\t\nL000124\t\\author{Hari Padma}\nL000125\t\\email{hpadmanabhan@g.harvard.edu}\nL000126\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000127\t\nL000128\t\\author{Prakash Sharma}\nL000129\t\\affiliation{Department of Chemistry, Emory University, Atlanta, GA, USA}\nL000130\t\nL000131\t\\author{Sophia F. R. TenHuisen}\nL000132\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000133\t\\affiliation{Department of Applied Physics, Harvard University, Cambridge, MA, USA}\nL000134\t\nL000135\t\\author{Filippo Glerean}\nL000136\t\\email{Present address: Condensed Matter Physics and Materials Science Department, Brookhaven National Laboratory, Upton, NY, USA}\nL000137\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000138\t\nL000139\t\\author{Antoine Roll}\nL000140\t\\affiliation{Condensed Matter Physics and Materials Science Department, Brookhaven National Laboratory, Upton, NY, USA}\nL000141\t\nL000142\t\\author{Pan Zhou}\nL000143\t\\affiliation{Department of Chemistry, Emory University, Atlanta, GA, USA}\nL000144\t\nL000145\t\\author{Sarbajaya Kundu}\nL000146\t\\affiliation{Department of Physics and Astronomy, University of Notre Dame, Notre Dame, IN, USA}\nL000147\t\\affiliation{Stavropoulos Center for Complex Quantum Matter, University of Notre Dame, Notre Dame, IN, USA}\nL000148\t\nL000149\t\\author{Arnau Romaguera}\nL000150\t\\author{Elizabeth Skoropata}\nL000151\t\\author{Hiroki Ueda}\nL000152\t\\author{Biaolong Liu}\nL000153\t\\author{Eugenio Paris}\nL000154\t\\affiliation{PSI Center for Photon Science, Paul Scherrer Institute, Villigen, Switzerland}\nL000155\t\nL000156\t\\author{Yu Wang}\nL000157\t\\author{Seng Huat Lee}\nL000158\t\\author{Zhiqiang Mao}\nL000159\t\\affiliation{Department of Physics, Pennsylvania State University, University Park, PA, USA}\nL000160\t\\affiliation{2D Crystal Consortium, Materials Research Institute, Pennsylvania State University, University Park, PA, USA}\nL000161\t\nL000162\t\\author{Mark P. M. Dean}\nL000163\t\\affiliation{Condensed Matter Physics and Materials Science Department, Brookhaven National Laboratory, Upton, NY, USA}\nL000164\t\nL000165\t\\author{Edwin W. Huang}\nL000166\t\\affiliation{Department of Physics and Astronomy, University of Notre Dame, Notre Dame, IN, USA}\nL000167\t\\affiliation{Stavropoulos Center for Complex Quantum Matter, University of Notre Dame, Notre Dame, IN, USA}\nL000168\t\nL000169\t\\author{Elia Razzoli}\nL000170\t\\affiliation{PSI Center for Photon Science, Paul Scherrer Institute, Villigen, Switzerland}\nL000171\t\nL000172\t\\author{Yao Wang}\nL000173\t\\affiliation{Department of Chemistry, Emory University, Atlanta, GA, USA}\nL000174\t\nL000175\t\\author{Matteo Mitrano}\nL000176\t\\email{mmitrano@g.harvard.edu}\nL000177\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000178\t\nL000179\t\nL000180\t\\maketitle\nL000181\t\\vspace{-10mm}\nL000182\t\\section*{Supplemental Material}\nL000183\t\nL000184\t\nL000185\t\nL000186\t\nL000187\t\nL000188\t\nL000189\t\nL000190\t\nL000191\t\nL000192\t\nL000193\t\nL000194\t\nL000195\t\\begin{enumerate}\nL000196\t\\item \\textbf{trXAS measurements}\nL000197\t\\item \\textbf{trRIXS measurements}\nL000198\t\\item \\textbf{RPA calculations}\nL000199\t\\item \\textbf{DMRG calculations}\nL000200\t\\end{enumerate}\nL000201\t\nL000202\t\\clearpage\nL000203\t\nL000204\t\\noindent\nL000205\t\\subsection{1. trXAS measurements}\nL000206\t\nL000207\t\nL000208\t\nL000209\t\nL000210\t\nL000211\tThe O $K$-edge trXAS spectra in Fig. 1 feature three prominent peaks. Prior work \\cite{nucker2000hole} demonstrated that the peaks centered at 528 eV and 528.5 eV consist primarily of contributions from the chain and ladder Zhang-Rice singlets, respectively, while the peak centered at 529.4 eV includes overlapping contributions from the chain and ladder upper Hubbard bands. The transfer of holes from chains to ladders by Ca substitution at equilibrium is empirically associated with a suppression of the UHB, and an enhancement of the ZRS peaks \\cite{nucker2000hole} (also see discussion in SI Section 4 of Ref. \\cite{padma2025symmetry}).\nL000212\t\nL000213\tWe model the trXAS spectra as the sum of three Lorentzians and a linear function\nL000214\t\\vspace{-2mm}\nL000215\t\\begin{equation}\nL000216\t\\label{eq4}\nL000217\tI(\\omega) = L(\\omega; A_1, \\omega_{01}, \\sigma_1) + L(\\omega; A_2, \\omega_{02}, \\sigma_2) + L(\\omega; A_3, \\omega_{03}, \\sigma_3) + a\\omega + b,\nL000218\t\\end{equation}\nL000219\t\\vspace{-0.5mm}\nL000220\twhere the Lorentzians $L(\\omega; A_i, \\omega_{0i}, \\sigma_i)$ describe chain ($i$ = 1) and ladder ($i$ = 2) Zhang-Rice singlet peaks, and the upper Hubbard band ($i$ = 3). The Lorentzian function is given by\nL000221\t\\begin{equation}\nL000222\tL(\\omega; A, \\omega_{0}, \\sigma) = \\frac{A}{\\pi}\\left[\\frac{\\sigma}{(\\omega - \\omega_0)^2 + \\sigma^2}\\right],\nL000223\t\\end{equation}\nL000224\twhere $A$, $\\omega_0$, and $\\sigma$ are the amplitude, center energy, and linewidth parameters. The fit parameters are shown in Table \\ref{tab1}.\nL000225\t\\vspace{-2mm}\nL000226\t\\begin{table}[h]\nL000227\t\\caption{Fit parameters for XAS spectra shown in Fig. 1(c-f) of the main text.}\\label{tab1}\nL000228\t\\begin{tabular}{@{}llllllllllll@{}}\nL000229\t\\toprule\nL000230\t   & $A_1$ & $\\omega_{01}$ (eV) & $\\sigma_1$ (eV) & $A_2$  & $\\omega_{02}$ (eV)  & $\\sigma_2$ (eV) & $A_3$  & $\\omega_{03}$ (eV)  & $\\sigma_3$ (eV) & $a$ & $b$ (eV) \\\\\nL000231\t\\midrule\nL000232\tEquilibrium~   & 0.7(1) & 527.89(2) & 0.28(3) & 0.5(1)  & 528.45(4)  & 0.34(6) & 1.5(1)  & 529.68(2)  & 0.55(4) & 0.038(6)  & -20(3) \\\\\nL000233\t$t$ = 0.4 ps~   & 0.8(1) & 527.90(2) & 0.31(3) & 0.6(1)  & 528.46(4)  & 0.37(6) & 1.5(1)  & 529.70(2)  & 1.18(9) & 0.035(6)  & -18(3)  \\\\\nL000234\t$t$ = 3 ps~   & 0.7(1) & 527.90(2) & 0.29(3) & 0.6(1)  & 528.45(4)  & 0.36(6) & 1.5(1)  & 529.70(2)  & 0.59(4) & 0.037(6)  & -18(3)  \\\\\nL000235\t$t$ = 101 ps~   & 0.7(1) & 527.89(2) & 0.29(3) & 0.6(2)  & 528.44(4)  & 0.37(7) & 1.5(1)  & 529.70(2)  & 0.58(5) & 0.034(6)  & -18(3)  \\\\\nL000236\t\\botrule\nL000237\t\\end{tabular}\nL000238\t\\end{table}\nL000239\t\nL000240\tWe observe an enhanced ladder Zhang-Rice singlet peak amplitude $A_2$, consistent with chain-to-ladder hole transfer by Ca substitution at equilibrium. Furthermore, all fit parameters are unchanged from 3 ps to 101 ps, confirming that the hole transfer is metastable.\nL000241\t\nL000242\t\\clearpage\nL000243\t\nL000244\t\\noindent\nL000245\t\\subsection{2. trRIXS measurements}\nL000246\t\nL000247\t\nL000248\t\nL000249\tWe present the full set of trRIXS spectra in Fig. \\ref{fig_trRIXS_raw}. All trRIXS spectra presented in this manuscript are normalized to the equilibrium integrated intensity of $dd$ and charge transfer excitations from 1.3 eV to 10 eV.\nL000250\t\nL000251\t\\begin{figure}[h]\nL000252\t    \\centering\nL000253\t    \\includegraphics[width=0.625\\textwidth]{Figures/SM_trRIXS_raw.pdf}\nL000254\t    \\caption{Equilibrium, transient ($t$ = 0.4 ps), and difference trRIXS spectra for momenta spanning $q_\\mathrm{leg}$ = 0.01 to 0.28 r.l.u. The spectra are vertically offset for clarity. All spectra are normalized to the equilibrium integrated intensity of $dd$ and charge transfer excitations from 1.3 eV to 10 eV.}\nL000255\t    \\label{fig_trRIXS_raw}\nL000256\t\\end{figure}\nL000257\t\nL000258\tTo isolate spectral changes below 1 eV, we fit and subtract the $dd$ excitations above 1.3 eV. We independently fit the equilibrium and transient trRIXS spectra between 1.3 eV and 2.8 eV to the sum of a skewed Gaussian and a Gaussian as shown in Fig. \\ref{fig_trRIXS_ddfit}. The resulting spectra with the $dd$ excitations' contribution removed are shown in Fig. \\ref{fig_trRIXS_nodd}, which form the basis for all subsequent analysis and interpretation.\nL000259\t\nL000260\t\\begin{figure}[h]\nL000261\t    \\centering\nL000262\t    \\includegraphics[width=0.65\\textwidth]{Figures/SM_trRIXS_ddfit_onoff.pdf}\nL000263\t    \\caption{(a) Equilibrium and (b) transient trRIXS spectra for momenta spanning $q_\\mathrm{leg}$ = 0.01 to 0.28 r.l.u. The dashed black lines are fits to the $dd$ excitations between 1.3 eV and 2.8 eV. The spectra are vertically offset for clarity.}\nL000264\t    \\label{fig_trRIXS_ddfit}\nL000265\t\\end{figure}\nL000266\t\nL000267\t\\begin{figure}[h]\nL000268\t    \\centering\nL000269\t    \\includegraphics[width=0.45\\textwidth]{Figures/SM_trRIXS_nodd.pdf}\nL000270\t    \\caption{Equilibrium, transient, and difference trRIXS spectra for momenta spanning $q_\\mathrm{leg}$ = 0.01 to 0.28 r.l.u., with the $dd$ excitations subtracted using the fits in Fig. \\ref{fig_trRIXS_ddfit}. The spectra are vertically offset for clarity.}\nL000271\t    \\label{fig_trRIXS_nodd}\nL000272\t\\end{figure}\nL000273\t\nL000274\tWe quantify light-induced spectral changes by fitting the momentum-dependent trRIXS spectra. Our prior work \\cite{padma2025symmetry} established that hole transfer from chains to ladders disrupts the spin singlets in the ladders, leading to an intensity suppression of the $\\Delta S = 1$ two-triplon continuum. We note that this phenomenon occurs without any accompanying energy shifts, suggesting that the exchange constants remain unchanged in the metastable state. We use these prior results to constrain our transient fits.\nL000275\t\nL000276\tThe equilibrium spectra are fit to a Gaussian for the quasielastic peak and an asymmetric Lorentzian (commonly used to fit multimagnon continua, see \\cite{bertinshaw2020spin, martinelli2022fractional, padma2025beyond}) for the two-triplon continuum [Fig. \\ref{fig_trRIXS_fits}(a)]. For the transient spectra, we include an additional Gaussian to capture the high-energy enhancement. The transient two-triplon frequency, linewidth, and asymmetry are constrained to vary by less than 20\\% from their equilibrium values, and the two-triplon amplitude is restricted to not exceed its equilibrium value. Applying this procedure uniformly across all momenta yields the results shown in Fig. \\ref{fig_trRIXS_fits}. On average, the $\\Delta S = 0$ two-triplon continuum is suppressed by 10\\% in the metastable state, similar to the overall suppression of $\\Delta S = 1$ channel reported previously \\cite{padma2025symmetry}, providing a robust self-consistency check.\nL000277\t\nL000278\t\\begin{figure}[h]\nL000279\t    \\centering\nL000280\t    \\includegraphics[width=0.45\\textwidth]{Figures/SM_trRIXS_fits.pdf}\nL000281\t    \\caption{(a) Equilibrium and (b) transient trRIXS spectra for momenta spanning $q_\\mathrm{leg}$ = 0.01 to 0.28 r.l.u., fit using the functional form described in the text. Black lines denote the total fits, thin grey lines the individual components. The transient spectra are fit with an additional Gaussian, denoted by grey shaded areas. The spectra are vertically offset for clarity.}\nL000282\t    \\label{fig_trRIXS_fits}\nL000283\t\\end{figure}\nL000284\t\nL000285\tTo examine the time evolution of the new collective mode, we measure trRIXS spectra as a function of time delay. The results, plotted in Fig. \\ref{fig_trRIXS_delays}, show that the transient reshaping of the spectra, including the high-energy enhancement, is unchanged at all positive time delays, indicating that the collective mode is metastable.\nL000286\t\nL000287\t\\begin{figure}[h]\nL000288\t    \\centering\nL000289\t    \\includegraphics[width=0.45\\textwidth]{Figures/SM_trRIXS_delays.pdf}\nL000290\t    \\caption{Equilibrium, transient, and difference trRIXS spectra at $q_\\mathrm{leg}$ = 0.25 for time delays spanning $t$ = -6.6 to 10 ps. The spectra are vertically offset for clarity.}\nL000291\t    \\label{fig_trRIXS_delays}\nL000292\t\\end{figure}\nL000293\t\nL000294\t\\clearpage\nL000295\t\nL000296\t\\noindent\nL000297\t\\subsection{3. RPA calculations}\nL000298\t\nL000299\t\nL000300\tTo check whether plasmons in a system with a charge density wave (CDW) can give rise to modes near $q_\\mathrm{CDW}$, we perform a calculation using the random phase approximation (RPA) for a two-leg ladder system. Under the RPA, the loss function is given by\nL000301\t\\begin{equation}\nL000302\t    L(\\mathbf{q},\\omega) = -{\\rm Im} \\frac{1}{1 - V(\\mathbf{q}) \\chi_0(\\mathbf{q},\\omega)}.\nL000303\t\\end{equation}\nL000304\t\nL000305\tWe use the interaction for a layered electron gas \\cite{fetter1974layered,hepting2018three}\nL000306\t\\begin{equation}\nL000307\tV(\\mathbf{q}) = \\frac{V_0}{q_{\\|}} \\frac{\\sinh(q_{\\|} c)}{\\cosh(q_{\\|} c) - \\cos(q_z c)},\nL000308\t\\end{equation}\nL000309\twhere $q_{\\|}$ is in-plane momentum transfer, and the Lindhard function\nL000310\t\\begin{equation}\nL000311\t    \\chi_0(\\mathbf{q}, \\omega) = \\frac{1}{N} \\sum_{\\mathbf{k}} \\frac{f_\\mathbf{k} - f_{\\mathbf{k}+\\mathbf{q}}}{\\omega + i0^+ + \\epsilon_\\mathbf{k} - \\epsilon_{\\mathbf{k}+\\mathbf{q}}}\nL000312\t\\end{equation}\nL000313\twhere $N=2500$ is the number of $k$-points; $f_\\mathbf{k} = [e^{(\\epsilon_\\mathbf{k}-\\mu)/T} + 1]^{-1}$ at temperature $T$, which we set to $0$; and $\\epsilon_\\mathbf{k}$ is the non-interacting dispersion. We tune the interaction strength $V_0$ to get a plasmon around $0.5$ eV at $q=0$. The results are qualitatively identical for any reasonable choice of $V_0$. As can be seen in the left panels of Fig.\\ \\ref{fig_RPA}, tuning $q_z$ can turn the plasmon acoustic at small in-plane $q_\\|$.\nL000314\t\nL000315\tWe treat the effects of a CDW at mean-field level by adding to our Hamiltonian a potential\nL000316\t\\begin{equation}\nL000317\t    H_{\\Delta} = \\Delta \\sum_{i} \\cos\\left(\\frac{2\\pi}{\\lambda} x_i\\right) \\hat{n}_i,\nL000318\t\\end{equation}\nL000319\twhere $\\lambda = 5a$ is the CDW period. The loss function for $\\Delta = 0.2$ eV is shown in the right panels of Fig.\\ \\ref{fig_RPA}. The main effect of the CDW is to break up the plasmon dispersion, due to the more complicated structure of the multi-band Lindhard function resulting in additional Landau damping in some regions. There is no collective mode or ``folding'' associated with the plasmon, and no special behavior near $q_\\mathrm{CDW} = 0.2$ r.l.u.\nL000320\t\nL000321\t\\begin{figure}[h]\nL000322\t    \\centering\nL000323\t    \\includegraphics[width=0.75\\textwidth]{Figures/SM_RPA.pdf}\nL000324\t    \\caption{Random phase approximation (RPA) calculations of the loss function, showing expected plasmon behaviors, with or without a CDW order parameter $\\Delta$, and at $q_z = 0$ or $q_z = \\pi/c$.}\nL000325\t    \\label{fig_RPA}\nL000326\t\\end{figure}\nL000327\t\nL000328\t\\clearpage\nL000329\t\nL000330\t\\noindent\nL000331\t\\subsection{4. DMRG calculations}\nL000332\t\nL000333\t\\label{sec:dmrg}\nL000334\t\nL000335\tThe minimal model for the ladder subunits of Sr$_{14}$Cu$_{24}$O$_{41}$ is the two-leg extended Hubbard model~\\cite{padma2025beyond}, described by the Hamiltonian:\nL000336\t\nL000337\t\\begin{equation}\nL000338\t\\begin{aligned}\nL000339\t\\hat{H} &=\nL000340\t     -t \\sum_{i,\\lambda, \\sigma} \\left( {c}_{i,\\lambda\\sigma}^{\\dagger} {c}_{i+1,\\lambda\\sigma} + \\mathrm{h.c.} \\right)\nL000341\t     - t_{\\perp} \\sum_{i,\\sigma} \\left( {c}_{i,1\\sigma}^{\\dagger} {c}_{i,2\\sigma} + \\mathrm{h.c.} \\right) \\\\\nL000342\t    & - t' \\sum_{i,\\sigma} \\left( {c}_{i,1\\sigma}^{\\dagger} {c}_{i+1,2\\sigma} + \\mathrm{h.c.} \\right)\nL000343\t     + U \\sum_{i,\\lambda} {n}_{i,\\lambda\\uparrow} {n}_{i,\\lambda\\downarrow}\nL000344\t     + V \\sum_{i,\\lambda} {n}_{i\\lambda} \\hat{n}_{i+1,\\lambda}\nL000345\t\\end{aligned}\nL000346\t\\label{eq:Hamiltonian}\nL000347\t\\end{equation}\nL000348\twhere \\({c}_{i, \\lambda\\sigma}^{\\dagger}\\) (\\({c}_{i, \\lambda\\sigma}\\)) creates (annihilates) an electron on rung $i$ with chain index $\\lambda\\in\\{1,2\\}$ and spin $\\sigma\\in \\{\\uparrow,\\downarrow\\}$, $n_{i,\\lambda}= \\sum_{\\sigma}n_{i, \\lambda\\sigma}$ is the electron number operator, $t$ and $t_{\\perp}$ are the nearest-neighbor hopping strengths along chain and rung directions, respectively, $t'$ is the next-nearest-neighbor (diagonal) hopping between the chains, and $U$ is the onsite Coulomb interaction. Recent studies have revealed that the nearest-neighbor attractive $V\\sim-t$ is necessary to accurately model one-dimensional cuprates~\\cite{chen2021anomalously, wang2021phonon, padma2025beyond}.\nL000349\t\nL000350\tWe adopt the model parameters from previous fits to experimental data~\\cite{padma2025beyond}, with $U = 8t$, $t_{\\perp} = 0.84t$, and $t' = -0.3t$, where $t \\simeq 0.38$ eV for cuprate ladders. Large attractive interactions ($-V > t$) can complicate the computation of long-range correlations due to the proximity to phase separation, hence we fix $V = -0.8t$ in our calculations. We note that our final results are not strongly dependent on the value of $V$. To ensure DMRG convergence, we perform $31$ sweeps and keep the largest singular eigenvalues up to $5600$, which yields a truncation error below $\\epsilon = 10^{-6}$ for a ladder of length $L=100$ with open boundary conditions.\nL000351\t\nL000352\tTo analyze the charge properties in the cuprate ladder ground state, we calculate the real-space distribution of charge correlation $D(r)=\\langle n_i n_{i+r} \\rangle  -\\langle n_i \\rangle \\langle n_{i+r} \\rangle$. Due to the sensitivity of the correlation exponents to the choice of the reference bond, we obtain more accurate estimates by averaging over a string of different reference sites in the bulk. We plot $D(r)$ on a logarithmic scale for selected hole densities $p$ in Fig.~\\ref{fig:dmrg_results}(a). The charge correlations exhibit a power-law decay at long distances, $D(r) \\propto r^{-K_\\alpha}$, characterized by the charge exponent $K_\\rho$. We plot the extracted exponents as a function of hole density $p$ in Fig.~\\ref{fig:dmrg_results}(b).\nL000353\t\nL000354\t\\begin{figure}\nL000355\t    \\centering\nL000356\t    \\includegraphics[width=0.95\\linewidth]{Figures/SM_DMRG.pdf}\nL000357\t    \\caption{Ground-state DMRG results for two-leg extended Hubbard ladder. (a) The real-space distribution of the charge correlation $D(r)$ at a few representative hole densities $p$, plotted on a logarithmic scale along both axes. The dashed lines are  power law fits, $D(r) \\propto r^{-K_\\alpha}$. (b) The extracted power law exponents $K_\\rho$ as a function of hole density.}\nL000358\t    \\label{fig:dmrg_results}\nL000359\t\\end{figure}\nL000360\t\nL000361\tThe charge correlations exhibit a clear crossover in behavior with increasing doping. At low doping levels, our calculations reveal a charge density wave ground state [see Fig. \\ref{fig:dmrg_results}(a)], with highly suppressed long-range charge fluctuations, as indicated by the large exponents $K_\\rho$. At larger doping, $K_\\rho$ sharply drops at $p \\sim 0.1$ [see Fig. \\ref{fig:dmrg_results}(b)], together with a quenching of the charge density wave. This sharp drop in $K_\\rho$ signifies a rapid increase in the charge susceptibility, supporting the emergence of enhanced charge fluctuations seen experimentally.\nL000362\t\nL000363\t\\vspace{-6mm}\nL000364\t\\bibliography{apssamp}\nL000365\t\\end{document}\nL000366\t===== END FILE: SM_v1.tex =====\nL000367\t\nL000368\t===== BEGIN FILE: main_v3.tex =====\nL000369\t\\documentclass[aps, prl, reprint, superscriptaddress]{revtex4-2}\nL000370\t\nL000371\t\\usepackage{graphicx}\nL000372\t\\usepackage{dcolumn}\nL000373\t\\usepackage{bm}\nL000374\t\nL000375\t\nL000376\t\nL000377\t\nL000378\t\nL000379\t\nL000380\t\nL000381\t\nL000382\t\nL000383\t\nL000384\t\nL000385\t\nL000386\t\\usepackage{graphicx}\nL000387\t\\usepackage{multirow}\nL000388\t\nL000389\t\nL000390\t\nL000391\t\nL000392\t\nL000393\t\nL000394\t\nL000395\t\nL000396\t\nL000397\t\nL000398\t\nL000399\t\nL000400\t\nL000401\t\nL000402\t\nL000403\t\nL000404\t\nL000405\t\nL000406\t\nL000407\t\nL000408\t\nL000409\t\nL000410\t\nL000411\t\nL000412\t\nL000413\t\nL000414\t\nL000415\t\nL000416\t\nL000417\t\nL000418\t\nL000419\t\nL000420\t\nL000421\t\nL000422\t\nL000423\t\nL000424\t\nL000425\t\nL000426\t\nL000427\t\nL000428\t\nL000429\t\nL000430\t\nL000431\t\nL000432\t\nL000433\t\nL000434\t\nL000435\t\nL000436\t\nL000437\t\nL000438\t\\preprint{APS/123-QED}\nL000439\t\nL000440\t\\begin{document}\nL000441\t\nL000442\t\\title{\\textbf{A light-induced charge order mode in a metastable cuprate ladder}}\nL000443\t\nL000444\t\\author{Hari Padma}\nL000445\t\\email{hpadmanabhan@g.harvard.edu}\nL000446\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000447\t\nL000448\t\\author{Prakash Sharma}\nL000449\t\\affiliation{Department of Chemistry, Emory University, Atlanta, GA, USA}\nL000450\t\nL000451\t\\author{Sophia F. R. TenHuisen}\nL000452\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000453\t\\affiliation{Department of Applied Physics, Harvard University, Cambridge, MA, USA}\nL000454\t\nL000455\t\\author{Filippo Glerean}\nL000456\t\\email{Present address: Condensed Matter Physics and Materials Science Department, Brookhaven National Laboratory, Upton, NY, USA}\nL000457\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000458\t\nL000459\t\\author{Antoine Roll}\nL000460\t\\affiliation{Condensed Matter Physics and Materials Science Department, Brookhaven National Laboratory, Upton, NY, USA}\nL000461\t\nL000462\t\\author{Pan Zhou}\nL000463\t\\affiliation{Department of Chemistry, Emory University, Atlanta, GA, USA}\nL000464\t\nL000465\t\\author{Sarbajaya Kundu}\nL000466\t\\affiliation{Department of Physics and Astronomy, University of Notre Dame, Notre Dame, IN, USA}\nL000467\t\\affiliation{Stavropoulos Center for Complex Quantum Matter, University of Notre Dame, Notre Dame, IN, USA}\nL000468\t\nL000469\t\\author{Arnau Romaguera}\nL000470\t\\author{Elizabeth Skoropata}\nL000471\t\\author{Hiroki Ueda}\nL000472\t\\author{Biaolong Liu}\nL000473\t\\author{Eugenio Paris}\nL000474\t\\affiliation{PSI Center for Photon Science, Paul Scherrer Institute, Villigen, Switzerland}\nL000475\t\nL000476\t\\author{Yu Wang}\nL000477\t\\author{Seng Huat Lee}\nL000478\t\\author{Zhiqiang Mao}\nL000479\t\\affiliation{Department of Physics, Pennsylvania State University, University Park, PA, USA}\nL000480\t\\affiliation{2D Crystal Consortium, Materials Research Institute, Pennsylvania State University, University Park, PA, USA}\nL000481\t\nL000482\t\\author{Mark P. M. Dean}\nL000483\t\\affiliation{Condensed Matter Physics and Materials Science Department, Brookhaven National Laboratory, Upton, NY, USA}\nL000484\t\nL000485\t\\author{Edwin W. Huang}\nL000486\t\\affiliation{Department of Physics and Astronomy, University of Notre Dame, Notre Dame, IN, USA}\nL000487\t\\affiliation{Stavropoulos Center for Complex Quantum Matter, University of Notre Dame, Notre Dame, IN, USA}\nL000488\t\nL000489\t\\author{Elia Razzoli}\nL000490\t\\affiliation{PSI Center for Photon Science, Paul Scherrer Institute, Villigen, Switzerland}\nL000491\t\nL000492\t\\author{Yao Wang}\nL000493\t\\affiliation{Department of Chemistry, Emory University, Atlanta, GA, USA}\nL000494\t\nL000495\t\\author{Matteo Mitrano}\nL000496\t\\email{mmitrano@g.harvard.edu}\nL000497\t\\affiliation{Department of Physics, Harvard University, Cambridge, MA, USA}\nL000498\t\nL000499\t\\begin{abstract}\nL000500\tWe report the observation of an emergent charge order mode in the optically-excited cuprate ladder Sr$_{14}$Cu$_{24}$O$_{41}$. Near-infrared light in the ladder plane drives a symmetry-protected electronic metastable state together with a partial melting of the equilibrium charge order. Our time-resolved resonant inelastic x-ray scattering measurements at the upper Hubbard band reveal a gapless collective excitation dispersing from the charge-order wavevector up to 0.8 eV with a slope on the order of the quasiparticle velocity. These findings reveal a regime where correlated carriers acquire itinerant character at finite momentum, and charge order becomes dynamically fluctuating, offering a platform to explore light-induced pairing instabilities.\nL000501\t\\end{abstract}\nL000502\t\nL000503\t\\maketitle\nL000504\t\nL000505\tOptically excited quantum materials display striking nonequilibrium phenomena, ranging from photoinduced magnetic~\nL000506\t\\cite{disa2020polarizing,shin2018phonon} and charge-ordered phases~\nL000507\t\\cite{Kogar2020light} to transient topological~\nL000508\t\\cite{wang2013observation,mciver2020light,Ito2023buildup} and superconducting states~\nL000509\t\\cite{fausti2011light,hu2014optically,mitrano2016possible}. Yet, these driven states are often short-lived, rapidly relaxing back to equilibrium due to dissipation and decoherence. In rare cases, light can steer materials into nonequilibrium configurations that evade thermalization and acquire metastable character. Such long-lived states generally arise from cooperative structural and electronic effects, defect dynamics, or trapping by impurities~\nL000510\t\\cite{vonderlinde1974multiphoton,Koshihara1990photoinduced,Kiryukhin1997xray,fiebig1998visualization,rini2007control,Ichikawa2011transient,zhang2016cooperative,Stojchevska2015ultrafast,stoica2019optical,Nova2019metastable,disa2023photo,Vogelgesang2018phase,zong2019evidence,Gerasimenko2019quantum,budden2021evidence}. Metastability, however, may also emerge from purely electronic dynamical bottlenecks, and realizing electronic long-lived, or ``hidden”, states is a key challenge in the study of dynamical phase transitions.\nL000511\t\nL000512\tStrongly correlated materials provide a natural platform for realizing electronic metastability~\\cite{murakami2025photoinduced}. Theoretical works have proposed the creation of light-induced states protected against rapid decay by the presence of a Mott gap \\cite{kollath2007quench, eckstein2009thermalization}, by approximate conservation laws \\cite{kollar2011generalized}, or by transient trapping in the presence of competing orders~\\cite{sun2020transient,Masoumi2025metastability}. Electronic nonthermal phases may also be engineered by transiently modifying the electronic Hamiltonian, which involves coherently renormalizing electronic interactions via optical dressing \\cite{oka2019floquet} (either transiently or in a steady state) and enabling persistent changes in carrier distributions. These nonequilibrium states are predicted to exhibit novel electronic phases including excitonic order \\cite{kunevs2015excitonic, werner2020nonthermal} and $\\eta$-pairing condensates \\cite{yang1989eta, rosch2008metastable, li2020eta}. However, long-lived nonequilibrium electronic states have remained experimentally elusive, hindering the exploration of novel charge correlations.\nL000513\t\nL000514\tRecent experiments have observed electronic metastability in the model cuprate ladder Sr$_{14}$Cu$_{24}$O$_{41}$ \\cite{padma2025symmetry}. Starting from a self-doped ($p$ = 0.06) charge-ordered ground state \\cite{abbamonte2004crystallization,Vuletic2006spinladder}, ultrafast 1.55-eV pump pulses induce a prompt transfer of holes between the chain charge reservoir and ladder subunits, which are effectively decoupled at equilibrium [see Fig. \\ref{fig:fig1}(a)]. The ladder hole concentration increases ($\\Delta p$ = 0.03), partially melting charge order and driving the system toward a gapless regime. This nonequilibrium charge redistribution arises from a coherent optical dressing of Zhang–Rice singlet states in the ladders and the activation of a symmetry-forbidden chain-to-ladder hopping term. When the optical field vanishes, the equilibrium symmetry is restored, suppressing relaxation and trapping holes in a nonthermal state persisting for several nanoseconds. Beyond demonstrating symmetry-protected electronic metastability, these results prompt the question of whether trapped carriers exhibit emergent collective dynamics or incipient pairing, as expected from the intrinsic tendency of cuprate ladders toward hole binding and superconductivity under pressure \\cite{uehara1996superconductivity, dagotto1999experiments, hirthe2023magnetically, padma2025beyond, scheie2025cooper}.\nL000515\t\nL000516\tHere, we explore this phenomenon by probing the charge dynamics of driven Sr$_{14}$Cu$_{24}$O$_{41}$ using O $K$-edge time-resolved resonant inelastic x-ray scattering (trRIXS). Following optical excitation into the metastable state, we observe a novel collective mode emerging from the partially melted charge order. This excitation disperses up to 0.8~eV from the ordering wavevector with a slope on the order of the quasiparticle velocity, as expected for a charge collective mode. Based on its energy scale and dispersion, and supported by numerical simulations, we attribute this mode to charge order fluctuations in the ladders. These measurements indicate that the electronic metastable state hosts gapless, fluctuating charge order dynamics distinct from those of charge-ordered cuprates at equilibrium, and where correlated carriers exhibit itinerant character at finite momentum.\nL000517\t\nL000518\t\\begin{figure}\nL000519\t    \\centering\nL000520\t    \\includegraphics[width=0.48\\textwidth]{Figures/Figure_1.pdf}\nL000521\t    \\caption{(a) Crystal structure of Sr$_{14}$Cu$_{24}$O$_{41}$ featuring chain and ladder sublattices. Effectively independent at equilibrium, these units become transiently coupled by near-infrared (1.55 eV) excitation, giving rise to a metastable chain-to-ladder hole transfer. (b) Time-resolved x-ray absorption spectroscopy (trXAS) at the O $K$-edge probes the low energy electronic structure of chains and ladders, including upper Hubbard band (UHB) and Zhang-Rice singlet (ZRS) states. (c) Equilibrium (black) and transient (blue, 8 mJ/cm$^2$ fluence) O $K$-edge trXAS at $t = 0.4$ ps. Pump and probe pulses are polarized along the ladder legs ($E \\parallel c$). (d-f) Differential trXAS intensity [$I_\\mathrm{XAS}(t) - I_\\mathrm{XAS}(t < 0)$] at $t = 0.4$ ps, 3 ps, and 101 ps, respectively. The pump-induced spectral reshaping is metastable. The solid lines are fits to the data (see SM Section 1).}\nL000522\t    \\label{fig:fig1}\nL000523\t\\end{figure}\nL000524\t\nL000525\tWe conducted time-resolved x-ray absorption (trXAS) and trRIXS measurements at the Furka endstation of the Athos beamline at SwissFEL, Paul Scherrer Institut \\cite{swissfel_furka}. We acquired trXAS spectra in fluorescence yield mode with x-rays at near-normal incidence, detecting the signal with an avalanche photodiode positioned at $2\\theta = 78^\\mathrm{o}$. We recorded O $K$-edge trRIXS spectra with an incident energy of 530 eV, keeping the scattering angle fixed at $2\\theta = 136^\\mathrm{o}$ while varying the incident angle $\\theta$ from 70$^\\mathrm{o}$ to 130$^\\mathrm{o}$. This geometry corresponds to momentum transfers from 0 to 0.28 r.l.u. (in units of 2$\\pi$/$c_\\mathrm{L}$, $c_\\mathrm{L}$ = 3.95 Å) along the ladder legs and accesses the tail of the charge-order peak at $q_\\mathrm{CO}$ = (0, 1, 0.2) r.l.u. The RIXS spectrometer provided a total energy resolution of 160 meV. We used $\\sigma$-polarized x-rays to enhance the intensity of charge excitations and focused the beam to 300 $\\mu$m ($H$) $\\times$ 10 $\\mu$m ($V$). We monitored shot-to-shot x-ray intensity fluctuations with a photodiode and used them to normalize the data. We excited the samples with 800 nm (1.55 eV), 100-fs pulses focused to 500 $\\mu$m to achieve fluences up to 8 mJ/cm$^2$, as in our prior experiments \\cite{padma2025symmetry}. The pump penetration depth exceeds that of the soft x-rays at all measured incident angles, ensuring a homogeneously excited volume. We cleaved high-quality single crystals of Sr$_{14}$Cu$_{24}$O$_{41}$ in situ along the $ac$ plane and maintained them at 100 K throughout the experiment.\nL000526\t\nL000527\tResonant x-ray scattering at the O $K$-edge ($1s\\!\\rightarrow\\!2p$ transition) of copper oxides provides a direct probe of hole ordering and collective excitations. The x-ray absorption spectrum of Sr$_{14}$Cu$_{24}$O$_{41}$ in this energy range exhibits two prominent pre-edge features at 528 and 529.7~eV, corresponding to Zhang-Rice singlet states (ZRS) and upper Hubbard band (UHB), respectively [Fig.~\\ref{fig:fig1}(b)]. The relative intensities of these peaks encode the distribution of holes between chains and ladders, as established in equilibrium studies with Ca substitution~\\cite{nucker2000hole, abbamonte2004crystallization}. Following optical excitation, the trXAS spectra [Fig.~\\ref{fig:fig1}(c)] display a prompt spectral-weight transfer from the UHB to the ZRS peak, which remains largely unchanged for hundreds of picoseconds [Figs.~\\ref{fig:fig1}(d)–(f)]. This reshaping is consistent with our previous report of metastable chain-to-ladder hole transfer~\\cite{padma2025symmetry} and with the equilibrium behavior of Ca-substituted compounds~\\cite{nucker2000hole}. Crucially, these spectral changes reveal that correlated carriers in the UHB undergo the most pronounced dynamical changes in the metastable state.\nL000528\t\nL000529\t\\begin{figure*}\nL000530\t    \\includegraphics[width=0.8\\textwidth]{Figures/Figure_2.pdf}\nL000531\t    \\caption{(a) Sketch of the time-resolved resonant inelastic X-ray scattering (trRIXS) experiment. Following optical excitation, O $K$-edge X-ray pulses probe charge dynamics in the ladder via scattering into a grating spectrometer. Black arrows represent spins, pink halos represent charge-ordered holes in the ground state, and the yellow halo a hole transferred from the chain to the ladder. $\\lambda_\\mathrm{CO}$ denotes the charge-order wavelength. (b) Equilibrium (grey), transient (black), and difference (red) trRIXS spectra at $t$ = 0.4 ps, at momentum transfers $q_\\mathrm{leg}$ = 0.16 and 0.28 reciprocal lattice units (r.l.u.) and at resonance with the UHB peak of the XAS spectrum. Here, $q_\\mathrm{leg} \\parallel c$ and $q_\\perp \\parallel b$. (c-e) Equilibrium, transient, and difference trRIXS momentum-energy intensity maps, as a function of $q_\\mathrm{leg}$ and $q_{\\perp}$, respectively.  $q_\\mathrm{CO}$ marks the charge order wavevector \\cite{abbamonte2004crystallization}. Arrows in (e) indicate the momentum transfer of the spectra in panel (b). Dashed lines in (e) are guides to the eye.}\nL000532\t    \\label{fig:fig2}\nL000533\t\\end{figure*}\nL000534\t\nL000535\tWe probe the collective excitations of these correlated carriers using high-resolution trRIXS~\\cite{mitrano2020probing,Mitrano2024exploring}. Fig.~\\ref{fig:fig2} summarizes the main findings of this Letter. To suppress fluorescence that overlaps with the RIXS signal and directly probe the dynamics of the UHB states, we tune the incident x-rays to the 529.7-eV resonance. With the scattering geometry set in the $ac$ plane, we measure the dispersion along the ladder legs ($q_\\mathrm{leg}$) while simultaneously intercepting the tail of the charge-order peak $q_\\mathrm{CO}$~\\cite{abbamonte2004crystallization,Rusydi2006quantum} [Fig.~\\ref{fig:fig2}(a)]. Although charge order is most prominent at resonance with the Zhang–Rice peak, it is still visible at the UHB resonance. Upon excitation into the metastable phase, the trRIXS spectra exhibit a pronounced momentum-dependent reshaping at energy losses below 1.2~eV [Fig.~\\ref{fig:fig2}(b)]. At $q_\\mathrm{leg} = 0.16$ r.l.u., the quasielastic peak is enhanced while the finite-energy-loss spectrum remains unchanged. In contrast, at $q_\\mathrm{leg} = 0.28$ r.l.u., the quasielastic response is largely unaltered, and a strong enhancement appears at energy losses up to 1.2~eV. These momentum-dependent spectral changes signal the emergence of a new collective excitation.\nL000536\t\nL000537\tWe construct energy–momentum maps of the trRIXS spectra to resolve this emergent excitation. We rotate the sample angle while keeping the x-ray analyzer fixed, thereby scanning the momentum transfer along the ladder direction. Figs.~\\ref{fig:fig2}(c–e) display the resulting spectra as a function of $q_\\mathrm{leg}$ (parallel to the ladder legs) and $q_\\perp$ (normal to the ladder planes). The momentum trajectory intercepts the tail of the charge-order peak at $q_\\mathrm{CO}$, which contributes to the quasielastic intensity. The equilibrium map [Fig.~\\ref{fig:fig2}(c)] shows the corresponding enhancement of the quasielastic peak near the tail of the charge-order reflection, together with a broad continuum of excitations up to $\\sim$0.6~eV, attributed to the $\\Delta S = 0$ two-triplon continuum~\\cite{tseng2023momentum}. In the metastable phase [Fig.~\\ref{fig:fig2}(d)], the transient RIXS signal exhibits an enhancement of spectral weight up to 1.2~eV, accompanied by an increased quasielastic charge-order peak. This enhancement is consistent with diffuse scattering around the charge order peak and a partial redistribution of spectral weight from the elastic peak to its tails. To highlight these changes, we plot the difference between transient and equilibrium maps in Fig.~\\ref{fig:fig2}(e), revealing a well-defined and strongly dispersive mode centered at the tail of $q_\\mathrm{CO}$.\nL000538\t\nL000539\tWe quantify the mode dispersion by fitting the momentum-dependent trRIXS spectra. Our prior Cu $L$-edge trRIXS experiments showed that the metastable hole transfer disrupts ladder spin singlets, suppressing the $\\Delta S = 1$ two-triplon continuum intensity without any measurable energy shift and indicating that the exchange coupling constants remain unchanged~\\cite{padma2025symmetry}. This observation constrains the O $K$-edge trRIXS analysis. We first model the equilibrium spectra with a Gaussian for the quasielastic peak and an asymmetric Lorentzian for the $\\Delta S = 0$ two-triplon continuum [Fig.~\\ref{fig:fig3}(a)]. For the transient spectra, we use the equilibrium parameters as initial conditions and include an additional Gaussian to capture the high-energy enhancement [Fig.~\\ref{fig:fig3}(b)]. The resulting dispersion of the emergent mode is shown in Fig.~\\ref{fig:fig3}(c). These fits reproduce the observed spectral redistribution without any systematic shift of the magnetic continuum. In the metastable state, the intensity of the $\\Delta S = 0$ continuum is reduced by $\\sim$10\\%, consistent with the suppression of the $\\Delta S = 1$ spin-excitation intensity at the Cu $L$ edge~\\cite{padma2025symmetry}. In contrast, fitting the transient spectra without the additional term requires an overall blueshift of the $\\Delta S = 0$ continuum to reproduce the high-energy enhancement, at odds with our prior measurements~\\cite{padma2025symmetry}. The energy scale and dispersion of the light-induced mode are also incompatible with a magnetic origin. Its propagation velocity (2.1~$\\pm$~0.3~eV\\AA) far exceeds that of $\\Delta S = 1$ magnetic excitations in this ladder compound~\\cite{padma2025beyond} (lower boundary shown in Fig.~\\ref{fig:fig3}(c)) and those observed in other cuprates. Moreover, it approaches energy scales larger than any magnetic excitation, including the $\\Delta S = 0$ two-triplon continuum that dominates the equilibrium RIXS spectrum at the O $K$-edge UHB~\\cite{tseng2023momentum}. Taken together, these observations identify the feature as a charge collective mode.\nL000540\t\nL000541\t\\begin{figure*}\nL000542\t    \\includegraphics[width=0.75\\textwidth]{Figures/Figure_3.pdf}\nL000543\t    \\caption{(a,b) Momentum-dependent RIXS spectra in and out of equilibrium, vertically offset for clarity. Momentum is given in r.l.u. along the ladder direction. Equilibrium spectra in (a) are fit with a Gaussian for the quasielastic peak and an asymmetric Lorentzian for the $\\Delta S = 0$ two-triplon (thin black lines). Transient spectra in (b) include an additional Gaussian component (shaded red). (c) Dispersion of the emergent collective mode (red markers) extracted from fits in (b). The shaded gray area denotes the theoretical $\\Delta S = 0$ two-triplon continuum from Ref.~\\cite{tseng2023momentum}, while blue markers indicate the lower boundary of the $\\Delta S = 1$ two-triplon continuum from Ref.~\\cite{padma2025beyond}. Error bars represent instrumental uncertainties in momentum transfer and energy-loss reference point.}\nL000544\t    \\label{fig:fig3}\nL000545\t\\end{figure*}\nL000546\t\nL000547\tWe now discuss the assignment of this emergent charge mode. This excitation has not been observed in previous equilibrium RIXS studies~\\cite{tseng2023momentum}, raising the question of its origin. Its energy scale and propagation velocity resemble that of acoustic plasmons recently reported in electron- and hole-doped cuprates~\\cite{lee2014asymmetry, hepting2018three, lin2020doping, nag2020detection}. However, acoustic plasmons disperse symmetrically about $q = 0$, in sharp contrast to our observation of a branch centered at the charge order wave vector $q_\\mathrm{CO}$. No counterpart is detected at $q_\\mathrm{leg} = 0$, arguing against a zone-folding replica as the origin of this mode. Although weak coupling theories are not necessarily accurate for this material, for completeness, we performed RPA calculations (see Fig. S6) which support this conclusion. We furthermore exclude the lower edge of the particle–hole continuum near $2k_\\mathrm{F}$ as the origin. Such excitations are indeed detectable by RIXS, as shown in recent measurements \\cite{lomeli2025direct}. However, $2k_\\mathrm{F} = (1-p)/2$ in one-dimensional systems \\cite{giamarchi2003quantum, kung2017numerically}, which for our experimental hole densities $p < 0.10$ corresponds to $q_\\mathrm{leg} > 0.45$ r.l.u., well beyond the momentum range where we observe the charge mode.\nL000548\t\nL000549\tThe symmetric dispersion around $q_\\mathrm{CO}$ is consistent with a gapless charge order collective mode. In a static charge-ordered state, the dynamical charge structure factor carries spectral weight predominantly at zero energy, whereas fluctuating order shifts spectral weight to finite energies~\\cite{kivelson2003detect,mitrano2019ultrafast}. Ultrafast resonant soft x-ray diffraction reveals a partial suppression of the static charge-order peak in the metastable state~\\cite{padma2025symmetry}, while our current O $K$-edge trRIXS measurements show a concurrent enhancement around $q_\\mathrm{CO}$ at finite energy loss. The absence of any measurable shift in the charge-order wavevector~\\cite{padma2025symmetry} rules out a sliding charge-ordered state~\\cite{Mitrano2019evidence}, indicating that the melting of charge order proceeds through fluctuating, rather than translational, dynamics. The propagation velocity of the resulting excitations is comparable to that of charge-density-wave modes observed at equilibrium in two-dimensional cuprates (up to 1.3~eV\\AA)~\\cite{chaix2017dispersive, lee2021spectroscopic, lin2020strongly, li2020multiorbital, huang2021quantum}. Notably, it is also on the order of the ladder quasiparticle dispersion, 1.4~eV\\AA, determined by angle-resolved photoemission~\\cite{takahashi1997angle}, suggesting that free and periodically modulated carriers propagate in a similar manner within the metastable state.\nL000550\t\nL000551\tTo understand the enhanced charge fluctuations in the metastable state, we performed DMRG calculations of charge correlations in a single-band Hubbard ladder as a function of hole doping $p$ (see SM Section 4). This model has been shown to capture the spin dynamics of cuprate ladders at equilibrium~\\cite{padma2025beyond, scheie2025cooper} and in the metastable state~\\cite{padma2025symmetry}. Our calculations reveal a doping-driven crossover accompanied by an order-of-magnitude enhancement of charge fluctuations. For $p < 0.08$, the ground state features rapidly decaying charge correlations, indicative of highly suppressed charge fluctuations. As the hole density increases, these fluctuations grow markedly, as signaled by a sharp decrease of the power-law exponent. We identify a crossover between these regimes near $p = 0.1$ (Fig.~S7). While charge order in the parent compound Sr$_{14}$Cu$_{24}$O$_{41}$ cannot be quantitatively reproduced by the single-band Hubbard model \\cite{wohlfeld2007origin, wohlfeld2010t}, our results nevertheless provide a theoretical basis to understand the charge mode observed in the metastable state~\\cite{padma2025symmetry}. At equilibrium, the ladder subunits in Sr$_{14}$Cu$_{24}$O$_{41}$ are self-doped with $p = 0.06$, while in the metastable state, the photoinduced hole transfer $\\Delta p = 0.03$ drives the system towards a highly fluctuating regime. These fluctuations, in the presence of the partially melted charge order, manifest as the gapless collective mode observed at $q_\\mathrm{CO}$\nL000552\t\nL000553\tOur experiments reveal an emergent charge order mode in the electronic metastable phase of Sr$_{14}$Cu$_{24}$O$_{41}$. Following the optically-induced transfer of holes from the chain reservoirs to the ladders, the charge-ordered state partially melts and evolves into a fluctuating phase featuring gapless charge excitations extending up to 0.8~eV. This collective mode appears as a distinct hallmark of the light-induced metastable state, absent from the equilibrium RIXS spectrum and unreported in prior studies \\cite{tseng2023momentum}.\nL000554\t\nL000555\tOur findings have implications for the physics of metastable phases and dynamical ordering phenomena in correlated systems. The observation of a gapless collective mode emanating from the charge-order wavevector indicates that the charge-ordered phase enters a fluctuating regime in which correlated carriers in the UHB acquire itinerant character at finite momentum. This nonequilibrium state provides a promising platform for exploring dynamical pairing instabilities in cuprates. In two-dimensional cuprates at equilibrium, charge order competes with superconductivity, and its optical suppression leads to transient superconducting-like states~\\cite{fausti2011light, nicoletti2014optically, hu2014optically,cremin2019photoenhanced}, consistent with theoretical expectations for nonequilibrium competing orders~\\cite{sun2020transient, wang2021fluctuating}. Cuprate ladders display similar competition~\\cite{dagotto1992superconductivity, blumberg2002sliding, vuletic2003suppression, Vuletic2006spinladder} together with strong hole pairing \\cite{hirthe2023magnetically, padma2025beyond, scheie2025cooper}, suggesting that their fluctuating charge-ordered state could be driven toward a metastable superconducting or $\\eta$-paired condensate under suitable conditions. Our results thus motivate future optical and x-ray scattering experiments to search for signatures of such hidden condensates~\\cite{murakami2022exploring} in the spin and charge structure factors of light-driven metastable electronic states~\\cite{murakami2025photoinduced}.\nL000556\t\nL000557\tWe thank P. Abbamonte, G. Aeppli, L. Benfatto, G. C. Ghiringhelli, and S. Johnston for insightful discussions. The experimental research leading to these results was primarily supported by the US Department of Energy, Office of Basic Energy Sciences, Early Career Award Program, under award no. DE-SC0022883. Theoretical part of the work (P.S. and Yao Wang) was supported by the Air Force Office of Scientific Research Young Investigator Program under grant no. FA9550-23-1-0153. Work performed at Brookhaven National Laboratory was supported by the US Department of Energy, Division of Materials Science, under contract no. DE-SC0012704. We acknowledge the Paul Scherrer Institut, Villigen, Switzerland, for the provision of beamtime at the Furka beamline of the SwissFEL. Work at PSI was partially funded by the PSI Research Grant 2022. The single-crystal growth work was performed at the Pennsylvania State University Two-Dimensional Crystal Consortium—Materials Innovation Platform (2DCC-MIP), which is supported by NSF Cooperative Agreement no. DMR-2039351. The simulation used resources of the Frontera computing system at the Texas Advanced Computing Center, Award No. OAC-1818253.\nL000558\t\nL000559\t\nL000560\t\nL000561\t\nL000562\t\nL000563\t\nL000564\t\nL000565\t\nL000566\t\nL000567\t\nL000568\t\nL000569\t\nL000570\t\nL000571\t\\bibliography{apssamp}\nL000572\t\\end{document}\nL000573\t===== END FILE: main_v3.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. This is a bounded mechanical repair: change only the field or fields needed to satisfy the exact schema/locator diagnostic below. Preserve every other scientific statement, equation, numeric value, uncertainty, domain, claim, source ID, dependency, and locator from the rejected response. Reconcile an unknown reference only with a source-grounded entity already represented in the response and source; do not invent a new scientific entity or fact. For a locator error, use only an exact supporting range in the unchanged numbered source. Return the complete JSON object without Markdown or commentary.\",\"previous_output\":\"{\\n  \\\"assessment\\\": \\\"The source packet provides the trXAS fit law (sum of three Lorentzians plus a linear term) and the central fit parameter values for the Equilibrium and t = 0.4 ps rows in Table 1. The public input omega domain [527.89, 529.70] eV is supported by the reported center energies of the first and third Lorentzians. The readout is the fitted XAS intensity I(omega). The two branches share the identical expression AST; branch-specific fit parameters are private. Fixed conditions (sample, temperature, geometry, pump/probe settings) are supported by lines 514-525. The extraction is complete and case_authoring_ready is true.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Hari Padma, Light-Induced Charge Order Mode in a Metastable Cuprate Ladder, Physical Review Letters (2026), DOI:10.1103/wdcf-jly6\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/wdcf-jly6\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2510.24686v1\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper reports time-resolved x-ray absorption (trXAS) and trRIXS measurements on the cuprate ladder Sr14Cu24O41, focusing on a light-induced metastable charge order mode. The trXAS spectra are modeled as a sum of three Lorentzians plus a linear term, with fit parameters tabulated for equilibrium and several time delays. The selected cluster is the trXAS fit law and the Equilibrium and t = 0.4 ps rows of Table 1.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"trxas_lorentzian_fit\\\",\\n      \\\"statement\\\": \\\"The trXAS spectrum I(omega) is modeled as the sum of three Lorentzians (for chain ZRS, ladder ZRS, and UHB) plus a linear background term a*omega + b. Each Lorentzian is L(omega; A, omega0, sigma) = (A/pi) * sigma / ((omega - omega0)^2 + sigma^2).\\\",\\n      \\\"equations\\\": [\\n        \\\"I(omega) = L(omega; A1, omega01, sigma1) + L(omega; A2, omega02, sigma2) + L(omega; A3, omega03, sigma3) + a*omega + b\\\",\\n        \\\"L(omega; A, omega0, sigma) = (A/pi) * sigma / ((omega - omega0)^2 + sigma^2)\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"I(omega)\\\",\\n        \\\"omega\\\",\\n        \\\"A1\\\",\\n        \\\"omega01\\\",\\n        \\\"sigma1\\\",\\n        \\\"A2\\\",\\n        \\\"omega02\\\",\\n        \\\"sigma2\\\",\\n        \\\"A3\\\",\\n        \\\"omega03\\\",\\n        \\\"sigma3\\\",\\n        \\\"a\\\",\\n        \\\"b\\\",\\n        \\\"A\\\",\\n        \\\"omega0\\\",\\n        \\\"sigma\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"A1_equilibrium\\\",\\n          \\\"value\\\": 0.7,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.1, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units\\\",\\n          \\\"role\\\": \\\"amplitude of first Lorentzian (chain ZRS) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: A1 = 0.7(1)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"omega01_equilibrium\\\",\\n          \\\"value\\\": 527.89,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.02, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"center energy of first Lorentzian (chain ZRS) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: omega01 = 527.89(2) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma1_equilibrium\\\",\\n          \\\"value\\\": 0.28,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.03, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"linewidth of first Lorentzian (chain ZRS) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: sigma1 = 0.28(3) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"A2_equilibrium\\\",\\n          \\\"value\\\": 0.5,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.1, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units\\\",\\n          \\\"role\\\": \\\"amplitude of second Lorentzian (ladder ZRS) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: A2 = 0.5(1)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"omega02_equilibrium\\\",\\n          \\\"value\\\": 528.45,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.04, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"center energy of second Lorentzian (ladder ZRS) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: omega02 = 528.45(4) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma2_equilibrium\\\",\\n          \\\"value\\\": 0.34,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.06, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"linewidth of second Lorentzian (ladder ZRS) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: sigma2 = 0.34(6) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"A3_equilibrium\\\",\\n          \\\"value\\\": 1.5,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.1, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units\\\",\\n          \\\"role\\\": \\\"amplitude of third Lorentzian (UHB) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: A3 = 1.5(1)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"omega03_equilibrium\\\",\\n          \\\"value\\\": 529.68,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.02, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"center energy of third Lorentzian (UHB) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: omega03 = 529.68(2) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma3_equilibrium\\\",\\n          \\\"value\\\": 0.55,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.04, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"linewidth of third Lorentzian (UHB) for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: sigma3 = 0.55(4) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"a_equilibrium\\\",\\n          \\\"value\\\": 0.038,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.006, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units per eV\\\",\\n          \\\"role\\\": \\\"slope of linear background for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: a = 0.038(6)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"b_equilibrium\\\",\\n          \\\"value\\\": -20,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 3, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"intercept of linear background for equilibrium branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: b = -20(3) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"A1_t04ps\\\",\\n          \\\"value\\\": 0.8,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.1, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units\\\",\\n          \\\"role\\\": \\\"amplitude of first Lorentzian (chain ZRS) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: A1 = 0.8(1)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"omega01_t04ps\\\",\\n          \\\"value\\\": 527.9,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.02, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"center energy of first Lorentzian (chain ZRS) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: omega01 = 527.90(2) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma1_t04ps\\\",\\n          \\\"value\\\": 0.31,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.03, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"linewidth of first Lorentzian (chain ZRS) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: sigma1 = 0.31(3) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"A2_t04ps\\\",\\n          \\\"value\\\": 0.6,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.1, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units\\\",\\n          \\\"role\\\": \\\"amplitude of second Lorentzian (ladder ZRS) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: A2 = 0.6(1)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"omega02_t04ps\\\",\\n          \\\"value\\\": 528.46,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.04, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"center energy of second Lorentzian (ladder ZRS) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: omega02 = 528.46(4) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma2_t04ps\\\",\\n          \\\"value\\\": 0.37,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.06, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"linewidth of second Lorentzian (ladder ZRS) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: sigma2 = 0.37(6) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"A3_t04ps\\\",\\n          \\\"value\\\": 1.5,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.1, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units\\\",\\n          \\\"role\\\": \\\"amplitude of third Lorentzian (UHB) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: A3 = 1.5(1)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"omega03_t04ps\\\",\\n          \\\"value\\\": 529.7,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.02, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"center energy of third Lorentzian (UHB) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: omega03 = 529.70(2) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sigma3_t04ps\\\",\\n          \\\"value\\\": 1.18,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.09, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"linewidth of third Lorentzian (UHB) for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: sigma3 = 1.18(9) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"a_t04ps\\\",\\n          \\\"value\\\": 0.035,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 0.006, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"arbitrary units per eV\\\",\\n          \\\"role\\\": \\\"slope of linear background for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: a = 0.035(6)\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"b_t04ps\\\",\\n          \\\"value\\\": -18,\\n          \\\"uncertainty\\\": \\\"parenthetical uncertainty 3, convention source_unspecified\\\",\\n          \\\"unit\\\": \\\"eV\\\",\\n          \\\"role\\\": \\\"intercept of linear background for t = 0.4 ps branch\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: b = -18(3) eV\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"pi_constant\\\",\\n          \\\"value\\\": 3.141592653589793,\\n          \\\"uncertainty\\\": \\\"exact mathematical constant\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"pi in Lorentzian normalization\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 222,\\n              \\\"line_end\\\": 222,\\n              \\\"support\\\": \\\"Lorentzian formula includes division by pi\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 213,\\n          \\\"line_end\\\": 224,\\n          \\\"support\\\": \\\"Model definition: I(omega) as sum of three Lorentzians plus linear term; Lorentzian formula; parameters described.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"sample_sr14cu24o41\\\",\\n      \\\"statement\\\": \\\"Single crystals of Sr14Cu24O41 cleaved in situ along the ac plane.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 525,\\n          \\\"line_end\\\": 525,\\n          \\\"support\\\": \\\"We cleaved high-quality single crystals of Sr14Cu24O41 in situ along the ac plane\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"temperature_100K\\\",\\n      \\\"statement\\\": \\\"Sample maintained at 100 K throughout the experiment.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 525,\\n          \\\"line_end\\\": 525,\\n          \\\"support\\\": \\\"maintained them at 100 K throughout the experiment\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"trxas_geometry\\\",\\n      \\\"statement\\\": \\\"trXAS spectra acquired in fluorescence yield mode with x-rays at near-normal incidence, detecting signal with an avalanche photodiode at 2theta = 78 degrees.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 525,\\n          \\\"line_end\\\": 525,\\n          \\\"support\\\": \\\"We acquired trXAS spectra in fluorescence yield mode with x-rays at near-normal incidence, detecting the signal with an avalanche photodiode positioned at 2theta = 78 degrees.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"pump_conditions\\\",\\n      \\\"statement\\\": \\\"Excitation with 800 nm (1.55 eV), 100-fs pulses focused to 500 um, fluences up to 8 mJ/cm^2.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 525,\\n          \\\"line_end\\\": 525,\\n          \\\"support\\\": \\\"We excited the samples with 800 nm (1.55 eV), 100-fs pulses focused to 500 um to achieve fluences up to 8 mJ/cm^2\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"polarization_along_ladder\\\",\\n      \\\"statement\\\": \\\"Pump and probe pulses polarized along the ladder legs (E parallel c).\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 521,\\n          \\\"line_end\\\": 521,\\n          \\\"support\\\": \\\"Pump and probe pulses are polarized along the ladder legs (E parallel c).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"omega\\\",\\n      \\\"definition\\\": \\\"Photon energy (in eV) at which the trXAS intensity is evaluated.\\\",\\n      \\\"unit\\\": \\\"eV\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 527.89,\\n      \\\"maximum\\\": 529.7,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The public input omega domain is [527.89, 529.70] eV, supported by the reported center energies of the first and third Lorentzians (omega01 and omega03) in the selected rows.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 232,\\n          \\\"line_end\\\": 233,\\n          \\\"support\\\": \\\"omega01 values 527.89 and 527.90 eV; omega03 values 529.68 and 529.70 eV in the two rows.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"xas_intensity\\\",\\n      \\\"definition\\\": \\\"Fitted trXAS intensity I(omega) as the sum of three Lorentzians plus a linear term.\\\",\\n      \\\"unit\\\": \\\"arbitrary units\\\",\\n      \\\"statistic\\\": \\\"Fit parameters are reported as central values with parenthetical uncertainties; the readout is the model function evaluated at omega.\\\",\\n      \\\"uncertainty\\\": \\\"Parenthetical uncertainties on fit parameters are reported but their statistical meaning is source_unspecified.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 213,\\n          \\\"line_end\\\": 224,\\n          \\\"support\\\": \\\"I(omega) defined as sum of three Lorentzians plus linear term; Lorentzian formula given.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"trxas_equilibrium_fit\\\",\\n      \\\"statement\\\": \\\"At equilibrium, the trXAS intensity I(omega) is given by the sum of three Lorentzians (with parameters A1=0.7, omega01=527.89 eV, sigma1=0.28 eV; A2=0.5, omega02=528.45 eV, sigma2=0.34 eV; A3=1.5, omega03=529.68 eV, sigma3=0.55 eV) plus a linear term a*omega+b with a=0.038 and b=-20 eV.\\\",\\n      \\\"quantitative_form\\\": \\\"I(omega) = (A1/pi)*sigma1/((omega-omega01)^2+sigma1^2) + (A2/pi)*sigma2/((omega-omega02)^2+sigma2^2) + (A3/pi)*sigma3/((omega-omega03)^2+sigma3^2) + a*omega + b\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"xas_intensity\\\": {\\n          \\\"op\\\": \\\"add\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"add\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"add\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"divide\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"divide\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"A1_equilibrium\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"pi_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"sigma1_equilibrium\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"add\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"op\\\": \\\"subtract\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"omega\\\"\\n                                    },\\n                                    {\\n                                      \\\"param\\\": \\\"omega01_equilibrium\\\"\\n                                    }\\n                                  ]\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"sigma1_equilibrium\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"divide\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"divide\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"A2_equilibrium\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"pi_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"sigma2_equilibrium\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"add\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"op\\\": \\\"subtract\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"omega\\\"\\n                                    },\\n                                    {\\n                                      \\\"param\\\": \\\"omega02_equilibrium\\\"\\n                                    }\\n                                  ]\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"sigma2_equilibrium\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"op\\\": \\\"divide\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"multiply\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"divide\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"A3_equilibrium\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"pi_constant\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"param\\\": \\\"sigma3_equilibrium\\\"\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"add\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"power\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"subtract\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"var\\\": \\\"omega\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"omega03_equilibrium\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"two_constant\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"power\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"sigma3_equilibrium\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"two_constant\\\"\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            },\\n            {\\n              \\\"op\\\": \\\"add\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"multiply\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"param\\\": \\\"a_equilibrium\\\"\\n                    },\\n                    {\\n                      \\\"var\\\": \\\"omega\\\"\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"param\\\": \\\"b_equilibrium\\\"\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"trxas_lorentzian_fit\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"omega\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"omega\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 527.89,\\n          \\\"maximum\\\": 529.7,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The public input omega domain is [527.89, 529.70] eV, supported by the reported center energies of the first and third Lorentzians (omega01 and omega03) in the selected rows.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 232,\\n              \\\"line_end\\\": 232,\\n              \\\"support\\\": \\\"Equilibrium row: omega01 = 527.89 eV, omega03 = 529.68 eV.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"xas_intensity\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"sample_sr14cu24o41\\\",\\n        \\\"temperature_100K\\\",\\n        \\\"trxas_geometry\\\",\\n        \\\"pump_conditions\\\",\\n        \\\"polarization_along_ladder\\\"\\n      ],\\n      \\\"applicability\\\": \\\"The fit law applies to the O K-edge trXAS spectra of Sr14Cu24O41 at equilibrium, with omega in the range of the reported peak centers.\\\",\\n      \\\"statistical_basis\\\": \\\"Fit parameters are reported as central values with parenthetical uncertainties; the statistical meaning of the uncertainties is not specified.\\\",\\n      \\\"uncertainty\\\": \\\"Parenthetical uncertainties on fit parameters are reported but their statistical meaning is source_unspecified.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 213,\\n          \\\"line_end\\\": 224,\\n          \\\"support\\\": \\\"Model definition and Lorentzian formula.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 232,\\n          \\\"line_end\\\": 232,\\n          \\\"support\\\": \\\"Equilibrium row fit parameters.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"trxas_t04ps_fit\\\",\\n      \\\"statement\\\": \\\"At t = 0.4 ps, the trXAS intensity I(omega) is given by the sum of three Lorentzians (with parameters A1=0.8, omega01=527.90 eV, sigma1=0.31 eV; A2=0.6, omega02=528.46 eV, sigma2=0.37 eV; A3=1.5, omega03=529.70 eV, sigma3=1.18 eV) plus a linear term a*omega+b with a=0.035 and b=-18 eV.\\\",\\n      \\\"quantitative_form\\\": \\\"I(omega) = (A1/pi)*sigma1/((omega-omega01)^2+sigma1^2) + (A2/pi)*sigma2/((omega-omega02)^2+sigma2^2) + (A3/pi)*sigma3/((omega-omega03)^2+sigma3^2) + a*omega + b\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"xas_intensity\\\": {\\n          \\\"op\\\": \\\"add\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"add\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"add\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"divide\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"divide\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"A1_t04ps\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"pi_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"sigma1_t04ps\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"add\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"op\\\": \\\"subtract\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"omega\\\"\\n                                    },\\n                                    {\\n                                      \\\"param\\\": \\\"omega01_t04ps\\\"\\n                                    }\\n                                  ]\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"sigma1_t04ps\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"divide\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"divide\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"A2_t04ps\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"pi_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"sigma2_t04ps\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"add\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"op\\\": \\\"subtract\\\",\\n                                  \\\"args\\\": [\\n                                    {\\n                                      \\\"var\\\": \\\"omega\\\"\\n                                    },\\n                                    {\\n                                      \\\"param\\\": \\\"omega02_t04ps\\\"\\n                                    }\\n                                  ]\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"sigma2_t04ps\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_constant\\\"\\n                                }\\n                              ]\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"op\\\": \\\"divide\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"multiply\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"divide\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"A3_t04ps\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"pi_constant\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"param\\\": \\\"sigma3_t04ps\\\"\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"op\\\": \\\"add\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"power\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"subtract\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"var\\\": \\\"omega\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"omega03_t04ps\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"two_constant\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"power\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"sigma3_t04ps\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"two_constant\\\"\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            },\\n            {\\n              \\\"op\\\": \\\"add\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"multiply\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"param\\\": \\\"a_t04ps\\\"\\n                    },\\n                    {\\n                      \\\"var\\\": \\\"omega\\\"\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"param\\\": \\\"b_t04ps\\\"\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"trxas_lorentzian_fit\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"omega\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"omega\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 527.89,\\n          \\\"maximum\\\": 529.7,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The public input omega domain is [527.89, 529.70] eV, supported by the reported center energies of the first and third Lorentzians (omega01 and omega03) in the selected rows.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 233,\\n              \\\"line_end\\\": 233,\\n              \\\"support\\\": \\\"t = 0.4 ps row: omega01 = 527.90 eV, omega03 = 529.70 eV.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"xas_intensity\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"sample_sr14cu24o41\\\",\\n        \\\"temperature_100K\\\",\\n        \\\"trxas_geometry\\\",\\n        \\\"pump_conditions\\\",\\n        \\\"polarization_along_ladder\\\"\\n      ],\\n      \\\"applicability\\\": \\\"The fit law applies to the O K-edge trXAS spectra of Sr14Cu24O41 at t = 0.4 ps after optical excitation, with omega in the range of the reported peak centers.\\\",\\n      \\\"statistical_basis\\\": \\\"Fit parameters are reported as central values with parenthetical uncertainties; the statistical meaning of the uncertainties is not specified.\\\",\\n      \\\"uncertainty\\\": \\\"Parenthetical uncertainties on fit parameters are reported but their statistical meaning is source_unspecified.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 213,\\n          \\\"line_end\\\": 224,\\n          \\\"support\\\": \\\"Model definition and Lorentzian formula.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 233,\\n          \\\"line_end\\\": 233,\\n          \\\"support\\\": \\\"t = 0.4 ps row fit parameters.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"fit_uncertainty_convention\\\",\\n      \\\"statement\\\": \\\"The parenthetical uncertainties on the fit parameters in Table 1 are not defined (e.g., standard error, confidence interval). The statistical meaning is source_unspecified.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"trxas_equilibrium_fit\\\",\\n        \\\"trxas_t04ps_fit\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"trxas_lorentzian_fit\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"omega\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"xas_intensity\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 232,\\n          \\\"line_end\\\": 235,\\n          \\\"support\\\": \\\"Table rows list parameters with parenthetical uncertainties but no definition of the uncertainty type.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"parameters.outputs.xas_intensity.args[0].args[0].args[0].args[1].args[0].args[1].param is not an allowed parameter\",\"path\":\"$.claims[0].oracle_outputs\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card.schema",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

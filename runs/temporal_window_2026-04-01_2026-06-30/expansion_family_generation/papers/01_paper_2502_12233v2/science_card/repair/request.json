@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2502.12233v2\", \"citation\": \"Ilia Komissarov, Quantum Critical Dynamics Induced by Topological Zero Modes, Physical Review Letters (2026), DOI:10.1103/z8v9-f8j2\", \"journal_doi\": \"10.1103/z8v9-f8j2\"}\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: manuscript.tex =====\nL000002\t\\documentclass[\nL000003\tsuperscriptaddress,\nL000004\t\nL000005\t\nL000006\t\nL000007\t\nL000008\t\nL000009\t\nL000010\t\nL000011\t\nL000012\tbibnotes,\nL000013\t amsmath,amssymb,\nL000014\t aps,\nL000015\t prl,\nL000016\t\nL000017\t\nL000018\t\nL000019\t\nL000020\t\nL000021\tlongbibliography,\nL000022\teprint,\nL000023\tfloatfix,\nL000024\treprint\nL000025\t]{revtex4-2}\nL000026\t\nL000027\t\nL000028\t\nL000029\t\\usepackage{xcolor}\nL000030\t\\definecolor{darkblue}{RGB}{0,0,150}\nL000031\t\\definecolor{nightblue}{RGB}{0,0,100}\nL000032\t\nL000033\t\\usepackage{mathrsfs,dsfont,mathtools,braket,MnSymbol}\nL000034\t\nL000035\t\\newcommand{\\refsub}[2]{\\hyperref[#1]{\\ref*{#1}#2}}\nL000036\t\nL000037\t\nL000038\t\\usepackage{bm}\nL000039\t\\usepackage[\nL000040\tcolorlinks,\nL000041\tcitecolor=darkblue,\nL000042\tlinkcolor=darkblue,\nL000043\turlcolor=nightblue]{hyperref}\nL000044\t\nL000045\t\nL000046\t\nL000047\t\\newcommand{\\RQ}[1]{{\\color{magenta} [RQ: #1]}}\nL000048\t\\newcommand{\\IK}[1]{{\\color{blue} [IK: #1]}}\nL000049\t\nL000050\t\\usepackage[english]{babel}\nL000051\t\\usepackage[babel,kerning=true,spacing=true]{microtype}\nL000052\t\\renewcommand{\\figureautorefname}{Fig.}\nL000053\t\nL000054\t\nL000055\t\nL000056\t\nL000057\t\nL000058\t\nL000059\t\nL000060\t\nL000061\t\nL000062\t\nL000063\t\nL000064\t\\definecolor{DarkRed}{RGB}{100,0,0}\nL000065\t\\definecolor{LightGreen}{RGB}{000,50,0}\nL000066\t\nL000067\t\nL000068\t\\newcommand{\\clr}{\\color{red}}\nL000069\t\\newcommand{\\clb}{\\color{blue}}\nL000070\t\\newcommand{\\proj}[1]{\\left| #1 \\right> \\left< #1 \\right|}\nL000071\t\nL000072\t\nL000073\t\nL000074\t\\newcommand{\\nn}{\\nonumber}\nL000075\t\\newcommand{\\f}{\\frac}\nL000076\t\\def\\({\\left(}\nL000077\t\\def\\){\\right)}\nL000078\t\\def\\prl{\\partial}\nL000079\t \\newcommand{\\D}{{\\rm d}}\nL000080\t\\newcommand{\\Tr}{ \\text{Tr}}\nL000081\t\\newcommand{\\lb}{\\left[}\nL000082\t\\newcommand{\\rb}{\\right]}\nL000083\t\\newcommand{\\half}{\\frac{1}{2}}\nL000084\t\\newcommand{\\pf}{(2\\pi)^4}\nL000085\t\\def\\inf{\\infty}\nL000086\t\\def\\v{\\varepsilonc}\nL000087\t\nL000088\t\nL000089\t\\newcommand{\\beq}{\\begin{equation}}\nL000090\t\\newcommand{\\eeq}{\\end{equation}}\nL000091\t\\newcommand{\\bal}{\\begin{aligned}}\nL000092\t\\newcommand{\\eal}{\\end{aligned}}\nL000093\t\nL000094\t\nL000095\t\\newcommand{\\bfa}{{\\bf a}}\nL000096\t\\newcommand{\\bfr}{{\\bf r}}\nL000097\t\\newcommand{\\bfb}{{\\bf b}}\nL000098\t\\newcommand{\\bfk}{{\\bf k}}\nL000099\t\\newcommand{\\bfq}{{\\bf q}}\nL000100\t\\def\\a{\\alpha}\nL000101\t\\def\\d{\\delta}\nL000102\t\\def\\De{\\Delta}\nL000103\t\\def\\e{\\epsilon}\nL000104\t\\def\\E{\\hbox{$\\cal E $}}\nL000105\t\\def\\s{\\sigma}\nL000106\t\\def\\r{\\rho}\nL000107\t\\newcommand{\\vp}{\\varphi}\nL000108\t\\def\\w{\\omega}\nL000109\t\nL000110\t\nL000111\t\nL000112\t\nL000113\t\\begin{document}\nL000114\t\\title{\nL000115\tQuantum Critical Dynamics Induced by Topological Zero Modes\nL000116\t}\nL000117\t\nL000118\t\\author{Ilia Komissarov}\nL000119\t\\email{i.komissarov@columbia.edu}\nL000120\t\\affiliation{Department of Physics, Columbia University, New York, NY 10027, USA}\nL000121\t\\author{Tobias Holder}\nL000122\t\\email{tobiasholder@tauex.tau.ac.il}\nL000123\t\\affiliation{School of Physics and Astronomy, Tel Aviv University, Tel Aviv, Israel}\nL000124\t\nL000125\t\\author{Raquel Queiroz}\nL000126\t\\email{raquel.queiroz@columbia.edu}\nL000127\t\\affiliation{Department of Physics, Columbia University, New York, NY 10027, USA}\nL000128\t\\affiliation{Center for Computational Quantum Physics, Flatiron Institute, New York, New York 10010, USA}\nL000129\t\nL000130\t\\date{\\today}\nL000131\t\nL000132\t\\begin{abstract}\nL000133\tWe investigate low-frequency ac transport in the Su-Schrieffer-Heeger (SSH) chain with chiral disorder near the topological delocalization transition. Our key finding is that the formation of hybridized pairs of topological domain wall zero modes leads to the anomalous logarithmic scaling of the ac conductivity $\\sigma(\\omega) \\sim \\log \\omega$ at criticality, and $\\sigma(\\omega) \\sim \\omega^{2|\\delta|}\\log^2 \\omega$ away from it.\nL000134\t Using the combination of real-space renormalization group analysis and qualitative hybridization arguments, we demonstrate that the form of the scaling of ac conductivity at criticality stems directly from the stretched-exponential ($\\psi(x)\\sim e^{-s\\sqrt{x}}$) spatial decay of zero-mode wavefunctions at the critical point.\nL000135\t\\end{abstract}\nL000136\t\nL000137\t\\maketitle\nL000138\t\nL000139\t\\paragraph{Introduction.---}\nL000140\t\nL000141\tTransport phenomena in disordered topological insulators differ strikingly from those in trivial insulators. For example, some subset of electronic states may become delocalized even in low-dimensional systems --- a prominent example being the quantum Hall plateau transition \\cite{evers_anderson_2008, qh1, qh2, qh3}, which, despite many years of research, remains poorly understood \\cite{sarma}. A simpler and more tractable model that displays similar behavior is the Su-Schrieffer-Heeger (SSH) chain \\cite{ssh} with chiral disorder, i.e., with disorder in hopping elements only. In this model, exactly one mode at zero energy becomes delocalized when the geometric averages of even and odd hopping elements are equal \\cite{theodorou_extended_1976, altland_topology_2015}.\nL000142\t\nL000143\tMany aspects of quantum critical behavior in this model and the ones in the same universality class were extensively studied \\cite{tr1, tr2, soukoulis_off-diagonal_1981, zhang_anatomy_2023, balents_delocalization_1997, gogolin_electron_1988}, and observed experimentally in disordered atomic wires \\cite{meier}. The renormalization-group flow equations were solved analytically \\cite{fisher1, fisher2}, providing access to exact results, such as the low-energy density of states and critical exponents. For the continuous $1D$ fermion model with random mass, characterized by the same fixed point, it has been shown that at criticality, charge carriers exhibit a logarithmically slow spreading of probability density \\cite{bouchaud_classical_1990, bagrets_sinai_2016}.\nL000144\t\nL000145\tIn this work, we clarify the nature of the low-energy states that dominate the ac conductivity in this model. Our analytical approach follows the framework introduced by Mott \\cite{mott_electronic_2012}, who proposed that special rare resonating states dominate the ac conductivity in the Anderson model. We demonstrate that, in the SSH chain with chiral disorder, we can identify a relevant subset of states for which the matrix element of the dipole operator diverges at small $\\omega$. We show that the role of such states is played by bonding ($\\psi_+$) and anti-bonding ($\\psi_-$) orbitals formed by hybridizing pairs of topological zero modes (see \\autoref{plot1}). The dipole transition amplitude between $\\ket{\\psi_+}$ and $\\ket{\\psi_-}$ at low $\\omega$ behaves as $\\log \\omega$ away from criticality and $\\log^2 \\omega$ exactly at the critical point due to the exponential and the stretched-exponential decay of the wavefunctions of zero modes \\cite{balents_delocalization_1997}.\nL000146\t\nL000147\t\\begin{figure}[t!]\nL000148\t    \\centering\nL000149\t    \\includegraphics[width=0.45\\textwidth]{plot1}\nL000150\t    \\caption{Hopping disorder in the SSH chain creates isolated rare regions characterized by extremely small effective tunneling probability $t_{\\rm eff}$. Two zero modes appearing on both sides of the link $t_{\\rm eff}$ hybridize away from zero energy with energy splitting $\\omega \\sim t_{\\rm eff} \\sim e^{-\\sqrt[\\alpha]{d/\\xi}}$, where $\\xi$ encodes the typical size of individual zero modes and both $\\alpha=1$ and $\\alpha=2$ are possible in this model. The transition amplitude between these states in a time-dependent electric field is $|\\braket{\\psi_-| \\hat x| \\psi_+}| \\sim d \\sim \\log^\\alpha \\omega$, implying an insulator for $\\alpha = 1$ with ac conductivity following a modified Mott-Berezinskiy law \\eqref{soffcrit}, and, for $\\alpha=2$, a glassy metal characterized by activated dynamical scaling \\eqref{scrit}.}\nL000151\t    \\label{plot1}\nL000152\t\\end{figure}\nL000153\t\nL000154\tOur approach leads to the logarithmic scaling of low-frequency ac conductivity at criticality\nL000155\t\\begin{equation}\nL000156\t    \\sigma_{\\rm crit}(\\omega) \\sim \\log (\\Omega/\\omega) \\, ,\nL000157\t    \\label{scrit}\nL000158\t\\end{equation}\nL000159\twhere $\\Omega$ is a high-energy reference scale. This form of ac conductivity is highly atypical: as the frequency $\\omega$ is decreased, we would expect the number of states participating in transport to decrease polynomially due to Pauli blocking. This would lead to insulating behavior as it occurs in the chain with purely on-site disorder (Anderson model), where $\nL000160\t\\sigma_{\\rm MB}(\\omega) \\sim \\omega^2 \\log^2 \\omega \\, ,$\nL000161\taccording to the Mott-Berezinskiy law \\cite{mott_electronic_2012, abrikosov_conductivity_1978, khalatnikov_kinetics_1996}. Instead, in the case of the SSH chain with chiral disorder and at criticality, the divergence of the density of the in-gap states induced by the fluctuations in the winding number introduced by impurities (Dyson singularity \\cite{evers_anderson_2008, eggarter}) compensates for the Pauli blocking effects, and the dc conductivity diverges. This divergence is, however, only logarithmic in frequency, which indicates the tunneling regime of electronic propagation with the vanishing Drude weight, in contrast to the ``free acceleration'' $\\sigma(\\omega) \\sim \\omega^{-1}$ form \\cite{drude} typical in conventional metals. Therefore, the appearance of \\eqref{scrit} highlights a remarkable situation in which the topology almost exactly counteracts the localizing effects of disorder, giving rise to logarithmically slow ``glassy'' behavior of the ac conductivity. We note that using chiral disorder is crucial for this behavior, as on-site impurities would lower the symmetry to the topologically trivial Anderson model without a divergent density of states.\nL000162\t\nL000163\tUsing  similar hybridization arguments, we also argue that away from the critical point, the form of the ac conductivity in the SSH chain with chiral disorder assumes the form\nL000164\t\\begin{equation}\nL000165\t    \\sigma(\\omega) \\sim \\omega^{2 |\\delta|} \\log^2 \\omega \\, ,\nL000166\t    \\label{soffcrit}\nL000167\t\\end{equation}\nL000168\twith $\\delta$ parameterizing the distance to the critical point\nL000169\t~\\footnote{See supplemental material, where we explain the main ingredients of the real-space renormalization group in one dimension, and give instructions on how to apply the scaling analysis to other models.}. Thus, in the $\\delta \\neq 0$ case, the dc conductivity vanishes since the divergence in the density of zero modes is milder than in the critical case and insufficient to compensate for the reduction of low energy excitations with energy $\\omega$. Both Eq. \\eqref{scrit} and Eq. \\eqref{soffcrit} are in agreement with previous studies on spin chains \\cite{motr}, provided that the correspondence $2 |\\delta| = z^{-1}$ is taken into account \\cite{McKenzie}, where $z$ is the dynamical critical exponent, which diverges at the transition. Dynamical properties similar to Eq.~\\eqref{scrit} and Eq.~\\eqref{soffcrit} were also obtained previously near superconductor-metal transitions \\cite{scmet}, and many-body localized phases \\cite{Gopalakrishnan_2015}.\nL000170\t\nL000171\tOur work complements these earlier results by relating the scaling of ac conductivity in Griffiths systems to hopping conduction phenomena in disordered insulators studied by Mott and Berezinskii \\cite{mott_electronic_2012, khalatnikov_kinetics_1996}. To establish this relation, a precise understanding of the hybridized topological zero modes is central, from which we obtain several new properties regarding the scaling of the ac conductivity and the role of topology in transport. Namely, we connect the decay of the critical zero-mode states (i.~e., the scaling of the matrix element of the position operator) with the energy separation between the states (cf. also \\cite{annica}). The result is a low-disorder scaling of ac conductivity $\\sigma_{\\rm crit}(\\omega) \\sim s^{-2} \\log (s^2/\\omega)$ expressed in terms of the parameter $s$ characterizing the disorder strength. Unlike conventional real-space renormalization-group methods, the more general Mott framework, which relies solely on the sufficient spatial separation of hybridized pairs \\cite{kirsch_mott_2003}, enables us to study transport properties at relatively high energy scales analytically. In particular, we demonstrate a smooth crossover between the regimes Eq.~\\eqref{scrit} and Eq.~\\eqref{soffcrit}. This implies that observing the activated dynamical scaling in Eq. \\eqref{scrit} does not require the fine-tuning of parameters to criticality, and can be performed in an off-critical system at sufficiently high frequencies $\\omega$. Lastly, we find that ac conductivity receives a topological enhancement~\\cite{windingr}.\nL000172\t\nL000173\tIn the following, we study the low-frequency dynamics of the SSH chain with bond dilution as an intuitive example that elucidates the role of zero-mode resonances in transport. The case of continuous bond disorder distributions follows from similar considerations. Finally, we present analytical and numerical evidence that, at criticality, the transition amplitude between the Mott resonances scales as $\\log^2 \\omega$, leading to the activated scaling of the low-frequency ac conductivity, as given in Eq.~\\eqref{scrit}.\nL000174\t\nL000175\t\\paragraph{AC conductivity in the bond-diluted SSH chain.---}\nL000176\t\\label{sec1}\nL000177\tTo gain intuition about the role of zero modes in the low-frequency transport of disordered topological insulators, we first consider an example where bonds are removed randomly from an SSH chain \\cite{ssh}\nL000178\t\\begin{equation}\nL000179\t    \\hat H_{\\rm SSH} = \\sum_i t_i' \\ket{i,\\rm B} \\bra{i,\\rm A}  + t_i \\ket{i+1,\\rm B} \\bra{i,\\rm A} + {\\rm h.c.}\\, ,\nL000180\t    \\label{sshhd}\nL000181\t\\end{equation}\nL000182\twhere $t_i$ and $t_i'$ take either their unperturbed values $t$ and $t'$ with probability $1-p$ or 0 with probability $p$. Since our goal is accessing the low-frequency transport at zero energy, we are interested in the structure of states around $E=0$. We assume $t'<t$.\nL000183\t\nL000184\tWhen $p > 0$, the chain breaks down into isolated segments among which only the ones terminating with $t'$ on both sides contribute to the low-frequency ac conductivity. These regions host pairs of zero modes in between which optical transitions are allowed in the sub-gap regime $\\omega \\ll |t-t'|$. To see this, consider a topological segment of length $d$. If $d$ is large enough, the zero modes at its ends hybridize with each other without mixing with other states due to the finite energy gap. From perturbation theory (see \\cite{Note1}), the energy associated with this hybridization is proportional to the exponentially small overlap between the zero modes, $\\omega = \\Omega  e^{-d/ \\xi}$, with $\\xi$ encoding the typical size of the zero mode which is proportional to its localization length $\\xi_0 = \\log^{-1}|t/t'|$, see \\cite{asboth}. It follows that the long topological segment hosts low-lying in energy resonant bonding and anti-bonding states $\\ket{\\psi_{\\pm}} = (\\ket{\\psi_{\\rm L}} \\pm \\ket{\\psi_{\\rm R}})/\\sqrt{2}$ of the zero modes at the left $\\ket{\\psi_{\\rm L}}$ and right $\\ket{\\psi_{\\rm R}}$ ends of the section. The dipole matrix element between the resonances takes the form\nL000185\t\\begin{equation}\nL000186\t\\begin{aligned}\nL000187\t    |\\braket{\\psi_+|\\hat x|\\psi_-}| \\sim |\\braket{\\psi_{\\rm L}|\\hat x|\\psi_{\\rm L}} - \\braket{\\psi_{\\rm R}|\\hat x|\\psi_{\\rm R}}|  \\sim & \\, d \\sim \\xi_0 \\log \\omega \\, ,\nL000188\t    \\label{x}\nL000189\t\\end{aligned}\nL000190\t\\end{equation}\nL000191\twhile the density of such states per unit length arises from all topological sections of arbitrary length $d$, appearing with probability $(1-p)^d$. That is,\nL000192\t\\begin{equation}\nL000193\t    \\nu_{\\rm topo}(E) \\sim \\sum_d (1-p)^{d} \\delta\\left(E - \\Omega e^{-d/\\xi} \\right) \\sim |E|^{-1 +2 |\\delta|}\\, ,\nL000194\t    \\label{dos}\nL000195\t\\end{equation}\nL000196\twhere in this model $|\\delta|= (\\xi/2) |\\log(1-p)|$  {diverges at criticality}. Similar algebraic behavior of the density of states is well-known in the theory of disordered magnets \\cite{vojta_phases_2013}, and a direct mapping to the $1D$ random-bond Ising model can be formally established: see supplementary information (SI) in Ref.~\\cite{Note1}. Continuing this analogy, the model given by Eq.~\\eqref{sshhd} with $0<|\\delta| < 1/2$ is in the so-called Griffiths phase with the hybridized pairs of zero modes playing the role of the pairs of domain walls which form the rare magnetized regions \\cite{mccoy, vojta_phases_2013, grif}.\nL000197\t\nL000198\t\\begin{figure*}[t!]\nL000199\t    \\centering\nL000200\t    \\includegraphics[width=1\\textwidth]{plot2}\nL000201\t    \\caption{$a)\\,$Dynamical conductivity in the SSH chain with chiral box disorder at half filling for different values of the parameter $\\delta$, which encodes the distance to the topological phase transition. The numerical data is fitted to $\\sigma(\\omega) = c_1 \\omega^{2 |\\delta_{\\rm fit}|} \\log^2 (c_2/\\omega)$, and $|\\delta_{\\rm fit}|= 0.78$, $0.78$, $1.23$, $1.24$ indicate a good agreement with the actual values of dimerization $\\delta$, confirming our expression for ac conductivity in this regime \\eqref{soffcrit}. The crossover to the critical $\\sigma(\\omega) \\sim \\log \\omega$ regime occurs beyond a certain $\\delta$-dependent frequency indicated by the dotted lines. Note that ac conductivity is enhanced for $\\delta>0$, corresponding to the topological phase in the model. $b)$ Schematic representation of the crossover between different types of states found in the SSH model with bond disorder. When $\\delta \\neq 0$, the closest to $E = 0$ states are the hybridized exponential modes. Immediately above it lie the stretched-exponential double-peak wavefunctions arising from the surviving critical regions. At even higher energies, regular exponentially localized states are found. $c)$ Same as $a)$ for the critical value $\\delta = 0$ and different disorder strengths $s$. The curves exhibit good data collapse after rescaling both the frequency and the conductivity by $s^2$. The unscaled curves are shown in the inset. Importantly, the $\\log \\omega$ law holds at all disorder strengths, consistent with \\eqref{sigcrit}. The simulations were performed for chains of $10^3$ sites and $10^6$ disorder configurations.}\nL000202\t    \\label{plot2}\nL000203\t\\end{figure*}\nL000204\t\nL000205\tUsing Eqs.~\\eqref{x} and \\eqref{dos}, we estimate the ac conductivity at low frequencies at half filling through the Kubo-Greenwood formula \\cite{mott_electronic_2012}\nL000206\t\\begin{equation}\nL000207\t    \\sigma(\\omega) =  \\frac{\\pi e^2 \\omega}{\\hbar} \\sum_{E_n \\leq E_{\\rm F} \\leq E_m} |\\braket{n|\\hat x|m}|^2 \\delta (E_m - E_n - \\omega)  \\, .\nL000208\t    \\label{kgformula}\nL000209\t\\end{equation}\nL000210\tFor $\\omega \\ll |t-t'|$, Eq.~\\eqref{kgformula} reduces to the sum over all transitions between the $\\psi_{\\pm}$ pairs of resonances created by hybridizing zero modes\nL000211\t\\begin{equation}\nL000212\t\\begin{aligned}\nL000213\t    \\sigma(\\omega) & \\sim \\omega \\int_0^\\omega d E\\, \\nu(E) |\\braket{\\psi_{E}|\\hat x|\\psi_{-E}}|^2 \\delta(2 E - \\omega) \\\\ & \\sim \\omega^{2 |\\delta|} \\log^2 \\omega \\, ,\nL000214\t\\end{aligned}\nL000215\t    \\label{acdelta}\nL000216\t\\end{equation}\nL000217\tas stated in Eq.~\\eqref{soffcrit}.\nL000218\t\nL000219\t\\paragraph{AC conductivity away from criticality.---}\nL000220\t\\label{sec12}\nL000221\tWe now argue that conductivity retains the form of Eq.~\\eqref{soffcrit} for a continuous distribution of disordered bonds. To this end, consider the model defined in Eq.~\\eqref{sshhd}\nL000222\twith $t_i=t-\\epsilon_i$, $t_i' = t' - \\epsilon_i$, where $\\epsilon_i$, $\\epsilon_i'$ are drawn from any smooth distribution. For the numerical simulations, we assume it is uniform over the interval $[-W/2, W/2]$.\nL000223\t\nL000224\tWe use real space renormalization group (RSRG) \\cite{fisher1, fisher2}, to obtain the properties of low-energy states in this case~\\cite{Note1}. This method consists of identifying the largest hopping parameters and removing them from the chain using second-order perturbation theory, thus lowering the energy cutoff $\\Omega$, down from its initial value of $\\Omega_0 = {\\rm max}[t_i,t_i']$ (without loss of generality, we fix $\\prod_i t_i'< \\prod_i t_i$).\nL000225\tAs this procedure is continuously repeated, the remaining effective hoppings $t'_{\\mathrm{eff}}$ become broadly distributed $P(t'_{\\mathrm{eff}}) \\sim \\exp [-2 |\\delta|  \\frac{\\log(\\Omega/t'_{\\mathrm{eff}})}{(\\Omega_0/\\Omega)^{2|\\delta|}} ]$,\nL000226\t\nL000227\twhere the staggering parameter $\\delta$ is related to the typical localization length at zero energy $\\xi_0$ as $\\delta=\\llangle \\kappa \\rrangle s^{-2}$, where\nL000228\t\\begin{equation}\nL000229\t    \\xi_0^{-1} = |\\llangle \\kappa \\rrangle|, \\,~ s^2=a(\\llangle \\kappa^2 \\rrangle - \\llangle \\kappa \\rrangle^2), \\,~\nL000230\t    \\kappa \\equiv a^{-1}\\log \\left|\\frac{t - \\varepsilon}{t' - \\varepsilon'}  \\right| \\, .\nL000231\t\nL000232\t    \\label{kappas}\nL000233\t\\end{equation}\nL000234\tHere, $\\llangle{\\cdot}\\rrangle$ denotes the disorder average, and $a$ is the lattice constant. We assign the hoppings $t_i$ length $a$ ($L(t_i) = a$) and bonds $t_i'$ zero length ($L(t_i') = 0$), such that $\\delta > 0$ corresponds to the topological and $\\delta < 0$ to the trivial phases, distinguished by the values of the disorder-averaged winding number \\cite{windingr}.  {Note that the criticality in this model corresponds to $\\delta = 0$.}\nL000235\t\nL000236\tThe broad character of the distribution $P(t'_{\\mathrm{eff}})$ allows us to apply the Mott hybridization argument to the pairs of states connected by the effective $t'_{\\mathrm{eff}}$ hoppings (cf. \\autoref{plot1}), since the bonds $t_{\\rm eff}'$ \\textit{close in real space} are statistically likely to host pairs of zero modes that are very \\textit{far apart in energy}. Recalling that the zero modes are exponentially localized and repeating the arguments leading to Eq.~\\eqref{x}, we conclude that Eq.~\\eqref{x} is also valid for the continuous distribution of bonds. A more rigorous way to obtain Eq.~\\eqref{x} using the distribution $P(t'_{\\mathrm{eff}})$ is shown in \\cite{Note1}. Moreover, considering that the low-energy density of states retains the form of Eq.~\\eqref{dos}, $\\nu(E) \\sim |E|^{2 |\\delta|-1}$ \\cite{evers_anderson_2008}, we conclude that Eq.~\\eqref{soffcrit} for the conductivity remains valid for the case of the continuous distribution of bonds. We also add that the contribution from the optical transitions, which are asymmetric in energy --- absent in the previously discussed case of bond-dilution [Eq.~\\eqref{sshhd}] --- does not affect the result as it decays faster than $\\omega^{4 |\\delta|}$ at low frequencies and therefore subdominant \\footnote{\nL000237\tSince the matrix element of the position operator for asymmetric in energy transitions is regular in $\\omega$, we estimate from \\eqref{kgformula} that $\\sigma_{\\rm asym}(\\omega) \\lesssim \\omega \\int_0^{\\omega} dE \\, \\nu(E)\t\\nu(E+\\hbar \\omega) \\sim \\omega^{4 |\\delta|}$}.\nL000238\t\nL000239\tWe verify the validity of Eq.~\\eqref{soffcrit} by computing $\\sigma(\\omega)$ numerically using the Kubo-Greenwood formula Eq.~\\eqref{kgformula} for the model of Eq.~\\eqref{sshhd}  with box disorder of $\\epsilon_i, \\epsilon_i'$ and different values of the staggering parameter $\\delta$. As shown in ~\\autoref{plot2}a, Eq.~\\eqref{soffcrit} provides reasonable estimates for the numerical data at small frequencies. We also observe that the ac conductivity is enhanced on the topological side due to the increased characteristic length of the low-energy impurity resonances at $\\delta > 0$, contributing to $\\sigma(\\omega)$ via the matrix element of the position operator (see Eq.~\\eqref{kgformula}). While one would expect such topological enhancement to affect only transport originating at the lattice scale, we find that it persists for hopping transport over much longer length scales.\nL000240\t\nL000241\t\\paragraph{AC conductivity at criticality.---}\nL000242\t\\label{sec2}\nL000243\t\nL000244\t\\begin{figure}[t!]\nL000245\t        \\centering\nL000246\t        \\includegraphics[width=0.4\\textwidth]{plot3}\nL000247\t    \\caption{Dipole transition amplitude between states separated by $\\omega$ with disorder strength $s^2  = 0.3$, fit to $\\log^2 \\omega$ (black line) and $\\log \\omega$ (red dashed line). The best data fit to $\\log^2 \\omega$ is evidence for stretched exponential behavior of the zero-energy wavefunction at criticality, justifying the result \\eqref{logsq}. Inset: coefficient $c_s$ as a function of disorder strength $s$, extracted from fitting $\\log^2 \\omega$. The predicted relation $c_s = c_{\\rm crit}s^{-2}$  in  \\eqref{logsq} is established with $c_{\\rm crit} \\simeq 0.13$. The calculation used $10^3$ sites at criticality ($t=t'=1$), chiral box disorder, and averaging over $10^4$ configurations.}\nL000248\t    \\label{plot3}\nL000249\t\\end{figure}\nL000250\t\nL000251\tWe now consider the low-frequency behavior of the ac conductivity in the SSH chain with chiral disorder \\eqref{sshhd} at criticality, $t=t'$, with $\\epsilon_i$ and $\\epsilon_i'$ now drawn from the same disorder distribution, such that the condition $\\prod_i t_i = \\prod_i t_i'$ is satisfied. At half-filling, this model hosts a single delocalized state at $E=0$ ($\\xi_0 = \\infty$) \\cite{theodorou_extended_1976}.\nL000252\t\nL000253\tSimilarly to the off-critical case in the previous section, the low-frequency ac conductivity is dominated by the transitions between isolated bonding and anti-bonding Mott resonances. In this case, all renormalized $t_i,t_i'$ hoppings become broadly distributed with the probability $P(t_{\\rm eff}) \\sim \\exp[- \\frac{ \\log (\\Omega/t_{\\rm eff})} {\\log(\\Omega_0/\\Omega)}]$ as the energy cutoff is lowered, which suppresses hybridization events between more than two zero modes, thus again justifying the application of the Mott-type pairwise hybridization argument. In the critical case, the low-energy resonances arise on either $t_{\\rm eff}$ or $t_{\\rm eff}'$ bonds.\nL000254\t\nL000255\tThe important aspect that distinguishes the critical case from the off-critical is the stretched-exponential decay of the zero mode wavefunctions at large distances $\\psi_0(x) \\sim e^{-s \\sqrt{x}}$: this unusual spatial dependence is due to the exponent of the wavefunction undergoing a random walk, see SI~\\cite{Note1}. Following the same argument leading to Eq.~\\eqref{x}, we postulate the transition amplitude between the bonding and antibonding critical Mott resonances in the form\nL000256\t\\begin{equation}\nL000257\t    \\llangle |\\braket{\\psi_{\\omega/2} | \\hat x| \\psi_{- \\omega/2}}| \\rrangle_{\\rm crit} \\equiv c_{\\rm crit} s^{-2} \\log^2 (\\Omega /\\omega)  \\, .\nL000258\t    \\label{logsq}\nL000259\t\\end{equation}\nL000260\tThis dependence is confirmed by numerical simulations, as shown in \\autoref{plot3}, with the fit to $\\log^2 \\omega$ agreeing exceptionally well with the data.\nL000261\t\nL000262\tCombining the result of Eq.~\\eqref{logsq} and the form of the low-energy density of states, given by the Dyson singularity $\\nu_{\\rm crit}(E) = s^2 [|E| \\log^3 \\left( \\Omega /|E| \\right)]^{-1}$~\\cite{evers_anderson_2008, eggarter}, we obtain the leading low-frequency asymptote of the ac conductivity at $E_{\\rm F} = 0$ via the summation over transitions symmetric in energy relative to $E_{\\rm F}$, as in Eq.~\\eqref{acdelta}:\nL000263\t\nL000264\t\\begin{equation}\nL000265\t    \\sigma_{\\rm crit}(\\omega)  \\sim  s^{-2} \\log (\\Omega/\\omega) \\, .\nL000266\t    \\label{sigcrit}\nL000267\t\\end{equation}\nL000268\t\nL000269\t\nL000270\t\nL000271\t\nL000272\t\nL000273\t\nL000274\t\nL000275\t\nL000276\tThe scaling above is valid at any disorder strength, while the more specific form $\\sigma_{\\rm crit} \\sim s^{-2} \\log (s^2/\\omega)$ is established at low disorder (for $s \\ll 1$ when $\\Omega \\sim s^2$~\\cite{Note1}). The validity of Eq.~\\eqref{sigcrit} and scaling with $s$ at low disorder are confirmed numerically in \\autoref{plot2}c.\nL000277\t\nL000278\tInterestingly, the logarithmic scaling \\eqref{sigcrit} is also found within a certain frequency range away from criticality (cf. \\autoref{plot2}a). This behavior is due to the finite critical topological segments, which are short enough to stay unaffected by the finite localization length $\\bar \\xi_0 \\sim |\\delta|^{-2}$ \\footnote{In this model, the \\textit{average} localization length $\\bar \\xi_0$ is more divergent at criticality than the \\textit{typical} localization length $\\xi_0$ \\cite{evers_anderson_2008}, which scales merely as $|\\delta|^{-1}$ near the critical point, as follows from \\eqref{kappas}.}, and hence remain in the form of critical stretched-exponential resonances (a detailed representation of different types of states in the SSH chain with chiral disorder is found in ~\\autoref{plot2}b). The crossover occurs when the frequency satisfies $\\log^2 \\omega \\sim \\bar \\xi_0$, or $\\omega \\sim e^{-1/|\\delta|}$. This argument clarifies the apparent mismatch between \\eqref{scrit} and \\eqref{soffcrit} at $\\delta = 0$; when the staggering is decreased, the lower edge of the region hosting stretched-exponential resonances indicated with dotted lines in \\autoref{plot2}a,b approaches $E = 0$, and at any finite $\\omega$, a crossover between the two regimes occurs.\nL000279\t\nL000280\tIt is instructive to point out that Eq.~\\eqref{scrit} is consistent with the known result that the dc conductivity in this model grows as a square root of the size of the system $\\sigma(L) \\sim \\sqrt{L}$ \\cite{evers_anderson_2008}. In a finite chain, the transport at the lowest possible $\\omega$ occurs due to the tunneling between the two largest resonances of the size $L$, while, according to Eq.~\\eqref{logsq}, $L \\sim \\log^2 \\omega$.\nL000281\t\nL000282\t {\nL000283\tLastly, we note that the divergence of the critical dynamical exponent $z = (2 |\\delta|)^{-1}$ is also manifest in the behavior of the dc conductivity as a function of temperature in this model~\\cite{Note1}\nL000284\t\\begin{equation}\nL000285\t\\sigma(T) \\sim  \\exp\\left[-(T/T_0)^{\\frac{1}{1+z}}\\right]\\, ,\nL000286\t\\end{equation}\nL000287\twhere $T_0$ is a constant reference value. This implies that at the criticality, the transport regime changes from thermally activated to polynomial in $T$, providing a sharp signature in the variable-range hopping exponent, routinely measured in experiments \\cite{shk}.}\nL000288\t\nL000289\t\\paragraph{Conclusion.---}\nL000290\t\\label{sec3}\nL000291\tStudying the hybridization of topological zero modes in the SSH chain with chiral disorder, we demonstrated the emergence of a sub-diffusive metallic phase characterized by an activated scaling of the ac conductivity [Eq.~\\eqref{scrit}]. Remarkably, this behavior is a consequence of the type of wave function decay \\textit{only} - since the latter determines both the dipole transition amplitude between the Mott resonances and the scaling of the density of states entering the expression for the conductivity in Eq.~\\eqref{acdelta}. The latter statement comes from the realization that the scaling $\\psi_0 \\sim e^{-s \\sqrt{x}}$, according to our hybridization argument, fixes the length of the typical critical state at energy $\\omega$ to be $d(\\omega) \\sim \\log^2 \\omega$. This expression, in turn, dictates the typical number of modes with $|E| < \\omega$, i.e., $n(\\omega) \\sim d^{-1} (\\omega)\\sim \\log^{-2} \\omega$, and therefore, the Dyson singularity is reproduced $\\nu(E) \\sim d n(E)/dE \\sim |E|^{-1} \\log^{-3} |E|$.\nL000292\t\nL000293\tWe showed that the argument originally introduced by Mott to determine the ac conductivity of Anderson insulators can be extended to the critical sub-diffusive metal phase of the SSH chain, which is described by the infinite randomness fixed point. In this case, the dynamics is dominated by the pairwise hybridization of zero modes, which gives rise to the Dyson singularity and enhances transport at low frequencies. By connecting hopping conductivity with the phenomenon of activated dynamical scaling in Griffiths phases \\cite{motr}, we open a pathway towards observing the tunneling metallic behavior in Eq. \\eqref{soffcrit} in higher-dimensional disordered insulators with suitable divergence in the density of states.\nL000294\t\nL000295\tThe recognition of the crucial role of topological in-gap states at criticality opens a new perspective on the microscopic nature of disorder-induced topological phase transitions, such as the quantum Hall plateau transition or critical delocalization in disordered Chern insulators. Indeed, in these systems, similarly, only a single state is delocalized at criticality.  {The states away from the critical inherit its multi-fractal properties by continuity in $E$, with ac conductivity $\\sigma(\\omega)$ arising due to the optical transitions between these states and carrying the information about the critical behavior.} A crucial distinction of quantum Hall criticality is that the typical wavefunction of the delocalized state is algebraically and not stretched-exponentially localized \\cite{evers_anderson_2008}. However, rare region arguments have been successfully applied to algebraically decaying impurity wavefunctions, e.g., in Weyl semimetals \\cite{pixley_rare_2021}.\nL000296\t\nL000297\tSince the appearance of localized in-gap states around strong impurities is a ubiquitous feature of topological phases in any dimension~\\cite{queiroz2024ring}, we anticipate that their resonant hopping will also play a crucial role in determining the existence and dynamics at topological criticality in higher spatial dimensions.\nL000298\t\nL000299\t\\begin{acknowledgments}\nL000300\t\\emph{Acknowledgments ---} We thank Gil Refael for insightful discussions. This work is supported by the National Science Foundation under Award No. DMR-2340394 and the Schwinger Foundation. T.H.\\ acknowledges financial support by the European Research Council (ERC) under grant QuantumCUSP (Grant Agreement No. 101077020).\nL000301\t\\end{acknowledgments}\nL000302\t\nL000303\t\nL000304\t\nL000305\t\nL000306\t\nL000307\t\nL000308\t\nL000309\t\\onecolumngrid\nL000310\t\\newpage\nL000311\t\\appendix\nL000312\t\\begin{center}\nL000313\t\\textbf{\\large Supplementary information for\\\\ ``Quantum Critical Dynamics Induced by Topological Zero Modes\"}\nL000314\t\\\\[6pt]\nL000315\tIlia Komissarov, Tobias Holder, Raquel Queiroz\nL000316\t\\end{center}\nL000317\t\nL000318\t\\stepcounter{page}\nL000319\t\nL000320\t\nL000321\t\\newcommand{\\hh}{\\textcolor{black}}\nL000322\t\\newenvironment{hhc}{\\par\\color{black}}{\\par}\nL000323\t\\newenvironment{hbb}{\\par\\color{black}}{\\par}\nL000324\t\nL000325\t\\newcommand{\\hhb}{\\textcolor{black}}\nL000326\t\nL000327\t\\newcommand{\\hb}{\\textcolor{black}}\nL000328\t\nL000329\t\nL000330\t\\newcommand{\\bh}{\\textcolor{black}}\nL000331\t\\renewcommand{\\thefigure}{S\\arabic{figure}}\nL000332\t\nL000333\t\nL000334\t\\renewcommand{\\thetable}{S\\arabic{table}}\nL000335\t\\renewcommand{\\tablename}{Supplementary Table}\nL000336\t\nL000337\t\\renewcommand{\\thesection}{S\\arabic{section}}\nL000338\t\nL000339\t\\renewcommand{\\theequation}{S\\arabic{equation}}\nL000340\t\nL000341\t\nL000342\t\nL000343\t\nL000344\t\nL000345\t\nL000346\t\nL000347\t\nL000348\tIn this Supplementary Information, we first review the properties of the zero-energy solutions in the SSH chain with chiral disorder. We further analytically address the hybridization of topological zero modes in the bond-diluted SSH chain. We then review certain applications of the real-space renormalization group in the SSH chain with chiral disorder. Additionally, we elaborate on the mapping between the SSH chain model and the random-bond Ising model, as well as the random-mass $1D$ fermion model in a continuum. Lastly, we obtain the temperature dependence of the dc conductivity in the bond-disordered SSH chain.\nL000349\t\nL000350\t\nL000351\t\\section{Notations and conventions}\nL000352\tThe lattice constant $a$ is set to unity, unless stated otherwise. We use $E$ and $E_{\\rm F}$ to denote the reference value of the energy and the Fermi energy, respectively. The quantity $\\omega$ bears a meaning of the energy difference, hybridization energy, or the frequency of the applied ac electric field expressed in units of energy, depending on the context. With $d(E)$ we denote the characteristic spatial extent of states at energy $E$. We use the notation $\\llangle\\ldots\\rrangle$ for the disorder average, reserving $\\braket{\\ldots}$ for matrix elements of operators. For the numerical simulations performed for the SSH chain with chiral disorder, we fix the sum of the inequivalent hoppings to a constant value $t+t' = 2$: the remaining free parameters of the model are therefore the difference $t-t'$ and the disorder strength $W$. The edge states are removed from the spectrum if present.\nL000353\t\nL000354\t\\section{Wavefunctional decay of zero modes in the SSH chain with chiral disorder}\nL000355\t\\label{appa}\nL000356\t\nL000357\tIn this section, we review the properties of the zero-energy states in the SSH chain with chiral disorder, showing that they decay exponentially at long distances when the system is away from criticality, and stretched-exponentially (as $\\psi \\sim e^{-s \\sqrt{x}}$) at the critical point.\nL000358\t\nL000359\tWe consider the Schrodinger equation $\\hat H_{\\rm SSH} \\ket{\\psi} = 0$ with the Hamiltonian\nL000360\t\\begin{equation}\nL000361\t    \\hat H_{\\rm SSH} = \\sum_i t_i' \\ket{i,\\rm B} \\bra{i,\\rm A}  + t_i \\ket{i+1,\\rm B} \\bra{i,\\rm A} + {\\rm h.c.} \\, .\nL000362\t    \\label{sshhda}\nL000363\t\\end{equation}\nL000364\tUsing the real-space representation\nL000365\t$\\ket{\\psi} = \\sum_i \\left( \\psi_{i \\rm A} \\ket{i, \\rm A} + \\psi_{i \\rm B} \\ket{i, \\rm B} \\right)$, we obtain\nL000366\t\\begin{equation}\nL000367\t\\begin{aligned}\nL000368\t    t_i' \\psi_{i\\rm A} + t_i \\psi_{i-1\\rm A} & = 0 \\, , \\\\\nL000369\t    t_i' \\psi_{i\\rm B} + t_i \\psi_{i+1\\rm B} & = 0 \\, .\nL000370\t\\end{aligned}\nL000371\t\\end{equation}\nL000372\tBy iterating the above expressions, the growth(decay) rates of the zero modes localized on A and B sub-lattices are found\nL000373\t\\begin{equation}\nL000374\t    \\xi_{0\\rm B}^{-1} = -\\xi_{0\\rm A}^{-1} = \\frac{1}{N} \\log \\left| \\psi_{N\\rm A}/\\psi_{1\\rm A} \\right|  = \\frac{1}{N} \\sum_i^N \\log \\left|   t_i'/t_i\\right| \\, .\nL000375\t    \\label{xiavg}\nL000376\t\\end{equation}\nL000377\tSince the sum of the random quantities on the right-hand side is self-averaging, we can introduce the typical localization length of the mode localized on the B sub-lattice as defined by the law of large numbers\nL000378\t\\begin{equation}\nL000379\t\\xi_{0}^{-1} = \\left \\llangle \\log \\left|   t'_i /t_i\\right| \\right \\rrangle \\, .\nL000380\t\\end{equation}\nL000381\tIf the expression on the right-hand side is finite, the zero mode decays exponentially on average. If, on the other hand, the right-hand side vanishes, the exponent of the wavefunction, as we can see from \\eqref{xiavg}, undergoes a random walk with zero mean. The spatial decay is stretched-exponential, and characterized by a length scale $s$:\nL000382\t\\begin{equation}\nL000383\t    \\left\\llangle |\\log \\psi_N|^2 \\right\\rrangle - \\left\\llangle |\\log \\psi_N| \\right\\rrangle^2 = \\sqrt{\\left\\llangle \\left( \\sum_{i=1}^N \\log \\left| t_i'/t_i \\right| \\right)^2 \\right\\rrangle} = s \\sqrt{N} \\, , \\qquad s = \\llangle \\log^2|t_i'/t_i| \\rrangle - \\llangle \\log|t_i'/t_i| \\rrangle^2 \\, .\nL000384\t\\end{equation}\nL000385\tTherefore, we recover the average stretched-exponential zero mode behavior $\\psi(x) \\sim e^{-s \\sqrt{x}}$. The qualifier \\textit{average} is extremely important here, as the critical wavefunctions would typically exhibit multiple minima and maxima due to the fluctuations in the winding number. As we are primarily interested in disorder-averaged low-frequency transport properties, the leading stretched-exponential part of the wavefunction profile is sufficient.\nL000386\t\nL000387\t\\section{Mott resonances in the bond-diluted SSH chain}\nL000388\t\\label{appb}\nL000389\t\nL000390\tIn this section, we derive the hybridization energy of the zero modes analytically in the bond-diluted SSH chain model. We, therefore, consider \\eqref{sshhda}, with the hoppings missing with a probability $p$ from the unperturbed chain with parameters $t$, $t'$.\nL000391\t\nL000392\t\\begin{figure}[t!]\nL000393\t        \\centering\nL000394\t        \\includegraphics[width=0.4\\textwidth]{appplot1}\nL000395\t    \\caption{$a)$ Two zero modes ($\\psi_{\\rm L}$ and $\\psi_{\\rm R}$) appear on both sides of the topological region created by the bond-dilution disorder in the SSH chain. $b)$ If the segment is sufficiently long, the zero modes hybridize into sub-gap bonding, and anti-bonding states $\\psi_{\\pm}$. Due to the finite gap, only the optical transitions between such states (indicated with a purple arrow) will contribute to the low-frequency ac conductivity.}\nL000396\t    \\label{appplot1}\nL000397\t\\end{figure}\nL000398\t\nL000399\tAs argued in the main text, at low frequency, only the transitions between the hybridized topological zero modes shown in \\autoref{appplot1} are relevant for transport. We therefore consider a topological segment of the length $d$, as shown in the image, assuming $|t'|<|t|$. The normalized unperturbed zero modes localized on the ends of the chain take the form\nL000400\t\\begin{equation}\nL000401\t\\begin{aligned}\nL000402\t\\ket{\\psi_{\\rm L}} & = \\sqrt{\\frac{2}{\\xi_0}} \\sum_{0 \\leq i \\leq d} e^{-i/\\xi_0} \\ket{i, \\rm A} \\, , \\\\\nL000403\t\\ket{\\psi_{\\rm R}} & = \\sqrt{\\frac{2}{\\xi_0}}  \\sum_{0 \\leq i \\leq d} e^{(i-d)/\\xi_0} \\ket{i, \\rm B} \\, ,\nL000404\t\\end{aligned}\nL000405\t\\label{psiab}\nL000406\t\\end{equation}\nL000407\twhere $\\xi_0 = \\log^{-1}|t/t'|$, and $d, \\xi_0$ assumed large. By repeatedly using the decimation procedure outlined in the next Appendix, the Hamiltonian of the segment is reduced to\nL000408\t\\begin{equation}\nL000409\t\\hat H_{0} = t' (t'/t)^d \\hat c^\\dagger_{0\\rm A} \\hat c_{d\\rm B} + {\\rm h.c.} \\, .\nL000410\t\\end{equation}\nL000411\tNote that the parameter $(t'/t)^d$ is always small for sufficiently long sections, which justifies the application of the perturbation theory to obtain the low-lying in energy states. Using degenerate perturbation theory, the energies of the hybridized states $\\ket{\\psi_{\\pm}}$ are found as\nL000412\t\\begin{equation}\nL000413\tE_\\pm \\simeq \\pm \\braket{\\psi_{\\rm L}| \\hat H_{0} | \\psi_{\\rm R}} = \\pm 2t'/\\xi_0 (t'/t)^d =\\pm 2t'/\\xi_0 e^{-d/\\xi_0} \\, .\nL000414\t\\end{equation}\nL000415\tTherefore, in the bond-diluted SSH chain, the energy of the low-lying Mott resonances depends exponentially on their size $d$.\nL000416\t\nL000417\t\\section{Real-space renormalization group}\nL000418\t\\label{appc}\nL000419\t\nL000420\tIn this section, we review the real-space renormalization group (RSRG) treatment of the SSH chain with chiral disorder \\eqref{sshhda}. The RSRG procedure consists of identifying the largest of the hoppings within the chain (suppose $t_2$) and decimating it using the second-order perturbation theory \\cite{dobro}. Consider, e.g., the $t_1 - t_2 - t_3$ cluster of hoppings described by the Hamiltonian\nL000421\t\\beq\nL000422\t\\hat H = \\hat H_{0} + \\hat H_{\\rm pert}\\, , \\qquad \\hat H_{0} = t_2 \\hat c^{\\dagger}_2 \\hat c_3 + {\\rm h.c.} \\, , \\qquad \\hat H_{\\rm pert,} = t_1 \\hat c^{\\dagger}_1 \\hat c_2+ t_3 \\hat c^{\\dagger}_3 \\hat c_4 + {\\rm h.c.} \\, .\nL000423\t\\eeq\nL000424\tThe unperturbed eigenvalues are $E_0= \\pm t_2$ and the eigenstates read\nL000425\t\\beq\nL000426\t\\ket{\\psi_{\\pm}} = \\frac{1}{\\sqrt{2}}(\\hat c_2^\\dagger \\pm \\hat c_3^\\dagger)\\ket{0} \\equiv \\frac{1}{\\sqrt{2}}(\\ket{2} \\pm \\ket{3}) \\, .\nL000427\t\\eeq\nL000428\tWithin the second-order perturbation theory, the effective hopping that replaces the given string $t_1 - t_2 - t_3$ is obtained as\nL000429\t\\beq\nL000430\tt_{\\rm eff} = \\frac{\\braket{1|\\hat H_{\\rm pert}|\\psi_{+}}\\braket{\\psi_{+}|\\hat H_{\\rm pert}|4}}{t_2} - \\frac{\\braket{1|\\hat H_{\\rm pert}|\\psi_{-}}\\braket{\\psi_{-}|\\hat H_{\\rm pert}|4}}{t_2} = \\frac{t_1 t_3}{t_2} \\, ,\nL000431\t\\label{deci}\nL000432\t\\eeq\nL000433\tsince\nL000434\t\\beq\nL000435\t\\bal\nL000436\t\\braket{1|\\hat H_{\\rm pert}|\\psi_{+}} & = \\frac{t_1}{\\sqrt{2}}\\, , \\qquad\nL000437\t\\braket{1|\\hat H_{\\rm pert}|\\psi_{-}} = \\frac{t_1}{\\sqrt{2}} \\, , \\\\\nL000438\t\\braket{4|\\hat H_{\\rm pert}|\\psi_{+}} & = \\frac{t_3}{\\sqrt{2}} \\, , \\qquad\nL000439\t\\braket{4|\\hat H_{\\rm pert}|\\psi_{-}} = - \\frac{t_3}{\\sqrt{2}} \\, .\nL000440\t\\eal\nL000441\t\\eeq\nL000442\t\nL000443\tThe procedure \\eqref{deci} is repeated multiple times until the maximum hopping in the chain falls below the cutoff $\\Omega$. If we collectively label all odd links $t'$ and all even links $t$, their distributions $P_{t} \\equiv P_{t}(t, \\Omega)$ and $P_{t'} \\equiv P_{t'}(t',\\Omega)$ will ``run'' with the cutoff according to\nL000444\t\\begin{equation}\nL000445\t\\begin{aligned}\nL000446\t-\\frac{\\partial P_{t}}{\\partial \\Omega} & =\\left[P_t^\\Omega-P_{t'}^\\Omega \\right] P_t+P_{t'}^\\Omega \\int d t_1 d t_2 \\, P_t (t_1, \\Omega) P_t (t_2, \\Omega) \\delta \\left(t-t_1 t_2 / \\Omega \\right), \\\\\nL000447\t-\\frac{\\partial P_{t'}}{\\partial \\Omega} & =\\left[P_{t'}^\\Omega-P_{t}^\\Omega \\right] P_{t'}+P_t^\\Omega \\int d t_1' d t_2' \\, P_{t'} (t_1', \\Omega) P_{t'} (t_2', \\Omega) \\delta\\left(t'-t_1' t_2' / \\Omega\\right) \\, ,\nL000448\t\\end{aligned}\nL000449\t\\end{equation}\nL000450\twhere $P_t^\\Omega \\equiv P_t(\\Omega, \\Omega)$, and $P_{t'}^\\Omega \\equiv P_{t'}(\\Omega, \\Omega)$. This system of integro-differential equations was solved in both critical and off-critical cases \\cite{fisher1, fisher2}. We review these solutions and their implications below.\\\\\\\\\nL000451\t\\textit{\\underline{Off-critical case:}}\\\\\\\\\nL000452\tFor convenience, we introduce logarithmic variables\nL000453\t\\begin{equation}\nL000454\t\\Gamma \\equiv \\log(\\Omega_0/\\Omega) \\, , \\qquad T \\equiv \\log(\\Omega/t) \\, , \\qquad T' \\equiv \\log(\\Omega/t') \\, .\nL000455\t\\end{equation}\nL000456\tIf the hoppings $t$ are on average larger than $t'$, the fixed point is characterized by distributions\nL000457\t\\begin{equation}\nL000458\tP_{t}(T) =2 |\\delta| \\exp [-2 |\\delta| T] \\, ,  \\qquad\nL000459\tP_{t'}(T') =2 |\\delta| e^{-2 |\\delta| \\Gamma} \\exp \\left[-2 |\\delta| e^{-2 |\\delta| \\Gamma} T' \\right] \\, ,\nL000460\t\\label{offcdists}\nL000461\t\\end{equation}\nL000462\ti.e., the distribution for $T$ (and therefore $t$) becomes cutoff-independent, while the distribution of $T'$ becomes extremely broad already on a logarithmic scale. It implies that extremely small and isolated in energy hoppings $t'$ appear, giving rise to low-energy Mott-like resonances formed by the zero modes hybridizing through small $t'$ bonds. The quantity $\\delta$ in the expressions  above is introduced as\nL000463\t\\begin{equation}\nL000464\t\\delta \\equiv \\frac{\\llangle T \\rrangle - \\llangle T' \\rrangle}{{\\rm var}\\,T + {\\rm var} \\, T'} \\, .\nL000465\t\\end{equation}\nL000466\t\nL000467\tThe differential equation describes the number of surviving unit cells at the scale $\\Gamma$\nL000468\t\\begin{equation}\nL000469\td N = - N (P_t + P_t') d \\Gamma \\, ,\nL000470\t\\label{dNeq}\nL000471\t\\end{equation}\nL000472\tas the act of decimation always removes one unit cell. Integration of this equation yields $N \\sim \\Omega^{- 2 |\\delta|}$. The low-energy density of states at energy $E$ is found as $\\nu (E) \\sim d N^{-1}(E)/ d E \\sim E^{2 |\\delta| - 1}$. Since almost all decimated hoppings are $t$-hoppings, on the approach to the fixed point, the $t'$ hoppings become typically very long. Their lengths are therefore approximately equal to the typical length of the unit cell, i.e., $d_{t'} \\sim N^{-1} \\sim \\Omega^{2 |\\delta|}$. The typical $t'$ hopping itself can be found using the second distribution in \\eqref{offcdists}, as\nL000473\t\\begin{equation}\nL000474\tt_{\\rm typ}' \\sim \\exp (\\braket{T'}_{\\rm D}) \\sim \\exp(-\\Omega^{2 |\\delta|}) \\sim e^{- d_{t'}} \\, .\nL000475\t\\end{equation}\nL000476\tTherefore, the hybridization energy of the zero modes across such a hopping element is exponentially small in its length. \\\\\\\\\nL000477\t\\textit{\\underline{Critical case:}}\\\\\\\\\nL000478\tThe distributions of $T$ and $T'$ \\begin{equation}\nL000479\tP_t(T)=\\frac{1}{\\Gamma} e^{-T / \\Gamma}\\,  , \\qquad P_{t'}(T')=\\frac{1}{\\Gamma} e^{-T' / \\Gamma}\nL000480\t\\label{rgcrit}\nL000481\t\\end{equation}\nL000482\tboth become extremely broad at a low cutoff. The low-energy Mott resonances in this case arise on both $t$ and $t'$ hoppings. Solving \\eqref{dNeq} in this case, yields the scaling of the remaining number of unit cells $N \\sim \\log^{-2} \\Omega$, and therefore, $d_{t'} \\sim d_t \\sim \\log^2 \\Omega$ due to the $t \\leftrightarrow t'$ duality manifest in \\eqref{rgcrit}. The low-energy density of states is described by the Dyson singularity $\\nu(E) \\sim d N(E) / dE \\sim (E \\log^3 E)^{-1}$. Lastly, using \\eqref{rgcrit}, we establish that the remaining at low $\\Omega$ hoppings are typically stretched-exponentially dependent on their lengths\nL000483\t\\begin{equation}\nL000484\tt_{\\rm typ}' \\sim t_{\\rm typ} \\sim \\exp (\\braket{T}_{\\rm D}) \\sim e^{-\\Gamma} \\sim e^{- \\sqrt{d}} \\, .\nL000485\t\\end{equation}\nL000486\t\nL000487\tWe note here that it is useful to define the dynamical critical exponent $z$ as the polynomial part of the scaling of the typical length of the excitation with the time over which it occurs: $d^z \\sim (1/\\omega)$. From the discussion above, we obtain $z=1/(2|\\delta|)$. The polynomial part of the scaling of the density of states at small energies then reads $\\nu(E) \\sim E^{-1+1/z}$. Since the low-frequency ac conductivity is given by the pair-wise summation over the symmetric in energy transitions, as shown in the main text, the ac conductivity is itself proportional to the density of states, and hence, $\\sigma(\\omega) \\sim \\omega^{1/z}$, up to logarithmic corrections, in consistency with $\\sigma_{\\rm crit} \\sim \\log (\\Omega/\\omega)$, when $z = \\infty$.\nL000488\t\nL000489\t\\section{Mapping to spin and effective continuous models}\nL000490\t\nL000491\t\\label{appd}\nL000492\t\nL000493\tThe mapping between the $1D$ Ising models and the $1D$ tight-binding models of Fermions is well-known \\cite{mckenzie_exact_1996}. The details of this mapping that apply to the case of an SSH chain with chiral disorder are reviewed below. Additionally, at the critical point, the properties of these lattice models are identical to those of the continuous Dirac-fermion model with random mass studied extensively earlier. This allows making a host of exact statements about the properties of the SSH chain at and around criticality.\nL000494\t\nL000495\tThe starting point is the $XX$ Ising model in $1D$\nL000496\t\\begin{equation}\nL000497\t    \\hat H_{\\rm Ising} = \\sum_i J_i [\\hat \\sigma_i^x \\hat \\sigma_{i+1}^x + \\hat \\sigma_i^y \\hat \\sigma_{i+1}^y] \\, ,\nL000498\t    \\label{ising}\nL000499\t\\end{equation}\nL000500\twhere $J_{i\\,\\rm odd} = (t' - \\epsilon_j)/2$ with random $\\epsilon_i$ and $J_{i\\,\\rm even} = t/2$. Using the Jordan-Wigner transformation\nL000501\t\\begin{equation}\nL000502\t    \\begin{aligned}\nL000503\t    & \\hat{\\sigma}_i^x \\hat{\\sigma}_{i+1}^x=\\left(\\hat{c}_i^{\\dagger} \\hat{c}_{i+1}+\\hat{c}_i^{\\dagger} \\hat{c}_{i+1}^{\\dagger}+\\text{h.c.}\\right)\\, , \\\\\nL000504\t    & \\hat{\\sigma}_i^y \\hat{\\sigma}_{i+1}^y=\\left(\\hat{c}_i^{\\dagger} \\hat{c}_{i+1}-\\hat{c}_i^{\\dagger} \\hat{c}_{i+1}^{\\dagger}+\\text {h.c.}\\right)\\, ,\nL000505\t\\end{aligned}\nL000506\t\\end{equation}\nL000507\tit is straightforward to show that the Hamiltonian \\eqref{ising} is equivalent to that for the SSH chain with chiral disorder studied in the main text. The dynamical spin conductivity in the model \\eqref{ising} was studied in \\cite{motr}, where it was shown that away from the criticality (random dimer phase)\nL000508\t\\begin{equation}\nL000509\t    \\sigma(\\omega) \\sim s^{-2} \\omega^{1/z} \\log^2 \\omega \\, ,\nL000510\t\\end{equation}\nL000511\twhere $z$ is the dynamical critical exponent. At criticality, \\cite{motr} find\nL000512\t\\begin{equation}\nL000513\t    \\sigma_{\\rm crit}(\\omega) \\sim s^{-2} \\log \\omega \\, .\nL000514\t\\end{equation}\nL000515\tThese expressions agree with those in the main text once we set $z = (2 |\\delta|)^{-1}$, as shown below. It is noteworthy that the low-frequency spin transport in this case arises from hybridized domain wall states on both sides of the rare regions created by disorder in magnetic couplings. For example, these rare regions may arise from the extensive incorporation of the even-bond-ordered phase into a predominantly odd-bond-ordered environment. Such hybridized domain walls are non-local duals of the Mott resonances described in the main text.\nL000516\t\nL000517\tSome further exact analytical results for the SSH chain follow from the low-energy theory for the SSH chain Hamiltonian (see main text) expanded around $k_{\\rm F} = \\pi$\nL000518\t\\begin{equation}\nL000519\t    \\hat H_{\\rm cont} = \\sum_x \\hat c^\\dagger_x [ i v_{\\rm F}  \\hat \\sigma_2 \\prl_x + (t' - t - \\varepsilon_x) \\hat \\sigma_1]\\,  \\hat c_x \\, ,\nL000520\t\\end{equation}\nL000521\twhere $v_{\\rm F} = t$. In the extensive studies of this model summarized in \\cite{mckenzie_exact_1996} it was established that away from criticality, $\\nu(E) \\sim E^{-1+2|\\delta|}$ and the dynamical critical exponent $z=(2 |\\delta|)^{-1}$. At criticality ($\\delta=0$), the density of states takes the form of the Dyson singularity $\\nu(E) \\sim s^2 [|E| \\log^3 (s^2/|E|)]^{-1}$. The results found within this continuum model apply to the full tight-binding case when the dimerization is small, and the disorder is low, i.e., $t \\gg |t-t'|$, $s^2 \\ll 1$.\nL000522\t\nL000523\t\\section{Variable-range hopping and temperature-dependent dc conductivity}\nL000524\t\\label{appe}\nL000525\t\nL000526\tIn this appendix, we obtain the temperature dependence of the dc conductivity due to variable-range hopping between the topological zero modes in the SSH chain with bond disorder \\eqref{sshhda}.\nL000527\t\nL000528\tConsider two off-critical $|\\delta| > 0$ zero-mode states $\\psi_1$ and $\\psi_2$ centered at the positions $x_1$ and $x_2$, and separated in the real space by $d=|x_1-x_2|$. The phonon-assisted hopping rate between these localized states is governed by the competition between the exponentially decaying wavefunction overlap and the Boltzmann weight \\cite{shk},\nL000529\t\\begin{equation}\nL000530\tW(x_1,x_2)\\sim |\\langle \\psi_1|\\hat x|\\psi_2 \\rangle|^2 \\,\nL000531\te^{-\\frac{\\Delta E}{k_{\\rm B}T}} .\nL000532\t\\label{wij}\nL000533\t\\end{equation}\nL000534\tThe typical energy spacing between states within a segment of length $d$ is determined by the condition that there is $O(1)$ state in that window. Away from criticality in the random-bond SSH chain model, where the density of states scales as $\\nu(E)\\sim E^{2\\delta-1}$, we find\nL000535\t\\begin{equation}\nL000536\td\\int_0^{\\Delta E} dE\\,\\nu(E) \\sim 1 \\Rightarrow \\quad\nL000537\t\\Delta E\\sim d^{-1/(2\\delta)} .\nL000538\t\\end{equation}\nL000539\tFor the regular exponentially localized states with $|\\langle \\psi_i|\\hat x|\\psi_j\\rangle|^2\\sim e^{-2d/\\xi}$, the hopping rate becomes\nL000540\t\\begin{equation}\nL000541\tW(d)=\\exp\\!\\left(-\\frac{2d}{\\xi}\nL000542\t-c\\frac{d^{-1/(2\\delta)}}{k_{\\rm B}T}\\right)\\, ,\nL000543\t\\end{equation}\nL000544\twhere $c$ is a constant. Minimizing the exponent yields the optimal hopping distance\nL000545\t\\begin{equation}\nL000546\t\\overline d \\sim (T_0/T)^{\\frac{2\\delta}{1+2\\delta}},\nL000547\t\\end{equation}\nL000548\tand from \\eqref{wij}, we find\nL000549\t\\begin{equation}\nL000550\t\\sigma(T)\\sim W(\\overline d)\\sim\nL000551\t\\exp\\!\\left[-(T_0/T)^{\\frac{2\\delta}{1+2\\delta}}\\right] \\, .\nL000552\t\\label{sT}\nL000553\t\\end{equation}\nL000554\t\nL000555\tFor $\\delta=1/2$, the density of states is constant and one recovers the standard one-dimensional Mott variable-range hopping law \\cite{mott_electronic_2012}, observed, e.g., in polymer nanofibers \\cite{vrh}. In contrast, in the limit $\\delta\\to 0$, the Mott exponent vanishes, indicating the transition between the tunneling transport regime and the polynomial temperature scaling characteristic of a metal. This signals the onset of the activated dynamical scaling, characterized by the divergence of a dynamical critical exponent $z = (2 |\\delta|)^{-1}$.\nL000556\t\nL000557\t\nL000558\t\nL000559\t \\bibliography{refs}\nL000560\t\nL000561\t\nL000562\t\nL000563\t\\end{document}\nL000564\t===== END FILE: manuscript.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Before returning, check the whole object: every referenced mechanism, condition, control, readout, claim, and dependency ID must be declared; every claim must provide exactly one domain for each cited control; and each claim domain must stay inside that control's source-supported domain. Apply the domain fields exactly: continuous_interval uses two numeric ordered endpoints and allowed_values=[]; numeric_values uses null endpoints and at least two unique allowed_values; fixed_value uses null endpoints and exactly one allowed_value; symbolic/unreported use null endpoints, allowed_values=[], and a non-empty domain_statement. Never leave one endpoint null in a continuous_interval. If a figure-evidence addendum gives only a finite supported query set, use numeric_values rather than a partial interval. Preserve all domain kinds without inventing interpolation. Keep a single branch value as a fixed condition rather than an equal-endpoint interval. If no compilable continuous or discrete numeric control remains, set case_authoring_ready false; an unready card may use empty controls or claims arrays. Every retained mechanism must have at least one source equation. Every claim in an authoring-ready card must include oracle_outputs: its keys exactly match readout_names, var leaves name only claim controls, and param leaves name only parameters of linked mechanisms. Put every scientific constant, coefficient, and exponent in a named, anchored ScienceParameter and reference it with a param leaf. Numeric literals, including 0 and 1, are forbidden here; the case binder alone adds structural selector literals. oracle_outputs encodes central values only and quantitative_form remains its human-readable rendering. Keep source data aggregation, data-point error bars, and fit-parameter uncertainty in provenance fields; never attach them to a deterministic query value. For an undefined plus/minus convention, use source_unspecified and do not guess standard error or create an ambiguity solely for that omission. Fix every such violation visible in the complete object, not only the first reported one. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides two quantitative regimes for ac conductivity in the SSH chain with chiral disorder: off-critical (Eq. soffcrit) and critical (Eq. sigcrit). Both are supported by analytical arguments and numerical fits. The off-critical regime uses the control delta (staggering parameter) with a fitted exponent 2|delta|, and the critical regime uses disorder strength s with a fitted log^2 amplitude. The source reports numerical fits for delta values 0.78, 0.78, 1.23, 1.24 and for critical case with s^2=0.3, c_crit=0.13. The extraction captures the central quantitative relations, parameters, and fixed conditions. The case is authoring-ready with two regimes sharing controls delta and s, and readouts sigma_offcrit and sigma_crit.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Ilia Komissarov, Quantum Critical Dynamics Induced by Topological Zero Modes, Physical Review Letters (2026), DOI:10.1103/z8v9-f8j2\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/z8v9-f8j2\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2502.12233v2\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper studies low-frequency ac transport in the Su-Schrieffer-Heeger (SSH) chain with chiral disorder, focusing on the topological delocalization transition. It derives scaling laws for ac conductivity at criticality (logarithmic) and away from criticality (power-law with log^2 corrections), using real-space renormalization group and Mott hybridization arguments. The selected quantitative cluster covers the off-critical and critical ac conductivity formulas, their parameters, and numerical verification.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"mott_hybridization_offcrit\\\",\\n      \\\"statement\\\": \\\"Away from criticality, zero modes hybridize into bonding/anti-bonding pairs with energy splitting exponentially small in segment length; the dipole matrix element scales as d ~ xi0 log omega, and the density of states is algebraic, leading to ac conductivity sigma ~ omega^{2|delta|} log^2 omega.\\\",\\n      \\\"equations\\\": [\\n        \\\"|braket{psi_+|x|psi_-}| ~ d ~ xi0 log omega\\\",\\n        \\\"nu_topo(E) ~ |E|^{-1+2|delta|}\\\",\\n        \\\"sigma(omega) ~ omega^{2|delta|} log^2 omega\\\"\\n      ],\\n      \\\"variable_names\\\": [\\\"delta\\\", \\\"omega\\\", \\\"sigma\\\", \\\"d\\\", \\\"xi0\\\", \\\"nu\\\"],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"offcrit_power_exponent\\\",\\n          \\\"value\\\": 2,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"exponent multiplying |delta| in the power-law factor of sigma(omega)\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 165,\\n              \\\"line_end\\\": 165,\\n              \\\"support\\\": \\\"Equation (soffcrit) states sigma(omega) ~ omega^{2|delta|} log^2 omega.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"offcrit_log_exponent\\\",\\n          \\\"value\\\": 2,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"exponent of the logarithmic factor in sigma(omega)\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 165,\\n              \\\"line_end\\\": 165,\\n              \\\"support\\\": \\\"Equation (soffcrit) states sigma(omega) ~ omega^{2|delta|} log^2 omega.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 184,\\n          \\\"line_end\\\": 190,\\n          \\\"support\\\": \\\"Hybridization energy omega = Omega e^{-d/xi}, dipole matrix element ~ d ~ xi0 log omega.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 193,\\n          \\\"line_end\\\": 196,\\n          \\\"support\\\": \\\"Density of states nu_topo(E) ~ |E|^{-1+2|delta|}, with |delta| = (xi/2)|log(1-p)|.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 213,\\n          \\\"line_end\\\": 217,\\n          \\\"support\\\": \\\"Kubo-Greenwood summation yields sigma(omega) ~ omega^{2|delta|} log^2 omega.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"mott_hybridization_crit\\\",\\n      \\\"statement\\\": \\\"At criticality, zero modes decay stretched-exponentially as psi ~ e^{-s sqrt{x}}, leading to dipole matrix element ~ c_crit s^{-2} log^2(Omega/omega) and Dyson singularity in density of states, giving ac conductivity sigma_crit ~ s^{-2} log(Omega/omega).\\\",\\n      \\\"equations\\\": [\\n        \\\"psi_0(x) ~ e^{-s sqrt{x}}\\\",\\n        \\\"|braket{psi_{omega/2}|x|psi_{-omega/2}}|_crit = c_crit s^{-2} log^2(Omega/omega)\\\",\\n        \\\"nu_crit(E) = s^2 [|E| log^3(Omega/|E|)]^{-1}\\\",\\n        \\\"sigma_crit(omega) ~ s^{-2} log(Omega/omega)\\\"\\n      ],\\n      \\\"variable_names\\\": [\\\"s\\\", \\\"omega\\\", \\\"sigma_crit\\\", \\\"c_crit\\\", \\\"Omega\\\", \\\"psi\\\"],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"crit_amplitude_coefficient\\\",\\n          \\\"value\\\": 0.13,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"coefficient c_crit in the dipole matrix element fit\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 247,\\n              \\\"line_end\\\": 247,\\n              \\\"support\\\": \\\"Caption of plot3: predicted relation c_s = c_crit s^{-2} established with c_crit ~ 0.13.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"crit_log_exponent\\\",\\n          \\\"value\\\": 2,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"exponent of log in the dipole matrix element\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 257,\\n              \\\"line_end\\\": 258,\\n              \\\"support\\\": \\\"Equation (logsq) defines the transition amplitude as c_crit s^{-2} log^2(Omega/omega).\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"crit_s_power\\\",\\n          \\\"value\\\": -2,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"power of s in the dipole matrix element and conductivity\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 257,\\n              \\\"line_end\\\": 258,\\n              \\\"support\\\": \\\"Equation (logsq) has s^{-2} factor.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 265,\\n              \\\"line_end\\\": 266,\\n              \\\"support\\\": \\\"Equation (sigcrit) has s^{-2} factor.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 255,\\n          \\\"line_end\\\": 258,\\n          \\\"support\\\": \\\"Stretched-exponential decay psi_0 ~ e^{-s sqrt{x}} and postulated transition amplitude with c_crit s^{-2} log^2(Omega/omega).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 262,\\n          \\\"line_end\\\": 266,\\n          \\\"support\\\": \\\"Dyson singularity nu_crit(E) = s^2 [|E| log^3(Omega/|E|)]^{-1} and resulting sigma_crit ~ s^{-2} log(Omega/omega).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"ssh_chain_half_filling\\\",\\n      \\\"statement\\\": \\\"The SSH chain is at half filling, with Fermi energy E_F = 0.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Caption of plot2: 'Dynamical conductivity in the SSH chain with chiral box disorder at half filling'.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 251,\\n          \\\"line_end\\\": 251,\\n          \\\"support\\\": \\\"At half-filling, this model hosts a single delocalized state at E=0.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"chiral_disorder\\\",\\n      \\\"statement\\\": \\\"Disorder is chiral, i.e., only in hopping elements, preserving chiral symmetry.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 141,\\n          \\\"line_end\\\": 141,\\n          \\\"support\\\": \\\"SSH chain with chiral disorder, i.e., disorder in hopping elements only.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"low_frequency_regime\\\",\\n      \\\"statement\\\": \\\"The ac conductivity is considered at low frequencies, omega << |t-t'| for off-critical, and at low frequencies generally.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 184,\\n          \\\"line_end\\\": 184,\\n          \\\"support\\\": \\\"Optical transitions allowed in the sub-gap regime omega << |t-t'|.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 210,\\n          \\\"line_end\\\": 210,\\n          \\\"support\\\": \\\"For omega << |t-t'|, Eq. (kgformula) reduces to sum over psi_+ pairs.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"offcrit_numerical_setup\\\",\\n      \\\"statement\\\": \\\"Numerical simulations for off-critical case used chains of 10^3 sites and 10^6 disorder configurations, with box disorder uniform over [-W/2, W/2].\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Caption of plot2: 'The simulations were performed for chains of 10^3 sites and 10^6 disorder configurations.'\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 222,\\n          \\\"line_end\\\": 222,\\n          \\\"support\\\": \\\"For numerical simulations, assume uniform distribution over [-W/2, W/2].\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"crit_numerical_setup\\\",\\n      \\\"statement\\\": \\\"Numerical simulations for critical case used 10^3 sites at criticality (t=t'=1), chiral box disorder, averaging over 10^4 configurations.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 247,\\n          \\\"line_end\\\": 247,\\n          \\\"support\\\": \\\"Caption of plot3: 'The calculation used 10^3 sites at criticality (t=t'=1), chiral box disorder, and averaging over 10^4 configurations.'\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"delta\\\",\\n      \\\"definition\\\": \\\"Staggering parameter encoding the distance to the topological phase transition; delta = 0 at criticality, delta > 0 topological, delta < 0 trivial.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [0.78, 1.23],\\n      \\\"domain_statement\\\": \\\"Numerical fits reported for |delta_fit| = 0.78, 0.78, 1.23, 1.24, corresponding to actual dimerization values; the model is defined for any delta, but the extracted quantitative fits are for these values.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Caption of plot2: '|delta_fit| = 0.78, 0.78, 1.23, 1.24 indicate a good agreement with the actual values of dimerization delta'.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"s\\\",\\n      \\\"definition\\\": \\\"Disorder strength parameter, defined as s^2 = a(<kappa^2> - <kappa>^2), where kappa = a^{-1} log|(t-epsilon)/(t'-epsilon')|.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"numeric_values\\\",\\n      \\\"minimum\\\": null,\\n      \\\"maximum\\\": null,\\n      \\\"allowed_values\\\": [0.3],\\n      \\\"domain_statement\\\": \\\"Numerical fit for dipole amplitude used s^2 = 0.3; the scaling sigma_crit ~ s^{-2} log(Omega/omega) is claimed valid at any disorder strength, but the extracted quantitative fit is for s^2=0.3.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 247,\\n          \\\"line_end\\\": 247,\\n          \\\"support\\\": \\\"Caption of plot3: 'Dipole transition amplitude between states separated by omega with disorder strength s^2 = 0.3'.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"sigma_offcrit\\\",\\n      \\\"definition\\\": \\\"AC conductivity away from criticality, computed via Kubo-Greenwood formula, scaling as omega^{2|delta|} log^2 omega.\\\",\\n      \\\"unit\\\": \\\"arbitrary units\\\",\\n      \\\"statistic\\\": \\\"Numerical data fitted to sigma(omega) = c1 omega^{2|delta_fit|} log^2(c2/omega) for chains of 10^3 sites and 10^6 disorder configurations.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Caption of plot2: 'The numerical data is fitted to sigma(omega) = c1 omega^{2|delta_fit|} log^2(c2/omega)'.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 207,\\n          \\\"line_end\\\": 209,\\n          \\\"support\\\": \\\"Kubo-Greenwood formula for ac conductivity.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"sigma_crit\\\",\\n      \\\"definition\\\": \\\"AC conductivity at criticality, scaling as s^{-2} log(Omega/omega).\\\",\\n      \\\"unit\\\": \\\"arbitrary units\\\",\\n      \\\"statistic\\\": \\\"Numerical data collapse after rescaling frequency and conductivity by s^2; fits to log omega law at all disorder strengths.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Caption of plot2c: 'The curves exhibit good data collapse after rescaling both the frequency and the conductivity by s^2. Importantly, the log omega law holds at all disorder strengths.'\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 265,\\n          \\\"line_end\\\": 266,\\n          \\\"support\\\": \\\"Equation (sigcrit): sigma_crit(omega) ~ s^{-2} log(Omega/omega).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"offcrit_conductivity\\\",\\n      \\\"statement\\\": \\\"Away from criticality, the ac conductivity of the SSH chain with chiral disorder scales as sigma(omega) ~ omega^{2|delta|} log^2 omega, where delta is the staggering parameter.\\\",\\n      \\\"quantitative_form\\\": \\\"sigma_offcrit(omega) = C * omega^(2*|delta|) * (log(omega))^2\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"sigma_offcrit\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"power\\\",\\n              \\\"args\\\": [\\n                {\\\"var\\\": \\\"omega\\\"},\\n                {\\n                  \\\"op\\\": \\\"multiply\\\",\\n                  \\\"args\\\": [\\n                    {\\\"param\\\": \\\"offcrit_power_exponent\\\"},\\n                    {\\\"var\\\": \\\"delta\\\"}\\n                  ]\\n                }\\n              ]\\n            },\\n            {\\n              \\\"op\\\": \\\"power\\\",\\n              \\\"args\\\": [\\n                {\\\"var\\\": \\\"omega\\\"},\\n                {\\\"param\\\": \\\"offcrit_log_exponent\\\"}\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"mott_hybridization_offcrit\\\"],\\n      \\\"control_names\\\": [\\\"delta\\\", \\\"omega\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"delta\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [0.78, 1.23],\\n          \\\"domain_statement\\\": \\\"Numerical fits reported for |delta_fit| = 0.78, 0.78, 1.23, 1.24; the formula is claimed for any delta != 0, but the extracted quantitative fits are for these values.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 201,\\n              \\\"line_end\\\": 201,\\n              \\\"support\\\": \\\"Caption of plot2: '|delta_fit| = 0.78, 0.78, 1.23, 1.24 indicate a good agreement with the actual values of dimerization delta'.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"omega\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 0,\\n          \\\"maximum\\\": 1,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"Low-frequency regime, omega << |t-t'|; the formula is valid at small frequencies, with the crossover to critical regime at higher frequencies.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 184,\\n              \\\"line_end\\\": 184,\\n              \\\"support\\\": \\\"Optical transitions allowed in the sub-gap regime omega << |t-t'|.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 210,\\n              \\\"line_end\\\": 210,\\n              \\\"support\\\": \\\"For omega << |t-t'|, Eq. (kgformula) reduces to sum over psi_+ pairs.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"sigma_offcrit\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"ssh_chain_half_filling\\\", \\\"chiral_disorder\\\", \\\"low_frequency_regime\\\", \\\"offcrit_numerical_setup\\\"],\\n      \\\"applicability\\\": \\\"Valid for the SSH chain with chiral disorder away from criticality (delta != 0), at low frequencies omega << |t-t'|, and for both bond-diluted and continuous bond disorder distributions.\\\",\\n      \\\"statistical_basis\\\": \\\"Numerical fits to sigma(omega) = c1 omega^{2|delta_fit|} log^2(c2/omega) for chains of 10^3 sites and 10^6 disorder configurations.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 165,\\n          \\\"line_end\\\": 165,\\n          \\\"support\\\": \\\"Equation (soffcrit): sigma(omega) ~ omega^{2|delta|} log^2 omega.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 213,\\n          \\\"line_end\\\": 217,\\n          \\\"support\\\": \\\"Derivation via Kubo-Greenwood summation yields sigma(omega) ~ omega^{2|delta|} log^2 omega.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Numerical fits confirm the formula for |delta_fit| = 0.78, 0.78, 1.23, 1.24.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"crit_conductivity\\\",\\n      \\\"statement\\\": \\\"At criticality (delta=0), the ac conductivity of the SSH chain with chiral disorder scales as sigma_crit(omega) ~ s^{-2} log(Omega/omega), where s is the disorder strength.\\\",\\n      \\\"quantitative_form\\\": \\\"sigma_crit(omega) = s^{-2} * log(Omega/omega)\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"sigma_crit\\\": {\\n          \\\"op\\\": \\\"multiply\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"op\\\": \\\"power\\\",\\n              \\\"args\\\": [\\n                {\\\"var\\\": \\\"s\\\"},\\n                {\\\"param\\\": \\\"crit_s_power\\\"}\\n              ]\\n            },\\n            {\\n              \\\"op\\\": \\\"log\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"divide\\\",\\n                  \\\"args\\\": [\\n                    {\\\"param\\\": \\\"crit_omega_ref\\\"},\\n                    {\\\"var\\\": \\\"omega\\\"}\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\\"mott_hybridization_crit\\\"],\\n      \\\"control_names\\\": [\\\"s\\\", \\\"omega\\\"],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"s\\\",\\n          \\\"domain_kind\\\": \\\"numeric_values\\\",\\n          \\\"minimum\\\": null,\\n          \\\"maximum\\\": null,\\n          \\\"allowed_values\\\": [0.3],\\n          \\\"domain_statement\\\": \\\"Numerical fit for dipole amplitude used s^2 = 0.3; the scaling is claimed valid at any disorder strength, but the extracted quantitative fit is for s^2=0.3.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 247,\\n              \\\"line_end\\\": 247,\\n              \\\"support\\\": \\\"Caption of plot3: 'Dipole transition amplitude between states separated by omega with disorder strength s^2 = 0.3'.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"omega\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 0,\\n          \\\"maximum\\\": 1,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"Low-frequency regime; the formula is valid at low frequencies, with Omega as a high-energy reference scale.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 156,\\n              \\\"line_end\\\": 158,\\n              \\\"support\\\": \\\"Equation (scrit): sigma_crit(omega) ~ log(Omega/omega), where Omega is a high-energy reference scale.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 265,\\n              \\\"line_end\\\": 266,\\n              \\\"support\\\": \\\"Equation (sigcrit): sigma_crit(omega) ~ s^{-2} log(Omega/omega).\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\\"sigma_crit\\\"],\\n      \\\"fixed_condition_ids\\\": [\\\"ssh_chain_half_filling\\\", \\\"chiral_disorder\\\", \\\"low_frequency_regime\\\", \\\"crit_numerical_setup\\\"],\\n      \\\"applicability\\\": \\\"Valid at criticality (delta=0) for the SSH chain with chiral disorder, at low frequencies, and for any disorder strength s.\\\",\\n      \\\"statistical_basis\\\": \\\"Numerical data collapse after rescaling frequency and conductivity by s^2; fits to log omega law at all disorder strengths.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 156,\\n          \\\"line_end\\\": 158,\\n          \\\"support\\\": \\\"Equation (scrit): sigma_crit(omega) ~ log(Omega/omega).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 265,\\n          \\\"line_end\\\": 266,\\n          \\\"support\\\": \\\"Equation (sigcrit): sigma_crit(omega) ~ s^{-2} log(Omega/omega).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 201,\\n          \\\"line_end\\\": 201,\\n          \\\"support\\\": \\\"Caption of plot2c: 'The curves exhibit good data collapse after rescaling both the frequency and the conductivity by s^2. Importantly, the log omega law holds at all disorder strengths.'\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"omega_notation\\\",\\n      \\\"statement\\\": \\\"The symbol omega is used both as the frequency of the ac field and as the energy difference/hybridization energy; the paper notes this in the supplementary information.\\\",\\n      \\\"claim_ids\\\": [\\\"offcrit_conductivity\\\", \\\"crit_conductivity\\\"],\\n      \\\"mechanism_ids\\\": [\\\"mott_hybridization_offcrit\\\", \\\"mott_hybridization_crit\\\"],\\n      \\\"control_names\\\": [\\\"omega\\\"],\\n      \\\"readout_names\\\": [\\\"sigma_offcrit\\\", \\\"sigma_crit\\\"],\\n      \\\"fixed_condition_ids\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 352,\\n          \\\"line_end\\\": 352,\\n          \\\"support\\\": \\\"The quantity omega bears a meaning of the energy difference, hybridization energy, or the frequency of the applied ac electric field expressed in units of energy, depending on the context.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"must contain at least two unique values\",\"path\":\"$.controls[1].allowed_values\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

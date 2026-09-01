@@ -1,0 +1,1050 @@
+{
+  "assessment": "The source packet provides the trXAS fit law (sum of three Lorentzians plus a linear term) and the central fit parameter values for the Equilibrium and t = 0.4 ps rows in Table 1. The public input omega domain [527.89, 529.70] eV is supported by the reported center energies of the first and third Lorentzians. The readout is the fitted XAS intensity I(omega). The two branches share the identical expression AST; branch-specific fit parameters are private. Fixed conditions (sample, temperature, geometry, pump/probe settings) are supported by lines 514-525. The extraction is complete and case_authoring_ready is true.",
+  "drafts": [
+    {
+      "candidate": {
+        "apparatus": {
+          "description": "The apparatus exposes an adjustable photon energy and a measurable X-ray absorption intensity. Determine their relationship experimentally.",
+          "name": "trxas_setup"
+        },
+        "background": "Use controlled measurements to characterize the observed phenomenon.",
+        "budget": 8,
+        "claim": "The X-ray absorption intensity as a function of photon energy is described by a sum of three Lorentzian peaks plus a linear background. The parameters of this model differ between the equilibrium state and a transient state at 0.4 ps after optical excitation.",
+        "common_fixed_conditions": [
+          {
+            "condition_id": "sample_sr14cu24o41",
+            "statement": "Single crystals of Sr14Cu24O41 cleaved in situ along the ac plane."
+          },
+          {
+            "condition_id": "temperature_100k",
+            "statement": "Sample maintained at 100 K throughout the experiment."
+          },
+          {
+            "condition_id": "trxas_geometry",
+            "statement": "trXAS spectra acquired in fluorescence yield mode with x-rays at near-normal incidence, detecting signal with an avalanche photodiode at 2theta = 78 degrees."
+          },
+          {
+            "condition_id": "polarization_along_ladder",
+            "statement": "Pump and probe pulses polarized along the ladder legs (E parallel c)."
+          }
+        ],
+        "confidence_threshold": 0.9,
+        "controls": [
+          {
+            "allowed_values": [],
+            "description": "Photon energy at which the X-ray absorption intensity is measured.",
+            "maximum": 529.7,
+            "minimum": 527.89,
+            "name": "omega",
+            "unit": "eV"
+          }
+        ],
+        "counterfactual_change": "The system is optically excited, and the spectrum is measured at a short time delay after excitation.",
+        "diagnostic_conditions": [
+          {
+            "omega": 528.0
+          },
+          {
+            "omega": 528.5
+          },
+          {
+            "omega": 529.0
+          }
+        ],
+        "family": "trxas_lorentzian_fit",
+        "hidden_conditions": [
+          {
+            "omega": 528.2
+          },
+          {
+            "omega": 528.8
+          },
+          {
+            "omega": 529.3
+          }
+        ],
+        "initial_observations": [
+          "The X-ray absorption intensity varies with photon energy.",
+          "The spectrum exhibits multiple peaks."
+        ],
+        "max_replicates": 1,
+        "notes": [
+          "The spectrum is a sum of several peaks. Explore the full energy range to characterize the response."
+        ],
+        "oracle": {
+          "counterfactual_applicability": [
+            "The fit law applies to the O K-edge trXAS spectra of Sr14Cu24O41 at t = 0.4 ps after optical excitation, with omega in the range of the reported peak centers."
+          ],
+          "counterfactual_fixed_conditions": [
+            {
+              "condition_id": "pumped_t04ps_8mj",
+              "statement": "Transient spectrum recorded at t = 0.4 ps after optical excitation with 8 mJ/cm^2 fluence."
+            }
+          ],
+          "counterfactual_parameters": {
+            "a1_equilibrium": 0.7,
+            "a1_t04ps": 0.8,
+            "a2_equilibrium": 0.5,
+            "a2_t04ps": 0.6,
+            "a3_equilibrium": 1.5,
+            "a3_t04ps": 1.5,
+            "a_equilibrium": 0.038,
+            "a_t04ps": 0.035,
+            "b_equilibrium": -20.0,
+            "b_t04ps": -18.0,
+            "omega01_equilibrium": 527.89,
+            "omega01_t04ps": 527.9,
+            "omega02_equilibrium": 528.45,
+            "omega02_t04ps": 528.46,
+            "omega03_equilibrium": 529.68,
+            "omega03_t04ps": 529.7,
+            "pi_constant": 3.141592653589793,
+            "regime": 1.0,
+            "sigma1_equilibrium": 0.28,
+            "sigma1_t04ps": 0.31,
+            "sigma2_equilibrium": 0.34,
+            "sigma2_t04ps": 0.37,
+            "sigma3_equilibrium": 0.55,
+            "sigma3_t04ps": 1.18,
+            "two_constant": 2.0
+          },
+          "kind": "closed_form",
+          "outputs": {
+            "xas_intensity": {
+              "args": [
+                {
+                  "args": [
+                    {
+                      "args": [
+                        1.0,
+                        {
+                          "param": "regime"
+                        }
+                      ],
+                      "op": "subtract"
+                    },
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "a1_equilibrium"
+                                            },
+                                            {
+                                              "param": "pi_constant"
+                                            }
+                                          ],
+                                          "op": "divide"
+                                        },
+                                        {
+                                          "param": "sigma1_equilibrium"
+                                        }
+                                      ],
+                                      "op": "multiply"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "args": [
+                                                {
+                                                  "var": "omega"
+                                                },
+                                                {
+                                                  "param": "omega01_equilibrium"
+                                                }
+                                              ],
+                                              "op": "subtract"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        },
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "sigma1_equilibrium"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        }
+                                      ],
+                                      "op": "add"
+                                    }
+                                  ],
+                                  "op": "divide"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "a2_equilibrium"
+                                            },
+                                            {
+                                              "param": "pi_constant"
+                                            }
+                                          ],
+                                          "op": "divide"
+                                        },
+                                        {
+                                          "param": "sigma2_equilibrium"
+                                        }
+                                      ],
+                                      "op": "multiply"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "args": [
+                                                {
+                                                  "var": "omega"
+                                                },
+                                                {
+                                                  "param": "omega02_equilibrium"
+                                                }
+                                              ],
+                                              "op": "subtract"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        },
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "sigma2_equilibrium"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        }
+                                      ],
+                                      "op": "add"
+                                    }
+                                  ],
+                                  "op": "divide"
+                                }
+                              ],
+                              "op": "add"
+                            },
+                            {
+                              "args": [
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "param": "a3_equilibrium"
+                                        },
+                                        {
+                                          "param": "pi_constant"
+                                        }
+                                      ],
+                                      "op": "divide"
+                                    },
+                                    {
+                                      "param": "sigma3_equilibrium"
+                                    }
+                                  ],
+                                  "op": "multiply"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "var": "omega"
+                                            },
+                                            {
+                                              "param": "omega03_equilibrium"
+                                            }
+                                          ],
+                                          "op": "subtract"
+                                        },
+                                        {
+                                          "param": "two_constant"
+                                        }
+                                      ],
+                                      "op": "power"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "param": "sigma3_equilibrium"
+                                        },
+                                        {
+                                          "param": "two_constant"
+                                        }
+                                      ],
+                                      "op": "power"
+                                    }
+                                  ],
+                                  "op": "add"
+                                }
+                              ],
+                              "op": "divide"
+                            }
+                          ],
+                          "op": "add"
+                        },
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "param": "a_equilibrium"
+                                },
+                                {
+                                  "var": "omega"
+                                }
+                              ],
+                              "op": "multiply"
+                            },
+                            {
+                              "param": "b_equilibrium"
+                            }
+                          ],
+                          "op": "add"
+                        }
+                      ],
+                      "op": "add"
+                    }
+                  ],
+                  "op": "multiply"
+                },
+                {
+                  "args": [
+                    {
+                      "param": "regime"
+                    },
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "a1_t04ps"
+                                            },
+                                            {
+                                              "param": "pi_constant"
+                                            }
+                                          ],
+                                          "op": "divide"
+                                        },
+                                        {
+                                          "param": "sigma1_t04ps"
+                                        }
+                                      ],
+                                      "op": "multiply"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "args": [
+                                                {
+                                                  "var": "omega"
+                                                },
+                                                {
+                                                  "param": "omega01_t04ps"
+                                                }
+                                              ],
+                                              "op": "subtract"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        },
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "sigma1_t04ps"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        }
+                                      ],
+                                      "op": "add"
+                                    }
+                                  ],
+                                  "op": "divide"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "a2_t04ps"
+                                            },
+                                            {
+                                              "param": "pi_constant"
+                                            }
+                                          ],
+                                          "op": "divide"
+                                        },
+                                        {
+                                          "param": "sigma2_t04ps"
+                                        }
+                                      ],
+                                      "op": "multiply"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "args": [
+                                                {
+                                                  "var": "omega"
+                                                },
+                                                {
+                                                  "param": "omega02_t04ps"
+                                                }
+                                              ],
+                                              "op": "subtract"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        },
+                                        {
+                                          "args": [
+                                            {
+                                              "param": "sigma2_t04ps"
+                                            },
+                                            {
+                                              "param": "two_constant"
+                                            }
+                                          ],
+                                          "op": "power"
+                                        }
+                                      ],
+                                      "op": "add"
+                                    }
+                                  ],
+                                  "op": "divide"
+                                }
+                              ],
+                              "op": "add"
+                            },
+                            {
+                              "args": [
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "param": "a3_t04ps"
+                                        },
+                                        {
+                                          "param": "pi_constant"
+                                        }
+                                      ],
+                                      "op": "divide"
+                                    },
+                                    {
+                                      "param": "sigma3_t04ps"
+                                    }
+                                  ],
+                                  "op": "multiply"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "args": [
+                                            {
+                                              "var": "omega"
+                                            },
+                                            {
+                                              "param": "omega03_t04ps"
+                                            }
+                                          ],
+                                          "op": "subtract"
+                                        },
+                                        {
+                                          "param": "two_constant"
+                                        }
+                                      ],
+                                      "op": "power"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "param": "sigma3_t04ps"
+                                        },
+                                        {
+                                          "param": "two_constant"
+                                        }
+                                      ],
+                                      "op": "power"
+                                    }
+                                  ],
+                                  "op": "add"
+                                }
+                              ],
+                              "op": "divide"
+                            }
+                          ],
+                          "op": "add"
+                        },
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "param": "a_t04ps"
+                                },
+                                {
+                                  "var": "omega"
+                                }
+                              ],
+                              "op": "multiply"
+                            },
+                            {
+                              "param": "b_t04ps"
+                            }
+                          ],
+                          "op": "add"
+                        }
+                      ],
+                      "op": "add"
+                    }
+                  ],
+                  "op": "multiply"
+                }
+              ],
+              "op": "add"
+            }
+          },
+          "paper_applicability": [
+            "The fit law applies to the O K-edge trXAS spectra of Sr14Cu24O41 at equilibrium, with omega in the range of the reported peak centers."
+          ],
+          "paper_fixed_conditions": [
+            {
+              "condition_id": "equilibrium_no_pump",
+              "statement": "Equilibrium spectrum recorded without optical pump excitation (pre-pump condition)."
+            }
+          ],
+          "paper_parameters": {
+            "a1_equilibrium": 0.7,
+            "a1_t04ps": 0.8,
+            "a2_equilibrium": 0.5,
+            "a2_t04ps": 0.6,
+            "a3_equilibrium": 1.5,
+            "a3_t04ps": 1.5,
+            "a_equilibrium": 0.038,
+            "a_t04ps": 0.035,
+            "b_equilibrium": -20.0,
+            "b_t04ps": -18.0,
+            "omega01_equilibrium": 527.89,
+            "omega01_t04ps": 527.9,
+            "omega02_equilibrium": 528.45,
+            "omega02_t04ps": 528.46,
+            "omega03_equilibrium": 529.68,
+            "omega03_t04ps": 529.7,
+            "pi_constant": 3.141592653589793,
+            "regime": 0.0,
+            "sigma1_equilibrium": 0.28,
+            "sigma1_t04ps": 0.31,
+            "sigma2_equilibrium": 0.34,
+            "sigma2_t04ps": 0.37,
+            "sigma3_equilibrium": 0.55,
+            "sigma3_t04ps": 1.18,
+            "two_constant": 2.0
+          }
+        },
+        "readouts": [
+          {
+            "description": "Fitted X-ray absorption intensity as a function of photon energy.",
+            "name": "xas_intensity",
+            "resolution": null,
+            "resolution_kind": null,
+            "statistic": "Deterministic central value of the source-reported quantitative relation.",
+            "uncertainty": "Any source-reported uncertainty is retained as provenance and is not sampled or propagated into this query.",
+            "unit": "arbitrary units"
+          }
+        ],
+        "relative_tolerance": 0.05,
+        "source": {
+          "arxiv_versioned_id": "2510.24686v1",
+          "citation": "Hari Padma, Light-Induced Charge Order Mode in a Metastable Cuprate Ladder, Physical Review Letters (2026), DOI:10.1103/wdcf-jly6",
+          "journal_doi": "10.1103/wdcf-jly6",
+          "locator": "Table 1, lines 213-233",
+          "role": "source"
+        },
+        "title": "Time-Resolved X-ray Absorption Spectroscopy of a Cuprate Ladder"
+      },
+      "counterfactual_derivation": {
+        "counterfactual_claim_ids": [
+          "trxas_t04ps_fit"
+        ],
+        "counterfactual_value": 1.0,
+        "description": "The two branches correspond to the equilibrium (pre-pump) and transient (t=0.4 ps after optical excitation) states reported in the source. The selector parameter distinguishes these two regimes.",
+        "historical_value": 0.0,
+        "kind": "reported_regime_selection",
+        "paper_claim_ids": [
+          "trxas_equilibrium_fit"
+        ],
+        "paper_defined_equations_unchanged": true,
+        "selector_parameter": "regime",
+        "source_claim_ids": [
+          "trxas_equilibrium_fit",
+          "trxas_t04ps_fit"
+        ],
+        "source_mechanism_ids": [
+          "trxas_lorentzian_fit"
+        ]
+      },
+      "design_summary": "The case presents a time-resolved X-ray absorption spectroscopy (trXAS) experiment on a cuprate ladder material. The player controls the photon energy (omega) and observes the fitted XAS intensity. Two hidden regimes are compared: the equilibrium (pre-pump) state and a transient state at 0.4 ps after optical excitation. The underlying spectral model is a sum of three Lorentzian peaks plus a linear background, with different fit parameters in each regime. The player must infer how the intensity-energy relationship changes between the two regimes.",
+      "information_boundary": {
+        "identification_only": {
+          "claim_ids": [
+            "trxas_equilibrium_fit",
+            "trxas_t04ps_fit"
+          ],
+          "fixed_condition_ids": [],
+          "items": [
+            "The spectral model is a sum of three Lorentzian peaks plus a linear background.",
+            "The model has parameters for peak amplitudes, center energies, linewidths, and background slope and intercept.",
+            "The model is used to describe the X-ray absorption spectrum."
+          ],
+          "line_ranges": [
+            {
+              "line_end": 224,
+              "line_start": 213
+            },
+            {
+              "line_end": 232,
+              "line_start": 232
+            },
+            {
+              "line_end": 233,
+              "line_start": 233
+            }
+          ],
+          "mechanism_ids": [
+            "trxas_lorentzian_fit"
+          ]
+        },
+        "oracle_only": {
+          "claim_ids": [
+            "trxas_equilibrium_fit",
+            "trxas_t04ps_fit"
+          ],
+          "fixed_condition_ids": [],
+          "items": [
+            "The equilibrium branch uses fit parameters: A1=0.7, omega01=527.89 eV, sigma1=0.28 eV; A2=0.5, omega02=528.45 eV, sigma2=0.34 eV; A3=1.5, omega03=529.68 eV, sigma3=0.55 eV; a=0.038, b=-20 eV.",
+            "The t=0.4 ps branch uses fit parameters: A1=0.8, omega01=527.90 eV, sigma1=0.31 eV; A2=0.6, omega02=528.46 eV, sigma2=0.37 eV; A3=1.5, omega03=529.70 eV, sigma3=1.18 eV; a=0.035, b=-18 eV.",
+            "The two branches share the same functional form but differ in the parameter values."
+          ],
+          "line_ranges": [
+            {
+              "line_end": 224,
+              "line_start": 213
+            },
+            {
+              "line_end": 232,
+              "line_start": 232
+            },
+            {
+              "line_end": 233,
+              "line_start": 233
+            }
+          ],
+          "mechanism_ids": [
+            "trxas_lorentzian_fit"
+          ]
+        },
+        "shared_player": [
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "title",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "background",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "apparatus",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "control.omega",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "readout.xas_intensity",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "initial_observation.0",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "initial_observation.1",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "fixed_condition.sample_sr14cu24o41",
+            "fixed_condition_ids": [
+              "sample_sr14cu24o41"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              },
+              {
+                "line_end": 525,
+                "line_start": 525
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "fixed_condition.temperature_100k",
+            "fixed_condition_ids": [
+              "temperature_100K"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              },
+              {
+                "line_end": 525,
+                "line_start": 525
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "fixed_condition.trxas_geometry",
+            "fixed_condition_ids": [
+              "trxas_geometry"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              },
+              {
+                "line_end": 525,
+                "line_start": 525
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "fixed_condition.polarization_along_ladder",
+            "fixed_condition_ids": [
+              "polarization_along_ladder"
+            ],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              },
+              {
+                "line_end": 521,
+                "line_start": 521
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          },
+          {
+            "claim_ids": [
+              "trxas_equilibrium_fit",
+              "trxas_t04ps_fit"
+            ],
+            "field": "note.0",
+            "fixed_condition_ids": [],
+            "line_ranges": [
+              {
+                "line_end": 224,
+                "line_start": 213
+              },
+              {
+                "line_end": 232,
+                "line_start": 232
+              },
+              {
+                "line_end": 233,
+                "line_start": 233
+              }
+            ],
+            "mechanism_ids": [
+              "trxas_lorentzian_fit"
+            ]
+          }
+        ]
+      },
+      "relationship_targets": [
+        {
+          "control": "omega",
+          "counterfactual_direction": "decreasing",
+          "counterfactual_shape": "Sum of three Lorentzian peaks plus linear background.",
+          "historical_direction": "non_monotonic",
+          "historical_shape": "Sum of three Lorentzian peaks plus linear background.",
+          "readout": "xas_intensity",
+          "source_claim_ids": [
+            "trxas_equilibrium_fit",
+            "trxas_t04ps_fit"
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

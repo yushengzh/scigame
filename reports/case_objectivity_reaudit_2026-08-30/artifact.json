@@ -1,0 +1,661 @@
+{
+  "surface": "report",
+  "manifest": {
+    "title": "29 个 Matched Scientific Families / 116 Cells 质量复审",
+    "description": "Family-level scientific correctness, Player/Oracle information completeness, and dual-Oracle readiness review.",
+    "version": 1,
+    "surface": "report",
+    "generatedAt": "2026-08-31T20:00:00+04:00",
+    "filters": [],
+    "cards": [],
+    "charts": [
+      {
+        "id": "admitted_family_counts",
+        "title": "Admitted families by case pack",
+        "subtitle": "29 admitted families / 116 matched cells; two rejected temporal candidates are excluded.",
+        "type": "bar",
+        "dataset": "admitted_family_counts",
+        "sourceId": "admission_count_sql",
+        "valueFormat": "number",
+        "encodings": {
+          "x": {
+            "field": "pack",
+            "type": "nominal",
+            "label": "Case pack"
+          },
+          "y": {
+            "field": "families",
+            "type": "quantitative",
+            "label": "Admitted families"
+          },
+          "tooltip": [
+            {
+              "field": "families",
+              "type": "quantitative",
+              "label": "Families",
+              "format": "number"
+            },
+            {
+              "field": "cells",
+              "type": "quantitative",
+              "label": "Matched cells",
+              "format": "number"
+            }
+          ]
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "family_findings_table",
+        "title": "Family-level scientific and information findings",
+        "subtitle": "Pass covers the declared scientific scope, Player information, deterministic Oracle truth, and evaluator contract.",
+        "dataset": "family_findings",
+        "sourceId": "family_table_sql",
+        "defaultSort": {
+          "field": "sequence",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "sequence",
+            "label": "#",
+            "type": "number"
+          },
+          {
+            "field": "family",
+            "label": "Family",
+            "type": "text"
+          },
+          {
+            "field": "pack",
+            "label": "Pack",
+            "type": "text"
+          },
+          {
+            "field": "status",
+            "label": "Decision",
+            "type": "text"
+          },
+          {
+            "field": "scientific_truth",
+            "label": "Scientific truth",
+            "type": "text"
+          },
+          {
+            "field": "player_information",
+            "label": "Player info",
+            "type": "text"
+          },
+          {
+            "field": "oracle_information",
+            "label": "Deterministic Oracle info",
+            "type": "text"
+          },
+          {
+            "field": "severity",
+            "label": "Severity",
+            "type": "text"
+          },
+          {
+            "field": "runtime_registered",
+            "label": "Registered",
+            "type": "boolean"
+          },
+          {
+            "field": "finding",
+            "label": "Finding",
+            "type": "text"
+          },
+          {
+            "field": "action",
+            "label": "Minimum action",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# 29 个 Matched Scientific Families / 116 Cells 质量复审\n\n审查单位是 family；四个 matched cells 不被当成四个统计独立样本。"
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "sourceId": "scientific_findings",
+        "body": "## Technical Summary\n\n**当前正式准入 29 个 family / 116 个 matched cells：20 个 built-in 与 9 个 temporal，均为 pass。** 116/116 真值提交通过 evaluator，116/116 false twins 被拒；1,242 次采样的确定性 Oracle 查询全部有限、单位一致且可重放。全部 29 个 family 已注册。\n\n另有两个 temporal candidates 被明确排除：它们的数值关系本身不必然错误，但不满足严格 matched-world 的同一科学对象与 evidence modality。确定性与概率性 Oracle 的差异仍是后续 ablation，不属于本轮 case 准入。"
+      },
+      {
+        "id": "admission_chart",
+        "type": "chart",
+        "chartId": "admitted_family_counts"
+      },
+      {
+        "id": "findings_table_block",
+        "type": "table",
+        "tableId": "family_findings_table"
+      },
+      {
+        "id": "shared_gates",
+        "type": "markdown",
+        "sourceId": "machine_evidence",
+        "body": "## Shared admission gates\n\n1. **Identification contract — pass:** public names, meanings, units, and finite-real domains are explicit; common temporal constants are no longer artificial unknowns.\n2. **Active information capacity — pass:** free parameters fit within the observation capacity, and finite domains cannot be completely enumerated within budget.\n3. **Runtime registration — pass:** all 20 built-in and 9 temporal families are addressable by their separate registries.\n4. **Oracle ablation — not evaluated here:** case truth was frozen independently of Oracle implementation."
+      },
+      {
+        "id": "player_completeness",
+        "type": "markdown",
+        "sourceId": "scientific_findings",
+        "body": "## Player information completeness\n\nAll admitted families expose apparatus, legal controls, readouts, units, domains/resolution, and budget. Historical and counterfactual public surfaces match apart from opaque IDs. Identification additionally exposes its complete scaffold; Discovery exposes only the shared expression grammar. No admitted Discovery payload reveals its sibling-world label or Identification skeleton."
+      },
+      {
+        "id": "oracle_completeness",
+        "type": "markdown",
+        "sourceId": "machine_evidence",
+        "body": "## Deterministic Oracle information completeness\n\nEvery selected world now carries non-empty applicability and fixed-condition context. The WorldModel returns the declared statistic, unit, resolution, and uncertainty wording, and both tracks receive identical evidence in the same world. Temporal fit uncertainty is retained as provenance when the Oracle evaluates only a central fitted curve."
+      },
+      {
+        "id": "dual_oracle",
+        "type": "markdown",
+        "body": "## Oracle modes are a later ablation\n\nThe two modes must be separate implementations behind the same proposal/response contract: `deterministic` uses CaseOracle + WorldModel, while `probabilistic` lets a God LLM read the complete selected-world private science and generate evidence. This review neither implements nor compares that ablation. The existing exact-copy LLM presentation layer is not the probabilistic God Oracle."
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "sourceId": "machine_evidence",
+        "body": "## Methodology\n\nThe review combined four-cell instantiation, boundary/midpoint Oracle queries, evaluator truth/false-twin checks, source-level family review, observation-capacity checks, and local numerical rank checks. Three independent reviewers covered built-in science, temporal source fidelity, and shared contracts. Full unit tests passed 410/410. Tests support implementation consistency; source review supports scientific fidelity within each declared idealization."
+      },
+      {
+        "id": "limits",
+        "type": "markdown",
+        "body": "## Evidence boundary\n\nVerified means faithful to the cited source or explicitly disclosed benchmark idealization; it is not an independent experimental replication. A counterfactual need not exist in our world, but it must be clearly authored, internally coherent, comparable under the shared apparatus, and never presented as a source-observed historical regime."
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## Next step\n\nThe 29 registered families can now be used for deterministic-Oracle development evaluation. Next, implement the probabilistic God Oracle as a genuinely independent path and preregister the deterministic-versus-probabilistic comparison. Do not change case truth while estimating that ablation effect."
+      }
+    ],
+    "sources": [
+      {
+        "id": "scientific_findings",
+        "label": "Family-level scientific adjudication",
+        "path": "reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json"
+      },
+      {
+        "id": "machine_evidence",
+        "label": "Reproducible machine contract evidence",
+        "path": "reports/case_objectivity_reaudit_2026-08-30/machine_evidence.json"
+      },
+      {
+        "id": "full_report",
+        "label": "Detailed Markdown review",
+        "path": "reports/case_objectivity_reaudit_2026-08-30/report.md"
+      },
+      {
+        "id": "admission_count_sql",
+        "label": "Admitted family counts by pack",
+        "path": "reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Counts admitted family-level PASS decisions in the built-in and temporal packs; rejected candidates are stored outside $.families.",
+          "executed_at": "2026-08-31T20:00:00+04:00",
+          "sql": "WITH document AS (SELECT CAST(readfile('reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json') AS TEXT) AS body), families AS (SELECT value FROM document, json_each(body, '$.families')) SELECT CASE json_extract(value, '$.pack') WHEN 'built_in' THEN 'Built-in' ELSE 'Temporal' END AS pack, count(*) AS families, 4*count(*) AS cells FROM families GROUP BY json_extract(value, '$.pack') ORDER BY CASE json_extract(value, '$.pack') WHEN 'built_in' THEN 1 ELSE 2 END;"
+        }
+      },
+      {
+        "id": "family_table_sql",
+        "label": "Family-level adjudication rows",
+        "path": "reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Extracts the 29 admitted family decisions and their Player/Oracle completeness findings in source order.",
+          "executed_at": "2026-08-31T20:00:00+04:00",
+          "sql": "WITH document AS (SELECT CAST(readfile('reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json') AS TEXT) AS body), families AS (SELECT key, value FROM document, json_each(body, '$.families')) SELECT CAST(key AS INTEGER)+1 AS sequence, json_extract(value, '$.family') AS family, CASE json_extract(value, '$.pack') WHEN 'built_in' THEN 'Built-in' ELSE 'Temporal' END AS pack, CASE json_extract(value, '$.status') WHEN 'pass' THEN 'Pass' WHEN 'revise' THEN 'Revise' ELSE 'Block' END AS status, json_extract(value, '$.scientific_truth') AS scientific_truth, json_extract(value, '$.player_information') AS player_information, json_extract(value, '$.deterministic_oracle_information') AS oracle_information, json_extract(value, '$.severity') AS severity, json_extract(value, '$.runtime_registered') AS runtime_registered, json_extract(value, '$.finding') AS finding, json_extract(value, '$.action') AS action FROM families ORDER BY CAST(key AS INTEGER);"
+        }
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-31T20:00:00+04:00",
+    "status": "ready",
+    "datasets": {
+      "admitted_family_counts": [
+        {
+          "pack": "Built-in",
+          "families": 20,
+          "cells": 80
+        },
+        {
+          "pack": "Temporal",
+          "families": 9,
+          "cells": 36
+        }
+      ],
+      "family_findings": [
+        {
+          "sequence": 1,
+          "family": "pendulum",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 2,
+          "family": "young_double_slit",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 3,
+          "family": "galileo_inclined_plane",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 4,
+          "family": "boyle_j_tube",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 5,
+          "family": "photoelectric",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 6,
+          "family": "faraday_induction",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 7,
+          "family": "radioactive_decay",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 8,
+          "family": "rutherford_scattering",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 9,
+          "family": "hooke_spring",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 10,
+          "family": "torricelli_efflux",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "The ideal efflux-speed law is scoped to geometrically matched outlets; area remains a legal control and shape, edge profile, thickness, and orientation remain matched.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 11,
+          "family": "ohm_circuit",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 12,
+          "family": "rc_discharge",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 13,
+          "family": "stefan_boltzmann",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 14,
+          "family": "newton_cooling",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 15,
+          "family": "beer_lambert",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 16,
+          "family": "michaelis_menten",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 17,
+          "family": "coulomb_force",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 18,
+          "family": "kepler_orbit",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 19,
+          "family": "brownian_diffusion",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 20,
+          "family": "poiseuille_flow",
+          "pack": "Built-in",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "The declared laminar range, 10 cm conditioned inlet lead, and fully developed no-slip Newtonian scope support the encoded pressure/radius/length/viscosity law.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 21,
+          "family": "kz_incompressible_energy_temperature_regimes",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Both source-reported temperature-regime central fits retain their reported applicability and fit-uncertainty provenance.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 22,
+          "family": "viscous_inertial_rheology",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 23,
+          "family": "rilw_msd_scaling",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 24,
+          "family": "defect_sre",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 25,
+          "family": "trxas_lorentzian_fit",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "The case returns only the source-defined third (UHB) Lorentzian fit component. Its two unknowns are the center and linewidth; two diagnostic energies give full local rank and one of three source energies remains held out.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 26,
+          "family": "self_similar_spreading_radius_ratio",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Both worlds now use the same source-reported two-dimensional deterministic simulation modality; only the interaction exponent k changes.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 27,
+          "family": "stealthy_hyperuniform_localization_scaling",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 28,
+          "family": "uamo_lyapunov",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "Independent scientific review found the encoded law, declared scope, public experiment contract, selected-world private truth, WorldModel evidence, and evaluator mutually consistent.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        },
+        {
+          "sequence": 29,
+          "family": "statistical_mean_field_effective_detuning",
+          "pack": "Temporal",
+          "status": "Pass",
+          "scientific_truth": "verified_within_declared_scope",
+          "player_information": "complete",
+          "oracle_information": "complete",
+          "severity": "none",
+          "runtime_registered": true,
+          "finding": "The paired axis is the source relation at representative d_H=1.5 versus the homogeneous two-dimensional d_H=2 limit; the three-point domain has budget two.",
+          "action": "Admitted; retain the declared applicability, fixed conditions, and matched information boundary."
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "scientific_findings",
+      "label": "Family-level scientific adjudication",
+      "path": "reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json"
+    },
+    {
+      "id": "machine_evidence",
+      "label": "Reproducible machine contract evidence",
+      "path": "reports/case_objectivity_reaudit_2026-08-30/machine_evidence.json"
+    },
+    {
+      "id": "full_report",
+      "label": "Detailed Markdown review",
+      "path": "reports/case_objectivity_reaudit_2026-08-30/report.md"
+    },
+    {
+      "id": "admission_count_sql",
+      "label": "Admitted family counts by pack",
+      "path": "reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Counts admitted family-level PASS decisions in the built-in and temporal packs; rejected candidates are stored outside $.families.",
+        "executed_at": "2026-08-31T20:00:00+04:00",
+        "sql": "WITH document AS (SELECT CAST(readfile('reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json') AS TEXT) AS body), families AS (SELECT value FROM document, json_each(body, '$.families')) SELECT CASE json_extract(value, '$.pack') WHEN 'built_in' THEN 'Built-in' ELSE 'Temporal' END AS pack, count(*) AS families, 4*count(*) AS cells FROM families GROUP BY json_extract(value, '$.pack') ORDER BY CASE json_extract(value, '$.pack') WHEN 'built_in' THEN 1 ELSE 2 END;"
+      }
+    },
+    {
+      "id": "family_table_sql",
+      "label": "Family-level adjudication rows",
+      "path": "reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Extracts the 29 admitted family decisions and their Player/Oracle completeness findings in source order.",
+        "executed_at": "2026-08-31T20:00:00+04:00",
+        "sql": "WITH document AS (SELECT CAST(readfile('reports/case_objectivity_reaudit_2026-08-30/scientific_findings.json') AS TEXT) AS body), families AS (SELECT key, value FROM document, json_each(body, '$.families')) SELECT CAST(key AS INTEGER)+1 AS sequence, json_extract(value, '$.family') AS family, CASE json_extract(value, '$.pack') WHEN 'built_in' THEN 'Built-in' ELSE 'Temporal' END AS pack, CASE json_extract(value, '$.status') WHEN 'pass' THEN 'Pass' WHEN 'revise' THEN 'Revise' ELSE 'Block' END AS status, json_extract(value, '$.scientific_truth') AS scientific_truth, json_extract(value, '$.player_information') AS player_information, json_extract(value, '$.deterministic_oracle_information') AS oracle_information, json_extract(value, '$.severity') AS severity, json_extract(value, '$.runtime_registered') AS runtime_registered, json_extract(value, '$.finding') AS finding, json_extract(value, '$.action') AS action FROM families ORDER BY CAST(key AS INTEGER);"
+      }
+    }
+  ]
+}

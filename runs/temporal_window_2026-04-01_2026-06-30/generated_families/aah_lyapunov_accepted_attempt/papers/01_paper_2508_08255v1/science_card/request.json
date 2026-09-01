@@ -1,0 +1,899 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2508.08255v1\", \"citation\": \"Quan Lin, Observation of Metal-Insulator and Spectral Phase Transitions in Aubry-André-Harper Models, Physical Review Letters (2026), DOI:10.1103/tz2n-lqxx\", \"journal_doi\": \"10.1103/tz2n-lqxx\"}\n\nSource-grounded routing hint from pre-screening:\nPreserve the source-verified full-domain UAMO Lyapunov family on public lambda_1,lambda_2 in [0.2,0.67]^2 with private eta=0 versus eta=0.1. Both claims must use the identical unsimplified source program max(zero, subtract(log(lambda0), multiply(two_pi, eta_branch))), with lambda0=lambda_2*(1+sqrt(1-lambda_1^2))/(lambda_1*(1+sqrt(1-lambda_2^2))); eta_zero=0 remains a distinct private leaf from zero. Parameter one has role only in both radicands and both 1+lambda_prime factors, anchored lines95,104,111; controls cite direct definitions lines95/104 and scan/endpoints, readout cites line218. In assessment explicitly quarantine contradictory prose at lines125,211,227,366-367 and retain selected truth from lines111,359,402 and reported 0.119; source_ambiguities empty. Private eta conditions only, no localized-phase inequality or initial-state branches, no extra claims/domains.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nRevision context from an independent review of a prior ScienceCard:\n{\"issues\":[{\"code\":\"card.eta_zero_program_regressed_from_the_common_source_skeleton\",\"detail\":\"The eta=0 AST is algebraically correct but omits subtract(multiply(two_pi,eta_zero)), while the eta=0.1 AST retains it. Restore the exact general source program maximum(zero, subtract(log(lambda_0), multiply(two_pi, eta_branch))) for both claims, changing only the private eta leaf. Keep eta_zero distinct from the max-floor parameter zero. This is required for the matched identification skeleton and was already source-closed in the prior unified card.\",\"line_ranges\":[{\"line_end\":96,\"line_start\":95},{\"line_end\":402,\"line_start\":400},{\"line_end\":425,\"line_start\":425}]},{\"code\":\"card.one_parameter_role_and_locator_regressed\",\"detail\":\"The parameter one is executed in four places: the radicands 1-lambda_1^2 and 1-lambda_2^2 and the factors 1+lambda_1_prime and 1+lambda_2_prime. Its role instead says it appears in the max function, where the AST and source use zero, and its sole line-111 anchor omits the two radicand equations. Change the role to those four real uses and add lines 95 and 104; keep line 111 and the value 1 unchanged.\",\"line_ranges\":[{\"line_end\":104,\"line_start\":95},{\"line_end\":111,\"line_start\":108},{\"line_end\":402,\"line_start\":400}]},{\"code\":\"card.control_and_readout_locator_chains_regressed\",\"detail\":\"The interval is scientifically valid, but the lambda_1 and lambda_2 entries paraphrase their coupling meanings and [0,1] domains without citing the direct definitions at lines 95 and 104. The readout calls L an inverse localization length without citing the exact definition at line 218. Add those direct locators while retaining the existing source-reported endpoints, whole-parameter-scan locators, and [0.2,0.67]^2 benchmark square.\",\"line_ranges\":[{\"line_end\":104,\"line_start\":95},{\"line_end\":134,\"line_start\":134},{\"line_end\":218,\"line_start\":218},{\"line_end\":425,\"line_start\":418}]},{\"code\":\"card.pt_threshold_inconsistency_inventory_regressed\",\"detail\":\"The assessment mentions only a main-text versus supplementary normalization inconsistency. The frozen source also contains the contradictory sentence at line 227 and the nonsensical/missing-2*pi turning-point prose at lines 366-367. Explicitly quarantine lines 125, 211, 227, and 366-367 as prose errors and retain the selected truth from lambda_0 at line 111, the original-model law at line 402, the dual equation at line 359, and the reported 0.119 value. Do not add a selected source ambiguity or change either numerical law.\",\"line_ranges\":[{\"line_end\":125,\"line_start\":125},{\"line_end\":227,\"line_start\":211},{\"line_end\":367,\"line_start\":357},{\"line_end\":404,\"line_start\":400}]}],\"previous_science_card\":{\"assessment\":\"The source packet provides a complete experimental and theoretical description of the unitary almost-Mathieu operator (UAMO) and its non-Hermitian extension (PUAMO) realized via single-photon quantum walks. The selected quantitative cluster focuses on the Lyapunov exponent L_lambda1_lambda2_eta of the PUAMO, given by L = max(0, log(lambda_0) - 2*pi*|eta|) with lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2')). Two claims are built for the private regimes eta=0 and eta=0.1, sharing public controls lambda_1 and lambda_2 in [0.2,0.67] and the common readout lyapunov_exponent. The source reports the full parameter-space phase scans for the Hermitian (eta=0) and non-Hermitian (eta=0.1) cases, and the Lyapunov formula is explicitly given in the supplementary material. The extraction captures the central quantitative relation with all structural constants as named, anchored parameters. The source contains an internal inconsistency in the PT-threshold wording (main text states eta_PT = -log(lambda_0) while the supplementary and reported numeric value 0.119 for lambda_1=0.25, lambda_2=0.5 imply eta_PT = log(lambda_0)/(2*pi)), but this does not affect the selected Lyapunov equations, which are internally consistent. Therefore case_authoring_ready is set to true.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":108,\"line_start\":108,\"support\":\"This can be inferred from the Lyapunov exponent L_lambda1_lambda2_Phi of the model, which describes the average decay of eigenstates\"},{\"line_end\":109,\"line_start\":109,\"support\":\"In the localized phase, we have L = log(lambda_0) > 0\"},{\"line_end\":111,\"line_start\":111,\"support\":\"lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2'))\"},{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"applicability\":\"The claim applies to the Hermitian regime (eta=0) with theta=0 and Phi=(sqrt(5)-1)/2. The formula is phase-spanning: positive L indicates localization, zero L indicates delocalization.\",\"claim_id\":\"lyapunov_eta_zero\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"lambda_1=0.67, 0.435, 0.2 in the Hermitian quantum walk\"},{\"line_end\":134,\"line_start\":134,\"support\":\"we experimentally map the relationship between sigma and lambda_1, lambda_2 by scanning the whole parameter space\"}],\"control_name\":\"lambda_1\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The source reports lambda_1 values 0.67, 0.435, 0.2 in the Hermitian phase diagram; the conservative interval [0.2, 0.67] lies within the source's 0-to-1 coupling range and is covered by the reported full-parameter-space phase scans.\",\"maximum\":0.67,\"minimum\":0.2},{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"lambda_2=0.2, 0.435, 0.67 in the Hermitian quantum walk\"},{\"line_end\":134,\"line_start\":134,\"support\":\"we experimentally map the relationship between sigma and lambda_1, lambda_2 by scanning the whole parameter space\"}],\"control_name\":\"lambda_2\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The source reports lambda_2 values 0.2, 0.435, 0.67 in the Hermitian phase diagram; the conservative interval [0.2, 0.67] lies within the source's 0-to-1 coupling range and is covered by the reported full-parameter-space phase scans.\",\"maximum\":0.67,\"minimum\":0.2}],\"control_names\":[\"lambda_1\",\"lambda_2\"],\"depends_on\":[],\"fixed_condition_ids\":[\"irrational_field_phi\",\"theta_zero\",\"eta_zero\"],\"mechanism_ids\":[\"lambda0_structure\",\"lyapunov_eta_zero\"],\"oracle_outputs\":{\"lyapunov_exponent\":{\"args\":[{\"param\":\"zero\"},{\"args\":[{\"args\":[{\"args\":[{\"var\":\"lambda_2\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"args\":[{\"param\":\"one\"},{\"args\":[{\"var\":\"lambda_1\"},{\"param\":\"square_exponent\"}],\"op\":\"power\"}],\"op\":\"subtract\"},{\"param\":\"sqrt_exponent\"}],\"op\":\"power\"}],\"op\":\"add\"}],\"op\":\"multiply\"},{\"args\":[{\"var\":\"lambda_1\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"args\":[{\"param\":\"one\"},{\"args\":[{\"var\":\"lambda_2\"},{\"param\":\"square_exponent\"}],\"op\":\"power\"}],\"op\":\"subtract\"},{\"param\":\"sqrt_exponent\"}],\"op\":\"power\"}],\"op\":\"add\"}],\"op\":\"multiply\"}],\"op\":\"divide\"}],\"op\":\"log\"}],\"op\":\"maximum\"}},\"quantitative_form\":\"L = max(0, log(lambda_0)) with lambda_0 = lambda_2*(1+sqrt(1-lambda_1^2))/(lambda_1*(1+sqrt(1-lambda_2^2)))\",\"readout_names\":[\"lyapunov_exponent\"],\"statement\":\"In the Hermitian regime (eta=0), the Lyapunov exponent of the UAMO is L = max(0, log(lambda_0)), where lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2')). The positive versus zero output identifies localization versus delocalization.\",\"statistical_basis\":\"The Lyapunov exponent is a theoretical quantity; the source reports the formula and uses it to characterize the localization transition. The experimental phase diagram is measured via the standard deviation sigma at t=6.\",\"uncertainty\":\"source_unspecified\"},{\"anchors\":[{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"},{\"line_end\":425,\"line_start\":425,\"support\":\"We set theta=0, eta=0.1\"},{\"line_end\":111,\"line_start\":111,\"support\":\"lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2'))\"}],\"applicability\":\"The claim applies to the non-Hermitian regime with eta=0.1, theta=0 and Phi=(sqrt(5)-1)/2. The formula is phase-spanning: positive L indicates localization, zero L indicates delocalization.\",\"claim_id\":\"lyapunov_eta_point_one\",\"control_domains\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":117,\"line_start\":117,\"support\":\"lambda_1=0.5 and 0.25 in the non-Hermitian quantum walk\"},{\"line_end\":418,\"line_start\":418,\"support\":\"we experimentally measure the second moment ... as a function of the parameters lambda_1 and lambda_2 across the entire parameter space\"}],\"control_name\":\"lambda_1\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The source reports lambda_1 values 0.5 and 0.25 in the non-Hermitian experiments; the conservative interval [0.2, 0.67] lies within the source's 0-to-1 coupling range and is covered by the reported full-parameter-space phase scans.\",\"maximum\":0.67,\"minimum\":0.2},{\"allowed_values\":[],\"anchors\":[{\"line_end\":117,\"line_start\":117,\"support\":\"lambda_2=0.25 and 0.5 in the non-Hermitian quantum walk\"},{\"line_end\":418,\"line_start\":418,\"support\":\"we experimentally measure the second moment ... as a function of the parameters lambda_1 and lambda_2 across the entire parameter space\"}],\"control_name\":\"lambda_2\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The source reports lambda_2 values 0.25 and 0.5 in the non-Hermitian experiments; the conservative interval [0.2, 0.67] lies within the source's 0-to-1 coupling range and is covered by the reported full-parameter-space phase scans.\",\"maximum\":0.67,\"minimum\":0.2}],\"control_names\":[\"lambda_1\",\"lambda_2\"],\"depends_on\":[],\"fixed_condition_ids\":[\"irrational_field_phi\",\"theta_zero\",\"eta_point_one_condition\"],\"mechanism_ids\":[\"lambda0_structure\",\"lyapunov_eta_point_one\"],\"oracle_outputs\":{\"lyapunov_exponent\":{\"args\":[{\"param\":\"zero\"},{\"args\":[{\"args\":[{\"args\":[{\"args\":[{\"var\":\"lambda_2\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"args\":[{\"param\":\"one\"},{\"args\":[{\"var\":\"lambda_1\"},{\"param\":\"square_exponent\"}],\"op\":\"power\"}],\"op\":\"subtract\"},{\"param\":\"sqrt_exponent\"}],\"op\":\"power\"}],\"op\":\"add\"}],\"op\":\"multiply\"},{\"args\":[{\"var\":\"lambda_1\"},{\"args\":[{\"param\":\"one\"},{\"args\":[{\"args\":[{\"param\":\"one\"},{\"args\":[{\"var\":\"lambda_2\"},{\"param\":\"square_exponent\"}],\"op\":\"power\"}],\"op\":\"subtract\"},{\"param\":\"sqrt_exponent\"}],\"op\":\"power\"}],\"op\":\"add\"}],\"op\":\"multiply\"}],\"op\":\"divide\"}],\"op\":\"log\"},{\"args\":[{\"param\":\"two_pi\"},{\"param\":\"eta_point_one\"}],\"op\":\"multiply\"}],\"op\":\"subtract\"}],\"op\":\"maximum\"}},\"quantitative_form\":\"L = max(0, log(lambda_0) - 2*pi*0.1) with lambda_0 = lambda_2*(1+sqrt(1-lambda_1^2))/(lambda_1*(1+sqrt(1-lambda_2^2)))\",\"readout_names\":[\"lyapunov_exponent\"],\"statement\":\"In the non-Hermitian regime with eta=0.1, the Lyapunov exponent of the PUAMO is L = max(0, log(lambda_0) - 2*pi*0.1), where lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2')). The positive versus zero output identifies localization versus delocalization.\",\"statistical_basis\":\"The Lyapunov exponent is a theoretical quantity; the source reports the formula and uses it to characterize the localization transition. The experimental phase diagram is measured via the second moment <x^2> at t=6.\",\"uncertainty\":\"source_unspecified\"}],\"controls\":[{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"lambda_1=0.67, 0.435, 0.2 in the Hermitian quantum walk\"},{\"line_end\":117,\"line_start\":117,\"support\":\"lambda_1=0.5 and 0.25 in the non-Hermitian quantum walk\"},{\"line_end\":134,\"line_start\":134,\"support\":\"we experimentally map the relationship between sigma and lambda_1, lambda_2 by scanning the whole parameter space\"}],\"definition\":\"Coupling constant controlling the strength of coupling between neighboring lattice sites in the shift operator S_lambda1_eta.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The source reports lambda_1 values 0.67, 0.435, 0.2 in the Hermitian phase diagram and 0.5, 0.25 in the non-Hermitian experiments; the conservative interval [0.2, 0.67] lies within the source's 0-to-1 coupling range and is covered by the reported full-parameter-space phase scans.\",\"maximum\":0.67,\"minimum\":0.2,\"name\":\"lambda_1\",\"unit\":\"dimensionless\"},{\"allowed_values\":[],\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"lambda_2=0.2, 0.435, 0.67 in the Hermitian quantum walk\"},{\"line_end\":117,\"line_start\":117,\"support\":\"lambda_2=0.25 and 0.5 in the non-Hermitian quantum walk\"},{\"line_end\":134,\"line_start\":134,\"support\":\"we experimentally map the relationship between sigma and lambda_1, lambda_2 by scanning the whole parameter space\"}],\"definition\":\"Coupling constant controlling the coupling of the shift in the synthetic dimension in the coin operator Q_lambda2_theta.\",\"domain_kind\":\"continuous_interval\",\"domain_statement\":\"The source reports lambda_2 values 0.2, 0.435, 0.67 in the Hermitian phase diagram and 0.25, 0.5 in the non-Hermitian experiments; the conservative interval [0.2, 0.67] lies within the source's 0-to-1 coupling range and is covered by the reported full-parameter-space phase scans.\",\"maximum\":0.67,\"minimum\":0.2,\"name\":\"lambda_2\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":107,\"line_start\":107,\"support\":\"we focus exclusively on irrational fields, specifically Phi=(sqrt(5)-1)/2\"}],\"condition_id\":\"irrational_field_phi\",\"statement\":\"The quasiperiodic field Phi is set to the irrational value (sqrt(5)-1)/2.\"},{\"anchors\":[{\"line_end\":82,\"line_start\":82,\"support\":\"For all plots, we set theta=0\"},{\"line_end\":425,\"line_start\":425,\"support\":\"We set theta=0\"}],\"condition_id\":\"theta_zero\",\"statement\":\"The phase theta is set to 0 in the experiments.\"},{\"anchors\":[{\"line_end\":96,\"line_start\":96,\"support\":\"For eta=0, the shift is balanced and, in particular, unitary.\"}],\"condition_id\":\"eta_zero\",\"statement\":\"The non-Hermitian parameter eta is set to 0, corresponding to the Hermitian regime.\"},{\"anchors\":[{\"line_end\":425,\"line_start\":425,\"support\":\"We set theta=0, eta=0.1\"}],\"condition_id\":\"eta_point_one_condition\",\"statement\":\"The non-Hermitian parameter eta is set to 0.1 in the non-Hermitian phase diagram.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":111,\"line_start\":111,\"support\":\"lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2'))\"},{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"equations\":[\"lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2'))\",\"L = max(0, log(lambda_0) - 2*pi*|eta|)\"],\"mechanism_id\":\"lambda0_structure\",\"parameters\":[{\"anchors\":[{\"line_end\":111,\"line_start\":111,\"support\":\"lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2'))\"}],\"name\":\"one\",\"role\":\"The integer one appearing in the definition of lambda_0 and in the max function.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":1.0},{\"anchors\":[{\"line_end\":95,\"line_start\":95,\"support\":\"lambda_1' = sqrt(1-lambda_1^2)\"},{\"line_end\":104,\"line_start\":104,\"support\":\"lambda_2' = sqrt(1-lambda_2^2)\"}],\"name\":\"square_exponent\",\"role\":\"The exponent 2 in the definitions lambda_1' = sqrt(1-lambda_1^2) and lambda_2' = sqrt(1-lambda_2^2).\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":2.0},{\"anchors\":[{\"line_end\":95,\"line_start\":95,\"support\":\"lambda_1' = sqrt(1-lambda_1^2)\"},{\"line_end\":104,\"line_start\":104,\"support\":\"lambda_2' = sqrt(1-lambda_2^2)\"}],\"name\":\"sqrt_exponent\",\"role\":\"The exponent 1/2 in the definitions lambda_1' = sqrt(1-lambda_1^2) and lambda_2' = sqrt(1-lambda_2^2).\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.5},{\"anchors\":[{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"name\":\"zero\",\"role\":\"The integer zero used in the max function.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.0},{\"anchors\":[{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"name\":\"two_pi\",\"role\":\"The constant 2*pi appearing in the Lyapunov exponent formula.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":6.283185307179586}],\"statement\":\"The Lyapunov exponent of the PUAMO is given by L = max(0, log(lambda_0) - 2*pi*|eta|), where lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2')) with lambda_1' = sqrt(1-lambda_1^2) and lambda_2' = sqrt(1-lambda_2^2). This mechanism defines the structural constants used in the Lyapunov claims.\",\"variable_names\":[\"lambda_1\",\"lambda_2\",\"lambda_1'\",\"lambda_2'\",\"lambda_0\",\"L\",\"eta\"]},{\"anchors\":[{\"line_end\":96,\"line_start\":96,\"support\":\"For eta=0, the shift is balanced and, in particular, unitary.\"},{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"equations\":[\"L = max(0, log(lambda_0))\"],\"mechanism_id\":\"lyapunov_eta_zero\",\"parameters\":[{\"anchors\":[{\"line_end\":96,\"line_start\":96,\"support\":\"For eta=0, the shift is balanced and, in particular, unitary.\"}],\"name\":\"eta_zero\",\"role\":\"The non-Hermitian parameter eta set to 0 in the Hermitian regime.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.0}],\"statement\":\"For the Hermitian regime with eta=0, the Lyapunov exponent is given by L = max(0, log(lambda_0)), where lambda_0 is as defined in the lambda0_structure mechanism. The value 0 is the non-Hermitian parameter used in the Hermitian regime.\",\"variable_names\":[\"L\",\"lambda_0\",\"eta\"]},{\"anchors\":[{\"line_end\":425,\"line_start\":425,\"support\":\"We set theta=0, eta=0.1\"},{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"equations\":[\"L = max(0, log(lambda_0) - 2*pi*0.1)\"],\"mechanism_id\":\"lyapunov_eta_point_one\",\"parameters\":[{\"anchors\":[{\"line_end\":425,\"line_start\":425,\"support\":\"We set theta=0, eta=0.1\"}],\"name\":\"eta_point_one\",\"role\":\"The non-Hermitian parameter eta set to 0.1 in the experimental phase diagram.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\",\"value\":0.1}],\"statement\":\"For the non-Hermitian regime with eta=0.1, the Lyapunov exponent is given by L = max(0, log(lambda_0) - 2*pi*0.1), where lambda_0 is as defined in the lambda0_structure mechanism. The value 0.1 is the non-Hermitian parameter used in the experimental phase diagram.\",\"variable_names\":[\"L\",\"lambda_0\",\"eta\"]}],\"paper_scope\":\"The paper reports the first experimental realization of the unitary almost-Mathieu operator (UAMO) and its non-Hermitian extension (PUAMO) using single-photon quantum walks. It observes metal-insulator transitions in the Hermitian limit, PT-symmetry-breaking transitions, and a novel spectral transition where all quasienergies become purely imaginary. The selected quantitative cluster focuses on the Lyapunov exponent L_lambda1_lambda2_eta, which quantifies the inverse localization length and is given by L = max(0, log(lambda_0) - 2*pi*|eta|) with lambda_0 = lambda_2*(1+lambda_1')/(lambda_1*(1+lambda_2')). Two claims are built for the private regimes eta=0 and eta=0.1, sharing public controls lambda_1 and lambda_2 in [0.2,0.67] and the common readout lyapunov_exponent.\",\"readouts\":[{\"anchors\":[{\"line_end\":108,\"line_start\":108,\"support\":\"This can be inferred from the Lyapunov exponent L_lambda1_lambda2_Phi of the model, which describes the average decay of eigenstates\"},{\"line_end\":402,\"line_start\":402,\"support\":\"L = max{0, log(lambda_0) - 2*pi*|eta|}\"}],\"definition\":\"The Lyapunov exponent L_lambda1_lambda2_eta of the PUAMO, which quantifies the inverse localization length of eigenstates. It is given by L = max(0, log(lambda_0) - 2*pi*|eta|).\",\"name\":\"lyapunov_exponent\",\"resolution\":null,\"statistic\":\"The Lyapunov exponent is a theoretical quantity derived from the transfer matrix; the source reports the formula and uses it to characterize the localization transition.\",\"uncertainty\":\"source_unspecified\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2508.08255v1\",\"citation\":\"Quan Lin, Observation of Metal-Insulator and Spectral Phase Transitions in Aubry-André-Harper Models, Physical Review Letters (2026), DOI:10.1103/tz2n-lqxx\",\"journal_doi\":\"10.1103/tz2n-lqxx\"},\"source_ambiguities\":[]}}\nThe previous ScienceCard is an editable rejected draft, not a source of new scientific facts. Use it as the baseline so supported content is not lost, but recheck every retained field against the supplied source. Address every listed issue by inspecting its line ranges, remove or revise unsupported content, and do not assume the review or prior draft is correct. The supplied source remains the sole authority. Return one complete revised ScienceCard for a new independent review.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: AAH_0616.tex =====\nL000002\t\\documentclass[prl,twocolumn,superscriptaddress,showpacs,floatfix,longbibliography,aps,10pt]{revtex4-2}\nL000003\t\nL000004\t\\newif\\ifarxiv\\arxivtrue\nL000005\t\nL000006\t\nL000007\t\\def\\minisection#1{\\ifarxiv\\section*{#1}\\else\\par\\vskip20pt\\noindent{\\bf #1}\\ \\fi}\nL000008\t\\def\\minisubsection#1{\\ifarxiv\\subsection*{#1}\\else\\par\\vskip20pt\\noindent{\\bf #1}\\ \\fi\\noindent}\nL000009\t\nL000010\t\\usepackage{mathrsfs,braket}\nL000011\t\\usepackage{amssymb, amsbsy, amsmath, latexsym, dsfont, array, layout,\nL000012\tgraphicx,mathrsfs,xcolor, bm}\nL000013\t\\usepackage{cancel}\nL000014\t\\usepackage[colorlinks=true,citecolor=blue,urlcolor=blue]{hyperref}\nL000015\t\\newcommand{\\fig}[1]{Fig.~\\ref{#1}}\nL000016\t\\newcommand{\\tab}[1]{Table~\\ref{#1}}\nL000017\t\\newcommand{\\one}{\\mathds{1}}\nL000018\t\\newcommand{\\ketbrad}[1]{\\left|{#1}\\rangle\\!\\langle{#1}\\right|}\nL000019\t\\newcommand{\\ketbra}[2]{\\left|{#1}\\rangle\\!\\langle{#2}\\right|}\nL000020\t\\newcommand{\\dslash}{\\not{\\text{d}}}\nL000021\t\\newcommand{\\red}{\\color[rgb]{0.8,0,0}}\nL000022\t\\newcommand{\\blue}{\\color[rgb]{0,0,0.6}}\nL000023\t\\newcommand{\\green}{\\color[rgb]{0.0,0.7,0.0}}\nL000024\t\\newcommand{\\gray}{\\color[rgb]{0.4,0.4,0.4}}\nL000025\t\\usepackage{changes}\nL000026\t\\DeclareMathOperator{\\arcsinh}{arcsinh}\nL000027\t\nL000028\t\nL000029\t\nL000030\t\\begin{document}\nL000031\t\nL000032\t\\title{Observation of Metal-Insulator and Spectral Phase Transitions in Aubry-Andr\\'{e}-Harper Models}\nL000033\t\nL000034\t\nL000035\t\\author{Quan Lin} \\thanks{These authors contributed equally to this work.}\nL000036\t\\affiliation{School of Physics, Southeast University, Nanjing 211189, China}\nL000037\t\nL000038\t\nL000039\t\nL000040\t\\author{Christopher Cedzich} \\thanks{These authors contributed equally to this work.}\nL000041\t\\affiliation{Heinrich Heine Universit\\\"at D\\\"usseldorf, Universit\\\"atsstr. 1, 40225 D\\\"usseldorf, Germany}\nL000042\t\\affiliation{Fakult\\\"at f\\\"ur Mathematik und Informatik, FernUniversit\\\"at in Hagen, Universit\\\"atsstr. 1, 58097 Hagen, Germany}\nL000043\t\nL000044\t\nL000045\t\\author{Qi Zhou}\nL000046\t\\affiliation{\nL000047\tChern Institute of Mathematics and LPMC, Nankai University, Tianjin 300071, China\nL000048\t}\nL000049\t\nL000050\t\\author{Peng Xue}\\email{gnep.eux@gmail.com}\nL000051\t\\affiliation{Beijing Computational Science Research Center, Beijing 100193, China}\nL000052\t\nL000053\t\nL000054\t\nL000055\t\\begin{abstract}\nL000056\t{\\bf Non-Hermitian extensions of the Aubry-Andr\\'{e}-Harper (AAH) model reveal a rich variety of phase transitions arising from the interplay of quasiperiodicity and non-Hermiticity. Despite their theoretical significance, experimental explorations remain challenging due to complexities in realizing controlled non-Hermiticity. Here, we present the first experimental realization of the unitary almost-Mathieu operator (UAMO) which simulates the AAH model by employing single-photon quantum walks. Through precise control of quasiperiodicity, we systematically explore the phase diagram displaying a phase transition between localized and delocalized regimes in the Hermitian limit. Subsequently, by introducing non-reciprocal hopping, we experimentally probe the parity-time (PT) symmetry-breaking transition that is characterized by the emergence of complex quasienergies. Moreover, we identify a novel spectral transition exclusive to discrete-time settings, where all quasienergies become purely imaginary. Both transitions are connected to changes in the spectral winding number, demonstrating their topological origins. These results clarify the interplay between localization, symmetry breaking, and topology in non-Hermitian quasicrystals, paving the way for future exploration of synthetic quantum matter.}\nL000057\t\\end{abstract}\nL000058\t\nL000059\t\nL000060\t\\maketitle\nL000061\t\nL000062\tPhase transitions are ubiquitous in nature and manifest themselves in various forms, each characterized by distinct physical signatures. Their defining feature is the abrupt change in an observable quantity such as an order parameter or characteristic length scale, which is sometimes accompanied by a spontaneous breaking of symmetries within the system. Notable examples include transitions between thermodynamic states of matter~\\cite{stanley1971phase}, phase transitions in topological insulators and superconductors~\\cite{hasanColloquiumTopologicalInsulators2010,kitaevPeriodicTableTopological2009,qiTopologicalInsulatorsSuperconductors2011,ryuTopologicalInsulatorsSuperconductors2010}, and disorder-induced metal-insulator transitions in low-dimensional random systems~\\cite{ander}. The latter describes the phenomenon that for disorder stronger than a certain ``critical'' value, wave functions become localized, impeding their diffusion across the medium. This so-called ``Anderson localization'' has been extensively studied via theoretical and experimental approaches across diverse media~\\cite{FiftyYearsOfAL,kunzSpectreOperateursAux1980,stolzIntroductionMathematicsAnderson2011,LeeRamakrishnan1985,sokoloff,roati,Segev,lahini,lin1,lin2}.\nL000063\t\nL000064\tAmong the numerous models elucidating such a localization-delocalization transition, the Aubry-Andr\\'{e}-Harper (AAH) model stands out due to its intrinsic Andr\\'{e}-Aubry duality and its emblematic role in studying quasicrystals~\\cite{lahini,Segev,roati,AA,fliu,sahu,Jitomirskaya1999Annals,sokoloff,verbin,szame,Lahini2007}.\nL000065\tCharacterized by an incommensurate potential applied to one-dimensional lattices, the AAH model exhibits sharp metal-insulator transitions driven by variations in the potential strength~\\cite{AA,Jitomirskaya1999Annals,avilaSharpPhaseTransitions2017}.\nL000066\tThese investigations have provided key insights into the model's utility and its links to other pivotal frameworks, such as the Hofstadter model~\\cite{brownBlochElectronsUniform1964,hofstadter} which describes the motion of electrons in a homogeneous magnetic field on a two-dimensional lattice and plays an important role in the understanding of quantum Hall systems~\\cite{thoulessQuantizedHallConductance1982,niuQuantizedHallConductance1985}. The universality of the AAH model is further highlighted by the broad experimental observation of metal-insulator transitions across multiple physical platforms, underscoring their significance in contemporary condensed-matter research~\\cite{lahini,Segev,roati}.\nL000067\t\nL000068\t\nL000069\t\\begin{figure*}[th]\nL000070\t\\includegraphics[width=0.95\\textwidth]{fig1}\nL000071\t\\caption{{\\bf Spectra of Floquet operator $W$ and experimental implementation.} {\\bf a} The eigenvalue $z$ of $W$ for $(\\lambda_{1}, \\lambda_{2})=(0.25, 0.5)$, with different colors corresponding to variations in $\\eta$. For visual guidance, a unit circle (dashed black line) is included. {\\bf b} A pair of photons is generated through spontaneous parametric down-conversion in a periodically poled potassium titanyl phosphate (PPKTP) crystal, with one photon serving as a trigger and the other as the walker in the quantum-walk network. The initial state is prepared using a polarizing beam splitter (PBS), a quarter-wave plate (QWP), and a half-wave plate (HWP). It then undergoes a quantum walk through an interferometric network comprising HWPs, beam displacers (BDs), and partially polarizing beam splitters (PPBSs). It is eventually detected by avalanche photodiodes (APDs), in coincidence with the trigger photon. }\\label{fig1}\nL000072\t\\end{figure*}\nL000073\t\nL000074\tRecent theoretical advancements have significantly broadened the understanding of phase transitions within the AAH model and its non-Hermitian extensions~\\cite{xcai,longhi21,yliu,yucePTSymmetricAubry2014,longhi19,jiangInterplayNonHermitianSkin2019}. An essential property of these extensions is the presence of parity-time (PT) symmetry, along with a phase transition known as the spontaneous breaking of PT symmetry, up to which the spectrum remains real even though the system remains non-Hermitian~\\cite{benderIntroductionPTSymmetricQuantum2005,benderRealSpectraNonHermitian1998,footnote1}.\nL000075\tDespite these theoretical advances, experimental realizations of the AAH model and its non-Hermitian extensions in optical systems have remained inaccessible, largely due to challenges in engineering quasiperiodic drives with controlled non-Hermiticity. To overcome these challenges, we investigate the unitary almost-Mathieu operator (UAMO)~\\cite{cedzi}. The UAMO has been rigorously demonstrated to be an exactly solvable simulator of the AAH model, exhibiting analogous metal-insulator phase transitions and localization properties~\\cite{cedzi,twentyMartinis,cedzich2024absence}. We further extend this framework to the non-Hermitian regime by introducing a gain-loss parameter into the UAMO~\\cite{cedzi2}. The exact solvability of the UAMO facilitates precise theoretical predictions and experimental verifications, further substantiating its potential for wide-ranging applications in the exploration of quantum systems.\nL000076\t\nL000077\tIn this work, we report the first experimental implementation of the UAMO and its non-Hermitian extension using dynamic signatures in single-photon quantum walks~\\cite{xiao1,xiao2}.\nL000078\tWe observe metal-insulator transitions driven by variations in the coupling constants. Moreover, we confirm the presence of a novel spectral transition that was theoretically predicted in~\\cite{cedzi2}, characterized by all quasienergies acquiring imaginary components. We correlate the non-Hermitian phase transitions with features of the eigenvalue spectrum, which can be characterized by the change of a topological winding number emerging from the closed contours of the spectrum in the complex plane. Our results provide the first experimental demonstration of the non-Hermitian AAH model and reveal the rich interplay between quasiperiodicity, non-Hermiticity, and discrete-time dynamics. Our platform not only facilitates precise control over phase transitions but also paves the way for designing synthetic structures with customized transport properties and for exploring novel topological phases in non-Hermitian systems.\nL000079\t\nL000080\t\\begin{figure*}[th]\nL000081\t\\includegraphics[width=\\textwidth]{fig2}\nL000082\t\\caption{{\\bf Experimental observation of metal-insulator transition in the AAH model.} {\\bf a}, {\\bf c}, {\\bf e} Measured probability distribution $P(x, t)$ of a 6-step Hermitian quantum walk governed by $W$ with $\\lambda_1=0.67>\\lambda_2=0.2$, $\\lambda_1=\\lambda_2=0.435$, $\\lambda_1=0.2<\\lambda_2=0.67$, respectively. {\\bf b}, {\\bf d}, {\\bf f} Measured and simulated probability distributions at the last step, $P(x, t =6)$, corresponding to {\\bf a}, {\\bf c}, {\\bf e}, respectively. {\\bf g} Measured (symbols) and simulated (lines) standard deviation $\\sigma$ of the Hermitian quantum walk. {\\bf h} The measured phase diagram evaluated by the standard deviation $\\sigma$ at time step $t = 6$. Note that for small values of $\\lambda_1$, the walker hardly moves, and for short times such as $t=6$ is virtually indistinguishable from a localized walker. Hence, the phase boundary in the bottom-left region is not sharply defined. For all plots, we set $\\theta=0$ and used the initial state $\\ket{\\psi(0)}=\\ket{0}\\otimes(\\ket{H}+i\\ket{V})/\\sqrt{2}$. Error bars are due to the statistical uncertainty in photon number counting.}\\label{fig2}\nL000083\t\\end{figure*}\nL000084\t\nL000085\t\\minisection{Results}\nL000086\t\\minisubsection{The pseudo-unitary almost Mathieu operator}\nL000087\t\nL000088\tWe investigate a non-unitary quantum walk on a one-dimensional lattice with two-dimensional spin at each lattice site using single photons within an alternating-loss scheme.\nL000089\tThe dynamics of the system are obtained by iteratively applying the Floquet operator\nL000090\t\\begin{align}\nL000091\tW_{\\lambda_{1},\\lambda_{2},\\theta,\\eta}=S_{\\lambda_{1},\\eta}Q_{\\lambda_{2},\\theta}\nL000092\t\\label{eq:U}\nL000093\t\\end{align}\nL000094\tto an initial state $|\\psi(0)\\rangle$, resulting in the time-evolved state $|\\psi(t)\\rangle=W_{\\lambda_{1},\\lambda_{2},\\eta}^t|\\psi(0)\\rangle$, where $t$ labels the discrete time steps.\nL000095\tHere $S_{\\lambda_{1},\\eta}$ is the shift operator, i.e., $S_{\\lambda_{1},\\eta}=\\sum_{x}( e^{2\\pi \\eta} \\lambda_{1}|x+1\\rangle\\langle x| \\otimes|0\\rangle\\langle 0|-\\lambda_{1}^{\\prime}|x\\rangle\\langle x| \\otimes|0\\rangle\\langle 1|+\\lambda_{1}^{\\prime}|x\\rangle\\langle x| \\otimes|1\\rangle\\langle 0|+ e^{-2\\pi \\eta} \\lambda_{1}|x-1\\rangle\\langle x| \\otimes|1\\rangle\\langle 1|)$, where $0\\leq\\lambda_1\\leq1$ is called the {\\it coupling constant}, as it controls the strength of coupling between neighboring lattice sites, and $\\lambda_{1}^{\\prime}=\\sqrt{1-\\lambda_{1}^{2}}$.\nL000096\tThe parameter $\\eta$ quantifies the imbalance of $S_{\\lambda_1,\\eta}$ between left-moving and right-moving modes. For $\\eta=0$, the shift is balanced and, in particular, unitary.\nL000097\tWhenever $\\eta\\neq0$, the shift is not unitary anymore in the standard sense. By convention, we refer to these regimes as the ``Hermitian'' and the ``non-Hermitian'' regime, respectively, and we call $\\eta$ the ``non-Hermitian parameter''. This nomenclature is adopted to align with the literature~\\cite{lin2,szame}, where a non-vanishing $\\eta$ breaks Hermiticity.\nL000098\t\nL000099\tThe coin operator $ Q_{\\lambda_{2},\\theta}=\\sum_{x}|x\\rangle\\langle x|\\otimes Q_x $ acts locally via a quasiperiodic matrix $Q_x\\in\\mathrm{SU}(2)$ given by\nL000100\t\\begin{align}\nL000101\tQ_{x}= \\begin{bmatrix}\\lambda_2\\cos(2\\pi(x\\Phi+\\theta))+i\\lambda_2^{\\prime}&-\\lambda_2\\sin(2\\pi(x\\Phi+\\theta))\\\\\\lambda_2\\sin(2\\pi(x\\Phi+\\theta))&\\lambda_2\\cos(2\\pi(x\\Phi+\\theta))-i\\lambda_2^{\\prime}\\end{bmatrix}\nL000102\t\\label{eq:Q}\nL000103\t\\end{align}\nL000104\twith $\\lambda_2^{\\prime}=\\sqrt{1-\\lambda_2^{2}}$. Here, $\\Phi \\in [0,1]$ plays the role of a magnetic field in an associated two-dimensional system~\\cite{cedzi3}, $0\\leq\\lambda_2\\leq1$ controls the coupling of the shift in the synthetic dimension, and the phase $ \\theta \\in [0,1]$ is its Fourier parameter~\\cite{cedzi}. In what follows, the dependence on $\\theta$ is omitted in the notation.\nL000105\t\nL000106\t\nL000107\tIn the Hermitian setting $\\eta=0$, the model is called UAMO~\\cite{cedzi} and has an Andr\\'{e}-Aubry duality with dual $W_{\\lambda_1,\\lambda_2,0}^\\sharp=W_{\\lambda_2,\\lambda_1,0}^\\top$. The arithmetic properties of $\\Phi$ play a crucial role: for rational values $\\Phi = n/m$, the system exhibits periodic behavior, and the evolved states propagate ballistically, with the spectrum of $W$ consisting of $2m$ bands that resemble a twofold copy of the Hofstadter butterfly. In this work, we focus exclusively on irrational fields, specifically $\\Phi=(\\sqrt{5}-1)/2$. Under these conditions, the UAMO $W_{\\lambda_1,\\lambda_2,0}$ possesses a metal-insulator phase transition about the self-dual line $\\lambda_1=\\lambda_2$. More specifically, for $\\lambda_1>\\lambda_2$, one observes ballistic transport, whereas, in the Aubry-dual regime $\\lambda_1<\\lambda_2$, the system displays Anderson localization~\\cite{cedzi,cedzi1}.\nL000108\tThis can be inferred from the Lyapunov exponent $L_{\\lambda_1,\\lambda_2,\\Phi}$ of the model, which describes the average decay of eigenstates (see Supplemental Material). On the spectrum, it vanishes for $\\lambda_1\\geq\\lambda_2$.\nL000109\tIn the localized phase, we have $L_{\\lambda_1,\\lambda_2,\\Phi}=\\log\\lambda_0>0$, where\nL000110\t\\begin{equation}\\label{eq:lambda0}\nL000111\t    \\lambda_0=\\frac{\\lambda_2(1+\\lambda_1')}{\\lambda_1(1+\\lambda_2')}.\nL000112\t\\end{equation}\nL000113\tGiven this phenomenological equivalence between the UAMO and the AAH model, we use the quantum walk $W_{\\lambda_1,\\lambda_2,0}$ to probe the properties of the AAH model.\nL000114\t\nL000115\t\\begin{figure*}[th]\nL000116\t\\includegraphics[width=0.75\\textwidth]{fig3}\nL000117\t\\caption{{\\bf Observation of the PT-symmetry transition in the non-Hermitian AAH model.} {\\bf a}, {\\bf d} Imaginary parts of the quasienergies for the non-Hermitian quantum walk with $\\theta=0$ for $\\lambda_1=0.5>\\lambda_2=0.25$ and $\\lambda_1=0.25<\\lambda_2=0.5$, respectively. {\\bf b}, {\\bf e} Measured overall probabilities $P(t)$ of the quantum walk with different initial states corresponding to the PT unbroken and broken phases, respectively. The parameters in {\\bf b}, {\\bf e} are the same as those in {\\bf a} and {\\bf d}, respectively. {\\bf c}, {\\bf f} Measured probability distributions $P(x, t)$ of the 6-step non-Hermitian quantum walk corresponding to {\\bf b} and {\\bf e}, the initial state for each is $\\ket{\\psi(0)}=\\ket{0}\\otimes(\\ket{H}+i\\ket{V})/\\sqrt{2}$.}\\label{fig3}\nL000118\t\\end{figure*}\nL000119\t\nL000120\tIn the non-Hermitian extension of the AAH model with unbalanced hopping, a topological phase transition between the localized and the delocalized phase occurs once the PT symmetry is broken~\\cite{longhi19,yliu}. This extension is realized in our system by introducing the non-Hermitian parameter $\\eta\\neq0$, and $W_{\\lambda_1,\\lambda_2,\\eta\\neq0}$ is called the {\\it pseudo}-UAMO (PUAMO)~\\cite{cedzi2,footnote2}. We find that the PUAMO is PT symmetric (see Methods) and possesses a PT symmetry-breaking phase transition that is signaled by some quasienergies of the PUAMO acquiring imaginary components. This phase transition is topological and can be characterized by the winding number~\\cite{cedzi2}\nL000121\t\\begin{align}\nL000122\t\\nu_\\eta(z)=\\lim_{N\\to\\infty}\\frac{1}{N}\\frac{1}{2\\pi i}\\int_0^1d\\theta\\partial_\\theta\\log\\det(W_{\\lambda_1,\\lambda_2,\\eta}-z),\nL000123\t\\label{eq:w}\nL000124\t\\end{align}\nL000125\twhere $N$ is the lattice size, and $z$ with $|z|=1$ is a base point in a gap of the spectrum of the UAMO~\\cite{twentyMartinis}. The winding number $\\nu_\\eta(z)$ is quantized and can take only three values. When $\\nu_\\eta(z) = 0$, the PUAMO retains unbroken PT symmetry for $\\log \\lambda_0 < \\eta < -\\log \\lambda_0$ (see Supplemental Material). As illustrated in Fig.~\\ref{fig1}{\\bf a}, by increasing the non-Hermitian parameter $\\eta$ beyond the critical point $\\eta_{\\text{PT}}=-\\log\\lambda_0$, the PT symmetry is spontaneously broken, and a condition emerges for $z$ in the unit circle such that $|\\nu_\\eta(z)|=1$. This phase transition is analogous to the spontaneous breaking of PT symmetry in the non-Hermitian AAH model. Further increasing $\\eta$ triggers a novel spectral phase transition at $\\eta_0=\\arcsinh(\\lambda_1'/\\lambda_1)/(2\\pi)$, characterized by purely imaginary quasienergies and $|\\nu_\\eta(z)|=1$ for all $z$ on the unit circle~\\cite{cedzi2}. This spectral transition does not appear in the pervious non-Hermitian AAH model~\\cite{cedzi2,footnote2} (see Supplemental Material). In combination with the metal-insulator transition in the Hermitian case, we systematically explore these transitions experimentally, as detailed in the subsequent sections.\nL000126\t\nL000127\t\nL000128\t\\minisubsection{Experimental detection of metal-insulator phase transitions in the UAMO model}\nL000129\t\nL000130\tWe implement the PUAMO with single photons using the photonic setup illustrated in Fig.~\\ref{fig1}{\\bf b}. The coin states $|0\\rangle$ and $|1\\rangle$ are encoded in the horizontal $|H\\rangle$ and vertical $|V\\rangle$ polarizations of photons, respectively, while their spatial modes represent the lattice degrees of freedom. The coin-rotation operators $Q_{\\lambda_2,\\theta}$ and the shift operator $S_{\\lambda_1,\\eta}$ are implemented using a combination of HWPs, BDs, and PPBSs. Photon detection is performed by APDs, allowing us to resolve the walker's spatial distribution at each time step (see Methods).\nL000131\t\nL000132\tWe first focus on the Hermitian regime ($\\eta=0$), where theoretical studies in~\\cite{cedzi} predict a metal-insulator transition that has not yet been explored experimentally. As illustrated in Figs.~\\ref{fig2}{\\bf a}, {\\bf b}, we experimentally observe a ballistic distribution in the quantum-walk dynamics, where the wave packet spreads linearly in time, confirming that the system is in the metallic phase for $\\lambda_1 > \\lambda_2$. Conversely, when $\\lambda_1<\\lambda_2$, we observe that the system is insulating, and wave packets remain localized (see Figs.\\ref{fig2}{\\bf e}, {\\bf f}). These two distinct dynamic behaviors are demarcated by the dynamics at the critical region $\\lambda_1=\\lambda_2$, as shown in Figs.~\\ref{fig2}{\\bf c}, {\\bf d}. We compare the measured photostatistics with the theoretical prediction via the {\\it similarity} $\\mathcal{S}(t)=\\big[\\sum_x\\sqrt{P_\\text{exp}(x,t)P_\\text{th}(x,t)}\\big]^2$, ranging from $0$ to $1$ for completely orthogonal and identical distributions, respectively. Here $P(x,t)=\\big(|\\langle{x}|\\otimes\\langle{0}|\\psi(t)\\rangle|^2+|\\langle{x}|\\otimes\\langle{1}|\\psi(t)\\rangle|^2\\big)/\\sum_x\\big(|\\langle{x}|\\otimes\\langle{0}|\\psi(t)\\rangle|^2+|\\langle{x}|\\otimes\\bra{1}\\psi(t)\\rangle|^2\\big)$ is the probability at lattice site $x$ and time $t$, and the subscripts ``exp'' and ``th'' denote experimentally measured and theoretically predicted probability distributions, respectively. In our experiments, we achieve $\\mathcal{S}>0.961$ in Fig.~\\ref{fig2}{\\bf a}, $\\mathcal{S}>0.978$ in Fig.~\\ref{fig2}{\\bf c}, and $\\mathcal{S} >0.984$ in Fig.~\\ref{fig2}{\\bf e} for all $t=1,\\dots,6$.\nL000133\t\nL000134\tThe localization transition can also be quantified by assessing the standard deviation of dynamic probabilities, defined as $\\sigma(t) = \\sqrt{\\sum_{x}P(x,t)x^{2}-(\\sum_{x}P(x,t)x)^2} $. In Fig.~\\ref{fig2}{\\bf g}, we observe that $\\sigma$ exhibits linear growth ($\\sigma \\sim t$) in the metallic phase with $\\lambda_{1}=0.67>\\lambda_2=0.2$, whereas $\\sigma$ remains constant ($\\sigma \\sim \\mathrm{const}.$) in the insulating phase with $\\lambda_1 = 0.2 < \\lambda_2 = 0.67$. These observations align well with theoretical predictions, as illustrated by the lines in Fig.~\\ref{fig2}{\\bf g}. To gain further insight of the phase transition, we experimentally map the relationship between the standard deviation $\\sigma$ and the parameters $\\lambda_{1}, \\lambda_{2}$ by scanning the whole parameter space. The distinct characteristics of $\\sigma$ in different phase regions enables clear identification of the phase regions after quantum-walk steps $t=6$. Our experimental results, as shown in Fig.~\\ref{fig2}{\\bf h}, graphically depict a phase diagram that explicitly delineates the regions corresponding to the two distinct dynamical behaviors. These delocalized and localized regions are clearly separated by the symmetric coupling $\\lambda_1 = \\lambda_2$, as shown in Fig.~\\ref{fig2}{\\bf h}. Along this self-dual line, all eigenstates of $W_{\\lambda_1,\\lambda_2}$ are critical, exhibiting neither delocalized nor localized behavior, and are characterized by a singular continuous quasienergy spectrum~\\cite{cedzi}.\nL000135\t\nL000136\t\\minisubsection{Observation of the spontaneous breaking of PT symmetry in the PUAMO model}\nL000137\t\nL000138\tWe now turn to the non-Hermitian extension of the UAMO by introducing a non-zero non-Hermitian parameter $\\eta$ to simulate unbalanced hopping in the AAH model.\nL000139\tNotably, through generalized Aubry duality, this is equivalent to introducing a complex quasiperiodic phase in $Q_{\\lambda_1,\\theta}$, i.e., $\\theta \\mapsto \\theta-i\\eta$ (see~\\cite{cedzi2} for details). This correspondence thus gives experimental access to complexified quasiperiodic phases.\nL000140\t\nL000141\tWhen non-Hermiticity is introduced in the metallic phase ($\\lambda_{1}>\\lambda_{2}$), the PT symmetry of PUAMO is broken for any non-zero $\\eta$, as demonstrated in Fig.~\\ref{fig3}{\\bf a}. Here, the quasienergy $E$ shown in Fig.~\\ref{fig3}{\\bf a} is defined by $z = e^{iE}$, with $z$ being the eigenvalue of $W_{\\lambda_1,\\lambda_2,\\eta}$. The winding number from Eq.~\\eqref{eq:w} is non-trivial as there exists $z \\in \\partial \\mathbb{D}$ such that $|\\nu_\\eta(z)|=1$. We confirm the breaking of PT symmetry by measuring the time evolution of the overall probability of photons, which is defined as $P(t)=\\sum_x |\\langle x|\\psi(t)\\rangle|^2$. In the PT-broken regime, one expects $P(t)$ to increase exponentially over time due to the positive imaginary components of the quasienergies. This behavior is experimentally confirmed in Fig.~\\ref{fig3}{\\bf b}, where the time evolution for arbitrary initial states indicates PT symmetry breaking. Moreover, we observe clear directional dynamics, as shown in Fig.~\\ref{fig3}{\\bf c}, where the walker's wave packet moves persistently to the right. The experimental results show a similarity $\\mathcal{S} > 0.948$ compared with numerical simulations. Such directional flow can be further analyzed through the properties of the Lyapunov exponent $L_{\\lambda_1,\\lambda_2,\\eta}$~\\cite{WZ1,WZ2,qhlee} (see Methods).\nL000142\t\nL000143\tConversely, in the insulating phase ($\\lambda_{1}<\\lambda_{2}$), PT symmetry is preserved at finite $\\eta$ with the winding number $\\nu_\\eta(z)=0$, as shown in Fig.~\\ref{fig3}{\\bf d}. In this regime, the measured $P(t)$ remains approximately constant, indicating that the quasienergies are entirely real. This observation aligns well with numerical simulations, as shown by the symbols and curves in Figs.~\\ref{fig3}{\\bf b}, {\\bf e}. Furthermore, the dynamics remain localized, as depicted in Fig.~\\ref{fig3}{\\bf e}, in contrast with the dynamics in metallic phase. The measured similarity $\\mathcal{S}>0.968$ in Fig.~\\ref{fig3}{\\bf f} supports our findings. The above discussion corroborates our complete experimental portrayal of the PT symmetry transition and localization transition in regions with small $\\eta$.\nL000144\t\nL000145\t\\begin{figure}[h]\nL000146\t\\includegraphics[width=0.5\\textwidth]{fig4}\nL000147\t\\caption{{\\bf Observation of the second phase transition in the non-Hermitian AAH model.} {\\bf a} Imaginary parts of the quasienergies of a non-Hermitian quantum walk with $\\theta=0$ for $\\lambda_1=0.25<\\lambda_2=0.5$. {\\bf b} Numerically calculated quasienergy spectra in the complex plane for $\\eta = 0.135$ under periodic boundary conditions. The inset shows the spatial distribution of the no-loss eigenstates. The other parameters are the same as those in {\\bf a}. {\\bf c}, {\\bf d}  Measured overall probabilities $P(t)$ of the quantum walk with different initial states for $\\eta=0.135$ and $\\eta=0.335$, respectively.}\\label{fig4}\nL000148\t\\end{figure}\nL000149\t\nL000150\t\\minisubsection{Observation of the novel spectral transition in the PUAMO model}\nL000151\t\nL000152\tFurthermore, as we further increase the non-Hermitian parameter $\\eta$, the second phase transition is observed, whereby the quasienergy becomes entirely complex, as demonstrated in Fig.~\\ref{fig4}{\\bf a} (refer also to the green dots in Fig.~\\ref{fig1}{\\bf a}). After the second transition, the winding number becomes $|\\nu_\\eta(z)|=1$ for all $z \\in \\partial \\mathbb{D}$. By analyzing the transfer matrix of $W_{\\lambda_1=0.25,\\lambda_2=0.5,\\eta}$, two critical points are identified, $\\eta_{\\text{PT}}=0.119$ and $\\eta_0=0.328$, corresponding to the PT symmetry transition and the second phase transition, respectively (see Supplementary Material). These two transition points are marked with dashed lines in Fig.~\\ref{fig4}{\\bf a}. To experimentally observe the second phase transition, we first note that when $\\eta_{\\text{PT}}<\\eta=0.135<\\eta_0$, there exist some quasienergies of $W_{\\lambda_1,\\lambda_2,\\eta}$ that remain purely real. The eigenstates corresponding to these quasienergies are localized in real space and are denoted as ``no-loss states'', as illustrated in Fig.~\\ref{fig4}{\\bf b}. We choose an initial state that has a significant overlap with one of the no-loss states $|\\psi_n\\rangle$, $|\\psi(0)\\rangle = \\mathcal{N} \\hat{P}_{\\text{n}} |\\psi_n\\rangle$, where $\\hat{P}_{\\text{n}} = |x_{n}\\rangle \\langle x_{n}|$ is the projection operator, and $x_n$ is the position of the maximum occupation probability of $|\\psi_n\\rangle$. The factor $\\mathcal{N}$ ensures the normalization of the initial state. Since the no-loss state is primarily localized at $x_n$, its overlap with the initial state is significantly larger than with any other bulk state. Consequently, after $t$ steps, the time evolution of the state is $|\\psi(t)\\rangle = W^t |\\psi(0)\\rangle = \\sum_{m}  e^{-iE_mt}|\\psi_m\\rangle\\langle \\psi_m |\\psi(0)\\rangle \\approx e^{-iE_{n}t}|\\psi_n\\rangle$ in the short-time dynamics, where $E_n$ represents the quasienergy of the no-loss state. This scenario ensures that the overall photon probability does not significantly increase over time, which can be experimentally verified in Fig.~\\ref{fig4}{\\bf c}. Here, the measured $P(t)$ (red line) does not increase with time, whereas for other choices of initial states, $P(t)$ consistently and rapidly increases.\nL000153\t\nL000154\tHowever, when the non-Hermitian parameter exceeds the second critical value, with $\\eta=0.335>\\eta_0$, the above scenario is no longer valid because all quasienergies acquire imaginary components and the evolved states always exhibit strong amplification, as shown in Fig.~\\ref{fig4}{\\bf d}. As a result, the contrasting behaviors of the measured $P(t)$ for $\\eta < \\eta_0$ (Fig.~\\ref{fig4}{\\bf c}) and $\\eta > \\eta_0$ (Fig.~\\ref{fig4}{\\bf d}) confirm the second phase transition within our system.\nL000155\t\nL000156\t\\minisection{Conclusion}\nL000157\t\nL000158\tWe demonstrate the first experimental realization of the (P)UAMO, a phenomenological analog to the (non-)Hermitian AAH model, through discrete-time quantum walks of single photons.\nL000159\tIn the Hermitian regime, we validate the localization-delocalization transitions inherent to the AAH model, clearly distinguishing metallic and insulating phases by dynamic signatures. By extending our exploration to non-Hermitian regimes, we experimentally confirm and characterize two distinct phase transitions: the PT symmetry-breaking transition and a previously unobserved spectral transition beyond which all quasienergies become complex. We elucidate these transitions through dynamic observables and directly associate their emergence with changes in the spectral winding number. Moreover, the versatility of our system suggests practical applications beyond fundamental research. For instance, exploiting the observed PT-symmetry breaking transitions, our setup can be effectively employed for mode-selective amplification in laser systems. In this context, amplification can be confined exclusively to a targeted mode, thus leaving the behavior of other modes unchanged. This approach has significant potential for designing advanced optical devices with enhanced mode discrimination capabilities, further underscoring the applicability of non-Hermitian quantum walks to technological innovations in photonics. Our quantum-walk platform not only provides a versatile framework for experimental studies of non-Hermitian phenomena but also opens pathways toward engineering synthetic topological materials with customized transport properties.\nL000160\t\nL000161\t\\minisection{Methods}\nL000162\t\\minisubsection{Experimental implementation}\nL000163\t\nL000164\tAs illustrated in Fig.~\\ref{fig1}{\\bf b}, the walker photon is initialized in a localized spatial mode and projected onto a selected polarization state through a sequence of polarization optics comprising a PBS, a QWP, and an HWP. The coin operator $Q_x$ is implemented by a set of wave plates\nL000165\t\\begin{equation}\nL000166\tQ_x = q\\left(\\phi_3\\right) h\\left(\\phi_2\\right) q\\left(\\phi_1\\right),\nL000167\t\\end{equation}\nL000168\twhere $q(\\cdot)$, $h(\\cdot)$ denote the unitary transformations implemented by QWP and HWP, respectively, with\nL000169\t\\begin{align}\nL000170\th(\\phi) &=\nL000171\t\\left[\nL000172\t\\begin{array}{cc}\nL000173\t\\cos 2\\phi & \\sin 2\\phi \\\\\nL000174\t\\sin 2\\phi & -\\cos 2\\phi\nL000175\t\\end{array}\nL000176\t\\right], \\\\\nL000177\tq(\\phi) &=\nL000178\t\\left[\nL000179\t\\begin{array}{cc}\nL000180\t\\cos^2 \\phi + i \\sin^2 \\phi & (1 - i)\\sin\\phi\\cos\\phi \\\\\nL000181\t(1 - i)\\sin\\phi\\cos\\phi & \\sin^2 \\phi + i \\cos^2 \\phi\nL000182\t\\end{array}\nL000183\t\\right].\nL000184\t\\end{align}\nL000185\tThe corresponding angles are $\\phi_1=\\frac{\\pi}{4}-(x \\Phi+\\theta) \\pi$, $\\phi_2=\\frac{\\pi}{4}-\\frac{1}{2} \\arccos \\lambda_2$, $\\phi_3=\\frac{\\pi}{4}+(x \\Phi+\\theta) \\pi$.\nL000186\t\nL000187\tThe shift operator $S_{\\lambda_{1},\\eta}$ is implemented by BDs, HWPs, and PPBSs, which is\nL000188\t\\begin{equation}\nL000189\tS_{\\lambda_{1},\\eta}=e^{4\\pi\\eta}M_{E}S'_{2}h(\\theta_2)S'_{1}h(\\theta_1)M_{E}\nL000190\t\\end{equation}\nL000191\twith $\\theta_1=0$, $\\theta_2=\\arccos \\lambda_1$. The conditional shift operators $S'_1$ and $S'_2$ move the walker in the corresponding coin states $|V\\rangle$ and $|H\\rangle$ to the right and left, respectively, with\nL000192\t\\begin{align*}\nL000193\tS'_1 &= \\sum_x |x+1\\rangle\\langle x| \\otimes |V\\rangle\\langle V| + |x\\rangle\\langle x| \\otimes |H\\rangle\\langle H|, \\\\\nL000194\tS'_2 &= \\sum_x |x-1\\rangle\\langle x| \\otimes |H\\rangle\\langle H| + |x\\rangle\\langle x| \\otimes |V\\rangle\\langle V|.\nL000195\t\\end{align*}\nL000196\tThe mode-selective loss operator is given by  $M_E = \\sum_{x}|x\\rangle\\langle x|\\otimes\\left[ \\begin{array}{cc} 1 & 0 \\\\ 0 & e^{-2\\pi\\eta} \\end{array} \\right]$, and is experimentally implemented using a PPBS. After the application of $M_E$ at each step, photons in the vertical polarization state $|V\\rangle$ are reflected by the PPBS with probability $p = 1-e^{-8\\pi\\eta}$, while the remaining photons continue to propagate in the quantum-walk evolution. The experimentally realized time-evolution operator ${\\tilde W}$ differs from $W$ by a factor of $e^{4\\pi \\eta}$, i.e., $W=e^{4\\pi \\eta} {\\tilde W}$~\\cite{xiao1}.\nL000197\t\nL000198\tIn the detection stage, the probability distribution of the walker is obtained as $P(x,t) = \\frac{N(x,t)}{\\sum_x N(x,t)}$, where $N(x,t) = N_H(x,t) + N_V(x,t)$ is the total number of photons detected at position $x$ after the $t$th step. Here, $N_{H}(x,t)$ and $N_{V}(x,t)$ denote the photon counts with horizontal and vertical polarizations, respectively, measured by APDs. The overall probability $P(t)$ is reconstructed as\nL000199\t\\begin{equation}\nL000200\tP(t) = e^{8\\pi\\eta t} \\sum_x \\frac{N(t, x)}{\\sum_x \\left[ N(t, x) + \\sum_{t'=1}^{t} N_L(t', x) \\right]},\nL000201\t\\end{equation}\nL000202\twhere $N_L(t, x)$ denotes the photon loss at position $x$ due to the partial measurement $M_E$ at time step $t$.\nL000203\t\\smallskip\nL000204\t\nL000205\t\\minisubsection{PT-symmetry of the PUAMO}\nL000206\t\nL000207\tPT-symmetry plays a significant role in characterizing phase transitions of the PUAMO: The Floquet operator $W_{\\lambda_1,\\lambda_2,\\eta}$ in the modified ``time frame'' $\\tilde{W}_{\\lambda_1,\\lambda_2,\\eta}=Q_{\\lambda_2,\\theta}^{1/2}S_{\\lambda_1}Q_{\\lambda_2,\\theta}^{1/2}$ exhibits PT-symmetry \\cite{cedzi2}, that is, $(\\mathcal{PT})\\tilde{W}_{\\lambda_1,\\lambda_2,\\theta,\\eta}(\\mathcal{PT})^{-1}=\\tilde{W}_{\\lambda_1,\\lambda_2,\\theta,\\eta}^{-1}$. Here, $\\mathcal{PT}$ represents the combined inversion of space and time given as the antilinear operator\nL000208\t\\begin{equation*}\nL000209\t    \\mathcal{PT}=\\sum_x\\ketbra x{-x}\\otimes \\mathcal{PT}_x\\mathcal K,\nL000210\t\\end{equation*}\nL000211\tacting locally as $\\mathcal{PT}_x = \\sigma_{z}$ where $\\mathcal K$ is complex conjugation. As the non-Hermitian parameter $\\eta$ increases, this PT-symmetry is spontaneously broken at the value $\\eta=-\\log\\lambda_0$, where parts of the spectrum of $W_{\\lambda_1,\\lambda_2,\\eta}$ move off of the unit circle, as illustrated in Fig.~\\ref{fig1}{\\bf a}.\nL000212\t\nL000213\tChanging the time frame from $W_{\\lambda_1,\\lambda_2,\\eta}$ to $\\tilde W_{\\lambda_1,\\lambda_2,\\eta}$ does not change the dynamics up to an initial rotation of the initial state. Also note that the original time frame is PT-symmetric, albeit for a position-dependent symmetry operator.\nL000214\t\\smallskip\nL000215\t\nL000216\t\\minisubsection{Non-Hermitian localization-delocalization transition}\nL000217\t\nL000218\tThe significance of the Lyapunov exponent $L$ is that it quantifies the inverse localization length of solutions to the secular equation, that is, it determines whether or not eigenstates are localized ($L>0$) or not ($L=0$). With this in mind, the delocalization in $\\eta$ can be understood: First, note that $W_{\\lambda_1,\\lambda_2,\\eta}$ is similar to $W_{\\lambda_1,\\lambda_2,0}$ via the (non-unitary) skin transformation $V_\\eta=\\sum_x\\sum_{s=0,1}e^{2\\pi\\eta x}\\ketbra xx\\otimes\\ketbra ss$. Thus, if $\\psi$ is an eigenstate of $W_{\\lambda_1,\\lambda_2,0}$, $(V_\\eta^{-1}\\psi)_x=e^{-2\\pi\\eta x}\\psi_x$ is an eigenstate of $W_{\\lambda_1,\\lambda_2,\\eta}$.\nL000219\t\nL000220\tIn the regime $\\lambda_1<\\lambda_2$, every eigenstate of $W_{\\lambda_1,\\lambda_2,0}$ is localized around some localization center $x_0$ and decays exponentially with inverse localization length $L=L_{\\lambda_1,\\lambda_2}=\\log\\lambda_0$, that is, $\\psi_x\\sim e^{-L|x-x_0|}$. Increasing $\\eta$ leads to eigenstates $\\psi^{(\\eta)}$ of $W_{\\lambda_1,\\lambda_2,\\eta}$ which by the above discussion follow\nL000221\t\\begin{equation*}\nL000222\t    \\psi^{(\\eta)}_x\\sim\\begin{cases}\nL000223\t        e^{-(L+2\\pi\\eta)(x-x_0)}, & x>x_0,\\\\\nL000224\t        e^{(L-2\\pi\\eta)(x-x_0)}, & x<x_0.\nL000225\t    \\end{cases}\nL000226\t\\end{equation*}\nL000227\tFor $\\eta>0$, such eigenfunctions decay to both sides of $x_0$ as long as $2\\pi\\eta<L$. However, as soon as $2\\pi\\eta>0$, delocalization sets in to the left of $x_0$, while the eigenfunction remains localized to the right. This is precisely what we observe in the experiment, see Fig.~\\ref{fig3}{\\bf c}.\nL000228\t\nL000229\t\nL000230\t\\smallskip\nL000231\t\nL000232\t{\\bf Data availability}\nL000233\t\nL000234\tThe data that support the findings of this study are available from the corresponding authors upon requests.\nL000235\t\nL000236\t{\\bf Code availability}\nL000237\t\nL000238\tThe codes that support the findings of this study are available from the corresponding authors upon requests.\nL000239\t\nL000240\t\nL000241\t\nL000242\t{\\bf Acknowledgments}\nL000243\t\nL000244\tQ.L. and P.X. are supported by the National Key R$\\&$D Program of China (Grant No. 2023YFA1406701) and the National Natural Science Foundation of China (Grants No. 12025401, No. 92265209). Q.Z. is supported by National Key R\\&D Program of China (2020 YFA0713300) and Nankai Zhide Foundation.\nL000245\t\nL000246\t{\\bf Author contributions}\nL000247\t\nL000248\tQ.L. performed the experiments and wrote part of the paper. C.C. and Q.Z. developed the theoretical aspects and wrote part of the paper. P.X. supervised the project, designed the experiments, analyzed the results, and revised the paper.\nL000249\t\nL000250\t{\\bf Competing interest declaration}\nL000251\t\nL000252\tThe authors declare no competing interests.\nL000253\t\nL000254\t\nL000255\t\\begin{thebibliography}{10}\nL000256\t\\newcommand{\\DOI}[1]{doi: \\href{https://doi.org/#1}{#1}}\nL000257\t\\newcommand{\\arxiv}[1]{\\href{https://arxiv.org/abs/#1}{\\texttt{arXiv:#1}}}\nL000258\t\\bibitem{stanley1971phase} Stanley, H. E. Phase transitions and critical phenomena. Clarendon Press, Oxford (1971).\nL000259\t\\bibitem{hasanColloquiumTopologicalInsulators2010} Hasan, M. Z. \\& Kane, C. L. Colloquium: topological insulators. Reviews of Modern Physics 82, 3045 (2010) \\arxiv{1002.3895}.\nL000260\t\\bibitem{kitaevPeriodicTableTopological2009} A. Kitaev. Periodic table for topological insulators and superconductors. In AIP Conference Proceedings, 22-30 (2009) \\arxiv{0901.2686}.\nL000261\t\\bibitem{qiTopologicalInsulatorsSuperconductors2011} Qi, X.-L. \\& Zhang, S.-C. Topological insulators and superconductors. Reviews of Modern Physics 83, 1057 (2011) \\arxiv{1008.2026}.\nL000262\t\\bibitem{ryuTopologicalInsulatorsSuperconductors2010} Ryu, S., Schnyder, A. P., Furusaki, A. \\& Ludwig, A. W. Topological insulators and superconductors: tenfold way and dimensional hierarchy. New Journal of Physics 12, 065010 (2010) \\arxiv{0912.2157}.\nL000263\t\nL000264\t\\bibitem{ander} Anderson, P.W. Absence of diffusion in certain random lattices. Physical Review 109, 1492 (1958).\nL000265\t\\bibitem{FiftyYearsOfAL} Abrahams, E. 50 years of Anderson Localization.  World Scientific (2010).\nL000266\t\\bibitem{kunzSpectreOperateursAux1980} Kunz, H. \\& Souillard, B. Sur le spectre des op\\'{e}rateurs aux diff\\'{e}rences finies al\\'{e}atoires. Communications in Mathematical Physics 78, 201-246 (1980).\nL000267\t\\bibitem{stolzIntroductionMathematicsAnderson2011} Stolz, G. An introduction to the mathematics of Anderson localization. Entropy and the quantum II Contemporary Mathematics 552, 71-108 (2011) \\arxiv{1104.2317}.\nL000268\t\\bibitem{LeeRamakrishnan1985} Lee, Patrick A. \\& Ramakrishnan, T. V. Disordered electronic systems. Reviews of Modern Physics 57, 287-337 (1985).\nL000269\t\nL000270\t\\bibitem{sokoloff} Sokoloff, J. Unusual band structure, wave functions and electrical conductance in crystals with incommensurate periodic potentials. Physics Reports 126, 189-244 (1985).\nL000271\t\\bibitem{roati} Roati, G. et al. Anderson localization of a non-interacting Bose-Einstein condensate. Nature 453, 895-898 (2008) \\arxiv{0804.2609}.\nL000272\t\\bibitem{Segev} Segev, M., Silberberg, Y. \\& Christodoulides, D. N. Anderson localization of light. Nature Photonics 7, 197-204 (2013).\nL000273\t\\bibitem{lahini} Lahini, Y. et al. Observation of a localization transition in quasiperiodic photonic lattices. Physical Review Letters 103, 013901 (2009) \\arxiv{0807.2845}.\nL000274\t\\bibitem{lin1} Lin, Q. et al. Observation of non-Hermitian topological Anderson insulator in quantum dynamics. Nature Communications 13, 3229 (2022) \\arxiv{2108.01097}.\nL000275\t\\bibitem{lin2} Lin, Q. et al. Topological phase transitions and mobility edges in non-Hermitian quasicrystals. Physical Review Letters 129, 113601 (2022) \\arxiv{2112.15024}.\nL000276\t\nL000277\t\\bibitem{AA} Aubry, S. \\& Andr\\'{e}, G. Analyticity breaking and Anderson localization in incommensurate lattices. Annals of the Israel Physical Society 3, 18 (1980).\nL000278\t\\bibitem{fliu} Liu, F., Ghosh, S. \\& Chong, Y. Localization and adiabatic pumping in a generalized Aubry-Andr\\'{e}-Harper model. Physical Review B 91, 014108 (2015) \\arxiv{1406.4675}.\nL000279\t\\bibitem{sahu} Sahu, D. K., Acharya, A. P., Choudhuri, D. \\& Datta, S. Self-duality of one-dimensional quasicrystals with spin-orbit interaction. Physical Review B 104, 054202 (2021) \\arxiv{2102.02387}.\nL000280\t\nL000281\t\\bibitem{Jitomirskaya1999Annals} Jitomirskaya, S. Y. Metal-insulator transition for the almost Mathieu operator. Annals of Mathematics, 1159-1175 (1999) \\arxiv{math/9911265}.\nL000282\t\nL000283\t\\bibitem{verbin} Verbin, M., Zilberberg, O., Kraus, Y. E., Lahini, Y. \\& Silberberg, Y. Observation of topological phase transitions in photonic quasicrystals. Physical Review Letters 110, 076403 (2013) \\arxiv{1211.4476}.\nL000284\t\\bibitem{szame} Weidemann, S., Kremer, M., Longhi, S. \\& Szameit, A. Topological triple phase transition in non-Hermitian Floquet quasicrystals. Nature 601, 354-359 (2022).\nL000285\t\\bibitem{Lahini2007} Lahini, Y. et al. Anderson localization and nonlinearity in one-dimensional disordered photonic lattices. Physical Review Letters 100, 013906 (2008) \\arxiv{0704.3788}.\nL000286\t\nL000287\t\\bibitem{avilaSharpPhaseTransitions2017} Avila, A., You, J. \\& Zhou, Q. Sharp phase transitions for the almost Mathieu operator. Duke Mathematical Journal 166, 2697-2718 (2017) \\arxiv{1512.03124}.\nL000288\t\nL000289\t\\bibitem{brownBlochElectronsUniform1964} Brown, E. Bloch electrons in a uniform magnetic field. Physical Review 133, A1038 (1964).\nL000290\t\\bibitem{hofstadter} Hofstadter, D. R. Energy levels and wave functions of Bloch electrons in rational and irrational magnetic fields. Physical Review B 14, 2239 (1976).\nL000291\t\\bibitem{thoulessQuantizedHallConductance1982} Thouless, D. J., Kohmoto, M., Nightingale, M. P. \\& den Nijs, M. Quantized Hall conductance in a two-dimensional periodic potential. Physical Review Letters 49, 405 (1982).\nL000292\t\\bibitem{niuQuantizedHallConductance1985} Niu, Q., Thouless, D. J. \\& Wu, Y.-S. Quantized Hall conductance as a topological invariant. Physical Review B 31, 3372 (1985).\nL000293\t\nL000294\t\\bibitem{xcai} Cai, X. Localization transitions and winding numbers for non-Hermitian Aubry-Andr\\'{e}-Harper models with off-diagonal modulations. Physical Review B 106, 214207 (2022).\nL000295\t\\bibitem{longhi21} Longhi, S. Phase transitions in a non-Hermitian Aubry-Andr\\'{e}-Harper model. Physical Review B 103, 054203 (2021) \\arxiv{2102.09214}.\nL000296\t\\bibitem{yliu} Liu, Y., Zhou, Q. \\& Chen, S. Localization transition, spectrum structure, and winding numbers for one-dimensional non-Hermitian quasicrystals. Physical Review B 104, 024201 (2021) \\arxiv{2009.07605}.\nL000297\t\\bibitem{yucePTSymmetricAubry2014} Yuce, C. PT symmetric Aubry-Andr\\'{e} model. Physics Letters A 378, 2024-2028 (2014) \\arxiv{1402.2749}.\nL000298\t\\bibitem{longhi19} Longhi, S. Topological phase transition in non-Hermitian quasicrystals. Physical Review Letters 122, 237601 (2019) \\arxiv{1905.09460}.\nL000299\t\\bibitem{jiangInterplayNonHermitianSkin2019} Jiang, H., Lang, L.-J., Yang, C., Zhu, S.-L. \\& Chen, S. Interplay of non-Hermitian skin effects and Anderson localization in nonreciprocal quasiperiodic lattices. Physical Review B 100, 054301 (2019).\nL000300\t\nL000301\t\\bibitem{benderIntroductionPTSymmetricQuantum2005} Bender, C. M. Introduction to PT-symmetric quantum theory. Contemporary physics 46, 277-292 (2005) \\arxiv{quant-ph/0501052}.\nL000302\t\\bibitem{benderRealSpectraNonHermitian1998} Bender, C. M. \\& Boettcher, S. Real spectra in non-Hermitian Hamiltonians having PT symmetry. Physical Review Letters 80, 5243 (1998) \\arxiv{physics/9712001}.\nL000303\t\nL000304\t\\bibitem{footnote1}We acknowledge that one has to be careful with nomenclature here: by ``non-Hermitian'' we mean ``non-Hermitian with respect to the given scalar product'' \\cite{mostafazadehExactPTsymmetryEquivalent2003}\nL000305\t\nL000306\t\\bibitem{cedzi} Cedzich, C., Fillman, J. \\& Ong, D. C. Almost everything about the unitary almost Mathieu operator. Communications in Mathematical Physics 403, 745-794 (2023) \\arxiv{2112.03216}.\nL000307\t\\bibitem{twentyMartinis} Cedzich, C. \\& Li, L. Twenty dry Martinis for the Unitary Almost Mathieu Operator. arXiv:2503.06710 (2025). \\arxiv{2503.06710}\nL000308\t\\bibitem{cedzich2024absence} Cedzich, C. \\& Fillman, J. Absence of bound states for quantum walks and CMV matrices via reflections. Journal of Spectral Theory 14, 1513-1536 (2024) \\arxiv{2402.11024}.\nL000309\t\\bibitem{cedzi2} Cedzich, C. \\& Fillman, J. Mobility edges in pseudo-unitary quasiperiodic quantum walks. arXiv:2411.16843 (2024). \\arxiv{2411.16843}\nL000310\t\nL000311\t\nL000312\t\\bibitem{xiao1} Xiao, L. et al. Non-Hermitian bulk-boundary correspondence in quantum dynamics. Nature Physics 16, 761-766 (2020) \\arxiv{1907.12566}.\nL000313\t\\bibitem{xiao2} Xiao, L. et al. Observation of non-Bloch parity-time symmetry and exceptional points. Physical Review Letters 126, 230402 (2021) \\arxiv{2009.07288}.\nL000314\t\nL000315\t\\bibitem{cedzi3} Cedzich, C., Fillman, J., Geib, T. \\& Werner, A. Singular continuous Cantor spectrum for magnetic quantum walks. Letters in Mathematical Physics 110, 1141-1158 (2020) \\arxiv{1908.09924}.\nL000316\t\nL000317\t\\bibitem{cedzi1} Cedzich, C., Fillman, J., Li, L., Ong, D. C. \\& Zhou, Q. Exact mobility edges for almost-periodic CMV matrices via gauge symmetries. International Mathematics Research Notices 2024, 6906-6941 (2024) \\arxiv{2307.10909}.\nL000318\t\nL000319\t\\bibitem{footnote2} For background and definitions of pseudo-unitarity, see \\cite{mostafazadehPseudounitaryOperatorsPseudounitary2004}\nL000320\t\nL000321\t\nL000322\t\\bibitem{WZ1} Yao, S. \\& Wang, Z. Edge states and topological invariants of non-Hermitian systems. Physical Review Letters 121, 086803 (2018) \\arxiv{1803.01876}.\nL000323\t\\bibitem{WZ2} Song, F., Yao, S. \\& Wang, Z. Non-Hermitian topological invariants in real space. Physical Review Letters 123, 246801 (2019) \\arxiv{1905.02211}.\nL000324\t\\bibitem{qhlee} Lee, C. H., Li, L. \\& Gong, J. Hybrid higher-order skin-topological modes in nonreciprocal systems. Physical Review Letters 123, 016805 (2019) \\arxiv{1810.11824}.\nL000325\t\nL000326\t\nL000327\t\nL000328\t\\bibitem{mostafazadehExactPTsymmetryEquivalent2003} Mostafazadeh, A. Exact PT-symmetry is equivalent to Hermiticity. Journal of Physics A: Mathematical and General 36, 7081 (2003) \\arxiv{quant-ph/0304080}.\nL000329\t\\bibitem{mostafazadehPseudounitaryOperatorsPseudounitary2004} Mostafazadeh, A. Pseudounitary operators and pseudounitary quantum dynamics. Journal of Mathematical Physics 45, 932-946 (2004) \\arxiv{math-ph/0302050}.\nL000330\t\nL000331\t\\ifarxiv\nL000332\t\\bibitem{HatanoNelson1} Hatano, N. \\& Nelson, D. R. Localization transitions in non-Hermitian quantum mechanics. Physical Review Letters 77, 570 (1996) \\arxiv{cond-mat/9603165}.\nL000333\t\\bibitem{HatanoNelson2} Hatano, N. \\& Nelson, D. R. Vortex pinning and non-Hermitian quantum mechanics. Physical Review B 56, 8651 (1997) \\arxiv{cond-mat/9705290}.\nL000334\t\nL000335\t\\bibitem{yliu} Liu, Y., Zhou, Q. \\& Chen, S. Localization transition, spectrum structure, and winding numbers for one-dimensional non-Hermitian quasicrystals. Physical Review B 104, 024201 (2021) \\arxiv{2009.07605}.\nL000336\t\nL000337\t\\bibitem{bourgainContinuityLyapunovExponent2002} Bourgain, J. \\& Jitomirskaya, S. Continuity of the Lyapunov exponent for quasiperiodic operators with analytic potential. Journal of Statistical Physics 108, 1203-1218 (2002) \\arxiv{math-ph/0110040}.\nL000338\t\\fi\nL000339\t\nL000340\t\nL000341\t\\end{thebibliography}\nL000342\t\nL000343\t\\ifarxiv\nL000344\t\\begin{widetext}\nL000345\t\\appendix\nL000346\t\\section*{Appendix}\nL000347\t\\input{suppl_content}\nL000348\t\\end{widetext}\nL000349\t\\fi\nL000350\t\nL000351\t\\end{document}\nL000352\t===== END FILE: AAH_0616.tex =====\nL000353\t\nL000354\t===== BEGIN FILE: suppl_content.tex =====\nL000355\t\\subsection{Quantifying the phase transitions in the non-Hermitian regime.}\nL000356\t\nL000357\tCentral to understanding and quantifying the two phase transitions in the non-Hermitian regime is the understanding of the behavior of the Lyapunov exponent $L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp$ of the dual PUAMO $W_{\\lambda_1,\\lambda_2,\\eta}^\\sharp$ as a function of $\\eta$. This dual model has the same eigenvalue spectrum as $W_{\\lambda_1,\\lambda_2,\\eta}$, so if PT-symmetry spontaneously breaks for the dual model, it also breaks for the original model. In the dual model, $\\eta$ plays the role of a complexified phase $\\theta\\mapsto\\theta-i\\eta$. This (complexified) Lyapunov exponent $L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp$ is given by \\cite{cedzi2}\nL000358\t\\begin{equation*}\nL000359\t    L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp=\\max\\Big\\{0,-\\log\\lambda_0+2\\pi|\\eta|-2\\pi\\max\\{0,|\\eta|-\\eta_0\\}\\Big\\},\nL000360\t\\end{equation*}\nL000361\twhere $L_{\\lambda_1,\\lambda_2,0}^\\sharp=\\max\\{0,-\\log\\lambda_0\\}$ with $\\lambda_0$ as in Eq.~(3).\nL000362\tHere, $\\eta_0=\\arcsinh(\\lambda_1'/\\lambda_1)/(2\\pi)$ quantifies the value of $\\eta$ for which the associated transfer matrices are not analytic, a phenomenon that does not occur in the non-Hermitian AAH model or its dual. Since the derivation of this requires a lot of theoretical background, we refer the reader to \\cite{cedzi,cedzi2} instead of reproducing it here.\nL000363\t\nL000364\tIn the extended and critical phase with $\\lambda_1>\\lambda_2$ and $\\lambda_1=\\lambda_2$, respectively, the Lyapunov exponent of the UAMO vanishes, that is, $L_{\\lambda_1,\\lambda_2,0}=\\max\\{0,\\log\\lambda_0\\}=0$. The graph of $L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp$ therefore has one turning point at $\\eta=0$ and $\\eta=\\eta_0$, see Fig.~\\ref{fig:lyap_exp}. Therefore, PT-symmetry is immediately spontaneously broken for every positive $\\eta$.\nL000365\t\nL000366\tIn the localized phase $\\lambda_1<\\lambda_2$ the graph of $L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp$ has four turning points at $\\eta=\\pm\\lambda_0\\neq0$ and $\\eta=\\pm\\eta_0$\nL000367\t, see Fig.~ \\ref{fig:lyap_exp}. One has $L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp=0$ as long as $|\\eta|<\\log\\lambda_0$. In this regime, the dual UAMO is delocalized, so the original model is localized. Moreover, in this regime, not only is the spectrum confined to the unit circle by PT-symmetry, it is also independent of $\\eta$~\\cite{cedzi}. At $\\eta=\\log\\lambda_0$, the critical value of the first phase transition, PT-symmetry spontaneously breaks. As $|\\eta|$ is increased above this value, the dual UAMO localizes, which implies delocalization for the original model, see Methods. The second critical value is given by $\\eta=\\eta_0$. It signals the value of $\\eta$ beyond which $L_{\\lambda_1,\\lambda_2,\\eta}^\\sharp=-\\log\\lambda_0+\\eta_0=\\log[(1+\\lambda_2')/\\lambda_2]$ is independent of $\\eta$ and $\\lambda_1$, and only depends on $\\lambda_2$. Physically, this corresponds to the value of $\\eta$ for which either the (11)- or the (22)-entry of the coin of the dual model $W_{\\lambda_1,\\lambda_2,\\eta}^\\sharp$ vanishes infinitely often and therefore the walk decouples either to the left or to the right.\nL000368\t\nL000369\t\nL000370\t\\begin{figure}[h]\nL000371\t    \\includegraphics[width=.9\\textwidth]{figs1.pdf}\nL000372\t    \\caption{\\label{fig:lyap_exp}The graph of the dual Lyapunov exponent $L^\\sharp$ on the spectrum as a function of $\\eta$. In the left panel, $\\lambda_1<\\lambda_2$ and there are two turning points: one at the Lyapunov exponent $L$ and one at $\\eta_0=\\arcsinh(\\lambda_1'/\\lambda_1)/(2\\pi)$. These correspond to the critical values of the first and second phase transitions of the PUAMO, respectively. In the middle and right panels, $\\lambda_1=\\lambda_2$ and $\\lambda_1>\\lambda_2$, respectively, and there is only one transition at $\\eta_0$. In particular, there is no localization-delocalization transition. The dashed lines show the graphs of the dual Lyapunov exponents for the corresponding non-Hermitian AAH model.}\nL000373\t\\end{figure}\nL000374\t\nL000375\t\\subsection{Phenomenological correspondence between the (P)UAMO and the (non-Hermitian) AAH model}\nL000376\t\nL000377\tIn a certain regime of the non-Hermitian parameter $\\eta$, the PUAMO model from Eq.~(1) is phenomenologically equivalent to the non-Hermitian AAH model given by\nL000378\t\\begin{equation*}\nL000379\t    (H_{\\lambda,\\eta}\\psi)_n=e^{2\\pi \\eta}\\psi_{n+1}+e^{-2\\pi \\eta}\\psi_{n-1}+2\\lambda\\cos(2\\pi (\\Phi n+\\theta))\\psi_n,\nL000380\t\\end{equation*}\nL000381\twhich is also known as the quasiperiodic Hatano-Nelson model~\\cite{HatanoNelson1,HatanoNelson2,yliu}.\nL000382\tOn the spectrum, the Lyapunov exponent of this model is given by \\cite{bourgainContinuityLyapunovExponent2002,yliu}\nL000383\t\\begin{equation*}\nL000384\t    L_{\\lambda,\\eta}=\\log\\lambda+2\\pi|\\eta|.\nL000385\t\\end{equation*}\nL000386\tThe graph of the dual Lyapunov exponent $L_{\\lambda,\\eta}^\\sharp=L_{-\\lambda,\\eta}$ is shown in Fig.~\\ref{fig:lyap_exp} as gray dashed lines.\nL000387\tIn the Hermitian setting with $\\eta=0$, this model has a metal-insulator transition at $\\lambda=1$~\\cite{Jitomirskaya1999Annals}, which in the non-Hermitian setting is shifted to $\\eta=-\\log\\lambda$ \\cite{yliu}.\nL000388\t\nL000389\tThe regime in which the PUAMO behaves analogously to this model is given by $|\\eta|<\\arcsinh(\\lambda_1'/\\lambda_1)/(2\\pi)$. For larger values of $\\eta$, eigenfunctions of the non-Hermitian AAH model with corresponding real eigenvalues continue to exist, whereas in this regime the PUAMO does not have eigenstates corresponding to eigenvalues on the unit circle anymore, compare the two panels in Fig.~\\ref{fig:spectra_NHAAH_PUAMO}.\nL000390\t\nL000391\t\\begin{figure}[t]\nL000392\t    \\begin{center}\nL000393\t        \\includegraphics[width=0.95\\textwidth]{figs2.pdf}\nL000394\t    \\end{center}\nL000395\t    \\caption{\\label{fig:spectra_NHAAH_PUAMO} {\\bf a} The spectra of the non-Hermitian AAH model, and {\\bf b} the PUAMO for varying $\\eta$ where $E$ and $z$ correspond to the energy and the quasienergy, respectively. Here, the coupling constants $\\lambda$ for the non-Hermitian AAH model and $\\lambda_1$, $\\lambda_2$ for the PUAMO are chosen such that $\\lambda=1.5=\\lambda_0$ with $\\lambda_0$ as in Eq.~(3). The white markers in the colorbar indicate the displayed values of $\\eta$ in both plots, and the red and green markers indicate the critical values of the first and second phase transition, respectively. Clearly, for $\\eta$ larger than the first critical value, parts of the spectrum move off of the real axis and the unit circle, respectively. In the right plot, for $\\eta$ larger than the value of the second phase transition, no spectrum is left on the unit circle. This phase transition cannot happen in the non-Hermitian AAH model, as it would correspond to a discontinuity of the spectrum with respect to $\\eta$.}\nL000396\t\\end{figure}\nL000397\t\nL000398\t\\subsection{Observation of the localization-delocalization transition in the PUAMO model.}\nL000399\t\nL000400\tIn the main text, we discuss the localization-delocalization transition induced by non-Hermiticity, which can be quantified by the Lyapunov exponent $L_{\\lambda_1,\\lambda_2,\\eta}$. However, instead of fixing $\\lambda_1$ and $\\lambda_2$ and varying $\\eta$, we can also observe the (same) phase transition for a fixed value of $\\eta$ by tuning $\\lambda_1$ and $\\lambda_2$. The rationale behind this is that in the parameter region of localization, the Lyapunov exponent must be positive, that is,\nL000401\t\\begin{equation*}\nL000402\t    L_{\\lambda_1,\\lambda_2,\\eta}=\\max\\{0,\\log\\lambda_0-2\\pi|\\eta|\\}>0,\nL000403\t\\end{equation*}\nL000404\twith $\\lambda_0$ as in Eq.~(3).\nL000405\tFor fixed $\\eta>0$, this is to require that $\\log\\lambda_0>2\\pi|\\eta|$, or, differently put, that\nL000406\t\\begin{equation*}\nL000407\t    \\lambda_2>\\frac{2e^{2\\pi\\eta}\\lambda_1(1+\\lambda_1')}{2(1+\\lambda_1')+(e^{4\\pi\\eta}-1)\\lambda_1^2}.\nL000408\t\\end{equation*}\nL000409\tThe phase transition is thus expected at\nL000410\t\\begin{equation}\\label{eq:nh-phase_transition}\nL000411\t    \\lambda_2=\\begin{cases}\\frac{2e^{2\\pi\\eta}\\lambda_1(1+\\lambda_1')}{2(1+\\lambda_1')+\\lambda_1^2(e^{4\\pi\\eta}-1)}, & 0\\leq\\lambda_1\\leq\\frac{2e^{2\\pi|\\eta|}}{1+e^{4\\pi|\\eta|}},\\\\\nL000412\t    1,&\\frac{2e^{2\\pi|\\eta|}}{1+e^{4\\pi|\\eta|}}<\\lambda_1\\leq1.\nL000413\t    \\end{cases}\nL000414\t\\end{equation}\nL000415\tNote that for the UAMO with $\\eta=0$, this boils down to the known phase transition at $\\lambda_1=\\lambda_2$~\\cite{cedzi}.\nL000416\t\nL000417\t\nL000418\tTo gain further insight into this modified phase transition of the PUAMO, we experimentally measure the second moment $\\langle x^2 \\rangle = \\sum_x x^2 P(x, t)$ as a function of the parameters $\\lambda_1$ and $\\lambda_2$ across the entire parameter space. The second moment quantifies the spreading rate of the walker, thus providing a direct characterization of the system's localization properties. As shown in Fig.~\\ref{fig:s3}{\\bf a}, our experimental results clearly capture the localization transition, and these observations agree well with the theoretical result presented in Fig.~\\ref{fig:s3}{\\bf b}. Comparing Fig.~2{\\bf h} and Fig.~\\ref{fig:s3}{\\bf a}, we observe that the introduction of non-Hermiticity modifies the boundary of the localization transition, which is consistent with the theoretical prediction given by Eq.~\\eqref{eq:nh-phase_transition}.\nL000419\t\nL000420\t\nL000421\t\nL000422\t\nL000423\t\\begin{figure}[h]\nL000424\t    \\includegraphics[width=.7\\textwidth]{figs3.pdf}\nL000425\t    \\caption{\\label{fig:s3} {\\bf a} Measured phase diagram, which is evaluated via the second moment of position $\\langle x^2 \\rangle$ after $t=6$ time steps. We set $\\theta=0$, $\\eta=0.1$ and chose $\\ket{\\psi(0)}=\\ket{0}\\otimes(\\ket{H}+i\\ket{V})/\\sqrt{2}$ as the initial state. The dashed curve indicates the critical value of the first phase transition. {\\bf b} Theoretical phase diagram with the phase transition in red according to Eq.~\\eqref{eq:nh-phase_transition}.}\nL000426\t\\end{figure}\nL000427\t===== END FILE: suppl_content.tex =====",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_science_card",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

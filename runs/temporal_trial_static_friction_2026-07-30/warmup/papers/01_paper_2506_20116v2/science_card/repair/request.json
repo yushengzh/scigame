@@ -1,0 +1,705 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered LaTeX source. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nOnly encode a quantity as a continuous control when the source supports responses across that interval. Two isolated reported condition values do not license interpolation: represent them as separate fixed regime conditions instead. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nPrioritize complete, coherent quantitative clusters that share controls and readouts across source-reported regimes. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce those responses. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored numeric interval for every cited control; never substitute the broader paper-level control range. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, executable expression trees, or code.\n\nScienceCard JSON Schema:\n{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"}},\"required\":[\"control_name\",\"minimum\",\"maximum\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"minimum\",\"maximum\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2506.20116v2\", \"citation\": \"Yui Takai, Static Friction of Liquid Marbles, Physical Review Letters (2026), DOI:10.1103/njnj-yhc6\", \"journal_doi\": \"10.1103/njnj-yhc6\"}\n\nThe line numbers below are the only valid locator coordinate system.\n\nL000001\t===== BEGIN FILE: final_arxiv.tex =====\nL000002\t\nL000003\t\\documentclass[twocolumn, prl,\nL000004\t amsmath,amssymb,\nL000005\t superscriptaddress,aps,\nL000006\t]{revtex4-2}\nL000007\t\nL000008\t\\usepackage[utf8]{inputenc}\nL000009\t\\usepackage[english]{babel}\nL000010\t\\usepackage{amsmath}\nL000011\t\\usepackage{hyperref}\nL000012\t\\usepackage{amsfonts}\nL000013\t\\usepackage{amssymb}\nL000014\t\\usepackage{graphicx}\nL000015\t\\usepackage{epstopdf}\nL000016\t\\usepackage{xcolor}\nL000017\t\\usepackage[dvipsnames]{xcolor}\nL000018\t\\usepackage{ulem}\nL000019\t\nL000020\t\\usepackage{setspace}\nL000021\t\nL000022\t\\begin{document}\nL000023\t\nL000024\t\\title{Static Friction of Liquid Marbles}\nL000025\t\nL000026\t\\author{Yui Takai}\nL000027\t\\thanks{These authors contributed equally to this work.}\nL000028\t\\affiliation{The University of Tokyo, Department of Mechanical Engineering, Tokyo, Japan.}\nL000029\t\nL000030\t\\author{Kei Mukoyama}\nL000031\t\\thanks{These authors contributed equally to this work.}\nL000032\t\\affiliation{The University of Tokyo, Department of Mechanical Engineering, Tokyo, Japan.}\nL000033\t\nL000034\t\\author{Pritam Kumar Roy}\nL000035\t\\affiliation{The University of Tokyo, Department of Mechanical Engineering, Tokyo, Japan.}\nL000036\t\\affiliation{Central University of Rajasthan, Department of Physics, Rajasthan, India}\nL000037\t\nL000038\t\\author{Guillaume Lagubeau}\nL000039\t\\affiliation{Université de Lille, CNRS, UMR 8520-IEMN, Lille, France.}\nL000040\t\nL000041\t\\author{David Quéré}\nL000042\t\\affiliation{ESPCI Paris, Physique et Mécanique des Milieux Hétérogènes, UMR 7636 du CNRS, Paris, France.}\nL000043\t\nL000044\t\\author{Samuel Poincloux}\\email{poincloux@phys.aoyama.ac.jp}\nL000045\t\\affiliation{Department of Physical Sciences, Aoyama Gakuin University, Sagamihara, Japan.}\nL000046\t\nL000047\t\\author{Timothée Mouterde}\\email{mouterde@g.ecc.u-tokyo.ac.jp}\nL000048\t\\affiliation{The University of Tokyo, Department of Mechanical Engineering, Tokyo, Japan.}\nL000049\t\nL000050\t\\begin{abstract}\nL000051\tLiquid marbles, droplets coated with a granular layer, are highly mobile as particles prevent capillary adhesion to the substrate. Yet their coating creates a static rolling friction, which we measure and model. Motion requires shear within the shell so that it is governed mainly by the grain density. This density controls yielding via a logistic function emerging as the particle network approaches percolation and increasing rapidly at close packing. More broadly, our system offers a simple platform for probing granular-raft mechanics and measuring their effective surface tension.\nL000052\t\nL000053\t\\end{abstract}\nL000054\t\nL000055\t\\maketitle\nL000056\t\nL000057\tManipulating small liquid volumes is challenging owing to capillary forces that pin droplets below the millimeter scale. A common approach to prevent capillary pinning is to form non-wetting states by separating the liquid from the solid via a gas layer. This layer can be formed actively by air entrainment from a fast-moving surface~\\cite{lhuissier2013levitation,gauthier2016aerodynamic} or, in the Leidenfrost effect, by evaporation~\\cite{biance2003leidenfrost}. On superhydrophobic surfaces, air is instead passively stabilized by hydrophobic micro/nanostructures~\\cite{shibuichi1996super,blossey2003self}. Alternatively, structures can be embedded at the liquid surface by coating the droplet with particles, to form liquid marbles~\\cite{aussillous2001liquid}, whose non-wetting state is substrate-independent. Particle properties can further be tailored to functionalize droplets, enabling manipulation by external stimuli such as light~\\cite{paven2016light} or magnetic fields~\\cite{zhao2010magnetic}, as well as the handling of hot liquids~\\cite{roy2025hot}. This makes liquid marbles controllable and possibly usable as microreactors~\\cite{sheng2015silica, oliveira2017potential,vadivelu2017liquid, tian2010liquid}, in soft robotics~\\cite{jeon2025particle}, or materials design~\\cite{rong2019liquid}.\nL000058\tMore broadly, liquid--grain interactions are central to erosion processes~\\cite{trottet2025sandball}.\nL000059\t\nL000060\tBoth marbles and droplets on superhydrophobic surfaces exhibit very low static friction, and even slight slopes can initiate their motion. For droplets, this friction arises from contact angle hysteresis and capillary forces~\\cite{pockels1914randwinkel,furmidge1962studies}. In contrast, liquid marble static friction resembles solid-solid friction for moderate volumes $10$--$50~\\mu\\mathrm{L}$~\\cite{jin2023marbles}, yet its physical origin remains largely unexplored. This paper examines how liquid marble's static friction arises from coupling between rolling deformation of aspherical droplets and their granular raft coating.\nL000061\t\nL000062\tLiquid marbles are prepared by coating water drops of surface tension $\\gamma=72~\\mathrm{mN/m}$, density $\\rho=1000~\\mathrm{kg/m^3}$, and volume $\\Omega$ (Fig.~\\ref{F1}a) with lycopodium particles (Fig.~\\ref{F1}b). These porous hydrophobic particles have mean diameter $d=32~\\mu$m, with standard deviation $3~\\mu$m, and cover a surface fraction $\\phi$ of the liquid interface. This preparation yields a reproducible initial surface fraction, $\\phi_\\mathrm{o}=0.83\\pm0.01$ (End Matter, Appendices A, B). The particles lower the effective surface tension $\\gamma_\\mathrm{eff}(\\phi)$~\\cite{aussillous2006properties,mchale2011liquid}, which is estimated from the marble shape as $\\gamma_\\mathrm{eff}(\\phi_\\mathrm{o})=53\\pm1~\\mathrm{mN/m}$.\nL000063\tThe marbles are then placed on a horizontal wafer, gradually tilted until the departure angle $\\alpha$, at which the marbles start moving (Fig.~\\ref{F1}a). Measured with a digital goniometer (Monotaro, Japan), $\\alpha$ corresponds to the slope at which the tangential weight $F=\\rho\\Omega g\\sin\\alpha\\simeq\\rho\\Omega g\\alpha$ overcomes static friction. The lycopodium mass is neglected, as it contributes less than $3\\%$ of the total mass.\nL000064\t\nL000065\t\\begin{figure*}[]\nL000066\t\t\\centering\nL000067\t\t\\includegraphics[scale=0.29]{./figures/Fig1.pdf}\nL000068\t\t\\caption{(a) A water marble with volume $\\Omega$ is deposited on a silicon wafer, which is slowly tilted until the marble departs at angle $\\alpha$. The photograph shows a marble with $\\Omega=50~\\mu\\mathrm{L}$.\nL000069\t    (b) Microscope image of the hydrophobic lycopodium particles, of diameter $32\\pm3~\\mu\\mathrm{m}$, used to form the granular shell.\nL000070\t    (c) Static friction $F$ of liquid marbles versus volume $\\Omega$ on log--log scales for hydrophilic (blue diamonds), hydrophobic (red squares), and superhydrophobic substrates (orange triangles).}\nL000071\t\t\\label{F1}\nL000072\t\\end{figure*}\nL000073\t\nL000074\tWe first examine the effects of substrate properties and marble volume on static friction. Hydrophilic, hydrophobic, and silica-nanobead-coated superhydrophobic silicon wafers are prepared (End Matter, Appendix C). We vary the marble initial volume from $1.5$ to $300~\\mu\\mathrm{L}$ and measure the static friction $F$ on each substrate (Fig.~\\ref{F1}c).\nL000075\tThree key observations emerge. (i) Static friction is substrate-independent despite differences in wetting and roughness and thus solid–solid friction. This rules out liquid– or particle–substrate dissipation. (ii) The marbles do not slide but initially roll (Supplemental Video 1, \\cite{Supplemental}), so $F$ is a static rolling friction.\nL000076\t(iii) Below $7\\pm2~\\mu$L, static friction is nearly volume-independent, of order a few $\\mu$N; above, it increases with volume up to $60~\\mu$N at $300~\\mu$L, more weakly than the linear scaling expected for Amontons--Coulomb sliding friction.\nL000077\tIn both cases, the friction is a small fraction of the marbles' weight---typically less than 10$\\%$---a hallmark of liquid marbles.\nL000078\tThe presence of two regimes suggests that the shape of the marbles influences their friction. This shape transition is governed by the capillary length $a(\\phi) = \\sqrt{\\gamma_{\\mathrm{eff}}(\\phi)/\\rho g}$: small marbles ($\\Omega \\ll a^3$) are nearly spherical (Fig.~\\ref{F2}a), while larger ones are flattened by gravity (Fig.~\\ref{F2}b). For $\\phi = \\phi_\\mathrm{o}$, we find $a^3(\\phi_\\mathrm{o}) \\approx 12$~$\\mu\\mathrm{L}$, consistent with the observed transition volume.\nL000079\t\nL000080\tThese observations suggest that static friction arises from the granular shell’s resistance to rolling, which we now model.\nL000081\tIn classic rolling friction~\\cite{reynolds1876vi}, resistance arises from viscoelastic bulk dissipation near the flattened contact region~\\cite{brilliantov1998rolling}.\nL000082\tLiquid marbles also are never perfectly spherical, even below the capillary length, because of gravity.\nL000083\tTheir rolling resistance likewise stems from asphericity, but deformation and dissipation occur in the granular shell rather than the liquid bulk: rolling without sliding requires geometrical rearrangements of the shell, accommodated by shear in the granular layer.\nL000084\t\nL000085\tDissipation by in-plane shear yielding of the granular shell, modeled as a granular raft~\\cite{cicuta2009granular,protiere2023particle} wrapped around the droplet, thus governs the onset of rolling.\nL000086\tWe determine the departure angle $\\alpha$ from an energy argument.\nL000087\tRolling over a distance $\\delta x$ begins when the gravitational energy gain $\\delta E_g\\simeq\\rho g\\Omega\\alpha \\ \\delta x$ exceeds the shear dissipation $\\delta E_d$ in the granular shell.\nL000088\tSince rolling starts under quasi-static substrate tilting, viscous dissipation in the liquid is negligible (End Matter, Appendix D).\nL000089\tWe assume that rolling by $\\delta x$ imposes a homogeneous shear strain $\\delta \\epsilon$ over an area $S$ of the granular shell (Fig.~\\ref{F2}a, b). To capture the onset of rolling, we model the shell rheology as purely plastic and quasi-static. The energy dissipated in this shell of volume $Sd$, then writes $\\delta E_d\\sim S d q_y \\delta\\epsilon$, with $q_y$ the yield stress of the granular shell~\\cite{kruyt2006shear}.\nL000090\tThis estimate neglects the elastic response of the granular assembly by assuming that the imposed shear is fully dissipated. We use a cohesionless Mohr--Coulomb criterion, $q_y=\\mu p(\\phi)$, where $\\mu$ is a macroscopic friction coefficient~\\cite{andreotti2013granular} and $p(\\phi)$ is the mean normal stress in the shell, taken homogeneous over the marble.\nL000091\tThis stress reduces the marble's effective surface tension, $\\gamma_{\\mathrm{eff}} = \\gamma-p(\\phi)d$~\\cite{cicuta2009granular,lagubeau2014armoring}.\nL000092\tOut-of-plane deformations and dynamic rolling would require additional ingredients.\nL000093\tWe rewrite the pressure term as $p(\\phi)= \\gamma f(\\phi)/d$, introducing a dimensionless function $f(\\phi)$ that captures the surface-fraction dependence.\nL000094\tMicroscopically, $f(\\phi)$ represents the dimensionless average normal component of intergrain contact forces.\nL000095\tThe effective surface tension is then  $\\gamma_{\\mathrm{eff}} = \\gamma(1-f(\\phi))$, so $f$ also quantifies how $\\gamma_\\mathrm{eff}$ varies with $\\phi$.\nL000096\t Substituting this into the energy balance $\\delta E_g\\sim \\delta E_d$, we obtain the departure angle:\nL000097\t\nL000098\t\\begin{equation}\nL000099\t     \\alpha \\approx \\frac{S a^2}{\\Omega}\\frac{\\delta\\epsilon}{\\delta x}\\mu \\frac{f(\\phi)}{1-f(\\phi)}\nL000100\t    \\label{eq:model_general}\nL000101\t\\end{equation}\nL000102\t\nL000103\tHere, the sheared shell area $S$ and the shear strain $\\delta \\epsilon$ involved in dissipation are primarily set by the marble's aspheric deformation, analogous to shear in rolling non-wetting droplets~\\cite{mahadevan1999rolling}.\nL000104\tGravity flattens the marbles, forming a contact disk of diameter $l$ and setting the sheared region's height (Fig. \\ref{F2}a, b).\nL000105\tWe consider the large-marble regime of Fig.~\\ref{F1}c, where gravity flattens the marbles to a height $\\simeq2a$.\nL000106\tApproximating their shape as a cylinder of base diameter $l$ and height $2a$ gives $\\Omega\\simeq\\pi l^2a/2$.\nL000107\tThe flat base of the large marbles being more extended than their height, we take the sheared area to be the entire cylindrical surface, $S\\approx \\pi l^2/2+2\\pi l a$, and the shear length as the marbles' height $2a$, yielding $\\delta\\epsilon\\approx\\delta x/2a$ (Fig.~\\ref{F2}b).\nL000108\t\nL000109\tCombining these with Eq.~\\ref{eq:model_general} gives the departure angle:\nL000110\t\\begin{equation}\nL000111\t    \\alpha\\approx  \\frac{1}{2}\\left({1+\\sqrt{\\frac{8\\pi a^3}{\\Omega}}}\\right)\\mu \\frac{f(\\phi)}{1-f(\\phi)} \\, ,\nL000112\t    \\label{eq:model_large}\nL000113\t\\end{equation}\nL000114\t\nL000115\tTo compare the model with experiments, we plot in Fig.~\\ref{F2}c the departure angle averaged over the three substrates shown in Fig.~\\ref{F1}c, since static friction is substrate-independent. Fitting Eq.~\\ref{eq:model_large} in the large-marble regime of Fig.~\\ref{F1}c, $\\Omega>7~\\mu$L, with $f(\\phi_\\mathrm{o})=0.26$ and $a(\\phi_\\mathrm{o})\\simeq2.3~\\mathrm{mm}$, i.e. $\\gamma_\\mathrm{eff}(\\phi_\\mathrm{o})\\simeq53~\\mathrm{mN/m}$, gives $\\mu=0.053 \\pm 0.003$ (red line in Fig.~\\ref{F2}c). The model agrees with the data over two decades in volume, from $3$ to $300~\\mu$L, with deviations only for $\\Omega<3~\\mu$L.\nL000116\t\nL000117\tTo capture this deviation, we adapt the model to small, quasi-spherical marbles of radius $R$, with $\\Omega\\simeq4\\pi R^3/3$. Balancing the weight, $\\rho gR^3$, with the Laplace pressure integrated over the contact area, $\\gamma_{\\mathrm{eff}}l^2/R$, gives $l\\sim R^2/a$~\\cite{mahadevan1999rolling}. Most of the marble rotates as a rigid body, so shear is confined near the contact over a distance $l$ (Fig.~\\ref{F2}a). Thus $S\\simeq2\\pi Rl$ and $\\delta\\epsilon\\simeq\\delta x/l$, which with Eq.~\\ref{eq:model_general} gives for small marbles:\nL000118\t\\begin{equation}\nL000119\t    \\alpha \\approx \\left({6\\pi^2}\\right)^{1/3} \\left( \\frac{a^3}{\\Omega}\\right) ^{2/3} \\mu \\frac{f(\\phi)}{1-f(\\phi)}\nL000120\t    \\label{eq:model_small}\nL000121\t\\end{equation}\nL000122\tUsing $\\mu$ obtained for large marbles, Eq.~\\ref{eq:model_small} predicts the small-$\\Omega$ data with a prefactor of $0.69$ (black line, Fig.~\\ref{F2}c), close to unity and accounting for geometry-dependent approximations. The small-marble model remains valid up to $\\sim15~\\mu$L, within experimental uncertainty.\nL000123\tThese results call for several remarks. (i) For $3\\lesssim\\Omega\\lesssim15~\\mu$L, close to $a^3\\simeq12~\\mu$L, both models describe the data within error bars, corresponding to the shape transition from spherical to flattened marbles. (ii) The model predicts three successive regimes as $\\Omega$ increases: $\\alpha\\sim\\Omega^{-2/3}$ at small volumes, a crossover with $\\alpha\\sim\\Omega^{-1/2}$, and a plateau at large volumes.\nL000124\t(iii) The small fitted value of the macroscopic friction coefficient reflects that granular rafts at $\\phi_\\mathrm{o}$ are fragile assemblies that yield easily under shear.\nL000125\t\nL000126\t\\begin{figure}[]\nL000127\t\t\\centering\nL000128\t\t\\includegraphics[scale=0.33]{./figures/Fig2.pdf}\nL000129\t\t\\caption{ (a-b) Sketches of liquid marbles rolling on a surface tilted by $\\alpha$. The red regions denote the sheared part of the shell for marbles (a) smaller and (b) larger  than the capillary length. (c) Departure angle $\\alpha$ versus liquid-marble volume $\\Omega$ on a lin--log scale. Data are averages over the three substrates shown in Fig.~\\ref{F1}c, since static friction is substrate-independent. The red line is Eq. \\ref{eq:model_large} with $f(\\phi_\\mathrm{o}) = 0.26$, $a(\\phi_\\mathrm{o})= 2.3$~mm and $\\mu$~=~0.053~$\\pm$~0.003; the black line is Eq.~\\ref{eq:model_small} adjusted by a factor of 0.69.\nL000130\t    Solid lines indicate the fitted ranges, and shaded areas show the 95\\% confidence intervals. }\nL000131\t\t\t\\label{F2}\nL000132\t\\end{figure}\nL000133\t\nL000134\t\\begin{figure*}[]\nL000135\t\t\\centering\nL000136\t\t\\includegraphics[scale=0.33]{./figures/Fig3.pdf}\nL000137\t\t\\caption{ (a) Photographs of lycopodium marbles with initial volume $\\Omega_\\mathrm{o}=100~\\mu\\mathrm{L}$, from which liquid is removed ($\\delta\\Omega<0$) or added ($\\delta\\Omega>0$) at fixed particle number. Here $\\delta\\Omega$ ranges from $-20$ to $20~\\mu\\mathrm{L}$; the central image corresponds to the standard preparation.\nL000138\t    (b) Particle surface fraction $\\phi$ versus relative volume change $\\delta\\Omega/\\Omega_\\mathrm{o}$ for $\\Omega_\\mathrm{o}=50$, 75, 100, 125, and $150~\\mu\\mathrm{L}$. Surface areas and volumes are obtained by image analysis assuming axisymmetry. The black line is the fit $\\phi=\\phi_\\mathrm{o}(1-0.58\\delta\\Omega/\\Omega_\\mathrm{o})$, with $\\phi_\\mathrm{o}=0.83$; the shaded area is the 95\\% confidence interval.\nL000139\t    (c) Departure angle $\\alpha$ versus particle surface fraction $\\phi$ for $\\Omega_\\mathrm{o}=50$--$150~\\mu\\mathrm{L}$. Inset: $\\alpha/\\alpha_\\mathrm{o}$, with $\\alpha_\\mathrm{o}=\\alpha(\\phi_\\mathrm{o})$, plotted versus $\\phi$ on a log-linear scale. The black line is the best exponential fit, $\\exp[\\beta(\\phi-\\phi_\\mathrm{o})]$, with $\\beta=15.4\\pm1.7$.}\nL000140\t\t\\label{F3}\nL000141\t\\end{figure*}\nL000142\t\nL000143\tOur model also predicts that static friction depends on the intergrain normal force through $f(\\phi)$.\nL000144\tThis function increases non-linearly with the particle surface fraction $\\phi$ as observed in rafts and marbles~\\cite{cicuta2009granular,varshney2012amorphous,lagubeau2014armoring}, but also more generally in 2D rheology of particles trapped at interfaces~\\cite{cicuta2003shearing, madivala2009self,kato2023surface}.\nL000145\tWe test this hypothesis with a second experiment. Marbles are prepared with initial volume $\\Omega_\\mathrm{o}$, surface area $S_\\mathrm{o}$, and surface fraction $\\phi_\\mathrm{o}$. $S$ is then varied by adding ($\\delta\\Omega>0$) or removing ($\\delta\\Omega<0$) water with a microsyringe (SGE Analytical Science). Since the number of particles, $\\sim\\phi_\\mathrm{o}S_\\mathrm{o}/d^2$, is fixed, the new surface fraction is $\\phi=(S_\\mathrm{o}/S)\\phi_\\mathrm{o}$.\nL000146\tThis method is suitable only for marbles much larger than the tip of the microsyringe ($\\Omega\\geq50\\,\\mu\\mathrm{L}$).\nL000147\tFigure~\\ref{F3}a shows deflated and inflated $100~\\mu\\mathrm{L}$ marbles. From these images, we measure the total surface area $S$ using the Pappus--Guldinus theorem, assuming axisymmetry (End Matter, Appendix E). Figure~\\ref{F3}b shows the surface fraction $\\phi$ versus the relative volume change $\\delta\\Omega/\\Omega_\\mathrm{o}$ for marbles with $\\Omega_\\mathrm{o}=50$, 75, 100, 125, and $150~\\mu\\mathrm{L}$. The surface fraction decreases linearly with $\\delta\\Omega/\\Omega_\\mathrm{o}$ and is well fitted by $\\phi=\\phi_\\mathrm{o}(1-0.58\\delta\\Omega/\\Omega_\\mathrm{o})$. We use this relation to estimate $\\phi$ for all marbles.\nL000148\t\nL000149\tFor the resulting marbles, with volume $\\Omega$, surface area $S$, and surface fraction $\\phi$, we measure the departure angle $\\alpha$ as a function of $\\phi$ for initial volumes $\\Omega_\\mathrm{o}=50$--$150~\\mu\\mathrm{L}$.\nL000150\tJust before rolling starts a front--rear curvature difference $\\Delta\\mathcal{C}$ develops despite the absence of classical contact-angle hysteresis (Supplemental Video 2, \\cite{Supplemental}). This deformation becomes more pronounced as $\\phi$ approaches 1 (Fig.~\\ref{FSI1}).\nL000151\t\nL000152\tIn short, the curvature asymmetry induces a Laplace pressure difference $\\gamma_\\mathrm{eff}\\Delta\\mathcal{C}$ that balances the hydrostatic pressure variation $\\rho g l\\alpha$. At fixed tilt, increasing $\\phi$ lowers $\\gamma_\\mathrm{eff}$, requiring larger deformations to maintain this balance (End Matter, Appendix F).\nL000153\tThe variation of the departure angle with surface fraction $\\alpha(\\phi)$, is plotted in Fig.~\\ref{F3}c.\nL000154\t\nL000155\tThe departure angle $\\alpha$, and thus static friction, increases exponentially with $\\phi$. Data for all initial volumes collapse onto $\\alpha / \\alpha_\\mathrm{o} = \\exp[\\beta(\\phi - \\phi_\\mathrm{o})]$, with $\\beta = 15.4 \\pm 1.7$ (inset, black line), where $\\alpha_\\mathrm{o}$ is the sliding angle at $\\phi_\\mathrm{o}$.\nL000156\tThe departure angle, which corresponds to the friction-to-weight ratio, abruptly increases from less than 0.8$\\%$ for inflated marbles with $\\phi \\sim 0.7$ to more than 50$\\%$ for deflated marbles with $\\phi$ close to 1.\nL000157\tThis effect dominates over the weak variations due to the initial marble volume in the large marbles regime (Eq.~\\ref{eq:model_large}). This observation also reveals that a non-wetting condition is not sufficient to ensure high mobility; a relatively low surface fraction is also necessary.\nL000158\t\nL000159\tFrom this experimental result and using Eq.~\\ref{eq:model_large} in the asymptotic limit $\\Omega/a^3\\gg 1$, we obtain an analytical estimate for $f(\\phi)$ in the form of a logistic function:\nL000160\t\\begin{equation}\nL000161\t    f(\\phi) = \\frac{1}{1+e^{-\\beta(\\phi-\\phi_c)}} ,\nL000162\t    \\label{eq:f_th}\nL000163\t\\end{equation}\nL000164\twith $\\phi_c = \\phi_\\mathrm{o} - (1/\\beta)\\ln\\left( \\gamma/\\gamma_\\mathrm{eff}(\\phi_\\mathrm{o})-1\\right) $, that is $\\phi_c \\approx$ 0.90~$\\pm$~0.01. This approximation is equivalent to assuming that dissipation occurs mainly at the top and bottom of the marbles, yet the full numerical solution yields curves very close to the logistic form (End Matter, Appendix G and Fig.~\\ref{F_noapprox}).\nL000165\tWe also note that $\\phi_\\mathrm{c}$ is independent of the choice of $\\phi_\\mathrm{o}$, despite its appearance in the expression.\nL000166\tFig.~\\ref{F4}a shows $f(\\phi)$ estimated directly from the departure angles using Eq.~\\ref{eq:model_large}, together with the prediction of Eq.~\\ref{eq:f_th}, both showing good agreement.\nL000167\tWe then interpret geometrically the logistic form of $f(\\phi)$ and its characteristic surface densities.\nL000168\tYielding increases progressively from $\\phi\\simeq0.65$, close to the 2D percolation threshold for monodisperse disks, $0.676$~\\cite{quintanilla2000efficient}. Above this threshold, a connected particle network forms, so that added particles increase the number of contacts across the shell and amplify the contact pressure.\nL000169\tThe inflection point occurs at $\\phi_c\\simeq0.90$, close to the close-packing fraction of 2D disks, $\\pi/\\sqrt{12}\\simeq0.907$~\\cite{toth2014regular}.\nL000170\t\nL000171\tThis suggests that saturation arises when, beyond close packing and up to surface fractions exceeding one, the interface deforms and buckles, redirecting added-particle forces out of plane rather than increasing in-plane normal forces between grains $f(\\phi)$.\nL000172\tRemarkably, the expression of $f(\\phi)$ in Eq.~\\ref{eq:f_th}, obtained assuming a continuous and homogeneous surface density and pressure field, remains valid even at low $\\phi$ where gaps may appear, and at high $\\phi$ where wrinkles develop.\nL000173\tThis saturation by wrinkling is observed both in marbles~\\cite{lagubeau2014armoring} and rafts~\\cite{vella2004elasticity,jambon2017wrinkles,protiere2023particle,prakash2024buckling}.\nL000174\t\nL000175\tTo test the generality of the logistic prediction beyond liquid marbles, we turn to two-dimensional granular rafts, another type of interfacial granular assembly. For rafts, the effective confining pressure can be probed directly by measuring the force required to yield the granular in an obstacle-dragging experiment~\\cite{dollet2005two, kolb2013rigid, seguin2016local}.\nL000176\tRafts are prepared by depositing a mass $m_g$ of hydrophobic glass beads (water contact angle 110°) or lycopodium, of diameter $d$ and density $\\rho_g$, onto a water bath in a Langmuir–Blodgett trough (End Matter, Appendix H). Adjusting the bath area $S_t$ controls the monolayer surface fraction, $\\phi=3m_g/(2\\rho_g dS_t)$.\nL000177\tTo measure intergrain forces, we insert vertically the core of a glass optical fiber into the raft. The fiber, of diameter $125~\\mu$m and length $3$--$6$~cm depending on the experiment, is clamped at one end while the trough is translated horizontally at $1~\\mathrm{mm/s}$, slow enough to avoid dynamic effects. As the raft resists the fiber motion, the fiber bends, and the yielding force $F_y$ is obtained from its deflection $\\delta$ (Fig.~\\ref{F4}b, inset) using $F_y=k\\delta$. The effective stiffness $k$ is calibrated from the static deflection of the horizontally clamped fiber under its own weight, giving $k=10$--$60~\\mathrm{mN/m}$ for long to short fibers, in agreement with the cantilever-beam equation (End Matter, Appendix I).\nL000178\tIn steady state, the fiber locally yields the granular raft, and we expect the exerted force to scale as $F_y \\sim q_y$, and thus with $F_y\\sim f(\\phi)$.\nL000179\tSince $f(\\phi)$ is expected to saturate to unity at large surface fractions, we normalize $F_y(\\phi)$ by its asymptotic value $F_y^{\\max}$. This provides an independent probe of the functional form $f(\\phi)=F_y(\\phi)/F_y^{\\max}$ and, consequently, of the interface effective surface tension.\nL000180\t\nL000181\t\\begin{figure}[]\nL000182\t\t\\centering\nL000183\t\t\\includegraphics[scale=0.36]{./figures/Fig4.pdf}\nL000184\t\t\\caption{\nL000185\t(a) $f(\\phi)$ versus $\\phi$, obtained from the departure angles of inflated and deflated liquid marbles with initial volumes $\\Omega_\\mathrm{o}=50$--$150~\\mu\\mathrm{L}$, color-coded from black to beige. Values are obtained using Eq.~\\ref{eq:model_large} in the asymptotic large-volume regime. The black line is Eq.~\\ref{eq:f_th}. (b) $f(\\phi)$ versus $\\beta(\\phi-\\phi_c)$ for liquid marbles, same data as in (a), and force measurements in two-dimensional granular rafts made of glass beads (red diamonds) or lycopodium particles (blue squares). The black line is the logistic function of Eq.~\\ref{eq:f_th}. Inset: schematic of the granular-raft yielding experiment, where the force is obtained from the deflection $\\delta$ of a calibrated fiber.}\nL000186\t\t\\label{F4}\nL000187\t\\end{figure}\nL000188\t\nL000189\tThe measurements reveal that $f(\\phi)$ for rafts also follows a logistic function (Fig. \\ref{f_data}). For each curve, we extract $\\beta$ and $\\phi_c$ by fitting $f(\\phi)$ with Eq.~\\ref{eq:f_th} (Table~\\ref{table_fit}).\nL000190\tIn Fig.~\\ref{F4}b, we plot $f(\\phi)=1-\\gamma_\\mathrm{eff}/\\gamma$ versus $\\beta(\\phi-\\phi_c)$. All data from marbles and rafts collapse onto the logistic prediction, spanning the full range $0\\leq\\gamma_\\mathrm{eff}/\\gamma\\leq1$. The agreement between marble- and raft-based measurements confirms that the static rolling friction of marbles is governed by yielding of their granular shell, which behaves as a two-dimensional raft. Moreover, the logistic form of $f(\\phi)$ appears independent of particle material and measurement method, suggesting an intrinsic structural property of granular rafts. While the shape seems universal, the steepness $\\beta$ and inflection density $\\phi_c$ vary significantly between marbles and rafts, but also between experimental runs for the rafts.\nL000191\tWe attribute this variability to the preparation protocol: marble shells are reproducibly prepared in a dense state, $\\phi\\simeq0.8$, by repeated rolling over a granular bed, whereas rafts are prepared at low density, $\\phi\\simeq0.5$, and then quasi-statically compressed without mechanical annealing. Their microstructure therefore remains protocol- and history-dependent~\\cite{planchette2025unjamming}, accounting for the run-to-run variability in $\\beta$ and $\\phi_c$.\nL000192\t\nL000193\tIn conclusion, our findings show that the particle shell responsible for the high mobility of liquid marbles also gives rise to their static rolling friction. Rolling requires shear-induced yielding of the granular shell, governed mainly by particle surface density, with marble shape weakly correcting the shear profile and yielding region.\nL000194\t\nL000195\tDespite being nearly spherical, smaller marbles require larger tilt angles to move under gravity than larger, gravity-flattened marbles. This contrasts with their dynamics, where smaller marbles roll faster~\\cite{mahadevan1999rolling,aussillous2001liquid}. The particle surface density $\\phi$ controls yielding through a logistic function that captures the shell rheology: yielding begins near the percolation threshold, while the inflection point coincides with the close-packing limit of the granular layer. The physical mechanism setting the steepness parameter $\\beta$, however, remains an open question.\nL000196\tFinally, our results underscore the critical role of particle surface fraction in maintaining low static friction, especially when evaporation increases shell density over time. Liquid marbles thus provide a platform to explore the interplay between two-dimensional interfacial rheology~\\cite{fuller2012complex,ji2020interfacial} and the macroscopic mechanics of such interfaces embedded in three-dimensional geometries.\nL000197\t\\\\\nL000198\t\nL000199\t\\begin{acknowledgments}\nL000200\t\\paragraph*{Acknowledgements}\nL000201\tWe thank Dominic Vella for fruitful discussions.\nL000202\tTM acknowledges the financial support provided by the Japan Society for the Promotion of Science (JSPS) - Grant-in-Aid for Scientific Research (B), 24K01341. SP acknowledges the financial support provided by JSPS KAKENHI Grant-in-Aid for Research Activity Start-up 24K22937. TM and PKR gratefully acknowledge the financial support provided by the JSPS Grant-in-Aid for JSPS Fellows 23KF0106. YT is grateful for the financial support from JST SPRING (Grant Number JPMJSP2108) and the Leadership Development Program for Ph.D. students at the University of Tokyo, School of Engineering.\nL000203\t\\end{acknowledgments}\nL000204\t\nL000205\t\\paragraph*{Data Availability}\nL000206\tThe data that support the findings of this article is openly available in Zenodo\nL000207\t\\cite{dataset}.\nL000208\t\nL000209\t\\begin{thebibliography}{10}\nL000210\t\nL000211\t\t\\bibitem{lhuissier2013levitation}\nL000212\t\tHenri Lhuissier, Yoshiyuki Tagawa, Tuan Tran, and Chao Sun.\nL000213\t\t\\newblock Levitation of a drop over a moving surface.\nL000214\t\t\\newblock {\\em Journal of Fluid Mechanics}, 733:R4, 2013.\nL000215\t\nL000216\t\t\\bibitem{gauthier2016aerodynamic}\nL000217\t\tAna{\\\"\\i}s Gauthier, James~C Bird, Christophe Clanet, and David Qu{\\'e}r{\\'e}.\nL000218\t\t\\newblock Aerodynamic leidenfrost effect.\nL000219\t\t\\newblock {\\em Physical Review Fluids}, 1(8):084002, 2016.\nL000220\t\nL000221\t\t\\bibitem{biance2003leidenfrost}\nL000222\t\tAnne-Laure Biance, Christophe Clanet, and David Qu{\\'e}r{\\'e}.\nL000223\t\t\\newblock Leidenfrost drops.\nL000224\t\t\\newblock {\\em Physics of fluids}, 15(6):1632--1637, 2003.\nL000225\t\nL000226\t\t\\bibitem{shibuichi1996super}\nL000227\t\tSatoshi Shibuichi, Tomohiro Onda, Naoki Satoh, and Kaoru Tsujii.\nL000228\t\t\\newblock Super water-repellent surfaces resulting from fractal structure.\nL000229\t\t\\newblock {\\em The Journal of Physical Chemistry}, 100(50):19512--19517, 1996.\nL000230\t\nL000231\t\t\\bibitem{blossey2003self}\nL000232\t\tRalf Blossey.\nL000233\t\t\\newblock Self-cleaning surfaces—virtual realities.\nL000234\t\t\\newblock {\\em Nature materials}, 2(5):301--306, 2003.\nL000235\t\nL000236\t\t\\bibitem{aussillous2001liquid}\nL000237\t\tPascale Aussillous and David Qu{\\'e}r{\\'e}.\nL000238\t\t\\newblock Liquid marbles.\nL000239\t\t\\newblock {\\em Nature}, 411(6840):924--927, 2001.\nL000240\t\nL000241\t\t\\bibitem{paven2016light}\nL000242\t\tMaxime Paven, Hiroyuki Mayama, Takafumi Sekido, Hans-J{\\\"u}rgen Butt, Yoshinobu\nL000243\t\tNakamura, and Syuji Fujii.\nL000244\t\t\\newblock Light-driven delivery and release of materials using liquid marbles.\nL000245\t\t\\newblock {\\em Advanced Functional Materials}, 26(19):3199--3206, 2016.\nL000246\t\nL000247\t\t\\bibitem{zhao2010magnetic}\nL000248\t\tYan Zhao, Jian Fang, Hongxia Wang, Xungai Wang, and Tong Lin.\nL000249\t\t\\newblock Magnetic liquid marbles: manipulation of liquid droplets using highly\nL000250\t\thydrophobic fe3o4 nanoparticles.\nL000251\t\t\\newblock {\\em Advanced materials}, 22(6):707--710, 2010.\nL000252\t\nL000253\t\t\\bibitem{roy2025hot}\nL000254\t\tPritam~Kumar Roy, Yui Takai, Rui Matsubara, Mizuki Tenjimbayashi, and\nL000255\t\tTimoth{\\'e}e Mouterde.\nL000256\t\t\\newblock Hot liquid marbles.\nL000257\t\t\\newblock {\\em Proceedings of the National Academy of Sciences},\nL000258\t\t122(20):e2500619122, 2025.\nL000259\t\nL000260\t\t\\bibitem{sheng2015silica}\nL000261\t\tYifeng Sheng, Guanqing Sun, Jie Wu, Guanghui Ma, and To~Ngai.\nL000262\t\t\\newblock Silica-based liquid marbles as microreactors for the silver mirror\nL000263\t\treaction.\nL000264\t\t\\newblock {\\em Angewandte Chemie}, 127(24):7118--7123, 2015.\nL000265\t\nL000266\t\t\\bibitem{oliveira2017potential}\nL000267\t\tNuno~M Oliveira, Rui~L Reis, and Jo{\\~a}o~F Mano.\nL000268\t\t\\newblock The potential of liquid marbles for biomedical applications: a\nL000269\t\tcritical review.\nL000270\t\t\\newblock {\\em Advanced healthcare materials}, 6(19):1700192, 2017.\nL000271\t\nL000272\t\t\\bibitem{vadivelu2017liquid}\nL000273\t\tRaja~K Vadivelu, Harshad Kamble, Ahmed Munaz, and Nam-Trung Nguyen.\nL000274\t\t\\newblock Liquid marble as bioreactor for engineering three-dimensional toroid\nL000275\t\ttissues.\nL000276\t\t\\newblock {\\em Scientific reports}, 7(1):12388, 2017.\nL000277\t\nL000278\t\t\\bibitem{tian2010liquid}\nL000279\t\tJunfei Tian, Tina Arbatan, Xu~Li, and Wei Shen.\nL000280\t\t\\newblock Liquid marble for gas sensing.\nL000281\t\t\\newblock {\\em Chemical Communications}, 46(26):4734--4736, 2010.\nL000282\t\nL000283\t\t\\bibitem{jeon2025particle}\nL000284\t\tHyobin Jeon, Keunhwan Park, Jeong-Yun Sun, and Ho-Young Kim.\nL000285\t\t\\newblock Particle-armored liquid robots.\nL000286\t\t\\newblock {\\em Science Advances}, 11(12):eadt5888, 2025.\nL000287\t\nL000288\t\t\\bibitem{rong2019liquid}\nL000289\t\tXia Rong, Rammile Ettelaie, Sergey~V Lishchuk, Huaigang Cheng, Ning Zhao, Fukui\nL000290\t\tXiao, Fangqin Cheng, and Hengquan Yang.\nL000291\t\t\\newblock Liquid marble-derived solid-liquid hybrid superparticles for co2\nL000292\t\tcapture.\nL000293\t\t\\newblock {\\em Nature communications}, 10(1):1854, 2019.\nL000294\t\nL000295\t\t\\bibitem{trottet2025sandball}\nL000296\t\tBertil Trottet, Daisuke Noto, Douglas~J Jerolmack, and Hugo~N Ulloa.\nL000297\t\t\\newblock Sandball genesis from raindrops.\nL000298\t\t\\newblock {\\em Proceedings of the National Academy of Sciences},\nL000299\t\t122(52):e2519392122, 2025.\nL000300\t\nL000301\t\t\\bibitem{pockels1914randwinkel}\nL000302\t\tAgnes Pockels.\nL000303\t\t\\newblock {\\\"U}ber randwinkel und ausbreitung von fl{\\\"u}ssigkeiten auf festen\nL000304\t\tk{\\\"o}rpern.\nL000305\t\t\\newblock {\\em Phys. Z}, 15:39--46, 1914.\nL000306\t\nL000307\t\t\\bibitem{furmidge1962studies}\nL000308\t\tC.~G.~L. Furmidge.\nL000309\t\t\\newblock Studies at phase interfaces. i. the sliding of liquid drops on solid\nL000310\t\tsurfaces and a theory for spray retention.\nL000311\t\t\\newblock {\\em Journal of colloid science}, 17(4):309--324, 1962.\nL000312\t\nL000313\t\t\\bibitem{jin2023marbles}\nL000314\t\tPanlin Jin, Kexin Zhao, Zo{\\'e} Blin, Malou Allais, Timoth{\\'e}e Mouterde, and\nL000315\t\tDavid Qu{\\'e}r{\\'e}.\nL000316\t\t\\newblock When marbles challenge pearls.\nL000317\t\t\\newblock {\\em The Journal of Chemical Physics}, 158(20):204709, 2023.\nL000318\t\nL000319\t\t\\bibitem{aussillous2006properties}\nL000320\t\tPascale Aussillous and David Qu{\\'e}r{\\'e}.\nL000321\t\t\\newblock Properties of liquid marbles.\nL000322\t\t\\newblock {\\em Proceedings of the Royal Society A: Mathematical, Physical and\nL000323\t\t\tEngineering Sciences}, 462(2067):973--999, 2006.\nL000324\t\nL000325\t\t\\bibitem{mchale2011liquid}\nL000326\t\tGlen McHale and Michael~I Newton.\nL000327\t\t\\newblock Liquid marbles: principles and applications.\nL000328\t\t\\newblock {\\em Soft Matter}, 7(12):5473--5481, 2011.\nL000329\t\nL000330\t\t\\bibitem{Supplemental}\nL000331\t\tSee Supplemental Material on the publisher's website for\nL000332\t\tSupplemental Videos 1 and 2.\nL000333\t\nL000334\t\t\\bibitem{reynolds1876vi}\nL000335\t\tOsborne Reynolds.\nL000336\t\t\\newblock Vi. on rolling-friction.\nL000337\t\t\\newblock {\\em Philosophical Transactions of the Royal Society of London},\nL000338\t\t(166):155--174, 1876.\nL000339\t\nL000340\t\t\\bibitem{brilliantov1998rolling}\nL000341\t\tNikolai~V Brilliantov and Thorsten P{\\\"o}schel.\nL000342\t\t\\newblock Rolling friction of a viscous sphere on a hard plane.\nL000343\t\t\\newblock {\\em Europhysics Letters}, 42(5):511, 1998.\nL000344\t\nL000345\t\t\\bibitem{cicuta2009granular}\nL000346\t\tPietro Cicuta and Dominic Vella.\nL000347\t\t\\newblock Granular character of particle rafts.\nL000348\t\t\\newblock {\\em Physical review letters}, 102(13):138302, 2009.\nL000349\t\nL000350\t\t\\bibitem{protiere2023particle}\nL000351\t\tSuzie Proti{\\`e}re.\nL000352\t\t\\newblock Particle rafts and armored droplets.\nL000353\t\t\\newblock {\\em Annual Review of Fluid Mechanics}, 55(1):459--480, 2023.\nL000354\t\nL000355\t\t\\bibitem{kruyt2006shear}\nL000356\t\tNicolaas~P Kruyt and L~Rothenburg.\nL000357\t\t\\newblock Shear strength, dilatancy, energy and dissipation in quasi-static\nL000358\t\tdeformation of granular materials.\nL000359\t\t\\newblock {\\em Journal of Statistical Mechanics: Theory and Experiment},\nL000360\t\t2006(07):P07021, 2006.\nL000361\t\nL000362\t\t\\bibitem{andreotti2013granular}\nL000363\t\tBruno Andreotti, Yo{\\\"e}l Forterre, and Olivier Pouliquen.\nL000364\t\t\\newblock {\\em Granular media: between fluid and solid}.\nL000365\t\t\\newblock Cambridge University Press, 2013.\nL000366\t\nL000367\t\t\\bibitem{lagubeau2014armoring}\nL000368\t\tGuillaume Lagubeau, Antonella Rescaglio, and Francisco Melo.\nL000369\t\t\\newblock Armoring a droplet: Soft jamming of a dense granular interface.\nL000370\t\t\\newblock {\\em Physical Review E}, 90(3):030201, 2014.\nL000371\t\nL000372\t\t\\bibitem{mahadevan1999rolling}\nL000373\t\tLakshminarayanan Mahadevan and Yves Pomeau.\nL000374\t\t\\newblock Rolling droplets.\nL000375\t\t\\newblock {\\em Physics of fluids}, 11(9):2449--2453, 1999.\nL000376\t\nL000377\t\t\\bibitem{varshney2012amorphous}\nL000378\t\tAtul Varshney, A~Sane, Shankar Ghosh, and S~Bhattacharya.\nL000379\t\t\\newblock Amorphous to amorphous transition in particle rafts.\nL000380\t\t\\newblock {\\em Physical Review E—Statistical, Nonlinear, and Soft Matter\nL000381\t\t\tPhysics}, 86(3):031402, 2012.\nL000382\t\nL000383\t\t\\bibitem{cicuta2003shearing}\nL000384\t\tPietro Cicuta, Edward~J Stancik, and Gerald~G Fuller.\nL000385\t\t\\newblock Shearing or compressing a soft glass in 2d: time-concentration\nL000386\t\tsuperposition.\nL000387\t\t\\newblock {\\em Physical review letters}, 90(23):236101, 2003.\nL000388\t\nL000389\t\t\\bibitem{madivala2009self}\nL000390\t\tBasavaraj Madivala, Jan Fransaer, and Jan Vermant.\nL000391\t\t\\newblock Self-assembly and rheology of ellipsoidal particles at interfaces.\nL000392\t\t\\newblock {\\em Langmuir}, 25(5):2718--2728, 2009.\nL000393\t\nL000394\t\t\\bibitem{kato2023surface}\nL000395\t\tAiri~N Kato, Yujie Jiang, Wei Chen, Ryohei Seto, and Tao Li.\nL000396\t\t\\newblock How surface roughness affects the interparticle interactions at a\nL000397\t\tliquid interface.\nL000398\t\t\\newblock {\\em Journal of Colloid and Interface Science}, 641:492--498, 2023.\nL000399\t\nL000400\t\t\\bibitem{quintanilla2000efficient}\nL000401\t\tJohn Quintanilla, Salvatore Torquato, and Robert~M Ziff.\nL000402\t\t\\newblock Efficient measurement of the percolation threshold forfully\nL000403\t\tpenetrable discs.\nL000404\t\t\\newblock {\\em Journal of Physics A: Mathematical and General}, 33(42):L399,\nL000405\t\t2000.\nL000406\t\nL000407\t\t\\bibitem{toth2014regular}\nL000408\t\tLászló~Fejes T{\\'o}th.\nL000409\t\t\\newblock {\\em Regular figures}.\nL000410\t\t\\newblock Elsevier, 2014.\nL000411\t\nL000412\t\t\\bibitem{vella2004elasticity}\nL000413\t\tDominic Vella, Pascale Aussillous, and L~Mahadevan.\nL000414\t\t\\newblock Elasticity of an interfacial particle raft.\nL000415\t\t\\newblock {\\em Europhysics Letters}, 68(2):212, 2004.\nL000416\t\nL000417\t\t\\bibitem{jambon2017wrinkles}\nL000418\t\tEtienne Jambon-Puillet, Christophe Josserand, and Suzie Protiere.\nL000419\t\t\\newblock Wrinkles, folds, and plasticity in granular rafts.\nL000420\t\t\\newblock {\\em Physical Review Materials}, 1(4):042601, 2017.\nL000421\t\nL000422\t\t\\bibitem{prakash2024buckling}\nL000423\t\tSuriya Prakash, Hugo Perrin, and Lorenzo Botto.\nL000424\t\t\\newblock Buckling of a monolayer of platelike particles trapped at a\nL000425\t\tfluid-fluid interface.\nL000426\t\t\\newblock {\\em Physical Review E}, 109(1):014801, 2024.\nL000427\t\nL000428\t\t\\bibitem{dollet2005two}\nL000429\t\tBenjamin Dollet, Florence Elias, Catherine Quilliet, Arnaud Huillier, Miguel\nL000430\t\tAubouy, and Fran{\\c{c}}ois Graner.\nL000431\t\t\\newblock Two-dimensional flows of foam: drag exerted on circular obstacles and\nL000432\t\tdissipation.\nL000433\t\t\\newblock {\\em Colloids and Surfaces A: Physicochemical and Engineering\nL000434\t\t\tAspects}, 263(1-3):101--110, 2005.\nL000435\t\nL000436\t\t\\bibitem{kolb2013rigid}\nL000437\t\tEvelyne Kolb, Pierre Cixous, Niels Gaudouen, and Thierry Darnige.\nL000438\t\t\\newblock Rigid intruder inside a two-dimensional dense granular flow: Drag\nL000439\t\tforce and cavity formation.\nL000440\t\t\\newblock {\\em Physical Review E—Statistical, Nonlinear, and Soft Matter\nL000441\t\t\tPhysics}, 87(3):032207, 2013.\nL000442\t\nL000443\t\t\\bibitem{seguin2016local}\nL000444\t\tAntoine Seguin, Corentin Coulais, Francisco Martinez, Yann Bertho, and Philippe\nL000445\t\tGondret.\nL000446\t\t\\newblock Local rheological measurements in the granular flow around an\nL000447\t\tintruder.\nL000448\t\t\\newblock {\\em Physical Review E}, 93(1):012904, 2016.\nL000449\t\nL000450\t\t\\bibitem{planchette2025unjamming}\nL000451\t\tCarole Planchette and Gregor Plohl.\nL000452\t\t\\newblock Unjamming of particle--laden interfaces: effects of geometry and\nL000453\t\thistory.\nL000454\t\t\\newblock {\\em Soft Matter}, 21(9):1718--1730, 2025.\nL000455\t\nL000456\t\t\\bibitem{fuller2012complex}\nL000457\t\tGerald~G Fuller and Jan Vermant.\nL000458\t\t\\newblock Complex fluid-fluid interfaces: rheology and structure.\nL000459\t\t\\newblock {\\em Annual review of chemical and biomolecular engineering},\nL000460\t\t3(1):519--543, 2012.\nL000461\t\nL000462\t\t\\bibitem{ji2020interfacial}\nL000463\t\tXiaoliang Ji, Xiaolu Wang, Yongjian Zhang, and Duyang Zang.\nL000464\t\t\\newblock Interfacial viscoelasticity and jamming of colloidal particles at\nL000465\t\tfluid--fluid interfaces: a review.\nL000466\t\t\\newblock {\\em Reports on Progress in Physics}, 83(12):126601, 2020.\nL000467\t\nL000468\t\t\\bibitem{dataset}\nL000469\t\tYui Takai, Kei Mukoyama, Pritam~Kumar Roy, Guillaume Lagubeau, David\nL000470\t\tQu{\\'e}r{\\'e}, Samuel Poincloux, and Timoth{\\'e}e Mouterde.\nL000471\t\t\\newblock {Dataset on the Static Friction of Liquid Marbles. Zenodo,\nL000472\t\t\thttps://doi.org/10.5281/zenodo.20103371}, 2026.\nL000473\t\nL000474\t\t\\bibitem{boyer2011unifying}\nL000475\t\tFran{\\c{c}}ois Boyer, {\\'E}lisabeth Guazzelli, and Olivier Pouliquen.\nL000476\t\t\\newblock Unifying suspension and granular rheology.\nL000477\t\t\\newblock {\\em Physical review letters}, 107(18):188301, 2011.\nL000478\t\nL000479\t\t\\bibitem{binks2005naturally}\nL000480\t\tBernard~P Binks, JH~Clint, G~Mackenzie, C~Simcock, and CP~Whitby.\nL000481\t\t\\newblock Naturally occurring spore particles at planar fluid interfaces and in\nL000482\t\temulsions.\nL000483\t\t\\newblock {\\em Langmuir}, 21(18):8161--8167, 2005.\nL000484\t\nL000485\t\\end{thebibliography}\nL000486\t\nL000487\t\\appendix\nL000488\t\nL000489\t\\setcounter{figure}{0}\nL000490\t\\renewcommand{\\thefigure}{S\\arabic{figure}}\nL000491\t\nL000492\t\\section{End Matter}\nL000493\t\nL000494\t\\textit{Appendix A: Liquid marble preparation ---} Liquid marbles are prepared by depositing a water volume $\\Omega$ with a micropipette onto a bed of lycopodium particles (Sigma-Aldrich). The droplet is gently rolled until fully coated with particles. The resulting liquid marble is transferred to a small stainless-steel Petri dish with a superhydrophobic metal spoon, rolled a few times to remove excess particles, and placed on the silicon wafer for static-friction measurements.\nL000495\t\\\\\nL000496\t\nL000497\t\\textit{Appendix B: Experimental determination of the surface fraction ---} The surface fraction $\\phi_\\mathrm{o}$ is determined directly from side-view photographs. The liquid surface appears brighter than the particles, allowing the surface fraction to be estimated by intensity thresholding. We measured $\\phi_\\mathrm{o}$ for liquid marbles with volumes $\\Omega = 2, 5, 7, 10, 30, 50, 100, 200,$ and $300~\\mu\\mathrm{L}$, using four marbles per volume. We obtained an average surface fraction of $83.0\\%$, with a standard deviation of $1.25\\%$.\nL000498\t\\\\\nL000499\t\nL000500\t\\textit{Appendix C: Substrate preparation ---} The hydrophilic substrate is a pristine silicon wafer with advancing and receding water contact angles of $23 \\pm 2^\\circ$ and $12 \\pm 2^\\circ$, respectively. The hydrophobic substrate is a silicon wafer whose surface is activated for $40$ s in a plasma cleaner and then coated by chemical vapor deposition of 1H,1H,2H,2H-perfluorodecyltrichlorosilane (Fluorochem Ltd.). The resulting advancing and receding water contact angles are $126 \\pm 2^\\circ$ and $99 \\pm 2^\\circ$, respectively. The superhydrophobic substrate is obtained by spraying a commercial coating (Glaco Mirror Coat Zero, Soft99) onto a silicon wafer. The substrates are dried vertically and, after solvent evaporation, heated on a hot plate at $200^\\circ$C for $30$ min. This process is repeated three times. The resulting coating is a rough layer of hydrophobic silica nanobeads, with advancing and receding water contact angles of $161 \\pm 2^\\circ$ and $152 \\pm 2^\\circ$, respectively.\nL000501\t\\\\\nL000502\t\nL000503\t\\textit{Appendix D: Departure angle measurement method ---} The substrate is attached to a rotating stage controlled by a micrometer screw for fine adjustment. It is tilted at a typical angular speed $\\dot\\alpha \\sim 2\\times10^{-3}$ rad/s until the marble starts moving. The departure angle is then measured with a digital goniometer (Monotaro, Japan). To quantify possible dynamic lubrication effects between grains, we compare the characteristic viscous stress $\\eta \\dot\\alpha$, where $\\eta$ is the liquid dynamic viscosity, to the normal stress $\\gamma f(\\phi)/d$. This gives the viscous number~\\cite{boyer2011unifying} $J = \\eta \\dot\\alpha d/\\gamma f(\\phi)$. This number diverges below the percolation threshold as the normal force between grains vanishes, $f(\\phi) \\rightarrow 0$. However, over the range of surface fractions explored in our experiments, the minimum value of $f(\\phi)$ is about $10^{-2}$. Even for this small value, we find $J \\approx 10^{-7} \\ll 1$, indicating that dynamic effects are negligible.\nL000504\t\\\\\nL000505\t\nL000506\t\\textit{Appendix E: Measurement of the marble surface area ---} To estimate the change in surface fraction induced by volume changes, we measure the surface area of liquid marbles from side-view images. Each image is binarized, and we identify the vertical symmetry axis dividing the marble into two equal halves. Assuming axisymmetry about this axis, we analyze one half of the profile. We detect its edge, which defines a planar curve $\\mathcal{C}$. The marble surface is then modeled as the surface of revolution generated by rotating $\\mathcal{C}$ about the symmetry axis. We compute the arc length $s$ of $\\mathcal{C}$ and the distance $X$ of its centroid from the symmetry axis. The total surface area is then obtained from the Pappus--Guldinus theorem as $S = 2\\pi s X$. This axisymmetric approximation may become less accurate as the surface fraction approaches unity and buckling occurs.\nL000507\t\\\\\nL000508\t\nL000509\t\\textit{Appendix F: Liquid marble shape deformation ---} Figure~\\ref{FSI1}a shows liquid marbles just before rolling for increasing surface fraction, from left to right: $\\phi=0.73$, $0.83$, and $0.93$ (initial volume $\\Omega_\\mathrm{o}=100~\\mu$L). The marbles exhibit a front--rear curvature difference $\\Delta \\mathcal{C}=\\mathcal{C}_\\mathrm{front}-\\mathcal{C}_\\mathrm{rear}$, measured from side-view images by fitting each interface with a circular arc of radius $\\mathcal{C}^{-1}$. Figure~\\ref{FSI1}b shows $\\Delta \\mathcal{C}$ as a function of the surface fraction $\\phi$, revealing a pronounced increase in asymmetry at large $\\phi$, which we now model. When the static liquid marble is tilted, the hydrostatic pressure difference between front and rear, $\\rho g l \\alpha$, is balanced by the Laplace pressure difference $\\gamma_\\mathrm{eff}\\Delta \\mathcal{C}$ associated with their curvature difference. Thus, $\\Delta \\mathcal{C}\\approx \\rho g l\\alpha/\\gamma_\\mathrm{eff}$. Using volume conservation, $l\\approx \\sqrt{2\\Omega/a\\pi}$, and evaluating $\\alpha$ at the departure angle, we obtain the curvature difference:\nL000510\t\\begin{equation}\nL000511\t    \\Delta \\mathcal{C} \\approx   \\sqrt{\\frac{\\Omega}{2\\pi a^5(\\phi)}}\\left({1+\\sqrt{\\frac{8\\pi a^3(\\phi)}{\\Omega}}}\\right)\\mu \\frac{f(\\phi)}{1-f(\\phi)} \\, ,\nL000512\t    \\label{eq:curvature}\nL000513\t\\end{equation}\nL000514\tWe plot this equation in Fig.~\\ref{FSI1}b, using the empirical relation between volume and surface coverage $\\phi = \\phi_\\mathrm{o} (1-0.58(\\Omega-\\Omega_\\mathrm{o})/\\Omega_\\mathrm{o})$ and taking $\\mu = 0.053$, the value obtained in the main text. Without any adjustable parameters, the model shows an excellent agreement with the measured curvature difference. This also reveals three mechanisms responsible for the large deformation observed before rolling at high particle fractions. (1) Increasing $\\phi$ increases the departure angle and thus the hydrostatic pressure difference across the marble. This pressure difference must be balanced by a Laplace pressure difference, requiring a larger front--rear curvature difference. (2) Increasing $\\phi$ decreases the effective surface tension, so a larger curvature difference is needed to produce the same Laplace pressure difference. (3) The reduced surface tension flattens the marble and increases its diameter $l$, further increasing the hydrostatic pressure difference and the required curvature difference.\nL000515\t\\\\\nL000516\t\nL000517\t\\begin{figure}[]\nL000518\t\t\\centering\nL000519\t\t\\includegraphics[scale=0.33]{./figures/FigSI1.pdf}\nL000520\t\t\\caption{ (a) Images of liquid marbles just before they depart from the substrate with volume 100 $\\mu$L and with $\\phi$ varied from left to right from 0.73, 0.83 and 0.93. The images show that larger surface fractions lead to greater deformations. (b) Curvature difference $\\Delta \\mathcal{C}$ between the rear and front side of the liquid marbles as a function of the surface fraction $\\phi$ for liquid marbles with initial volume 100 $\\mu$L.}\nL000521\t\t\t\\label{FSI1}\nL000522\t\\end{figure}\nL000523\t\nL000524\t\\textit{Appendix G: $f$ without approximations ---} The term $\\sqrt{8\\pi a^3/\\Omega}$ neglected to derive Eq.~\\ref{eq:f_th} can be as high as $\\approx 2.5$ over the range of volumes and surface fractions explored. We estimate its impact on $f(\\phi)$ by combining Eq.~\\ref{eq:model_large} with the empirical relation $\\phi = \\phi_\\mathrm{o}(1 - 0.58,\\delta\\Omega / \\Omega_\\mathrm{o})$. This gives:\nL000525\t\\begin{equation}\nL000526\t    \\frac{f(\\phi_\\mathrm{o})(1-f(\\phi))}{f(\\phi)(1-f(\\phi_\\mathrm{o}))} = \\frac{\\alpha_\\mathrm{o}}{\\alpha(\\phi)} \\frac{{1+\\sqrt{\\frac{8\\pi a^3(\\phi)}{\\Omega}}}}{{1+\\sqrt{\\frac{8\\pi a^3(\\phi_\\mathrm{o})}{\\Omega_\\mathrm{o}}}}},\nL000527\t    \\label{eq:f_no_approx}\nL000528\t\\end{equation}\nL000529\twith $f_\\mathrm{o}=f(\\phi_\\mathrm{o})$ and $a_\\mathrm{o}=a(\\phi_\\mathrm{o})$. Knowing $\\alpha(\\phi)/\\alpha_\\mathrm{o}$ for each pair of $(\\Omega_\\mathrm{o},\\phi)$ values, Eq.~\\ref{eq:f_no_approx} can be solved numerically for $f(\\phi)$. For the experimental points, $\\alpha(\\phi)/\\alpha_\\mathrm{o}$ is taken from the measurements, whereas for the analytical curves we use the fitted empirical relation $\\alpha(\\phi)/\\alpha_\\mathrm{o}=\\exp[\\beta(\\phi-\\phi_\\mathrm{o})]$. Without approximation, $f(\\phi)$ also depends on the initial volume $\\Omega_\\mathrm{o}$, but this dependence is very weak, as shown in Fig.~\\ref{F_noapprox}. The full numerical solution and the analytical approximation deviate slightly between $\\phi\\approx0.9$ and $\\phi\\approx1.2$, with the full solution remaining closer to the experimental data. However, since the deviation remains below $10\\%$, we emphasize the simplified model for its compact formulation and easier interpretation.\nL000530\t\\\\\nL000531\t\nL000532\t\\begin{figure}[h]\nL000533\t\t\\centering\nL000534\t\t\\includegraphics[scale=0.33]{./figures/FigSI2.pdf}\nL000535\t\t\\caption{Comparison between the asymptotic limit of $f(\\phi)$ given by Eq. \\ref{eq:f_th} (black line) and the numerical solutions without approximations obtained by solving Eq. \\ref{eq:f_no_approx} (dashed lines).\nL000536\t    }\nL000537\t\t\\label{F_noapprox}\nL000538\t\\end{figure}\nL000539\t\nL000540\t\\textit{Appendix H: Raft measurements ---} The rafts are prepared by depositing a particle mass $m_g$ at the surface of a Langmuir--Blodgett trough of area $S_t$, giving a surface fraction $\\phi = 3m_g/(2\\rho_g d S_t)$. We use lycopodium particles with diameter $d = 35 \\pm 7~\\mu$m and effective density $\\rho_g = 950$ kg/m$^3$~\\cite{binks2005naturally}, and glass beads with diameters $d = 170 \\pm 57$, $107 \\pm 20$, $92 \\pm 12$, and $64 \\pm 10~\\mu$m and density $\\rho_g = 2600$ kg/m$^3$. The trough area is varied, and for each value of $S_t$ we measure the force $F_y$ exerted by the granular raft on the fiber. For each particle type, we find that $F_y(\\phi)$ follows a logistic curve, $F_y(\\phi)=F_\\mathrm{max}/[1+\\exp[-\\beta(\\phi-\\phi_c)]]$, and fit the corresponding parameters $(F_\\mathrm{max},\\beta,\\phi_c)$. We plot $f=F_y/F_\\mathrm{max}$ as a function of $\\phi$ in Fig.~\\ref{f_data}, and as a function of the rescaled density $\\beta(\\phi-\\phi_c)$ in Fig.~\\ref{F4}. The fitted parameters are reported in Table~\\ref{table_fit}.\nL000541\t\\\\\nL000542\t\nL000543\t\\begin{figure}[h]\nL000544\t\t\\centering\nL000545\t\t\\includegraphics[scale=0.33]{./figures/FigSI3.pdf}\nL000546\t\t\\caption{ $f(\\phi)$ measured with glass beads and lycopodium rafts. The dashed lines represent the best fit with the logistic function Eq.~\\ref{eq:f_th}. The values for $\\beta$ and $\\phi_c$ and $F_\\mathrm{max}$ are listed in Table \\ref{table_fit}. }\nL000547\t\t\\label{f_data}\nL000548\t\\end{figure}\nL000549\t\nL000550\t\\begin{table}[h!]\nL000551\t\\scalebox{0.85}{\nL000552\t\\begin{tabular}{ p{3.5cm}||c|c|c|c}\nL000553\t\\centering\nL000554\t & $d$ ($\\mu$m) & $F_\\mathrm{max}$ ($\\mu$N) & $\\beta$  & $\\phi_c$ (\\%)\\\\\nL000555\t\\hline\nL000556\t\\textbf{lycopodium} marbles &32 $\\pm$ 3   & -- & 15.4 $\\pm$ 1.7    & 90 $\\pm$ 1 \\\\\nL000557\t\\hline\nL000558\t\\textbf{lycopodium} raft   & 35 $\\pm$ 7   & 109 $\\pm$ 5 & 24.3 $\\pm$ 5.2    & 76 $\\pm$ 1 \\\\\nL000559\t                            & 35 $\\pm$ 7   & 115 $\\pm$ 4 & 33.3 $\\pm$ 9.0    & 88 $\\pm$ 1 \\\\\nL000560\t                            & 35 $\\pm$ 7   & 87 $\\pm$ 9 & 27.8 $\\pm$ 12.8    & 69  $\\pm$ 2 \\\\\nL000561\t                            & 35 $\\pm$ 7   & 113 $\\pm$ 7 & 32.8 $\\pm$ 14.1    & 69  $\\pm$ 2 \\\\\nL000562\t \\hline\nL000563\t\\textbf{glass beads} raft  & 170 $\\pm$ 57   &    198 $\\pm$ 9   & 36.1 $\\pm$    7.7    & 78 $\\pm$ 1  \\\\\nL000564\t  &107 $\\pm$ 20                             &    172 $\\pm$ 21   & 27.3 $\\pm$    10.9   & 89 $\\pm$ 2 \\\\\nL000565\t  &107 $\\pm$ 20                             &    205 $\\pm$ 10   & 35.1 $\\pm$    9.8    & 90 $\\pm$ 1  \\\\\nL000566\t  &92 $\\pm$ 12                              &    164 $\\pm$ 9   & 27.9 $\\pm$    6.7    & 84 $\\pm$ 1  \\\\\nL000567\t  &64 $\\pm$ 10                              &    153 $\\pm$ 8   & 22.6 $\\pm$    4.1    & 88 $\\pm$ 1 \\\\\nL000568\t  &64 $\\pm$ 10                              &    300 $\\pm$ 23   & 19.8 $\\pm$    4.8    & 63 $\\pm$ 1 \\\\\nL000569\t\\end{tabular}\nL000570\t}\nL000571\t\t\\caption{Logistic function fit parameters for lycopodium liquid marbles, rafts, and glass beads rafts.}\nL000572\t    \\label{table_fit}\nL000573\t\\end{table}\nL000574\t\nL000575\t\\textit{Appendix I: Fiber's effective spring constant ---} The fiber's effective spring constant $k$ is measured by the static deflection of the fiber under its own weight. The values obtained range from 10 mN/m to 60 mN/m and are in good agreement with the cantilever beam equation for small deformations, $k = 3 E I / L^3$, with $I = \\pi d_f^4 / 64$ the fiber's area moment of inertia, and $E \\approx$~70~GPa its Young’s modulus. We considered only the linear regime (Hooke's law), which provides a good approximation with an average error of less than 1\\% and a maximum error of less than 7\\% in the worst-case scenario.\nL000576\t\nL000577\t\\end{document}\nL000578\t===== END FILE: final_arxiv.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. Preserve source-grounded content, and fix the reported strict-validation failure. Do not add Markdown or commentary.\",\"invalid_output\":\"{\\n  \\\"assessment\\\": \\\"The paper provides a quantitative model for the static rolling friction of liquid marbles, with explicit equations, fitted parameters, and experimental data across multiple regimes. It supports extraction of mechanisms, controls (marble volume, surface fraction), readouts (departure angle, static friction, curvature difference, raft yielding force), and quantitative claims with uncertainties. The source is suitable for authoring an interactive experiment.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Yui Takai, Static Friction of Liquid Marbles, Physical Review Letters (2026), DOI:10.1103/njnj-yhc6\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/njnj-yhc6\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2506.20116v2\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper investigates the static rolling friction of liquid marbles (water droplets coated with lycopodium particles) on tilted substrates. It develops a model based on shear yielding of the granular shell, validates it against departure-angle measurements for varying marble volume and particle surface fraction, and extends the logistic form of the intergrain force function to two-dimensional granular rafts. The study covers marble volumes from 1.5 to 300 µL, surface fractions from about 0.65 to near 1, and raft experiments with lycopodium and glass beads.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"rolling_friction_energy_balance\\\",\\n      \\\"statement\\\": \\\"The onset of rolling of a liquid marble is governed by an energy balance: the gravitational energy gain during rolling must exceed the shear dissipation in the granular shell. The shell is modeled as a purely plastic, quasi-static granular raft with a cohesionless Mohr-Coulomb yield criterion.\\\",\\n      \\\"equations\\\": [\\n        \\\"δE_g ≈ ρ g Ω α δx\\\",\\n        \\\"δE_d ~ S d q_y δϵ\\\",\\n        \\\"q_y = μ p(φ)\\\",\\n        \\\"γ_eff = γ - p(φ) d = γ(1 - f(φ))\\\",\\n        \\\"α ≈ (S a^2 / Ω) (δϵ/δx) μ f(φ)/(1-f(φ))\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"α\\\",\\n        \\\"Ω\\\",\\n        \\\"ρ\\\",\\n        \\\"g\\\",\\n        \\\"δx\\\",\\n        \\\"S\\\",\\n        \\\"d\\\",\\n        \\\"q_y\\\",\\n        \\\"μ\\\",\\n        \\\"p(φ)\\\",\\n        \\\"γ_eff\\\",\\n        \\\"γ\\\",\\n        \\\"f(φ)\\\",\\n        \\\"a\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"mu_large_marbles\\\",\\n          \\\"value\\\": 0.053,\\n          \\\"uncertainty\\\": \\\"±0.003 (standard error from fit)\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Macroscopic friction coefficient of the granular shell, fitted from large-marble departure angles.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 115,\\n              \\\"line_end\\\": 115,\\n              \\\"support\\\": \\\"Fitting Eq. (model_large) in the large-marble regime with f(φ_o)=0.26 and a(φ_o)≈2.3 mm gives μ=0.053±0.003.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"f_phi_o\\\",\\n          \\\"value\\\": 0.26,\\n          \\\"uncertainty\\\": \\\"Not specified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Dimensionless intergrain force function at the initial surface fraction φ_o=0.83.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 115,\\n              \\\"line_end\\\": 115,\\n              \\\"support\\\": \\\"Fitting Eq. (model_large) with f(φ_o)=0.26 and a(φ_o)≈2.3 mm.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"a_phi_o\\\",\\n          \\\"value\\\": 0.0023,\\n          \\\"uncertainty\\\": \\\"Not specified\\\",\\n          \\\"unit\\\": \\\"m\\\",\\n          \\\"role\\\": \\\"Capillary length at φ_o, corresponding to γ_eff(φ_o)≈53 mN/m.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 115,\\n              \\\"line_end\\\": 115,\\n              \\\"support\\\": \\\"a(φ_o)≈2.3 mm, i.e. γ_eff(φ_o)≈53 mN/m.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 87,\\n          \\\"line_end\\\": 89,\\n          \\\"support\\\": \\\"Energy balance: δE_g≈ρgΩαδx exceeds shear dissipation δE_d~S d q_y δϵ; shell rheology modeled as purely plastic and quasi-static.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 90,\\n          \\\"line_end\\\": 91,\\n          \\\"support\\\": \\\"Mohr-Coulomb criterion q_y=μp(φ); effective surface tension γ_eff=γ-p(φ)d.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 93,\\n          \\\"line_end\\\": 95,\\n          \\\"support\\\": \\\"p(φ)=γf(φ)/d, so γ_eff=γ(1-f(φ)).\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 96,\\n          \\\"line_end\\\": 99,\\n          \\\"support\\\": \\\"Substituting into energy balance gives α≈(S a^2/Ω)(δϵ/δx) μ f(φ)/(1-f(φ)).\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"large_marble_model\\\",\\n      \\\"statement\\\": \\\"For large marbles flattened by gravity to height ≈2a, the departure angle is given by a closed-form expression involving the capillary length, marble volume, and the intergrain force function.\\\",\\n      \\\"equations\\\": [\\n        \\\"Ω ≈ π l^2 a / 2\\\",\\n        \\\"S ≈ π l^2/2 + 2π l a\\\",\\n        \\\"δϵ ≈ δx / (2a)\\\",\\n        \\\"α ≈ (1/2) (1 + sqrt(8π a^3 / Ω)) μ f(φ)/(1-f(φ))\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"α\\\",\\n        \\\"Ω\\\",\\n        \\\"a\\\",\\n        \\\"l\\\",\\n        \\\"S\\\",\\n        \\\"δϵ\\\",\\n        \\\"δx\\\",\\n        \\\"μ\\\",\\n        \\\"f(φ)\\\"\\n      ],\\n      \\\"parameters\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 105,\\n          \\\"line_end\\\": 107,\\n          \\\"support\\\": \\\"Large-marble regime: height ≈2a, Ω≈πl^2a/2, S≈πl^2/2+2πla, δϵ≈δx/2a.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 109,\\n          \\\"line_end\\\": 113,\\n          \\\"support\\\": \\\"Combining gives α≈(1/2)(1+sqrt(8πa^3/Ω)) μ f(φ)/(1-f(φ)).\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"small_marble_model\\\",\\n      \\\"statement\\\": \\\"For small, quasi-spherical marbles, shear is confined near the contact region, leading to a different scaling of the departure angle with volume.\\\",\\n      \\\"equations\\\": [\\n        \\\"Ω ≈ 4π R^3 / 3\\\",\\n        \\\"l ~ R^2 / a\\\",\\n        \\\"S ≈ 2π R l\\\",\\n        \\\"δϵ ≈ δx / l\\\",\\n        \\\"α ≈ (6π^2)^{1/3} (a^3/Ω)^{2/3} μ f(φ)/(1-f(φ))\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"α\\\",\\n        \\\"Ω\\\",\\n        \\\"R\\\",\\n        \\\"a\\\",\\n        \\\"l\\\",\\n        \\\"S\\\",\\n        \\\"δϵ\\\",\\n        \\\"δx\\\",\\n        \\\"μ\\\",\\n        \\\"f(φ)\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"small_marble_prefactor\\\",\\n          \\\"value\\\": 0.69,\\n          \\\"uncertainty\\\": \\\"Not specified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Empirical prefactor adjusting the small-marble model to match data.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 122,\\n              \\\"line_end\\\": 122,\\n              \\\"support\\\": \\\"Eq. (model_small) predicts the small-Ω data with a prefactor of 0.69.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 117,\\n          \\\"line_end\\\": 117,\\n          \\\"support\\\": \\\"Small marbles: Ω≈4πR^3/3, l~R^2/a, S≈2πRl, δϵ≈δx/l.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 118,\\n          \\\"line_end\\\": 121,\\n          \\\"support\\\": \\\"Gives α≈(6π^2)^{1/3}(a^3/Ω)^{2/3} μ f(φ)/(1-f(φ)).\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"logistic_f_phi\\\",\\n      \\\"statement\\\": \\\"The dimensionless intergrain force function f(φ) follows a logistic function of the particle surface fraction, with an inflection point near close packing and onset near the 2D percolation threshold.\\\",\\n      \\\"equations\\\": [\\n        \\\"f(φ) = 1 / (1 + exp(-β(φ - φ_c)))\\\",\\n        \\\"φ_c = φ_o - (1/β) ln(γ/γ_eff(φ_o) - 1)\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"f(φ)\\\",\\n        \\\"φ\\\",\\n        \\\"β\\\",\\n        \\\"φ_c\\\",\\n        \\\"φ_o\\\",\\n        \\\"γ\\\",\\n        \\\"γ_eff\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"beta_marbles\\\",\\n          \\\"value\\\": 15.4,\\n          \\\"uncertainty\\\": \\\"±1.7 (standard error from fit)\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Steepness parameter of the logistic function for liquid marbles.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 155,\\n              \\\"line_end\\\": 155,\\n              \\\"support\\\": \\\"α/α_o = exp[β(φ-φ_o)] with β=15.4±1.7.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 556,\\n              \\\"line_end\\\": 556,\\n              \\\"support\\\": \\\"Table: lycopodium marbles β=15.4±1.7.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"phi_c_marbles\\\",\\n          \\\"value\\\": 0.9,\\n          \\\"uncertainty\\\": \\\"±0.01\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Inflection point of the logistic function for liquid marbles.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 164,\\n              \\\"line_end\\\": 164,\\n              \\\"support\\\": \\\"φ_c ≈ 0.90 ± 0.01.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 556,\\n              \\\"line_end\\\": 556,\\n              \\\"support\\\": \\\"Table: lycopodium marbles φ_c=90±1%.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 159,\\n          \\\"line_end\\\": 164,\\n          \\\"support\\\": \\\"From experimental result and Eq. (model_large) in asymptotic limit, f(φ)=1/(1+exp(-β(φ-φ_c))) with φ_c=φ_o-(1/β)ln(γ/γ_eff(φ_o)-1) ≈0.90±0.01.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 168,\\n          \\\"line_end\\\": 169,\\n          \\\"support\\\": \\\"Yielding increases from φ≈0.65 near 2D percolation threshold 0.676; inflection at φ_c≈0.90 close to close-packing 0.907.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"mechanism_id\\\": \\\"raft_yielding_force\\\",\\n      \\\"statement\\\": \\\"In two-dimensional granular rafts, the force required to yield the raft with a dragged fiber scales with the intergrain force function f(φ), which follows a logistic form.\\\",\\n      \\\"equations\\\": [\\n        \\\"F_y = k δ\\\",\\n        \\\"F_y ~ q_y ~ f(φ)\\\",\\n        \\\"f(φ) = F_y(φ) / F_y^max\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"F_y\\\",\\n        \\\"k\\\",\\n        \\\"δ\\\",\\n        \\\"q_y\\\",\\n        \\\"f(φ)\\\",\\n        \\\"φ\\\"\\n      ],\\n      \\\"parameters\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 177,\\n          \\\"line_end\\\": 179,\\n          \\\"support\\\": \\\"Fiber deflection δ gives yielding force F_y=kδ; expected F_y~q_y~f(φ); normalized f(φ)=F_y/F_y^max.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"water_properties\\\",\\n      \\\"statement\\\": \\\"Water droplets have surface tension γ=72 mN/m and density ρ=1000 kg/m^3.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 62,\\n          \\\"line_end\\\": 62,\\n          \\\"support\\\": \\\"Water drops of surface tension γ=72 mN/m, density ρ=1000 kg/m^3.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"lycopodium_particle_properties\\\",\\n      \\\"statement\\\": \\\"Lycopodium particles have mean diameter d=32 μm with standard deviation 3 μm, and are porous hydrophobic.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 62,\\n          \\\"line_end\\\": 62,\\n          \\\"support\\\": \\\"Lycopodium particles have mean diameter d=32 μm, standard deviation 3 μm.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"initial_surface_fraction\\\",\\n      \\\"statement\\\": \\\"The reproducible initial surface fraction is φ_o=0.83±0.01, with effective surface tension γ_eff(φ_o)=53±1 mN/m.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 62,\\n          \\\"line_end\\\": 62,\\n          \\\"support\\\": \\\"Reproducible initial surface fraction φ_o=0.83±0.01; γ_eff(φ_o)=53±1 mN/m.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"substrate_independence\\\",\\n      \\\"statement\\\": \\\"Static friction is substrate-independent across hydrophilic, hydrophobic, and superhydrophobic silicon wafers.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 75,\\n          \\\"line_end\\\": 75,\\n          \\\"support\\\": \\\"Static friction is substrate-independent despite differences in wetting and roughness.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"quasi_static_tilting\\\",\\n      \\\"statement\\\": \\\"The substrate is tilted at a typical angular speed of about 2×10^-3 rad/s until the marble starts moving.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 503,\\n          \\\"line_end\\\": 503,\\n          \\\"support\\\": \\\"Tilted at typical angular speed α̇~2×10^-3 rad/s.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"large_marble_regime\\\",\\n      \\\"statement\\\": \\\"Large-marble regime corresponds to Ω>7 μL, where gravity flattens marbles to height ≈2a.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Fitting Eq. (model_large) in the large-marble regime, Ω>7 μL.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"small_marble_regime\\\",\\n      \\\"statement\\\": \\\"Small-marble model valid up to ~15 μL, within experimental uncertainty.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 122,\\n          \\\"line_end\\\": 122,\\n          \\\"support\\\": \\\"Small-marble model remains valid up to ~15 μL.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"volume_change_method\\\",\\n      \\\"statement\\\": \\\"Surface fraction variation by adding/removing water is suitable only for marbles with Ω≥50 μL.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 146,\\n          \\\"line_end\\\": 146,\\n          \\\"support\\\": \\\"Method suitable only for marbles much larger than the tip of the microsyringe (Ω≥50 μL).\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"marble_volume\\\",\\n      \\\"definition\\\": \\\"Initial volume of the liquid marble, varied by micropipette deposition.\\\",\\n      \\\"unit\\\": \\\"μL\\\",\\n      \\\"minimum\\\": 1.5,\\n      \\\"maximum\\\": 300,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 74,\\n          \\\"line_end\\\": 74,\\n          \\\"support\\\": \\\"Vary the marble initial volume from 1.5 to 300 μL.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"particle_surface_fraction\\\",\\n      \\\"definition\\\": \\\"Surface fraction φ of the liquid interface covered by particles, varied by adding or removing water at fixed particle number.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"minimum\\\": 0.65,\\n      \\\"maximum\\\": 1.0,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 145,\\n          \\\"line_end\\\": 145,\\n          \\\"support\\\": \\\"S is varied by adding (δΩ>0) or removing (δΩ<0) water; new surface fraction φ=(S_o/S)φ_o.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 168,\\n          \\\"line_end\\\": 168,\\n          \\\"support\\\": \\\"Yielding increases progressively from φ≈0.65.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 156,\\n          \\\"line_end\\\": 156,\\n          \\\"support\\\": \\\"Departure angle increases from φ~0.7 to φ close to 1.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"relative_volume_change\\\",\\n      \\\"definition\\\": \\\"Relative change in volume δΩ/Ω_o used to vary surface fraction.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"minimum\\\": -0.2,\\n      \\\"maximum\\\": 0.2,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 137,\\n          \\\"line_end\\\": 137,\\n          \\\"support\\\": \\\"δΩ ranges from -20 to 20 μL for Ω_o=100 μL, i.e. δΩ/Ω_o from -0.2 to 0.2.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"departure_angle\\\",\\n      \\\"definition\\\": \\\"The tilt angle α at which the marble starts moving, measured with a digital goniometer.\\\",\\n      \\\"unit\\\": \\\"rad\\\",\\n      \\\"statistic\\\": \\\"Average over three substrates (hydrophilic, hydrophobic, superhydrophobic) for volume dependence; individual measurements for surface-fraction dependence.\\\",\\n      \\\"uncertainty\\\": \\\"Not specified for individual measurements; 95% confidence intervals shown in figures.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 63,\\n          \\\"line_end\\\": 63,\\n          \\\"support\\\": \\\"α is the slope at which the tangential weight F=ρΩg sinα overcomes static friction, measured with a digital goniometer.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Departure angle averaged over the three substrates.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"static_friction\\\",\\n      \\\"definition\\\": \\\"Tangential weight at departure, F=ρΩg sinα ≈ ρΩgα.\\\",\\n      \\\"unit\\\": \\\"N\\\",\\n      \\\"statistic\\\": \\\"Measured for each marble volume and substrate.\\\",\\n      \\\"uncertainty\\\": \\\"Not specified.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 63,\\n          \\\"line_end\\\": 63,\\n          \\\"support\\\": \\\"F=ρΩg sinα≃ρΩgα.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"curvature_difference\\\",\\n      \\\"definition\\\": \\\"Front-rear curvature difference ΔC = C_front - C_rear, measured from side-view images by fitting each interface with a circular arc.\\\",\\n      \\\"unit\\\": \\\"1/m\\\",\\n      \\\"statistic\\\": \\\"Measured for marbles with initial volume 100 μL as a function of φ.\\\",\\n      \\\"uncertainty\\\": \\\"Not specified.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 509,\\n          \\\"line_end\\\": 509,\\n          \\\"support\\\": \\\"ΔC=C_front-C_rear measured from side-view images by fitting each interface with a circular arc.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"raft_yielding_force\\\",\\n      \\\"definition\\\": \\\"Force F_y exerted by the granular raft on a dragged fiber, obtained from fiber deflection δ via F_y=kδ.\\\",\\n      \\\"unit\\\": \\\"N\\\",\\n      \\\"statistic\\\": \\\"Measured for each trough area and particle type.\\\",\\n      \\\"uncertainty\\\": \\\"Not specified for individual measurements; fit parameters have uncertainties.\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 177,\\n          \\\"line_end\\\": 177,\\n          \\\"support\\\": \\\"Yielding force F_y obtained from deflection δ using F_y=kδ.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"large_marble_departure_angle\\\",\\n      \\\"statement\\\": \\\"For large marbles (Ω>7 μL), the departure angle α is given by α≈(1/2)(1+sqrt(8πa^3/Ω)) μ f(φ)/(1-f(φ)), with fitted μ=0.053±0.003, f(φ_o)=0.26, a(φ_o)=2.3 mm. The model agrees with data over two decades in volume from 3 to 300 μL.\\\",\\n      \\\"quantitative_form\\\": \\\"α ≈ (1/2) (1 + sqrt(8π a^3 / Ω)) μ f(φ)/(1-f(φ))\\\",\\n      \\\"mechanism_ids\\\": [\\n        \\\"large_marble_model\\\",\\n        \\\"rolling_friction_energy_balance\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"marble_volume\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"marble_volume\\\",\\n          \\\"minimum\\\": 3,\\n          \\\"maximum\\\": 300,\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 115,\\n              \\\"line_end\\\": 115,\\n              \\\"support\\\": \\\"Model agrees with data over two decades in volume, from 3 to 300 μL.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"departure_angle\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"large_marble_regime\\\",\\n        \\\"substrate_independence\\\",\\n        \\\"water_properties\\\",\\n        \\\"lycopodium_particle_properties\\\",\\n        \\\"initial_surface_fraction\\\"\\n      ],\\n      \\\"applicability\\\": \\\"Valid for large marbles with Ω>7 μL, up to 300 μL; deviations for Ω<3 μL.\\\",\\n      \\\"statistical_basis\\\": \\\"Fitted to departure angles averaged over three substrates; 95% confidence intervals shown in Fig. F2c.\\\",\\n      \\\"uncertainty\\\": \\\"μ=0.053±0.003; other parameters fixed without uncertainty.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 115,\\n          \\\"line_end\\\": 115,\\n          \\\"support\\\": \\\"Fitting Eq. (model_large) in the large-marble regime with f(φ_o)=0.26 and a(φ_o)≈2.3 mm gives μ=0.053±0.003; model agrees with data from 3 to 300 μL.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"small_marble_departure_angle\\\",\\n      \\\"statement\\\": \\\"For small, quasi-spherical marbles, the departure angle is α≈(6π^2)^{1/3}(a^3/Ω)^{2/3} μ f(φ)/(1-f(φ)), with an empirical prefactor of 0.69. The model predicts the small-Ω data and remains valid up to ~15 μL.\\\",\\n      \\\"quantitative_form\\\": \\\"α ≈ 0.69 * (6π^2)^{1/3} (a^3/Ω)^{2/3} μ f(φ)/(1-f(φ))\\\",\\n      \\\"mechanism_ids\\\": [\\n        \\\"small_marble_model\\\",\\n        \\\"rolling_friction_energy_balance\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"marble_volume\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"marble_volume\\\",\\n          \\\"minimum\\\": 3,\\n          \\\"maximum\\\": 15,\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 122,\\n              \\\"line_end\\\": 122,\\n              \\\"support\\\": \\\"Small-marble model remains valid up to ~15 μL.\\\"\\n            },\\n            {\\n              \\\"line_start\\\": 123,\\n              \\\"line_end\\\": 123,\\n              \\\"support\\\": \\\"For 3≲Ω≲15 μL, both models describe the data.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"departure_angle\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"small_marble_regime\\\",\\n        \\\"substrate_independence\\\",\\n        \\\"water_properties\\\",\\n        \\\"lycopodium_particle_properties\\\",\\n        \\\"initial_surface_fraction\\\"\\n      ],\\n      \\\"applicability\\\": \\\"Valid for small marbles up to ~15 μL; prefactor 0.69 accounts for geometry-dependent approximations.\\\",\\n      \\\"statistical_basis\\\": \\\"Prediction using μ from large marbles; prefactor adjusted to match data.\\\",\\n      \\\"uncertainty\\\": \\\"Prefactor 0.69 without uncertainty; model valid within experimental uncertainty.\\\",\\n      \\\"depends_on\\\": [\\n        \\\"large_marble_departure_angle\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 122,\\n          \\\"line_end\\\": 122,\\n          \\\"support\\\": \\\"Using μ obtained for large marbles, Eq. (model_small) predicts the small-Ω data with a prefactor of 0.69.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"exponential_alpha_phi\\\",\\n      \\\"statement\\\": \\\"The departure angle α, and thus static friction, increases exponentially with surface fraction φ: α/α_o = exp[β(φ-φ_o)] with β=15.4±1.7, for initial volumes Ω_o=50-150 μL.\\\",\\n      \\\"quantitative_form\\\": \\\"α/α_o = exp[β(φ - φ_o)]\\\",\\n      \\\"mechanism_ids\\\": [\\n        \\\"logistic_f_phi\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"particle_surface_fraction\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"particle_surface_fraction\\\",\\n          \\\"minimum\\\": 0.7,\\n          \\\"maximum\\\": 1.0,\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 156,\\n              \\\"line_end\\\": 156,\\n              \\\"support\\\": \\\"Departure angle increases from less than 0.8% for φ~0.7 to more than 50% for φ close to 1.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"departure_angle\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"volume_change_method\\\",\\n        \\\"substrate_independence\\\",\\n        \\\"water_properties\\\",\\n        \\\"lycopodium_particle_properties\\\",\\n        \\\"initial_surface_fraction\\\"\\n      ],\\n      \\\"applicability\\\": \\\"Valid for initial volumes Ω_o=50-150 μL; data collapse onto single exponential.\\\",\\n      \\\"statistical_basis\\\": \\\"Fit to data for all initial volumes; 95% confidence interval shown in Fig. F3c inset.\\\",\\n      \\\"uncertainty\\\": \\\"β=15.4±1.7.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 155,\\n          \\\"line_end\\\": 155,\\n          \\\"support\\\": \\\"Data for all initial volumes collapse onto α/α_o = exp[β(φ-φ_o)] with β=15.4±1.7.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"logistic_f_phi_marble\\\",\\n      \\\"statement\\\": \\\"The intergrain force function f(φ) for liquid marbles follows a logistic function f(φ)=1/(1+exp(-β(φ-φ_c))) with β=15.4±1.7 and φ_c≈0.90±0.01, obtained from departure angles in the asymptotic large-volume regime.\\\",\\n      \\\"quantitative_form\\\": \\\"f(φ) = 1 / (1 + exp(-β(φ - φ_c)))\\\",\\n      \\\"mechanism_ids\\\": [\\n        \\\"logistic_f_phi\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"particle_surface_fraction\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"particle_surface_fraction\\\",\\n          \\\"minimum\\\": 0.65,\\n          \\\"maximum\\\": 1.0,\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 168,\\n              \\\"line_end\\\": 168,\\n              \\\"support\\\": \\\"Yielding increases progressively from φ≈0.65.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"departure_angle\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"volume_change_method\\\",\\n        \\\"substrate_independence\\\",\\n        \\\"water_properties\\\",\\n        \\\"lycopodium_particle_properties\\\",\\n        \\\"initial_surface_fraction\\\"\\n      ],\\n      \\\"applicability\\\": \\\"Valid for large marbles in asymptotic limit Ω/a^3≫1; full numerical solution deviates by less than 10%.\\\",\\n      \\\"statistical_basis\\\": \\\"Derived from exponential fit of α(φ) and Eq. (model_large); parameters from Table.\\\",\\n      \\\"uncertainty\\\": \\\"β=15.4±1.7, φ_c=0.90±0.01.\\\",\\n      \\\"depends_on\\\": [\\n        \\\"exponential_alpha_phi\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 159,\\n          \\\"line_end\\\": 164,\\n          \\\"support\\\": \\\"From experimental result and Eq. (model_large) in asymptotic limit, f(φ)=1/(1+exp(-β(φ-φ_c))) with φ_c≈0.90±0.01.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"raft_f_phi_logistic\\\",\\n      \\\"statement\\\": \\\"For two-dimensional granular rafts, the normalized yielding force f(φ)=F_y/F_y^max follows a logistic function with parameters varying by particle type and run, as listed in Table.\\\",\\n      \\\"quantitative_form\\\": \\\"f(φ) = 1 / (1 + exp(-β(φ - φ_c)))\\\",\\n      \\\"mechanism_ids\\\": [\\n        \\\"raft_yielding_force\\\",\\n        \\\"logistic_f_phi\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"particle_surface_fraction\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"particle_surface_fraction\\\",\\n          \\\"minimum\\\": 0.5,\\n          \\\"maximum\\\": 1.0,\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 191,\\n              \\\"line_end\\\": 191,\\n              \\\"support\\\": \\\"Rafts are prepared at low density, φ≈0.5, and then compressed.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"raft_yielding_force\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [],\\n      \\\"applicability\\\": \\\"Valid for lycopodium and glass bead rafts; parameters vary between runs due to preparation protocol.\\\",\\n      \\\"statistical_basis\\\": \\\"Fit to force measurements; parameters reported in Table with uncertainties.\\\",\\n      \\\"uncertainty\\\": \\\"β and φ_c vary; see Table for values.\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 189,\\n          \\\"line_end\\\": 189,\\n          \\\"support\\\": \\\"Measurements reveal that f(φ) for rafts also follows a logistic function; β and φ_c extracted by fitting.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 540,\\n          \\\"line_end\\\": 540,\\n          \\\"support\\\": \\\"For each particle type, F_y(φ) follows a logistic curve and fit parameters (F_max,β,φ_c) are reported.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"phi_c_independence\\\",\\n      \\\"statement\\\": \\\"The paper states that φ_c is independent of the choice of φ_o, despite its appearance in the expression φ_c = φ_o - (1/β)ln(γ/γ_eff(φ_o)-1). This is a subtle point that may require clarification.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"logistic_f_phi_marble\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"logistic_f_phi\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"particle_surface_fraction\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"departure_angle\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"initial_surface_fraction\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 165,\\n          \\\"line_end\\\": 165,\\n          \\\"support\\\": \\\"We also note that φ_c is independent of the choice of φ_o, despite its appearance in the expression.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"ambiguity_id\\\": \\\"small_marble_prefactor\\\",\\n      \\\"statement\\\": \\\"The small-marble model is adjusted by a prefactor of 0.69, which is described as 'close to unity and accounting for geometry-dependent approximations.' The origin of this prefactor is not derived from first principles.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"small_marble_departure_angle\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"small_marble_model\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"marble_volume\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"departure_angle\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 122,\\n          \\\"line_end\\\": 122,\\n          \\\"support\\\": \\\"Eq. (model_small) predicts the small-Ω data with a prefactor of 0.69, close to unity and accounting for geometry-dependent approximations.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"ambiguity_id\\\": \\\"raft_parameter_variability\\\",\\n      \\\"statement\\\": \\\"The logistic parameters β and φ_c for rafts vary significantly between particle types and experimental runs, attributed to preparation protocol and history dependence. This variability is not captured by a single set of parameters.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"raft_f_phi_logistic\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"raft_yielding_force\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"particle_surface_fraction\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"raft_yielding_force\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 190,\\n          \\\"line_end\\\": 191,\\n          \\\"support\\\": \\\"The steepness β and inflection density φ_c vary significantly between marbles and rafts, but also between experimental runs for the rafts; attributed to preparation protocol.\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"claim domain exceeds the control's source-supported domain\",\"path\":\"$.claims[4].control_domains[0]\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card_validation_failure",
+    "source_format": "latex"
+  },
+  "response_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "type": "number"
+                  },
+                  "minimum": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "minimum",
+                  "maximum",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "minimum",
+            "maximum",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

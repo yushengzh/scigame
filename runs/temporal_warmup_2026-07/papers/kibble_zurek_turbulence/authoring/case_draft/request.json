@@ -1,0 +1,718 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific benchmark case author. You receive one private, source-grounded science card. You do not receive the paper and must not add facts from memory.\nReturn exactly one JSON object matching the supplied CaseDraftBatch schema, without Markdown or extra text.\nUse only science-card mechanisms, claims, controls, readouts, fixed conditions, numeric values, domains, statistics, uncertainty statements, and exact line anchors.\nPrefer one coherent family that groups linked claims sharing a mechanism, rather than one isolated fitted equation. Use one or two readouts only when the card supports them.\nEvery shared Player fact, identification-only fact, and Oracle-only fact must be listed separately in information_boundary and cite existing card IDs and exact card line ranges.\nShared Player information gives only the minimum system, protocol, actual controls, operational readouts, and common fixed conditions needed to experiment. Do not reveal a fitted equation, coefficient, exponent, numeric outcome, hidden regime, source identity, or answer direction.\nInitial observations must be qualitative and contain no digits or precomputed measurements. They may state that the phenomenon and readouts exist, but not how a readout changes with a control.\nIdentification may expose a source-defined response skeleton and named parameter slots but no true values. Discovery receives only the generic expression language through the existing runtime.\nOracle equations, constants, domains, and aggregate semantics must be traceable to the card. Do not invent single-realization noise. The current Oracle is a deterministic central aggregate, so candidate.max_replicates must be exactly 1.\nUnder strict source-contained authoring, the alternate world must select another regime or branch that the same paper explicitly reports. Set counterfactual_derivation.kind to reported_regime_selection. Do not invent z=1, a new exponent, a new coefficient, a new equation, or any other unreported scientific value. A numeric selector may choose between two fully reported branches, but it is benchmark machinery rather than a paper claim.\nKeep the paper-defined branch equations unchanged. Use a single selector parameter with values zero and one to algebraically select between branches. Every other Oracle parameter must use the deterministic lowercase form of a globally unique science-card mechanism parameter name and copy its exact numeric value; it must be identical in both world maps. Put all scientific coefficients and exponents in named parameters; numeric expression leaves may only be zero or one. This prevents the Identification prompt from leaking their true values. The paper and counterfactual parameter maps must differ only in the selector.\nIf the card has no source-reported alternative regime that yields a meaningful relationship-level difference under the same public controls and readouts, return status=not_authorable and drafts=[].\nFor every readout, provide a relationship target. Worlds must differ in direction or qualitative shape, not merely below source uncertainty. Diagnostic conditions should distinguish the worlds within the Player budget. Hidden conditions must be disjoint and spread across the source-supported interior domain.\nUse source-derived reporting precision only as interface rounding; never present it as measurement resolution unless the card says so.\nThe Young double-slit exemplar is useful because its public observations are qualitative, its controls have independent experimental meaning, and one hidden mechanism change propagates predictively. The Brownian exemplar is useful because it defines an ensemble readout precisely and separates time and particle-size relationships. Copy these design principles, not their physics or numbers.\nThe generated candidate remains a draft. A deterministic filter and human source review decide acceptance.\n\nCaseDraftBatch JSON Schema:\n{\"$defs\":{\"expression_template\":{\"anyOf\":[{\"type\":\"number\"},{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/expression_template\"},\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"subtract\",\"multiply\",\"divide\",\"power\",\"negate\",\"exp\",\"log\",\"sin\",\"maximum\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]},\"temporal_case_candidate\":{\"additionalProperties\":false,\"properties\":{\"apparatus\":{\"additionalProperties\":false,\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"name\",\"description\"],\"type\":\"object\"},\"background\":{\"minLength\":1,\"type\":\"string\"},\"budget\":{\"minimum\":1,\"type\":\"integer\"},\"claim\":{\"minLength\":1,\"type\":\"string\"},\"confidence_threshold\":{\"exclusiveMinimum\":0,\"maximum\":1,\"type\":\"number\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"maximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"minimum\",\"maximum\"],\"type\":\"object\"},\"maxItems\":5,\"minItems\":1,\"type\":\"array\"},\"counterfactual_change\":{\"minLength\":1,\"type\":\"string\"},\"diagnostic_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"family\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"hidden_conditions\":{\"items\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"initial_observations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"max_replicates\":{\"minimum\":1,\"type\":\"integer\"},\"notes\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\"},\"oracle\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_parameters\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"kind\":{\"const\":\"closed_form\"},\"outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/expression_template\"},\"maxProperties\":2,\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"paper_parameters\":{\"additionalProperties\":{\"type\":\"number\"},\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"}},\"required\":[\"kind\",\"outputs\",\"paper_parameters\",\"counterfactual_parameters\"],\"type\":\"object\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"description\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"exclusiveMinimum\":0,\"type\":\"number\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"description\",\"unit\",\"resolution\"],\"type\":\"object\"},\"maxItems\":2,\"minItems\":1,\"type\":\"array\"},\"relative_tolerance\":{\"exclusiveMaximum\":1,\"exclusiveMinimum\":0,\"type\":\"number\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"},\"locator\":{\"minLength\":1,\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\",\"locator\",\"role\"],\"type\":\"object\"},\"title\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"family\",\"title\",\"claim\",\"source\",\"apparatus\",\"background\",\"initial_observations\",\"controls\",\"readouts\",\"oracle\",\"diagnostic_conditions\",\"hidden_conditions\",\"budget\",\"max_replicates\",\"confidence_threshold\",\"relative_tolerance\",\"notes\",\"counterfactual_change\"],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"drafts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"candidate\":{\"$ref\":\"#/$defs/temporal_case_candidate\"},\"counterfactual_derivation\":{\"additionalProperties\":false,\"properties\":{\"counterfactual_value\":{\"type\":\"number\"},\"description\":{\"minLength\":1,\"type\":\"string\"},\"historical_value\":{\"type\":\"number\"},\"kind\":{\"enum\":[\"benchmark_authored_parameter_substitution\",\"reported_regime_selection\"],\"type\":\"string\"},\"paper_defined_equations_unchanged\":{\"type\":\"boolean\"},\"selector_parameter\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"source_mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"kind\",\"description\",\"source_claim_ids\",\"source_mechanism_ids\",\"selector_parameter\",\"historical_value\",\"counterfactual_value\",\"paper_defined_equations_unchanged\"],\"type\":\"object\"},\"design_summary\":{\"minLength\":1,\"type\":\"string\"},\"information_boundary\":{\"additionalProperties\":false,\"properties\":{\"identification_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"line_ranges\"],\"type\":\"object\"},\"oracle_only\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"line_ranges\"],\"type\":\"object\"},\"shared_player\":{\"additionalProperties\":false,\"properties\":{\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"items\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"line_ranges\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"}},\"required\":[\"line_start\",\"line_end\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"items\",\"claim_ids\",\"mechanism_ids\",\"line_ranges\"],\"type\":\"object\"}},\"required\":[\"shared_player\",\"identification_only\",\"oracle_only\"],\"type\":\"object\"},\"relationship_targets\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"control\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"counterfactual_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"counterfactual_shape\":{\"minLength\":1,\"type\":\"string\"},\"historical_direction\":{\"enum\":[\"approximately_invariant\",\"decreasing\",\"increasing\",\"non_monotonic\",\"source_defined\"],\"type\":\"string\"},\"historical_shape\":{\"minLength\":1,\"type\":\"string\"},\"readout\":{\"pattern\":\"^[a-z][a-z0-9_]*$\",\"type\":\"string\"},\"source_claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"control\",\"readout\",\"historical_direction\",\"counterfactual_direction\",\"historical_shape\",\"counterfactual_shape\",\"source_claim_ids\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"}},\"required\":[\"design_summary\",\"information_boundary\",\"counterfactual_derivation\",\"relationship_targets\",\"candidate\"],\"type\":\"object\"},\"maxItems\":1,\"type\":\"array\"},\"status\":{\"enum\":[\"authored\",\"not_authorable\"],\"type\":\"string\"}},\"required\":[\"assessment\",\"status\",\"drafts\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Private science card; this is the only scientific authority:\n{\"assessment\":\"The source provides a complete numerical study of spontaneous quantum turbulence in a 2D BEC via the Kibble-Zurek mechanism, with quantitative controls (quench time, temperature), readouts (vortex number, equilibration time, energy spectra, structure functions), and fitted power-law parameters. The evidence supports authoring an interactive experiment.\",\"case_authoring_ready\":true,\"claims\":[{\"anchors\":[{\"line_end\":163,\"line_start\":161,\"support\":\"Fit n_v = (249.036 +/- 44.999) tau_Q^{-0.534 +/- 0.047}.\"}],\"applicability\":\"Valid for 10 <= tau_Q <= 1000, at equilibration time, in the low-temperature limit.\",\"claim_id\":\"vortex_number_kz_scaling\",\"control_names\":[\"quench_time\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"kibble_zurek_vortex_formation\"],\"quantitative_form\":\"n_v = 249.036 * tau_Q^{-0.534}\",\"readout_names\":[\"vortex_number\"],\"statement\":\"The vortex number at equilibration time scales as n_v = (249.036 +/- 44.999) tau_Q^{-0.534 +/- 0.047}, consistent with the KZ prediction n_v ~ tau_Q^{-1/2}.\",\"statistical_basis\":\"Averaged over R=1000 realizations; error bars 1 standard deviation.\",\"uncertainty\":\"Exponent uncertainty 0.047, amplitude uncertainty 44.999.\"},{\"anchors\":[{\"line_end\":158,\"line_start\":158,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069}.\"},{\"line_end\":497,\"line_start\":496,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069} + (0.078 +/- 0.059) tau_Q.\"}],\"applicability\":\"Valid for 10 <= tau_Q <= 1000, measured from critical crossing.\",\"claim_id\":\"equilibration_time_scaling\",\"control_names\":[\"quench_time\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"kibble_zurek_vortex_formation\"],\"quantitative_form\":\"t_eq = 3.779 * tau_Q^{0.541} + 0.078 * tau_Q\",\"readout_names\":[\"equilibration_time\"],\"statement\":\"The equilibration time scales as t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069} + (0.078 +/- 0.059) tau_Q, consistent with t_eq ~ tau_Q^{1/2}.\",\"statistical_basis\":\"Averaged over R=1000 realizations; error bars 1 standard deviation.\",\"uncertainty\":\"Exponent uncertainty 0.069, amplitude uncertainty 0.693, linear coefficient uncertainty 0.059.\"},{\"anchors\":[{\"line_end\":224,\"line_start\":224,\"support\":\"alpha = 1.710 +/- 0.079, beta = 3.025 +/- 0.030 for tau_Q=100.\"},{\"line_end\":236,\"line_start\":236,\"support\":\"E_i(k) = (176.555 +/- 14.316) k^{-1.710 +/- 0.079}, E_i(k) = (1028.257 +/- 123.069) k^{-3.025 +/- 0.030}.\"}],\"applicability\":\"At equilibration time, for tau_Q=100, in the inertial range and high-k range.\",\"claim_id\":\"kolmogorov_scaling_tau100\",\"control_names\":[\"quench_time\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"kolmogorov_scaling_incompressible_energy\"],\"quantitative_form\":\"E_i(k) = 176.555 * k^{-1.710} for inertial range; E_i(k) = 1028.257 * k^{-3.025} for high-k\",\"readout_names\":[\"incompressible_energy_spectrum\"],\"statement\":\"For tau_Q=100, the incompressible energy spectrum follows E_i(k) = 176.555 k^{-1.710} in the inertial range and E_i(k) = 1028.257 k^{-3.025} at high k.\",\"statistical_basis\":\"Averaged over R=1000 realizations; error bands 1 standard deviation.\",\"uncertainty\":\"Exponents: 1.710 +/- 0.079, 3.025 +/- 0.030; amplitudes: 176.555 +/- 14.316, 1028.257 +/- 123.069.\"},{\"anchors\":[{\"line_end\":225,\"line_start\":225,\"support\":\"alpha = 1.654 +/- 0.031, beta = 3.036 +/- 0.047 for tau_Q=350.\"},{\"line_end\":236,\"line_start\":236,\"support\":\"E_i(k) = (37.722 +/- 1.723) k^{-1.654 +/- 0.031}, E_i(k) = (226.968 +/- 42.383) k^{-3.036 +/- 0.047}.\"}],\"applicability\":\"At equilibration time, for tau_Q=350, in the inertial range and high-k range.\",\"claim_id\":\"kolmogorov_scaling_tau350\",\"control_names\":[\"quench_time\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"kolmogorov_scaling_incompressible_energy\"],\"quantitative_form\":\"E_i(k) = 37.722 * k^{-1.654} for inertial range; E_i(k) = 226.968 * k^{-3.036} for high-k\",\"readout_names\":[\"incompressible_energy_spectrum\"],\"statement\":\"For tau_Q=350, the incompressible energy spectrum follows E_i(k) = 37.722 k^{-1.654} in the inertial range and E_i(k) = 226.968 k^{-3.036} at high k.\",\"statistical_basis\":\"Averaged over R=1000 realizations; error bands 1 standard deviation.\",\"uncertainty\":\"Exponents: 1.654 +/- 0.031, 3.036 +/- 0.047; amplitudes: 37.722 +/- 1.723, 226.968 +/- 42.383.\"},{\"anchors\":[{\"line_end\":268,\"line_start\":263,\"support\":\"Panel (b) shows <E_i(k)> tau_Q^{3/4} vs k tau_Q^{1/4}.\"},{\"line_end\":323,\"line_start\":314,\"support\":\"Scaling ansatz and collapse.\"}],\"applicability\":\"For tau_Q values in the KZ regime (tau_Q > 10), at equilibration time.\",\"claim_id\":\"kz_universal_collapse\",\"control_names\":[\"quench_time\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"kz_universality_energy_spectrum\"],\"quantitative_form\":\"E_i(k) tau_Q^{3/4} = F(k tau_Q^{1/4})\",\"readout_names\":[\"incompressible_energy_spectrum\"],\"statement\":\"The incompressible energy spectra for different tau_Q collapse onto a universal curve when plotted as E_i(k) tau_Q^{3/4} vs k tau_Q^{1/4}.\",\"statistical_basis\":\"Averaged over R=1000 realizations; 95% confidence interval in panel (b).\",\"uncertainty\":\"Shaded error bands indicate 95% confidence interval.\"},{\"anchors\":[{\"line_end\":612,\"line_start\":612,\"support\":\"E_c = (3.977 +/- 0.120) x 10^3 tau_Q^{-0.019 +/- 0.006}.\"}],\"applicability\":\"At T=1, at equilibration time.\",\"claim_id\":\"compressible_energy_scaling_T1\",\"control_names\":[\"quench_time\",\"temperature\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"compressible_energy_scaling\"],\"quantitative_form\":\"E_c = 3977.0 * tau_Q^{-0.019}\",\"readout_names\":[\"total_compressible_energy\"],\"statement\":\"At T=1, the compressible energy is nearly independent of tau_Q, with E_c = (3.977 +/- 0.120) x 10^3 tau_Q^{-0.019 +/- 0.006}.\",\"statistical_basis\":\"Averaged over R=1000 realizations; error bars 1 standard deviation.\",\"uncertainty\":\"Exponent uncertainty 0.006, amplitude uncertainty 120.0.\"},{\"anchors\":[{\"line_end\":662,\"line_start\":662,\"support\":\"E_c = (7.422 +/- 4.679) x 10^3 tau_Q^{-0.902 +/- 0.131}.\"}],\"applicability\":\"At T=10^-6, at equilibration time.\",\"claim_id\":\"compressible_energy_scaling_Tlow\",\"control_names\":[\"quench_time\",\"temperature\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"compressible_energy_scaling\"],\"quantitative_form\":\"E_c = 7422.0 * tau_Q^{-0.902}\",\"readout_names\":[\"total_compressible_energy\"],\"statement\":\"At T=10^-6, the compressible energy scales as E_c = (7.422 +/- 4.679) x 10^3 tau_Q^{-0.902 +/- 0.131}, consistent with tau_Q^{-1}.\",\"statistical_basis\":\"Averaged over R=2000 realizations; error bars 1 standard deviation.\",\"uncertainty\":\"Exponent uncertainty 0.131, amplitude uncertainty 4679.0.\"},{\"anchors\":[{\"line_end\":584,\"line_start\":580,\"support\":\"Fitted relations for S_1, S_2, S_4, S_5.\"},{\"line_end\":591,\"line_start\":591,\"support\":\"kappa = 0.114 +/- 0.006.\"}],\"applicability\":\"For tau_Q=350, at equilibration time, over r range 0.03 to 15.\",\"claim_id\":\"ess_structure_functions\",\"control_names\":[\"quench_time\"],\"depends_on\":[],\"fixed_condition_ids\":[\"simulation_parameters\",\"homogeneous_periodic_box\",\"low_temperature_limit\",\"mean_field_critical_exponents\"],\"mechanism_ids\":[\"extended_self_similarity_structure_functions\"],\"quantitative_form\":\"S_p = A_p [S_3]^{zeta(p)} with zeta(p) = p/3 - 0.114 p (p-3)/2\",\"readout_names\":[\"velocity_structure_function\"],\"statement\":\"For tau_Q=350, the structure functions satisfy S_1 = 0.420 [S_3]^{0.439}, S_2 = 0.457 [S_3]^{0.820}, S_4 = 3.316 [S_3]^{1.069}, S_5 = 13.794 [S_3]^{1.118}, with exponents described by K62 with kappa = 0.114.\",\"statistical_basis\":\"Averaged over R=1000 realizations; error bars 1 standard deviation.\",\"uncertainty\":\"Exponents and amplitudes as given; kappa uncertainty 0.006.\"}],\"controls\":[{\"anchors\":[{\"line_end\":111,\"line_start\":111,\"support\":\"Vortex count scaling for 10 <= tau_Q <= 1000.\"},{\"line_end\":142,\"line_start\":142,\"support\":\"Linear quench mu(t) = mu_i + (mu_f - mu_i) t/tau_Q.\"}],\"definition\":\"Duration of the linear quench of the chemical potential from mu_i to mu_f.\",\"maximum\":1000.0,\"minimum\":10.0,\"name\":\"quench_time\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":365,\"line_start\":365,\"support\":\"Temperatures T=10^-6 and T=1 used.\"},{\"line_end\":613,\"line_start\":613,\"support\":\"T=1 corresponds to O(1) nK.\"}],\"definition\":\"Temperature in dimensionless units, with T=1 corresponding to O(1) nK.\",\"maximum\":1.0,\"minimum\":1e-06,\"name\":\"temperature\",\"unit\":\"dimensionless\"}],\"fixed_conditions\":[{\"anchors\":[{\"line_end\":480,\"line_start\":477,\"support\":\"Table of simulation parameters.\"}],\"condition_id\":\"simulation_parameters\",\"statement\":\"Simulation parameters: L=30, t_r=10, mu_i=0.1, mu_f=20, g=1, gamma=0.03, T=1, epsilon_cut=2.5 mu_f.\"},{\"anchors\":[{\"line_end\":466,\"line_start\":466,\"support\":\"Periodic box, V=0, Psi_C=0 initial.\"}],\"condition_id\":\"homogeneous_periodic_box\",\"statement\":\"The system is a periodic L x L homogeneous box with V(r)=0 and initial condition Psi_C=0.\"},{\"anchors\":[{\"line_end\":166,\"line_start\":165,\"support\":\"Low-temperature limit of order 1 nK or less.\"}],\"condition_id\":\"low_temperature_limit\",\"statement\":\"Work in the low-temperature limit (of order 1 nK or less) to isolate SQT from BKT effects.\"},{\"anchors\":[{\"line_end\":153,\"line_start\":153,\"support\":\"Mean-field values nu=1/2, z=2.\"}],\"condition_id\":\"mean_field_critical_exponents\",\"statement\":\"Use mean-field critical exponents nu=1/2 and z=2.\"}],\"mechanisms\":[{\"anchors\":[{\"line_end\":122,\"line_start\":118,\"support\":\"KZM predicts vortex density scaling rho_v ~ tau_Q^{-2 nu/(1+z nu)} and freeze-out time scaling.\"},{\"line_end\":156,\"line_start\":153,\"support\":\"Using nu=1/2, z=2, t_eq ~ tau_Q^{1/2}.\"},{\"line_end\":163,\"line_start\":159,\"support\":\"Vortex number scales as n_v ~ tau_Q^{-1/2}, with fit n_v = (249.036 +/- 44.999) tau_Q^{-0.534 +/- 0.047}.\"}],\"equations\":[\"rho_v = (1/xi_0^2) (tau_0/tau_Q)^{2 nu/(1+z nu)}\",\"hat_xi = xi_0 (tau_Q/tau_0)^{nu/(1+z nu)}\",\"hat_t = (tau_0 tau_Q^{z nu})^{1/(1+z nu)}\"],\"mechanism_id\":\"kibble_zurek_vortex_formation\",\"parameters\":[{\"anchors\":[{\"line_end\":163,\"line_start\":161,\"support\":\"Fit n_v = (249.036 +/- 44.999) tau_Q^{-0.534 +/- 0.047}\"}],\"name\":\"vortex_number_exponent\",\"role\":\"Fitted exponent in n_v = A tau_Q^exponent\",\"uncertainty\":\"0.047\",\"unit\":\"dimensionless\",\"value\":-0.534},{\"anchors\":[{\"line_end\":163,\"line_start\":161,\"support\":\"Fit n_v = (249.036 +/- 44.999) tau_Q^{-0.534 +/- 0.047}\"}],\"name\":\"vortex_number_amplitude\",\"role\":\"Fitted amplitude in n_v = A tau_Q^exponent\",\"uncertainty\":\"44.999\",\"unit\":\"dimensionless\",\"value\":249.036},{\"anchors\":[{\"line_end\":158,\"line_start\":158,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069}\"},{\"line_end\":497,\"line_start\":496,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069} + (0.078 +/- 0.059) tau_Q\"}],\"name\":\"equilibration_time_exponent\",\"role\":\"Fitted exponent in t_eq = A tau_Q^exponent + B tau_Q\",\"uncertainty\":\"0.069\",\"unit\":\"dimensionless\",\"value\":0.541},{\"anchors\":[{\"line_end\":158,\"line_start\":158,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069}\"},{\"line_end\":497,\"line_start\":496,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069} + (0.078 +/- 0.059) tau_Q\"}],\"name\":\"equilibration_time_amplitude\",\"role\":\"Fitted amplitude in t_eq = A tau_Q^exponent + B tau_Q\",\"uncertainty\":\"0.693\",\"unit\":\"dimensionless\",\"value\":3.779},{\"anchors\":[{\"line_end\":497,\"line_start\":496,\"support\":\"t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069} + (0.078 +/- 0.059) tau_Q\"}],\"name\":\"equilibration_time_linear_coefficient\",\"role\":\"Linear term coefficient in t_eq = A tau_Q^exponent + B tau_Q\",\"uncertainty\":\"0.059\",\"unit\":\"dimensionless\",\"value\":0.078}],\"statement\":\"During a finite-time quench through the BEC transition, the Kibble-Zurek mechanism predicts the formation of vortices with density scaling as rho_v ~ tau_Q^{-2 nu/(1+z nu)} and freeze-out time scaling as tau_Q^{z nu/(1+z nu)}.\",\"variable_names\":[\"rho_v\",\"tau_Q\",\"xi_0\",\"tau_0\",\"nu\",\"z\",\"hat_xi\",\"hat_t\"]},{\"anchors\":[{\"line_end\":204,\"line_start\":197,\"support\":\"Kolmogorov scaling E_i(k) ~ k^{-5/3} in inertial range.\"},{\"line_end\":210,\"line_start\":207,\"support\":\"At higher momenta, E_i(k) ~ k^{-3} due to vortex core.\"},{\"line_end\":237,\"line_start\":223,\"support\":\"Fitted exponents and amplitudes for tau_Q=100 and 350.\"}],\"equations\":[\"E_i(k) = A k^{-alpha} for inertial range\",\"E_i(k) = B k^{-beta} for high-k range\"],\"mechanism_id\":\"kolmogorov_scaling_incompressible_energy\",\"parameters\":[{\"anchors\":[{\"line_end\":224,\"line_start\":224,\"support\":\"alpha = 1.710 +/- 0.079 for tau_Q=100\"}],\"name\":\"inertial_exponent_tau100\",\"role\":\"Fitted exponent alpha for tau_Q=100\",\"uncertainty\":\"0.079\",\"unit\":\"dimensionless\",\"value\":1.71},{\"anchors\":[{\"line_end\":236,\"line_start\":236,\"support\":\"E_i(k) = (176.555 +/- 14.316) k^{-1.710 +/- 0.079}\"}],\"name\":\"inertial_amplitude_tau100\",\"role\":\"Fitted amplitude A for tau_Q=100\",\"uncertainty\":\"14.316\",\"unit\":\"dimensionless\",\"value\":176.555},{\"anchors\":[{\"line_end\":224,\"line_start\":224,\"support\":\"beta = 3.025 +/- 0.030 for tau_Q=100\"}],\"name\":\"highk_exponent_tau100\",\"role\":\"Fitted exponent beta for tau_Q=100\",\"uncertainty\":\"0.030\",\"unit\":\"dimensionless\",\"value\":3.025},{\"anchors\":[{\"line_end\":236,\"line_start\":236,\"support\":\"E_i(k) = (1028.257 +/- 123.069) k^{-3.025 +/- 0.030}\"}],\"name\":\"highk_amplitude_tau100\",\"role\":\"Fitted amplitude B for tau_Q=100\",\"uncertainty\":\"123.069\",\"unit\":\"dimensionless\",\"value\":1028.257},{\"anchors\":[{\"line_end\":225,\"line_start\":225,\"support\":\"alpha = 1.654 +/- 0.031 for tau_Q=350\"}],\"name\":\"inertial_exponent_tau350\",\"role\":\"Fitted exponent alpha for tau_Q=350\",\"uncertainty\":\"0.031\",\"unit\":\"dimensionless\",\"value\":1.654},{\"anchors\":[{\"line_end\":236,\"line_start\":236,\"support\":\"E_i(k) = (37.722 +/- 1.723) k^{-1.654 +/- 0.031}\"}],\"name\":\"inertial_amplitude_tau350\",\"role\":\"Fitted amplitude A for tau_Q=350\",\"uncertainty\":\"1.723\",\"unit\":\"dimensionless\",\"value\":37.722},{\"anchors\":[{\"line_end\":225,\"line_start\":225,\"support\":\"beta = 3.036 +/- 0.047 for tau_Q=350\"}],\"name\":\"highk_exponent_tau350\",\"role\":\"Fitted exponent beta for tau_Q=350\",\"uncertainty\":\"0.047\",\"unit\":\"dimensionless\",\"value\":3.036},{\"anchors\":[{\"line_end\":236,\"line_start\":236,\"support\":\"E_i(k) = (226.968 +/- 42.383) k^{-3.036 +/- 0.047}\"}],\"name\":\"highk_amplitude_tau350\",\"role\":\"Fitted amplitude B for tau_Q=350\",\"uncertainty\":\"42.383\",\"unit\":\"dimensionless\",\"value\":226.968}],\"statement\":\"The incompressible kinetic energy spectrum E_i(k) exhibits Kolmogorov scaling E_i(k) ~ k^{-5/3} in the inertial range, followed by a k^{-3} scaling at high momenta due to vortex cores.\",\"variable_names\":[\"E_i(k)\",\"k\",\"alpha\",\"beta\"]},{\"anchors\":[{\"line_end\":323,\"line_start\":314,\"support\":\"Scaling ansatz and collapse shown in Fig. 3.\"}],\"equations\":[\"E_i(k, tau_Q) = A(tau_Q) F(k hat_xi)\",\"A(tau_Q) ~ tau_Q^{-(1+nu)/(1+z nu)}\",\"hat_xi ~ tau_Q^{nu/(1+z nu)}\"],\"mechanism_id\":\"kz_universality_energy_spectrum\",\"parameters\":[],\"statement\":\"The incompressible kinetic energy spectrum E_i(k) collapses onto a universal curve when rescaled as E_i(k) tau_Q^{(1+nu)/(1+z nu)} vs k tau_Q^{nu/(1+z nu)}.\",\"variable_names\":[\"E_i(k)\",\"tau_Q\",\"hat_xi\",\"nu\",\"z\"]},{\"anchors\":[{\"line_end\":613,\"line_start\":612,\"support\":\"At T=1, E_c ~ tau_Q^{-0.019} due to thermal fluctuations.\"},{\"line_end\":663,\"line_start\":659,\"support\":\"At low T, E_c ~ tau_Q^{-1} and spectrum collapses.\"}],\"equations\":[\"E_c ~ tau_Q^{-1}\",\"E_c(k) tau_Q^{3/4} collapses vs k tau_Q^{1/4}\"],\"mechanism_id\":\"compressible_energy_scaling\",\"parameters\":[{\"anchors\":[{\"line_end\":612,\"line_start\":612,\"support\":\"E_c = (3.977 +/- 0.120) x 10^3 tau_Q^{-0.019 +/- 0.006}\"}],\"name\":\"compressible_energy_exponent_T1\",\"role\":\"Fitted exponent for E_c vs tau_Q at T=1\",\"uncertainty\":\"0.006\",\"unit\":\"dimensionless\",\"value\":-0.019},{\"anchors\":[{\"line_end\":612,\"line_start\":612,\"support\":\"E_c = (3.977 +/- 0.120) x 10^3 tau_Q^{-0.019 +/- 0.006}\"}],\"name\":\"compressible_energy_amplitude_T1\",\"role\":\"Fitted amplitude for E_c vs tau_Q at T=1\",\"uncertainty\":\"120.0\",\"unit\":\"dimensionless\",\"value\":3977.0},{\"anchors\":[{\"line_end\":662,\"line_start\":662,\"support\":\"E_c = (7.422 +/- 4.679) x 10^3 tau_Q^{-0.902 +/- 0.131}\"}],\"name\":\"compressible_energy_exponent_Tlow\",\"role\":\"Fitted exponent for E_c vs tau_Q at T=10^-6\",\"uncertainty\":\"0.131\",\"unit\":\"dimensionless\",\"value\":-0.902},{\"anchors\":[{\"line_end\":662,\"line_start\":662,\"support\":\"E_c = (7.422 +/- 4.679) x 10^3 tau_Q^{-0.902 +/- 0.131}\"}],\"name\":\"compressible_energy_amplitude_Tlow\",\"role\":\"Fitted amplitude for E_c vs tau_Q at T=10^-6\",\"uncertainty\":\"4679.0\",\"unit\":\"dimensionless\",\"value\":7422.0}],\"statement\":\"The compressible kinetic energy E_c scales as tau_Q^{-1} at low temperature due to phonon emission from vortex-antivortex annihilation, and its spectrum collapses under the same rescaling as the incompressible spectrum.\",\"variable_names\":[\"E_c\",\"tau_Q\",\"k\"]},{\"anchors\":[{\"line_end\":591,\"line_start\":579,\"support\":\"ESS fits and K62 parameter.\"}],\"equations\":[\"S_p(r) = A_p [S_3(r)]^{zeta(p)}\",\"zeta(p) = p/3 - kappa p (p-3)/2\"],\"mechanism_id\":\"extended_self_similarity_structure_functions\",\"parameters\":[{\"anchors\":[{\"line_end\":591,\"line_start\":591,\"support\":\"kappa = 0.114 +/- 0.006\"}],\"name\":\"k62_kappa\",\"role\":\"Fitted K62 intermittency parameter\",\"uncertainty\":\"0.006\",\"unit\":\"dimensionless\",\"value\":0.114},{\"anchors\":[{\"line_end\":580,\"line_start\":580,\"support\":\"S_1 = (0.420 +/- 0.011) [S_3]^{0.439 +/- 0.011}\"}],\"name\":\"structure_function_amplitude_p1\",\"role\":\"Amplitude for S_1 vs S_3\",\"uncertainty\":\"0.011\",\"unit\":\"dimensionless\",\"value\":0.42},{\"anchors\":[{\"line_end\":580,\"line_start\":580,\"support\":\"S_1 = (0.420 +/- 0.011) [S_3]^{0.439 +/- 0.011}\"}],\"name\":\"structure_function_exponent_p1\",\"role\":\"Exponent zeta(1) for S_1 vs S_3\",\"uncertainty\":\"0.011\",\"unit\":\"dimensionless\",\"value\":0.439},{\"anchors\":[{\"line_end\":581,\"line_start\":581,\"support\":\"S_2 = (0.457 +/- 0.021) [S_3]^{0.820 +/- 0.022}\"}],\"name\":\"structure_function_amplitude_p2\",\"role\":\"Amplitude for S_2 vs S_3\",\"uncertainty\":\"0.021\",\"unit\":\"dimensionless\",\"value\":0.457},{\"anchors\":[{\"line_end\":581,\"line_start\":581,\"support\":\"S_2 = (0.457 +/- 0.021) [S_3]^{0.820 +/- 0.022}\"}],\"name\":\"structure_function_exponent_p2\",\"role\":\"Exponent zeta(2) for S_2 vs S_3\",\"uncertainty\":\"0.022\",\"unit\":\"dimensionless\",\"value\":0.82},{\"anchors\":[{\"line_end\":582,\"line_start\":582,\"support\":\"S_4 = (3.316 +/- 0.220) [S_3]^{1.069 +/- 0.033}\"}],\"name\":\"structure_function_amplitude_p4\",\"role\":\"Amplitude for S_4 vs S_3\",\"uncertainty\":\"0.220\",\"unit\":\"dimensionless\",\"value\":3.316},{\"anchors\":[{\"line_end\":582,\"line_start\":582,\"support\":\"S_4 = (3.316 +/- 0.220) [S_3]^{1.069 +/- 0.033}\"}],\"name\":\"structure_function_exponent_p4\",\"role\":\"Exponent zeta(4) for S_4 vs S_3\",\"uncertainty\":\"0.033\",\"unit\":\"dimensionless\",\"value\":1.069},{\"anchors\":[{\"line_end\":584,\"line_start\":584,\"support\":\"S_5 = (13.794 +/- 1.061) [S_3]^{1.118 +/- 0.038}\"}],\"name\":\"structure_function_amplitude_p5\",\"role\":\"Amplitude for S_5 vs S_3\",\"uncertainty\":\"1.061\",\"unit\":\"dimensionless\",\"value\":13.794},{\"anchors\":[{\"line_end\":584,\"line_start\":584,\"support\":\"S_5 = (13.794 +/- 1.061) [S_3]^{1.118 +/- 0.038}\"}],\"name\":\"structure_function_exponent_p5\",\"role\":\"Exponent zeta(5) for S_5 vs S_3\",\"uncertainty\":\"0.038\",\"unit\":\"dimensionless\",\"value\":1.118}],\"statement\":\"The longitudinal velocity structure functions S_p(r) satisfy S_p(r) ~ [S_3(r)]^{zeta(p)} over an extended range, with exponents deviating from K41 and described by the K62 model with kappa = 0.114.\",\"variable_names\":[\"S_p(r)\",\"S_3(r)\",\"zeta(p)\",\"kappa\"]}],\"paper_scope\":\"Numerical simulations of the 2D stochastic projected Gross-Pitaevskii equation for a homogeneous BEC quenched through the condensation transition, establishing Kibble-Zurek scaling of vortex number and equilibration time, Kolmogorov scaling of the incompressible kinetic energy spectrum, and universal collapse of spectra under KZ rescaling.\",\"readouts\":[{\"anchors\":[{\"line_end\":113,\"line_start\":108,\"support\":\"Vortex count n_v at t_eq vs tau_Q, averaged over R=1000 realizations, error bars 1 std dev.\"}],\"definition\":\"Number of vortices at equilibration time, counted by detecting zeros of condensate density and winding number.\",\"name\":\"vortex_number\",\"statistic\":\"Mean over R=1000 realizations\",\"uncertainty\":\"1 standard deviation\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":113,\"line_start\":112,\"support\":\"t_eq vs tau_Q, averaged over R=1000 realizations, error bars 1 std dev.\"}],\"definition\":\"Time when growth of boson number changes from exponential to linear, measured from critical crossing.\",\"name\":\"equilibration_time\",\"statistic\":\"Mean over R=1000 realizations\",\"uncertainty\":\"1 standard deviation\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":231,\"line_start\":221,\"support\":\"E_i(k) for tau_Q=100 and 350, averaged over R=1000, error bands 1 std dev.\"}],\"definition\":\"Incompressible kinetic energy spectrum E_i(k) at equilibration time, computed from the solenoidal component of the weighted velocity field.\",\"name\":\"incompressible_energy_spectrum\",\"statistic\":\"Ensemble average over R=1000 realizations\",\"uncertainty\":\"1 standard deviation (shaded bands)\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":229,\"line_start\":226,\"support\":\"E_c(k) for tau_Q=100 and 350, averaged over R=1000, error bands 1 std dev.\"}],\"definition\":\"Compressible kinetic energy spectrum E_c(k) at equilibration time, computed from the irrotational component of the weighted velocity field.\",\"name\":\"compressible_energy_spectrum\",\"statistic\":\"Ensemble average over R=1000 realizations\",\"uncertainty\":\"1 standard deviation (shaded bands)\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":365,\"line_start\":365,\"support\":\"E_i at equilibration for various tau_Q at T=10^-6 and T=1, averaged over R=2000 and R=1000, error bars 1 std dev.\"}],\"definition\":\"Total incompressible kinetic energy E_i at equilibration time, integrated over all k.\",\"name\":\"total_incompressible_energy\",\"statistic\":\"Mean over R=2000 (T=10^-6) or R=1000 (T=1) realizations\",\"uncertainty\":\"1 standard deviation\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":606,\"line_start\":606,\"support\":\"E_c at equilibration for various tau_Q at T=10^-6 and T=1, averaged over R=2000 and R=1000, error bars 1 std dev.\"}],\"definition\":\"Total compressible kinetic energy E_c at equilibration time, integrated over all k.\",\"name\":\"total_compressible_energy\",\"statistic\":\"Mean over R=2000 (T=10^-6) or R=1000 (T=1) realizations\",\"uncertainty\":\"1 standard deviation\",\"unit\":\"dimensionless\"},{\"anchors\":[{\"line_end\":551,\"line_start\":545,\"support\":\"S_p(r) for tau_Q=350, averaged over R=1000, error bars 1 std dev.\"}],\"definition\":\"Longitudinal velocity structure function S_p(r) of the incompressible weighted velocity field, averaged over positions and orientations.\",\"name\":\"velocity_structure_function\",\"statistic\":\"Mean over R=1000 realizations\",\"uncertainty\":\"1 standard deviation\",\"unit\":\"dimensionless\"}],\"source\":{\"arxiv_versioned_id\":\"2506.21670v3\",\"citation\":\"Seong-Ho Shinn et al., Spontaneous Quantum Turbulence in a Newborn Bose-Einstein Condensate via the Kibble-Zurek Mechanism, Physical Review Letters (2026), DOI:10.1103/b16v-hwp2\",\"journal_doi\":\"10.1103/b16v-hwp2\"},\"source_ambiguities\":[{\"ambiguity_id\":\"equilibration_time_definition\",\"anchors\":[{\"line_end\":158,\"line_start\":158,\"support\":\"Main text fit without linear term.\"},{\"line_end\":497,\"line_start\":496,\"support\":\"Supplementary fit with linear term.\"}],\"claim_ids\":[\"equilibration_time_scaling\"],\"statement\":\"The main text reports t_eq = (3.779 +/- 0.693) tau_Q^{0.541 +/- 0.069} without a linear term, while the supplementary material includes an additional linear term (0.078 +/- 0.059) tau_Q. The main text may have omitted the linear term for brevity.\"},{\"ambiguity_id\":\"uncertainty_interpretation\",\"anchors\":[{\"line_end\":420,\"line_start\":420,\"support\":\"Weighted least squares with weights given by inverse variances.\"}],\"claim_ids\":[\"vortex_number_kz_scaling\",\"equilibration_time_scaling\",\"kolmogorov_scaling_tau100\",\"kolmogorov_scaling_tau350\",\"compressible_energy_scaling_T1\",\"compressible_energy_scaling_Tlow\",\"ess_structure_functions\"],\"statement\":\"The paper does not specify whether reported plus/minus values are standard errors, standard deviations, or confidence intervals. For fits, they are likely standard errors from weighted least squares, but this is not explicitly stated.\"}]}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "purpose": "temporal_case_authoring",
+    "source_mode": "science_card_only"
+  },
+  "response_schema": {
+    "$defs": {
+      "expression_template": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/expression_template"
+                },
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "subtract",
+                  "multiply",
+                  "divide",
+                  "power",
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "maximum",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "temporal_case_candidate": {
+        "additionalProperties": false,
+        "properties": {
+          "apparatus": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "description"
+            ],
+            "type": "object"
+          },
+          "background": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "budget": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "claim": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "confidence_threshold": {
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "type": "number"
+          },
+          "controls": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maximum": {
+                  "type": "number"
+                },
+                "minimum": {
+                  "type": "number"
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "unit": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "unit",
+                "minimum",
+                "maximum"
+              ],
+              "type": "object"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array"
+          },
+          "counterfactual_change": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "diagnostic_conditions": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "family": {
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "hidden_conditions": {
+            "items": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "initial_observations": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "max_replicates": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "oracle": {
+            "additionalProperties": false,
+            "properties": {
+              "counterfactual_parameters": {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "minProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "kind": {
+                "const": "closed_form"
+              },
+              "outputs": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/expression_template"
+                },
+                "maxProperties": 2,
+                "minProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "paper_parameters": {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "minProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "kind",
+              "outputs",
+              "paper_parameters",
+              "counterfactual_parameters"
+            ],
+            "type": "object"
+          },
+          "readouts": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "resolution": {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                "unit": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "unit",
+                "resolution"
+              ],
+              "type": "object"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "type": "array"
+          },
+          "relative_tolerance": {
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "source": {
+            "additionalProperties": false,
+            "properties": {
+              "arxiv_versioned_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "citation": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "journal_doi": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "locator": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "role": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "citation",
+              "journal_doi",
+              "arxiv_versioned_id",
+              "locator",
+              "role"
+            ],
+            "type": "object"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "title",
+          "claim",
+          "source",
+          "apparatus",
+          "background",
+          "initial_observations",
+          "controls",
+          "readouts",
+          "oracle",
+          "diagnostic_conditions",
+          "hidden_conditions",
+          "budget",
+          "max_replicates",
+          "confidence_threshold",
+          "relative_tolerance",
+          "notes",
+          "counterfactual_change"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "drafts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "candidate": {
+              "$ref": "#/$defs/temporal_case_candidate"
+            },
+            "counterfactual_derivation": {
+              "additionalProperties": false,
+              "properties": {
+                "counterfactual_value": {
+                  "type": "number"
+                },
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "historical_value": {
+                  "type": "number"
+                },
+                "kind": {
+                  "enum": [
+                    "benchmark_authored_parameter_substitution",
+                    "reported_regime_selection"
+                  ],
+                  "type": "string"
+                },
+                "paper_defined_equations_unchanged": {
+                  "type": "boolean"
+                },
+                "selector_parameter": {
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "type": "string"
+                },
+                "source_claim_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "source_mechanism_ids": {
+                  "items": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "kind",
+                "description",
+                "source_claim_ids",
+                "source_mechanism_ids",
+                "selector_parameter",
+                "historical_value",
+                "counterfactual_value",
+                "paper_defined_equations_unchanged"
+              ],
+              "type": "object"
+            },
+            "design_summary": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "information_boundary": {
+              "additionalProperties": false,
+              "properties": {
+                "identification_only": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                },
+                "oracle_only": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                },
+                "shared_player": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claim_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "items": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "line_ranges": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "mechanism_ids": {
+                      "items": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "claim_ids",
+                    "mechanism_ids",
+                    "line_ranges"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "shared_player",
+                "identification_only",
+                "oracle_only"
+              ],
+              "type": "object"
+            },
+            "relationship_targets": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "control": {
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "counterfactual_direction": {
+                    "enum": [
+                      "approximately_invariant",
+                      "decreasing",
+                      "increasing",
+                      "non_monotonic",
+                      "source_defined"
+                    ],
+                    "type": "string"
+                  },
+                  "counterfactual_shape": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "historical_direction": {
+                    "enum": [
+                      "approximately_invariant",
+                      "decreasing",
+                      "increasing",
+                      "non_monotonic",
+                      "source_defined"
+                    ],
+                    "type": "string"
+                  },
+                  "historical_shape": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "readout": {
+                    "pattern": "^[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "source_claim_ids": {
+                    "items": {
+                      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "control",
+                  "readout",
+                  "historical_direction",
+                  "counterfactual_direction",
+                  "historical_shape",
+                  "counterfactual_shape",
+                  "source_claim_ids"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "design_summary",
+            "information_boundary",
+            "counterfactual_derivation",
+            "relationship_targets",
+            "candidate"
+          ],
+          "type": "object"
+        },
+        "maxItems": 1,
+        "type": "array"
+      },
+      "status": {
+        "enum": [
+          "authored",
+          "not_authorable"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "assessment",
+      "status",
+      "drafts"
+    ],
+    "type": "object"
+  }
+}

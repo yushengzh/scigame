@@ -1,0 +1,905 @@
+{
+  "config": {
+    "max_output_tokens": 32768,
+    "seed": null,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "messages": [
+    {
+      "content": "You are a scientific evidence extractor. Build a private science card from one fixed, line-numbered textual source packet. You are not authoring a benchmark case.\nReturn exactly one JSON object matching the supplied schema, without Markdown or extra text.\nUse only the supplied source. Do not use outside knowledge or infer missing facts from citations.\nCopy the supplied citation, canonical journal DOI, and versioned arXiv ID exactly.\nExcept for mechanism.variable_names, names and IDs must be ASCII snake-style identifiers. Source-significant uppercase segments such as E_i or T_low may be retained; the next deterministic stage lowercases them for runtime use. mechanism.variable_names may preserve arbitrary raw paper notation.\nEvery factual statement and every numeric value must have at least one anchor whose inclusive line range supports it. Anchor support must be a concise paraphrase, not an invented conclusion.\nPreserve whether the source states equality, proportionality, approximation, prediction, definition, fitted relation, or qualitative observation.\nExtract mechanisms, actual manipulated numeric controls, readouts, fixed conditions, statistical aggregation, sample size, uncertainty, applicability ranges, limitations, and claim dependencies needed to interpret a quantitative interactive experiment.\nA control is a numeric quantity the study actually manipulates. A readout is a measured or computed observable. Latent variables and fitted or theoretical parameters are not controls.\nSample size, ensemble count, averaging rule, fit method, and uncertainty convention are statistical provenance, not physical fixed conditions and never a hidden-world discriminator. Record them in ScienceReadout.statistic/uncertainty and claim.statistical_basis/uncertainty instead of fixed_conditions. These fields describe the source data; they will not be copied onto a deterministic Oracle query.\nRepresent source support without inventing continuity: use domain_kind continuous_interval only for a source-supported nonzero interval, numeric_values for explicitly reported discrete manipulated settings, fixed_value for one setting, symbolic for a stated nonnumeric domain, and unreported when the source does not provide one. Only continuous_interval and numeric_values can later compile to Player controls. A fixed value belongs to the experimental context, not a range with equal endpoints. The quantity that distinguishes the two selected source-reported branches is private regime context, not a Player control: represent each branch value or limit as its own branch-specific fixed condition, and make the corresponding claim cite only its branch condition. Two isolated reported condition values do not license interpolation. Never borrow a numeric domain from one claim for another claim merely because they use the same symbol.\nUse this exact domain-field table for every control and claim domain: continuous_interval => numeric minimum, numeric maximum with minimum < maximum, allowed_values=[]; numeric_values => minimum=null, maximum=null, at least two unique allowed_values; fixed_value => minimum=null, maximum=null, exactly one allowed_value; symbolic or unreported => minimum=null, maximum=null, allowed_values=[], and a non-empty domain_statement. A one-sided or otherwise non-numeric source condition is not a continuous_interval with a null endpoint. When a reviewer figure-evidence addendum conservatively identifies a finite query set but not a continuous source interval, encode those supported values as numeric_values.\nFor every quantitative response that could become an Oracle equation, record each fitted coefficient and exponent as a named ScienceParameter under its linked mechanism. The parameter value is the central value; put the paper's uncertainty text in uncertainty. Never leave a numeric coefficient or exponent only inside claim.quantitative_form. If the meaning of a reported plus/minus value is not specified, write source_unspecified; do not guess standard error or confidence interval.\nFor every retained claim, encode the central-value control-to-readout relation in claim.oracle_outputs using the supplied expression AST. Output keys must exactly equal that claim's readout_names. A {\"var\": ...} leaf must name one of that claim's control_names. A {\"param\": ...} leaf must name a ScienceParameter belonging to one of that claim's mechanism_ids. Every scientific constant, including zero or one when it occurs in the source equation, must be a named, anchored ScienceParameter referenced by a param leaf. Numeric literals are forbidden in ScienceClaim oracle_outputs; structural selector literals are added only by the deterministic case binder. Keep quantitative_form as a human-readable rendering of the same relation. Do not put uncertainty ranges into oracle_outputs: the executable Oracle evaluates only source-reported central parameter values. Keep source aggregation, data-point error bars, fit-parameter uncertainty, and their conventions in the provenance fields; they are not uncertainty on each deterministic query result.\nAn unspecified plus/minus convention is missing metadata, not a contradiction: do not create a source_ambiguity solely because the paper omits whether a quoted fit uncertainty is a standard error, confidence interval, or another convention. Preserve the numeric plus/minus values in the quantitative form and parameter records, mark their meaning source_unspecified, and keep point error bars such as one standard deviation separate when the source defines them.\nParameter names must be globally unique, including after lowercasing. Qualify names by readout and regime when the paper reports several amplitudes, exponents, or other quantities of the same kind.\nKeep variable_names in the paper's recognizable notation when useful (for example tau_Q); unlike executable parameter names, they need not be lower_snake_case.\nNever invent a range, resolution, noise model, coefficient, parameter value, uncertainty interpretation, or simulator behavior.\nKeep general mechanisms and linked empirical claims together rather than atomizing every equation into an unrelated mini-case. claim.mechanism_ids cites mechanisms. claim.depends_on may cite only other claim_ids, never mechanism_ids; use an empty array when a claim has no claim-level prerequisite.\nExtract only the single best complete quantitative cluster for this authoring run; do not catalogue a second, unrelated experiment. Prefer two source-reported regimes that can use the same one-to-five controls and one-or-two readouts. If no such pair exists, extract the best single response faithfully and set case_authoring_ready false. Include every fixed condition, statistic, uncertainty, applicability limit, and branch parameter needed to reproduce the selected responses. Every quantitative claim must cite every selected mechanism that supplies a coefficient, exponent, or equation used by that claim. If the same paper symbol has a different meaning or source-supported domain in another experiment, omit that other experiment rather than merging or widening the selected control. Do not exhaust the output budget cataloguing unrelated qualitative results.\nDo not bundle a condition that changes between reported regimes into a common fixed condition. Split the common apparatus settings from each regime-specific value, and link each claim only to compatible conditions.\nInclude only fixed conditions needed to interpret the selected discovery formula. Omit global simulation or acquisition settings that do not enter the selected response, especially when their locator contains a branch-specific value incompatible with the other branch.\nPreserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.\nWhen the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.\nWhen main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.\nSet case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.\nDo not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.\n\nScienceCard JSON Schema:\n{\"$defs\":{\"science_expression\":{\"anyOf\":[{\"additionalProperties\":false,\"properties\":{\"var\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"var\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"param\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"}},\"required\":[\"param\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"add\",\"multiply\",\"maximum\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":2,\"minItems\":2,\"type\":\"array\"},\"op\":{\"enum\":[\"subtract\",\"divide\",\"power\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"args\":{\"items\":{\"$ref\":\"#/$defs/science_expression\"},\"maxItems\":1,\"minItems\":1,\"type\":\"array\"},\"op\":{\"enum\":[\"negate\",\"exp\",\"log\",\"sin\",\"step\"],\"type\":\"string\"}},\"required\":[\"op\",\"args\"],\"type\":\"object\"}]}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"properties\":{\"assessment\":{\"minLength\":1,\"type\":\"string\"},\"case_authoring_ready\":{\"type\":\"boolean\"},\"claims\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"applicability\":{\"minLength\":1,\"type\":\"string\"},\"claim_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"control_domains\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"control_name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}},\"required\":[\"control_name\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"depends_on\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"oracle_outputs\":{\"additionalProperties\":{\"$ref\":\"#/$defs/science_expression\"},\"description\":\"Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.\",\"minProperties\":1,\"propertyNames\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"object\"},\"quantitative_form\":{\"minLength\":1,\"type\":\"string\"},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"statistical_basis\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"claim_id\",\"statement\",\"quantitative_form\",\"oracle_outputs\",\"mechanism_ids\",\"control_names\",\"control_domains\",\"readout_names\",\"fixed_condition_ids\",\"applicability\",\"statistical_basis\",\"uncertainty\",\"depends_on\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"controls\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"allowed_values\":{\"items\":{\"type\":\"number\"},\"type\":\"array\",\"uniqueItems\":true},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"domain_kind\":{\"enum\":[\"continuous_interval\",\"fixed_value\",\"numeric_values\",\"symbolic\",\"unreported\"],\"type\":\"string\"},\"domain_statement\":{\"type\":\"string\"},\"maximum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"minimum\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"domain_kind\",\"minimum\",\"maximum\",\"allowed_values\",\"domain_statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"fixed_conditions\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"condition_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"condition_id\",\"statement\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"mechanisms\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"equations\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"minItems\":1,\"type\":\"array\"},\"mechanism_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"parameters\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"role\":{\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"},\"value\":{\"type\":\"number\"}},\"required\":[\"name\",\"value\",\"uncertainty\",\"unit\",\"role\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"statement\":{\"minLength\":1,\"type\":\"string\"},\"variable_names\":{\"items\":{\"minLength\":1,\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true}},\"required\":[\"mechanism_id\",\"statement\",\"equations\",\"variable_names\",\"parameters\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"paper_scope\":{\"minLength\":1,\"type\":\"string\"},\"readouts\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"definition\":{\"minLength\":1,\"type\":\"string\"},\"name\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"resolution\":{\"anyOf\":[{\"type\":\"null\"},{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"kind\":{\"enum\":[\"measurement_resolution\",\"reporting_increment\"],\"type\":\"string\"},\"value\":{\"exclusiveMinimum\":0,\"type\":\"number\"}},\"required\":[\"value\",\"kind\",\"anchors\"],\"type\":\"object\"}]},\"statistic\":{\"description\":\"Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.\",\"minLength\":1,\"type\":\"string\"},\"uncertainty\":{\"description\":\"Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.\",\"minLength\":1,\"type\":\"string\"},\"unit\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"name\",\"definition\",\"unit\",\"statistic\",\"uncertainty\",\"resolution\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"},\"source\":{\"additionalProperties\":false,\"properties\":{\"arxiv_versioned_id\":{\"minLength\":1,\"type\":\"string\"},\"citation\":{\"minLength\":1,\"type\":\"string\"},\"journal_doi\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"citation\",\"journal_doi\",\"arxiv_versioned_id\"],\"type\":\"object\"},\"source_ambiguities\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"ambiguity_id\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"anchors\":{\"items\":{\"additionalProperties\":false,\"properties\":{\"line_end\":{\"minimum\":1,\"type\":\"integer\"},\"line_start\":{\"minimum\":1,\"type\":\"integer\"},\"support\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"line_start\",\"line_end\",\"support\"],\"type\":\"object\"},\"minItems\":1,\"type\":\"array\"},\"claim_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"control_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"fixed_condition_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"mechanism_ids\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"readout_names\":{\"items\":{\"pattern\":\"^[A-Za-z][A-Za-z0-9_]*$\",\"type\":\"string\"},\"type\":\"array\",\"uniqueItems\":true},\"statement\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"ambiguity_id\",\"statement\",\"claim_ids\",\"mechanism_ids\",\"control_names\",\"readout_names\",\"fixed_condition_ids\",\"anchors\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"assessment\",\"case_authoring_ready\",\"source\",\"paper_scope\",\"mechanisms\",\"fixed_conditions\",\"controls\",\"readouts\",\"claims\",\"source_ambiguities\"],\"type\":\"object\"}",
+      "role": "system"
+    },
+    {
+      "content": "Authoritative source identity:\n{\"arxiv_versioned_id\": \"2506.20617v2\", \"citation\": \"Mattheus Burkhard, Tunable Lower Critical Fractal Dimension for a Nonequilibrium Phase Transition, Physical Review Letters (2026), DOI:10.1103/36fj-lsw7\", \"journal_doi\": \"10.1103/36fj-lsw7\"}\n\nSource-grounded routing hint from pre-screening:\nExtract only the statistical-mean-field effective detuning/lower-bound diagnostic delta_eff=delta-c*(4-2*d_H)/4*sqrt(delta^2+1/4), source lines568-576,613-623,692-720. Private branches: statistical-interface correction c=1 and homogeneous single-mode baseline c=0. Public controls delta in [1,3] and d_H in [1,2], common dimensionless readout delta_eff, identical unsimplified AST in both branches with private c. Make explicit this is the paper mean-field effective-detuning necessary-condition/lower-bound diagnostic, not the true numerical critical point or exact experiment. No extra claims.\nThis hint only selects a part of the supplied source for inspection. Verify every extracted fact against that source and provide exact locators; the source remains the sole authority. If the hinted cluster is unsupported or incomplete, represent it faithfully and set case_authoring_ready false.\n\nThe line numbers below are the only valid global locator coordinate system. File boundary markers preserve the original packet member path; textual data attachments contain reported values or metadata.\n\nL000001\t===== BEGIN FILE: SM.tex =====\nL000002\t\\title{{\\bf Supplementary Material for the article:}\\\\ ``Tunable lower critical fractal dimension for a non-equilibrium phase transition\"}\nL000003\t\\setcounter{page}{1}\nL000004\t\\setcounter{equation}{0}\nL000005\t\\setcounter{figure}{0}\nL000006\t\\renewcommand{\\theequation}{S\\arabic{equation}}\nL000007\t\\renewcommand{\\thefigure}{S\\arabic{figure}}\nL000008\t\nL000009\t\\date{\\today}\nL000010\t\\maketitle\nL000011\t\nL000012\t\\onecolumngrid\nL000013\t\nL000014\tThis Supplementary Material provides further theoretical details and additional numerical results that support and extend the findings presented in the main text.\nL000015\t\nL000016\t\\section{Numerical method}\nL000017\t\nL000018\tWe numerically simulate the driven--dissipative Gross--Pitaevskii equation [Eq.~(\\ref{eq:GPE})] on a two-dimensional spatial grid. The system is initialized in the vacuum state, $\\psi(\\mathbf{r},t=0)=0$ for all $\\mathbf{r}$. At time $t=0$, the coherent pump is switched on with a fixed driving amplitude $F$, corresponding to a driving intensity $I = F^2$. The equation is then time evolved up to a final time $t_f$, chosen sufficiently large for the dynamics to converge to the steady state. Time integration is performed using a second-order Runge--Kutta scheme with a fixed time step selected to ensure numerical stability.\nL000019\t\nL000020\tTo characterize the long-time dynamics, we compute the spatially averaged density $\\bar{n}(t)=\\int \\mathrm{d}^2x\\, n(\\mathbf{r},t)$ and apply a Fourier transform to its time evolution. From the resulting spectrum, we extract the asymptotic decay rate $\\lambda$ by measuring the full width at half maximum (FWHM) of the central peak, which provides the slowest relaxation rate of the system.\nL000021\t\nL000022\tWe have verified the robustness of our results by including quantum fluctuations within the Truncated Wigner Approximation, as shown in Fig.~\\ref{fig:TWA}. The driven-dissipative Gross--Pitaevskii equation is found to capture the  behavior remarkably well, as the spatial inhomogeneities induced by the driving pattern effectively act as \\textit{spatial fluctuations}~\\cite{Li2022}.\nL000023\t\\begin{figure}\nL000024\t    \\centering\nL000025\t    \\includegraphics[width=\\linewidth]{figures_SM/TWAvsGPE.pdf}\nL000026\t    \\caption{First-order phase transition observed within the Truncated Wigner Approximation. Here, we consider the same 1D system as in the main text, with a longitudinal size $L=34.5\\xi$ and $\\Delta=3\\gamma$. The observables are averaged over 100 trajectories.}\nL000027\t    \\label{fig:TWA}\nL000028\t\\end{figure}\nL000029\t\nL000030\t\nL000031\t\\section{The effect of detuning for a Sierpinski carpet}\nL000032\t\nL000033\tIn the main text, we characterize critical behavior in terms of the minimal asymptotic decay rate. Here, we further examine how the asymptotic decay rate depends on the driving intensity for different system sizes. In Fig.~\\ref{fig:SC-PT markers}(a)--(b), these quantities are shown for the Sierpinski carpet (second column in Fig.~\\ref{fig:patterns-driving+densities}) with $\\Delta=\\gamma$, a regime where no phase transition occurs. The minimal asymptotic decay rate exhibits a clear minimum around a critical driving intensity $I\\approx2.2\\gamma^2$, yet this minimum saturates to a finite value.\nL000034\t\nL000035\t\nL000036\t\\begin{figure}[t]\nL000037\t    \\centering\nL000038\t    \\includegraphics[width=\\columnwidth]{figures_SM/carpet_ADR+n_Delta1+2.pdf}\nL000039\t\nL000040\t\nL000041\t    \\caption{Response of the system to a Sierpinski carpet drive with fractal dimension $d_H = 1.84$.\nL000042\t(a) Asymptotic decay rate as a function of input intensity for detuning $\\Delta = \\gamma$, showing no phase transition.\nL000043\t(b) Corresponding bosonic density as a function of input intensity, with a smooth increase.\nL000044\t(c) For a larger detuning $\\Delta = 2.0\\gamma$, the minimal asymptotic decay rate $\\lambda_{\\min}$ vanishes at the critical point $I_c \\approx 7.1\\gamma^2$, indicating a first-order phase transition.\nL000045\t(d) At the same critical point, the average bosonic density exhibits a discontinuous jump.}\nL000046\t\nL000047\t    \\label{fig:SC-PT markers}\nL000048\t\\end{figure}\nL000049\t\nL000050\tIn Fig.~\\ref{fig:SC-PT markers}(c)--(d), we plot the same quantities for a larger detuning, $\\Delta=2\\gamma$. In this case, at a higher driving intensity $I_c\\approx7.1\\gamma^2$, the minimal asymptotic decay rate $\\lambda_{\\min}$ collapses to numerical precision, and the density exhibits an abrupt switch from the lower to the upper branch of the bistability. These features indicate the occurrence of a first-order phase transition.\nL000051\t\nL000052\t\nL000053\t\\section{Fractal dimension : nominal dimension vs box-counting dimension}\nL000054\t\nL000055\tIn this section, we discuss different notions of fractal dimension and clarify the distinction between nominal and box-counting definitions. The nominal mathematical fractal dimension \\( d \\) of a Sierpinski-carpet-like object can be determined from its self-similar scaling properties. If the pattern is constructed by dividing a square into \\( s \\times s \\) smaller squares and removing a given number of them (the “holes”), then at each iteration the remaining area scales as\nL000056\t\\[\nL000057\tA = s^2 - N_{\\text{holes}}.\nL000058\t\\]\nL000059\tThis area corresponds to the white surface shown in Fig.~\\ref{fig:dimension schema}. The nominal fractal dimension is then obtained from the ratio of logarithms,\nL000060\t\\[\nL000061\td^{th}_H = \\frac{\\log(A)}{\\log(s)} = \\frac{\\log(s^2 - N_{\\text{holes}})}{\\log(s)}.\nL000062\t\\]\nL000063\tThis expression characterizes how the number of occupied sites, or equivalently the total area, scales with the rescaling factor \\( s \\) for a \\textit{theoretical} infinitely self-similar fractal. The procedure is illustrated in Fig.~\\ref{fig:dimension schema} for the specific case of the Sierpinski carpet.\nL000064\t\nL000065\t\nL000066\t\\begin{figure}[h]\nL000067\t\\centering\nL000068\t\\begin{tikzpicture}[scale=0.95]\nL000069\t\\begin{scope}\nL000070\t    \\draw (0,0) rectangle (3,3);\nL000071\t\nL000072\t    \\node at (1.5,-0.5) {simple square} ;\nL000073\t\\end{scope}\nL000074\t\nL000075\t\\begin{scope}[shift={(5,0)}]\nL000076\t    \\draw (0,0) rectangle (3,3);\nL000077\t    \\draw [fill=black] (1,1) rectangle (2,2) ;\nL000078\t    \\draw [thin] (0,1) -- (3,1);\nL000079\t    \\draw [thin] (0,2) -- (3,2);\nL000080\t    \\draw [thin] (1,0) -- (1,3);\nL000081\t    \\draw [thin] (2,0) -- (2,3);\nL000082\t    \\node at (1.5,-0.5) {1st iteration} ;\nL000083\t\\end{scope}\nL000084\t\nL000085\t\\begin{scope}[shift={(10,0)}]\nL000086\t    \\draw (0,0) rectangle (3,3);\nL000087\t\nL000088\t    \\draw [fill=black] (1/3,1/3) rectangle (2/3,2/3) ;\nL000089\t    \\draw [fill=black] (1+1/3,1/3) rectangle (1+2/3,2/3) ;\nL000090\t    \\draw [fill=black] (2+1/3,1/3) rectangle (2+2/3,2/3) ;\nL000091\t    \\draw [fill=black] (1/3,1+1/3) rectangle (2/3,1+2/3) ;\nL000092\t    \\draw [fill=black] (1/3,2+1/3) rectangle (2/3,2+2/3) ;\nL000093\t    \\draw [fill=black] (2+1/3,2+1/3) rectangle (2+2/3,2+2/3) ;\nL000094\t    \\draw [fill=black] (2+1/3,1+1/3) rectangle (2+2/3,1+2/3) ;\nL000095\t    \\draw [fill=black] (1+1/3,2+1/3) rectangle (1+2/3,2+2/3) ;\nL000096\t\nL000097\t    \\draw [fill=black] (1,1) rectangle (2,2) ;\nL000098\t    \\draw [thin] (0,1) -- (3,1);\nL000099\t    \\draw [thin] (0,2) -- (3,2);\nL000100\t    \\draw [thin] (1,0) -- (1,3);\nL000101\t    \\draw [thin] (2,0) -- (2,3);\nL000102\t\nL000103\t    \\draw [ultra thin] (0,1/3) -- (3,1/3);\nL000104\t    \\draw [ultra thin] (0,2/3) -- (3,2/3);\nL000105\t    \\draw [ultra thin] (1/3,0) -- (1/3,3);\nL000106\t    \\draw [ultra thin] (2/3,0) -- (2/3,3);\nL000107\t\nL000108\t    \\draw [ultra thin] (0,1+1/3) -- (3,1+1/3);\nL000109\t    \\draw [ultra thin] (0,1+2/3) -- (3,1+2/3);\nL000110\t    \\draw [ultra thin] (1+1/3,0) -- (1+1/3,3);\nL000111\t    \\draw [ultra thin] (1+2/3,0) -- (1+2/3,3);\nL000112\t\nL000113\t    \\draw [ultra thin] (0,2+1/3) -- (3,2+1/3);\nL000114\t    \\draw [ultra thin] (0,2+2/3) -- (3,2+2/3);\nL000115\t    \\draw [ultra thin] (2+1/3,0) -- (2+1/3,3);\nL000116\t    \\draw [ultra thin] (2+2/3,0) -- (2+2/3,3);\nL000117\t\nL000118\t    \\node at (1.5,-0.5) {2nd iteration} ;\nL000119\t\\end{scope}\nL000120\t\\end{tikzpicture}\nL000121\t\nL000122\t\\caption{Constructing the Sierpinski Carpet. We divide an initial square in a grid of $3\\times3$ squares. We remove the central one. Then we can repeat this for the remaining eight squares. The area after one iteration is $A=s^2-N_{\\text{holes}}=3^2-1=8$. So the mathematical theoretical dimension is $d^{th}_H=\\log(8)/\\log(3)=1.89$.}\nL000123\t\nL000124\t\\label{fig:dimension schema}\nL000125\t\\end{figure}\nL000126\t\nL000127\tIn a purely mathematical context, two different fractals can share exactly the same fractal dimension. This occurs, for example, when one chooses the same subdivision factor, $s$ and the same number of removed sites $N_{\\text{holes}}$, but removes them in a different geometric arrangement at each iteration. One could follow the same construction procedure as in Fig.~\\ref{fig:dimension schema}, but instead remove, say, the upper-left square rather than the central one; the resulting object would have a drastically different visual appearance (see Fig.~\\ref{fig:disconnected_pattern} (left)), yet its nominal dimension $d^{th}_H$ would remain identical because the scaling rule encoded in $\\log(A)/\\log(s)$ is unchanged.\nL000128\t\nL000129\tHowever, it is crucial to understand that in our physical system the final spatial profile of the bosonic density does not necessarily inherit this mathematical invariance: distinct driving geometries can lead to patterns that exhibit different effective fractal dimensions. This arises because the pattern is subject to physical distortions—such as nonlinear interactions, finite-resolution effects, and the intrinsic dynamics of the driven–dissipative medium—that modify how the nominal fractal mask is mapped onto the actual stationary density distribution. As a result, two drivings with mathematically identical fractal dimensions may generate bosonic patterns with noticeably different scaling behavior and thus different measured fractal dimensions.\nL000130\t\nL000131\t\nL000132\tTo quantify the fractal dimension of the considered bosonic patterns, we employed the box-counting method \\cite{Theiler_EstimatingDimension1990}. The shape of each pattern is first extracted from a grayscale image (see, for example, Fig.~\\ref{fig:patterns-driving+densities}) by applying a threshold above which points are considered part of the pattern \\cite{Otsu_Threshold1979}. This thresholding procedure delineates the fractal structure within the image, effectively separating the foreground (pattern) from the background and yielding a binary representation. In this binary image, pixels above the threshold are marked as belonging to the pattern, while those below are discarded. This representation serves as the basis for further spatial analysis.\nL000133\t\nL000134\tThe box-counting method can be seen an inverse approach with respect to the fractal construction presented before. First, one divides the obtained binary image into a grid of $s^2$ square boxes, each with edge length $b = L/s$, where $L$ is the linear size of the system. We count the number of boxes occupied by the underlying density pattern, thereby estimating the area $A$ (in units of $b^2$) of the fractal, which corresponds to the white region shown in Fig.~\\ref{fig:patterns-driving+densities}. In principle, this area scales as $A \\propto s^{d_H}$, where $d_H$ is the Hausdorff (fractal) dimension. The box-counting dimension is thus given by the slope of $\\log A = f(\\log s)$ obtained over different scales $s$. By performing a linear fit to this curve, we extract an estimate of $d_H$, and the corresponding uncertainty is reported in the main text as the error bar on the box-counting dimension.\nL000135\tThe patterns in Fig.~\\ref{fig:patterns-driving+densities} are annotated with their respective box-counting dimensions $d_H$, which differ slightly from the theoretical nominal values $d^{th}_H$ for \\textit{perfect}, infinitely self-similar fractals. For example, for the Sierpinski carpet (second column), $d^{th}_H = 1.89$, and for the Sierpinski cross (third column), $d^{th}_H = 1.46$. Nevertheless, even for these distorted and finite structures, we can determine a fractal dimension lying between 1 and~2.\nL000136\t\nL000137\tFor patterns with fractal dimension equal to or lower than 1 (Fig.~\\ref{fig:patterns-driving+densities}, last column), we used a slightly modified version of the box-counting method. We restricted the analysis to the horizontal dimension by fixing the vertical box size to the system size $L$, while the horizontal box length still scales as $b = L/s$. Instead of square boxes of size $b^2$, we thus used rectangular boxes of size $bL$. This allows for a consistent evaluation of fractal dimensions ranging from 0 to~2. For integer-dimensional patterns (1D and 2D), we did not apply the box-counting method, as their Hausdorff dimensions are trivially $d_H = 1$ and $d_H = 2$, respectively. Nonetheless, one could apply box-counting to the patterns shown in the first and fourth columns of Fig.~\\ref{fig:patterns-driving+densities}; such an analysis would yield values close to 1 or 2, but never exactly. Indeed, precisely capturing integer dimensions via box-counting is challenging due to inherent estimation errors.\nL000138\t\nL000139\tAt this point, we want to remind the reader explicitly that the value of the Hausdorff dimension calculated according to the equation $d_H^{\\mathrm{th}} = \\log(s^2 - N_{holes})/\\log(s)$ and the value obtained by box-counting may differ from each other. Nevertheless, we emphasize that the fractal box-counting dimension $d_H$ is one of the key ingredients in characterizing the critical behavior of our system. For our conclusions, it is not essential whether two driving schemes share the same theoretical dimension $d_H^{\\mathrm{th}}$; what matters is the Hausdorff dimension of the resulting bosonic density pattern, which is determined via box counting. In the main text, we focus on symmetric driving geometries for clarity. We expect that fractals with asymmetric driven regions will also exhibit behavior governed by their fractal dimension. To illustrate this point, we consider an asymmetric pattern constructed following the same iterative procedure as for the Sierpinski carpet, but with the upper-left square removed instead of the central one. The nominal fractal dimension is therefore identical to that of the Sierpinski carpet, since in both cases $s=3$ and $N_{\\mathrm{holes}}=1$, yielding $d_H^{\\mathrm{th}}=\\log(9-1)/\\log(3)=1.89$. However, the resulting fractal (see Fig.~\\ref{fig:disconnected_pattern} (left)) is no longer symmetric with respect to the central vertical axis.\nL000140\t\nL000141\t\\begin{figure}\nL000142\t    \\centering\nL000143\t    \\includegraphics[width=0.35\\linewidth]{figures_SM/density_pattern_alternative.pdf}\nL000144\t    \\includegraphics[width=0.5\\linewidth]{figures_SM/ADR-vs-dH+disconnected.pdf}\nL000145\t    \\caption{Left: The spatial appearance of a pattern with asymmetric driving. Its construction is the same as in Fig.~\\ref{fig:dimension schema}, except now the upper left square is removed. Right: An edited version of Fig.~\\ref{fig:ADR-vs-dH} of the main text where the assymetric patterns (the one shown on the left) is brought to the fore with a distinct colour (purple).}\nL000146\t    \\label{fig:disconnected_pattern}\nL000147\t\\end{figure}\nL000148\t\nL000149\tWe can test that pattern in the same way we did in the main text. We obtain the result presented on the right-hand side of Fig.~\\ref{fig:disconnected_pattern}. The resulting box-counting Hausdorff dimensions $d_H$ predicts the critical dynamical behavior. For the asymmetric pattern (purple dot), we have very similar results to the Sierpinski carpet (blue empty square), which was to be expected since their nominal dimensions $d^{th}_H$ are the same.\nL000150\t\nL000151\t\\section{The spatial profiles of the studied fractals}\nL000152\t\\begin{figure}[h]\nL000153\t    \\centering\nL000154\t    \\includegraphics[width=0.9\\linewidth]{figures_SM/patterns_drive+density_SM.pdf}\nL000155\t    \\caption{Left panels: 2D square geometry ($d_H = 2$) and several variations of the Sierpinski carpet with fractal dimensions in the range $1 < d_H < 2$. Right panels: Variations of the Sierpinski cross ($1 < d_H < 2$) in the first two rows, followed by the 1D strip ($d_H = 1$) in the third row. The final row shows variations of the Cantor set with $d_H < 1$. All patterns are computed with $\\Delta = \\gamma$, and the driving amplitudes are tuned to their respective critical points. The geometries and system sizes correspond to those used in Fig.~\\ref{fig:ADR-vs-dH}.}\nL000156\t\\label{fig:other_patterns}\nL000157\t\\end{figure}\nL000158\tFigure~\\ref{fig:other_patterns} shows the spatial profiles of the patterns analyzed in the main text (Fig.~\\ref{fig:ADR-vs-dH}). In addition to the standard 2D and 1D reference patterns, we include several variations of the Sierpinski cross and carpet, as well as modified versions of the Cantor set with fractal dimension lower than one.\nL000159\t\nL000160\t\\iffalse\nL000161\t\\newpage\nL000162\t\nL000163\t\\section{Statistical mean field approach}\nL000164\t\nL000165\tThe dissipative phase transition is related to the bistable behavior of the bosonic system, which is predicted by a single-mode mean-field approximation. The Gross-Pitaevskii equation~(\\ref{eq:GPE}) in the steady state and for a homogeneous 2D driving becomes\nL000166\t\\begin{equation}\nL000167\t    0=\\left[-\\Delta+g\\left|\\psi\\right|^2-i\\frac{\\gamma}{2}\\right]\\psi\nL000168\t        +F \\,.\nL000169\t\\end{equation}\nL000170\tBy isolating the driving on the left-hand side and by taking the modulus squared, we get, with $n=|\\psi|^2$,\nL000171\t\\begin{equation}\nL000172\t\nL000173\t        I=|F|^2=\\left[(gn-\\Delta)^2-\\frac{\\gamma^2}{4}\\right]n\\,.\nL000174\t\nL000175\t    \\label{eq:bistability}\nL000176\t\\end{equation}\nL000177\tThis nonlinear relation gives the possible solutions of the density $n$ for a given driving intensity $I$, and can be called an equation of state~\\cite{RMP2013}. For $\\Delta>\\sqrt{3}/2~\\gamma$, this equation predicts a bistable behaviour, i.e., in a range of driving intensities, two stable solutions for the system's density $n$ exist~\\cite{drummond_quantum_1980} (see Fig.~\\ref{fig:mf-bistability}). This is a necessary condition for the appearance of the phase transition we are investigating. In this simple two-dimensional case, our mean-field approach predicts a critical detuning $\\Delta_c^{MF}(d_H=2)=\\sqrt{3}/2~\\gamma$.\nL000178\t\\begin{figure}[h]\nL000179\t    \\centering\nL000180\t    \\includegraphics[width=0.6\\linewidth]{figures_SM/MFBistability.pdf}\nL000181\t    \\caption{The mean-field equation of state (\\ref{eq:bistability}) for different values of detuning $\\Delta$. For $\\Delta>\\sqrt{3}/2~\\gamma$, we see the typical S-shape of a bistability curve.}\nL000182\t    \\label{fig:mf-bistability}\nL000183\t\\end{figure}\nL000184\t\nL000185\tTo account for dimensionality and extend this kind of analysis to fractal systems, one can take what we call a statistical mean field approach. First, we write the functional\nL000186\t\nL000187\t\\[\nL000188\t\\frac{1}{\\hbar} \\mathcal{F}[\\psi]\nL000189\t=\nL000190\t\\int \\! dx\\,dy \\,\nL000191\t\\left[\nL000192\t- \\Delta |\\psi|^2\nL000193\t+ \\frac{\\hbar}{2m} \\, |\\nabla \\psi|^2\nL000194\t + \\frac{g}{2} |\\psi|^4\nL000195\t- i \\frac{\\gamma}{2} |\\psi|^2\nL000196\t+ F \\psi^*\nL000197\t\\right]\\;,\nL000198\t\\]\nL000199\twhose stationarization gives the Gross-Pitaevskii equation\nL000200\t\\[\nL000201\t\\frac{1}{\\hbar}\\,\\frac{\\delta \\mathcal{F}}{\\delta \\psi^*} = 0\nL000202\t= - \\Delta \\psi -\\frac{\\hbar}{2m} \\nabla^2 \\psi\nL000203\t- i \\frac{\\gamma}{2} \\psi\nL000204\t + g |\\psi|^2 \\psi\nL000205\t+ F ~.\nL000206\t\\]\nL000207\t\nL000208\tOur goal is to approximate the full functional \\(\\mathcal{F}[\\psi]\\) by a coarse-grained functional \\(f(\\phi)\\), that keeps into account the driving pattern we use. Concretely, we partition space into square patches of size \\(l\\times l\\), where \\(l\\) is the smallest characteristic length scale of the fractal pattern, and write the functional as\nL000209\t$$\nL000210\t\\frac{1}{\\hbar} \\mathcal{F}[\\psi]\nL000211\t=\nL000212\t\\sum_p\\int_0^l dx_p \\int_0^l dy_p\nL000213\t\\left[\nL000214\t\\frac{\\hbar}{2m} \\, |\\nabla\\psi|^2\nL000215\t + \\frac{g}{2} |\\psi|^4\nL000216\t- \\Delta |\\psi|^2 - i \\frac{\\gamma}{2} |\\psi|^2\nL000217\t+ F\\psi^*\nL000218\t\\right],\nL000219\t$$\nL000220\twhere the sum runs over the patches, and the subscript $p$ indicates the quantities within each patch.\nL000221\t\nL000222\tWe assume the field to be zero in the non-driven patches ($F(x_p,y_p)=0$) and constant $\\psi(x_p,y_p)\\simeq \\phi$ in the driven ones ($F(x_p,y_p)=F$). The kinetic term requires special care, as it is nonzero only at the interfaces between driven and undriven areas where the field is non-uniform. We can obtain an analytical description of this kinetic contribution by calculating the energy cost of such an interface. This means solving\nL000223\t\\[\nL000224\t\\frac{\\hbar}{2m}\\partial_x^2\\psi(x)=-\\left(\\Delta+i\\frac{\\gamma}{2}\\right)\\psi(x) +F(x)\nL000225\t\\]\nL000226\tfor a step function of the driving field $F(x)=\\theta(-x)F$. The linear solution ($g\\to 0$) gives us a good estimate, because the density will be lower than in the bulk. The solution is a sum of the constant bulk solution $\\phi$, in the driven region, and a plane wave amplitude $\\frac{\\phi}{2}$ and momentum\nL000227\t$$\nL000228\tk^2=\\frac{2m}{\\hbar}\\left(\\Delta+i\\frac{\\gamma}{2}\\right).\nL000229\t$$\nL000230\tBy approximating all interfaces to behave the same way, the kinetic gradient term can hence be substituted with $|\\nabla\\psi|^2\\simeq |k|^2|\\frac{\\phi}{2}|^2$. Counting the number of edges for every patch $p$ then yields a contribution proportional to \\((z-z_p)\\), where \\(z=4\\) is the coordination number of the underlying 2D space and \\( z_p\\) is the local coordination number (i.e. the number of neighboring driven patches). The functional can hence be approximated by the following sum over driven patches:\nL000231\t\\[\nL000232\t\\frac{1}{\\hbar} \\mathcal{F}[\\psi]\nL000233\t\\approx\nL000234\t\\sum_p l^2\nL000235\t\\left[\nL000236\t- \\Delta |\\phi|^2\nL000237\t+ (z-z_p)\\frac{\\hbar}{8m} \\, |k|^2|\\phi|^2\nL000238\t + \\frac{g}{2} |\\phi|^4\nL000239\t- i \\frac{\\gamma}{2} |\\phi|^2\nL000240\t+ F \\phi^*\nL000241\t\\right]\nL000242\t\\]\nL000243\t\nL000244\tWe can now consider a rescaled and spatially averaged functional by introducing the average coordination number $\\tilde{z}$ of the specific pattern:\nL000245\t\\[\nL000246\tf(\\phi)\nL000247\t=\nL000248\t- \\Delta |\\phi|^2\nL000249\t+(z-\\tilde{z})\\frac{\\hbar}{8m} |k|^2 |\\phi|^2\nL000250\t- i \\frac{\\gamma}{2} |\\phi|^2\nL000251\t+ \\frac{g}{2} |\\phi|^4\nL000252\t+ F \\phi^*~.\nL000253\t\\]\nL000254\tExtremizing this averaged functional with respect to \\(\\phi^*\\) yields the \\textit{statistical} mean field steady-state equation\nL000255\t\\begin{equation}\nL000256\t    \\dot\\phi=0=\\left[-\\Delta+(z-\\tilde{z})\\eta(\\Delta)+g|\\phi|^2-i\\frac{\\gamma}{2}\\right]\\phi+F,\nL000257\t\\end{equation}\nL000258\twhere we introduced the interface energy scale $\\eta$,\nL000259\t\\begin{equation}\nL000260\t\\eta(\\Delta)=\\frac{\\hbar}{8m} |k|^2=\\frac{1}{4}\\sqrt{\\Delta^2+\\gamma^2/4}~.\nL000261\t\\end{equation}\nL000262\t\nL000263\tFrom this we can derive the equation of state\nL000264\t\\begin{equation}\nL000265\t    I=\\left[ \\left(g|\\phi|^2 -\\Delta+(z-\\tilde{z})\\eta\\right)^2+\\frac{\\gamma^2}{4} \\right]|\\phi|^2.\nL000266\t    \\label{eq:bistability bis}\nL000267\t\\end{equation}\nL000268\tThis extends the usual single-mode description for a uniform system by introducing an additional term $\\left(z-\\tilde{z}\\right)J$ that keeps the contribution of edges into account. We can now link the average the connectivity $\\tilde{z}$ to the fractal dimension with the relation $\\tilde{z}=2d_H$, that holds for integer dimensional systems.\nL000269\t\nL000270\tJust as equation \\eqref{eq:bistability}, this equation of state will display bistability when  ${\\Delta_{eff}=\\Delta-(4-2d_H)\\eta(\\Delta)}>\\frac{\\sqrt{3}}{2}\\gamma$. Since the bistability is a necessary condition for the presence of a phase transition, this gives us a dimensionality-dependent estimate for the critical detuning, below which the phase transition cannot occur\nL000271\t\\begin{equation}\\label{eq:mf-crit-detuning}\nL000272\t\\begin{split}\nL000273\t    \\Delta_c^{MF}(d_H)=&\nL000274\t     \\Delta_c^{MF}(2)+(z-\\tilde{z})\\eta(\\Delta_c^{MF}(d_H))\\\\\nL000275\t     =&\\frac{\\sqrt{3}}{2}\\gamma+(4-2d_H)\\eta(\\Delta_c^{MF}(d_H))\\\\\nL000276\t     =&\\frac{\\sqrt{3}}{2}\\gamma+\\frac{(4-2d_H)}{4}\\sqrt{\\left(\\Delta_c^{MF}(d_H)\\right)^2+\\gamma^2/4}~.\nL000277\t\\end{split}\nL000278\t\\end{equation}\nL000279\tThis dependence is plotted with a dashed line in the inset of figure~\\ref{fig:ADR-vs-Delta}. One can see that the curve follows the same trend as the numerical data, remaining below them, as expected. Moreover, equation \\eqref{eq:mf-crit-detuning} predicts that the critical detuning diverges when the dimensionality goes to zero, as was found for single-mode Kerr resonators.\nL000280\t\nL000281\t\nL000282\t\nL000283\t\nL000284\t\nL000285\t\nL000286\t\nL000287\t\nL000288\t\\fi\nL000289\t\nL000290\t\\section{Dependence of the critical driving on the detuning}\nL000291\t\nL000292\tIn Fig.~\\ref{fig:I_min}, we extract the value of the driving intensity $I_{\\min}$ such that $\\lambda(I_{\\min}) = \\lambda_{\\min}$, for a range of detuning values. As a reminder, $\\lambda(I)$ denotes the asymptotic decay rate of the observed pattern as a function of the driving intensity $I$, and $\\lambda_{\\min}$ is its minimum value. As discussed in the main text, this minimum signals the presence of critical behavior in the system. Plotting $I_{\\min}$ as a function of detuning thus allows us to trace how the onset of criticality evolves under varying external conditions.\nL000293\t\nL000294\tInterestingly, the value of $I_{\\min}$ closely matches the inflection point of the bistability curve derived from single-mode ($k=0$) mean-field solution for the homogeneous driving case. The inflection point corresponds to the value of the driving intensity at which the curvature of the response function (\\ref{eq:bistability}) changes sign—specifically, where the second derivative of the driving intensity with respect to the density $n = |\\psi|^2$ vanishes:\nL000295\t\\begin{equation}\nL000296\t    \\frac{d^2 I}{dn^2} = 0~.\nL000297\t\\end{equation}\nL000298\tThis yields the prediction\nL000299\t\\[\nL000300\tI_{\\min} = \\frac{2\\Delta}{3g}\\left(\\frac{\\Delta^2}{9} + \\frac{\\gamma^2}{4}\\right)~,\nL000301\t\\]\nL000302\twhich is shown as the grey dashed line in Fig.~\\ref{fig:I_min}. The close agreement between the numerical values of $I_{\\min}$ and the analytical inflection point provides a consistency check and further supports the interpretation of $\\lambda_{\\min}$ as a reliable marker of criticality.\nL000303\t\nL000304\t\nL000305\t\\begin{figure}[t]\nL000306\t    \\centering\nL000307\t    \\includegraphics[width=0.6\\linewidth]{figures_SM/CriticalDriving-1D-2D-and_others.pdf}\nL000308\t    \\caption{Evolution of the critical point $I_{\\min}$ as a function of $\\Delta$. A quadratic dependence is observed, consistent with estimates based on the single-mode mean-field description of the bistability curve. The inflection point of the mean-field curve (grey line) closely approximates the critical point across all geometries considered.}\nL000309\t\nL000310\t    \\label{fig:I_min}\nL000311\t\\end{figure}\nL000312\t\nL000313\t\\section{Asymptotic decay rate and Bogoliubov instabilities}\nL000314\t\nL000315\tFor a homogeneous driving, we can diagonalize the problem for fluctuations on top of the steady state and obtain a spectrum of the so-called dissipative Bogoliubov modes \\cite{RMP2013}. By analyzing the dispersion relation given in equation~(\\ref{eq:bogo}), we can interpret the phase transition as the emergence of an unstable mode.\nL000316\t\nL000317\t\\begin{equation}\nL000318\t    \\omega_{\\mathrm{Bog}}(\\mathbf{k})= \\pm\\left[\\left(-\\Delta+\\frac{\\hbar \\mathbf{k}^2}{2 m}+2 gn\\right)^2-\\left(g n\\right)^2\\right]^{1 / 2} -i\\frac{\\gamma}{2}~.\nL000319\t\\label{eq:bogo}\nL000320\t\\end{equation}\nL000321\t\nL000322\tAll modes decay with the natural polariton decay rate $\\gamma$; however, this rate can be reduced and is determined by the imaginary part of $\\omega_{\\mathrm{Bog}}$. If $\\Im\\left(\\omega_{\\mathrm{Bog}}(\\mathbf{k})\\right) < 0$, the mode is stable and has a linewidth given by $2\\Im\\left(\\omega_{\\mathrm{Bog}}(\\mathbf{k})\\right)$. The factor of 2 arises because we are considering the evolution of the bosonic density, $n(t) = |\\psi(t)|^2$.\nL000323\t\nL000324\tAn unstable mode corresponds to $\\Im\\left(\\omega_{\\mathrm{Bog}}(\\mathbf{k})\\right) \\geq 0$. In this case, the linewidth vanishes, the asymptotic decay rate tends to zero, and we can interpret the system as undergoing critical behavior.\nL000325\t\nL000326\tWe can define the minimal linewidth $\\lambda_{\\mathrm{Bog}}$ associated with the temporal evolution of the density of a homogeneous phase with steady-state density $n_{ss}$ as:\nL000327\t\\begin{equation}\nL000328\t\\lambda_{\\mathrm{Bog}}=\nL000329\t  \\left\\{\nL000330\t    \\begin{array}{l}\nL000331\t      2|\\max_{k,n_{ss}}\\Im\\left(\\omega_{\\mathrm{Bog}}(k,n_{ss})\\right)| \\text{ if stable}\\\\\nL000332\t      0 \\text{ else  .}\nL000333\t    \\end{array}\nL000334\t  \\right.\nL000335\t\\end{equation}\nL000336\t\nL000337\tAfter calculations, this leads to the following expression:\nL000338\t\\begin{equation}\nL000339\t\\lambda_{\\mathrm{Bog}}=\nL000340\t  \\left\\{\nL000341\t    \\begin{array}{l}\nL000342\t    \\gamma  \\text{   if }\\Delta<0 \\\\\nL000343\t      \\gamma-\\frac{2}{\\sqrt{3}}\\Delta \\text{   if }0<\\Delta<\\frac{\\sqrt{3}}{2}\\gamma \\\\\nL000344\t      0 \\text{   else . }\nL000345\t    \\end{array}\nL000346\t  \\right.\nL000347\t\\end{equation}\nL000348\t\nL000349\tThis dependence is shown as the dotted line in Fig.~\\ref{fig:bogo instabilities}, alongside numerical results for the 2D square geometry. Both the analytical predictions and the numerical data display a step-like behavior with a linear slope between the upper and lower values. The two curves coincide for $\\Delta \\gtrsim 1.0\\gamma$, where the system becomes critical and $\\lambda_{\\min} = 0$. Deviations at other detuning values can be primarily attributed to finite-size effects.\nL000350\t\nL000351\t\nL000352\t\nL000353\t\nL000354\t\\begin{figure}[h]\nL000355\t    \\centering\nL000356\t    \\includegraphics[width=0.6\\linewidth]{figures_SM/ADR-vs-Delta_withBogo.pdf}\nL000357\t    \\caption{Minimal asymptotic decay rate for the 2D square geometry (green squares), computed for a system size $L = 81l$. Vertical error bars indicate the difference in $\\lambda_{\\min}$ between this size and a smaller system with $L = 27l$. The grey dash-dotted line shows the linewidth $\\lambda_{\\mathrm{Bog}}$ predicted by Bogoliubov analysis for a uniform 2D system. The two curves exhibit similar behavior, with discrepancies attributed to finite-size effects.}\nL000358\t\nL000359\t    \\label{fig:bogo instabilities}\nL000360\t\\end{figure}\nL000361\t\nL000362\t\nL000363\t\\section{Time evolution of the density profile}\nL000364\t\nL000365\tAdditional insight can be gained by examining the time evolution of the density profile. In particular, we focus on the spatial structure of the slowest decaying mode in the fractal geometry corresponding to the Sierpinski carpet ($d_H \\approx 1.8$). Figure~\\ref{fig:spatial-decay} displays the spatial dependence of the density deviation from the steady state at different time steps; specifically, we plot $|n_{ss}(\\textbf{r}) - n(\\textbf{r}, t)|$ for various times $t$. This local information can be compared with the global behavior shown in the upper panel of Fig.~\\ref{fig:spatial-decay}, where the evolution of the spatially averaged density $\\bar{n}(t)$ is presented for the same system.\nL000366\t\nL000367\t\nL000368\t\nL000369\t\nL000370\t\\begin{figure}[t]\nL000371\t    \\centering\nL000372\t    \\includegraphics[width=0.85\\linewidth]{figures_SM/density-vs-time.pdf}\nL000373\t\nL000374\t\nL000375\t    \\caption{Lower panels: Spatial profile of the density deviation from the steady state at different time steps $t$, given by $|n_{ss}(\\textbf{r}) - n(\\textbf{r}, t)|$, for the Sierpinski carpet at the crossover point $I = 2.3\\gamma^2$ with $\\Delta = \\gamma$. Upper panel: Time evolution of the spatially averaged density $\\bar{n}(t) = \\int \\mathrm{d}^2x\\, n(t, x)$. In red, we plot the logarithm of the deviation from the steady state, making the asymptotic decay rate clearly visible.}\nL000376\t\nL000377\t    \\label{fig:spatial-decay}\nL000378\t\\end{figure}\nL000379\t\nL000380\tAt early times, the density $n(\\textbf{r}, t)$ is close to zero throughout the system, so the difference shown in the first lower panel of Fig.~\\ref{fig:spatial-decay} primarily reflects the shape of the final steady state. At later times, as shown in the final panels, a distinct pattern begins to emerge. This structure corresponds to the longest-lived mode—i.e., the one governing the asymptotic decay rate. In the Liouvillian framework, this is the eigenstate of the Lindbladian superoperator associated with the Liouvillian gap (the smallest nonzero eigenvalue). Thus, we are observing the mode that is key to characterizing the system’s critical behavior.\nL000381\t\nL000382\tFor a homogeneous condensate, this connects to the dispersion relation $\\omega(\\textbf{k})$ given in Eq.~(\\ref{eq:bogo}). In certain cases, the slowest-decaying mode (i.e., the one with the largest imaginary part of $\\omega$) occurs at a nonzero wavevector $\\textbf{k} \\neq \\vec{0}$, meaning that the longest-lived mode may not share the spatial symmetry of the driving field. In our case, the resulting mode exhibits a distinctive and nontrivial spatial structure, which will be the subject of future investigation.\nL000383\t\nL000384\t\nL000385\t\nL000386\t\nL000387\t\\section{Critical Detuning Independence from the interaction strength within the Non-Equilibrium Gross-Pitaevskii Framework}\nL000388\t\\label{sec:g}\nL000389\t\nL000390\tWithin the mean-field treatment employed in this work, changing the nonlinear interaction constant $g$ does not alter the underlying physics. In other words, when analyzing the Gross-Pitaevskii equation~(\\ref{eq:GPE}), varying $g$ does not affect the qualitative or quantitative results.\nL000391\t\nL000392\tTo illustrate this, consider two systems with nonlinear interaction strengths $g_1$ and $g_2$, and assume identical detuning and dissipation parameters: $\\Delta_1 = \\Delta_2 = \\Delta$ and $\\gamma_1 = \\gamma_2 = \\gamma$. Let us express $g_2 = g_1 / \\eta^2$, where $\\eta$ is a real scaling factor. The dynamics of system 2 is then governed by:\nL000393\t\\begin{equation}\nL000394\t    i\\frac{d\\psi_2}{dt} = \\left[-\\Delta - \\frac{\\hbar \\nabla^2}{2m} + \\frac{g_1}{\\eta^2} |\\psi_2|^2 - i\\frac{\\gamma}{2} \\right]\\psi_2 + iF_2(\\textbf{r})~.\nL000395\t\\end{equation}\nL000396\tIf we rescale the driving field and wavefunction as $F_2 = \\eta F_1$ and $\\psi_2 = \\eta \\psi_1$, the equation for $\\psi_2$ becomes identical to that of system 1. This rescaling is permissible because both $F$ and $\\psi$ are degrees of freedom of the system and, in practice, are often expressed in arbitrary units in experimental setups.\nL000397\t\nL000398\tTherefore, as long as the mean-field approximation holds, our results are invariant under changes in the absolute value of $g$. However, this invariance is not expected to persist in the strongly interacting regime, which lies beyond the scope of the present work and will be explored in future studies.\nL000399\t===== END FILE: SM.tex =====\nL000400\t\nL000401\t===== BEGIN FILE: main.tex =====\nL000402\t \\documentclass[aps,prl,reprint,twocolumn,floatfix,superscriptaddress,longbibliography,groupedaddress]{revtex4-2}\nL000403\t\nL000404\t\nL000405\t\\usepackage{standalone}\nL000406\t\\usepackage{amsthm}\nL000407\t\\usepackage{lipsum}\nL000408\t\\usepackage{amsfonts, amsmath, amssymb}\nL000409\t\\usepackage{graphicx}\nL000410\t\\usepackage{dcolumn}\nL000411\t\\usepackage{bm}\nL000412\t\\usepackage{dsfont}\nL000413\t\\usepackage[normalem]{ulem}\nL000414\t\\usepackage{color}\nL000415\t\\usepackage[utf8]{inputenc}\nL000416\t\\usepackage[colorlinks,citecolor=blue,linkcolor=blue,urlcolor=blue]{hyperref}\nL000417\t\\usepackage{tikz}\nL000418\t\\usepackage{braket}\nL000419\t\\usepackage{physics}\nL000420\t\\usepackage{color}\nL000421\t\\usepackage{soul}\nL000422\t\\usepackage{mathtools}\nL000423\t\\usepackage{float}\nL000424\t\\usepackage{esvect}\nL000425\t\\usepackage{stmaryrd}\nL000426\t\\usepackage{enumerate}\nL000427\t\\usepackage{bbold}\nL000428\t\\usepackage{ragged2e}\nL000429\t\\usepackage{autobreak}\nL000430\t\nL000431\t\nL000432\t\nL000433\t\\newcommand{\\SM}{Supplementary Material}\nL000434\t\nL000435\t\\makeatletter\nL000436\t\\def\\maketitle{\nL000437\t\t\\@author@finish\nL000438\t\t\\title@column\\titleblock@produce\nL000439\t\t\\suppressfloats[t]}\nL000440\t\\makeatother\nL000441\t\nL000442\t\nL000443\t\\begin{document}\nL000444\t\nL000445\t\nL000446\t\nL000447\t\nL000448\t\nL000449\t\\begin{abstract}\nL000450\t\\noindent\nL000451\tWe theoretically investigate the role of spatial dimension and driving frequency in a non-equilibrium phase transition of a driven-dissipative interacting bosonic system. In this setting,  spatial dimension is dictated by the shape of the external driving field. We consider both homogeneous driving configurations, which correspond to standard integer-dimensional systems, and fractal driving patterns, which give rise to a non-integer Hausdorff dimension for the spatial density. The onset of criticality is characterized by critical slowing down in the excited density dynamics as the system asymptotically approaches the steady state. By analyzing the system-size dependence of the asymptotic decay rate using numerical simulations of the full multi-mode dynamics, complemented by an analytical statistical mean-field treatment, we determine the lower critical dimension of the non-equilibrium phase transition. We show that this dimension can be non-integer and fractal in nature, and that it can be tuned continuously via the frequency detuning of the driving field.\nL000452\t\nL000453\t\\end{abstract}\nL000454\t\nL000455\t\nL000456\t\\title{Tunable lower critical fractal dimension for a non-equilibrium phase transition}\nL000457\t\\author{Mattheus Burkhard}\nL000458\t\\affiliation{Universit\\'{e} Paris Cit\\'e, CNRS, Mat\\'{e}riaux et Ph\\'{e}nom\\`{e}nes Quantiques, 75013 Paris, France}\nL000459\t\\author{Luca Giacomelli}\nL000460\t\\affiliation{Universit\\'{e} Paris Cit\\'e, CNRS, Mat\\'{e}riaux et Ph\\'{e}nom\\`{e}nes Quantiques, 75013 Paris, France}\nL000461\t\\author{ Cristiano Ciuti}\nL000462\t\\affiliation{Universit\\'{e} Paris Cit\\'e, CNRS, Mat\\'{e}riaux et Ph\\'{e}nom\\`{e}nes Quantiques, 75013 Paris, France}\nL000463\t\nL000464\t\\date{\\today}\nL000465\t\nL000466\t\\maketitle\nL000467\t\nL000468\t\nL000469\t{\\it Introduction ---}\nL000470\tA phase transition~\\cite{ma2001modern} in a physical system manifests as a nonanalytic or discontinuous behavior of observable quantities that emerges in an appropriate thermodynamic limit. Spatial dimensionality plays a central role in determining critical behavior, with a particularly important concept being the lower critical dimension $d_L$: a phase transition that exists for dimensions $d \\geq d_L$ is suppressed by fluctuations and ceases to occur for $d < d_L$. While equilibrium critical phenomena are well understood when restricted to integer spatial dimensions, the situation is far less settled for non-integer dimensions, especially in systems defined on fractal geometries~\\cite{mandelbrot_fractal_1983,Fractal_Ising_2016,zhou_fractal_2021,myerson-jain_construction_2022}. In particular, studies of the equilibrium Ising model~\\cite{Fractal_1980} have shown that critical behavior is not determined solely by the fractal (Hausdorff) dimension, but can also depend sensitively on additional geometrical characteristics of the underlying structure~\\cite{Fractal_1980, Carmona_IsingSierpinski1998,Perreau_IsingFractal2017,Yi_QuantumIsingFractal2015}.\nL000471\t\nL000472\tFurther complications arise out of equilibrium, where phase transitions are substantially less explored and understood than their equilibrium counterparts. In non-equilibrium systems, a critical point is characterized by a critical slowing down of the dynamics as the steady state is approached in the thermodynamic limit. For open quantum systems~\\cite{breuer_theory_2002}, this behavior is directly associated with the closing of the spectral gap of the Liouvillian governing the system dynamics~\\cite{Minganti2018}.\nL000473\tInteracting optical systems~\\cite{RMP2013} provide an especially powerful platform for investigating such transitions, owing to the precise control of external driving, nonlinearities, and dissipation. These ingredients compete to generate rich non-equilibrium dynamics and steady states~\\cite{Kessler2012,carmichael_breakdown_2015,bartolo_exact_2016,Fink_PRX2017,biella_phase_2017,biondi_nonequilibrium_2017,Fitzpatrick2017,Vukics2019finitesizescalingof, FinkPRX2024,Clerk2025}. While for interacting bosonic systems such as photons the thermodynamic limit may also be achieved by taking the occupation number of a mode to be arbitrarily large~\\cite{carmichael_breakdown_2015,Fink_PRX2017,Casteels2017,Rodriguez2017,Fink2017}, here we instead focus on the conventional thermodynamic limit of large spatial extent, which in optical settings corresponds to an infinite number of modes.\nL000474\t\nL000475\tRecent studies of driven-dissipative interacting bosonic systems have revealed a first-order phase transition in two dimensions (2D) \\cite{Foss-Feig2017,Vicentini2018,Li2022}, manifested by a discontinuous jump in the bosonic density. A theoretical analysis considered the regime in which the frequency detuning of the drive from the bosonic resonance is comparable to the dissipation rate and demonstrated that the system can display an emergent equilibrium behavior that maps onto the equilibrium Ising model \\cite{Foss-Feig2017}. In this correspondence, the low and high density phases play the role of the paramagnetic and ferromagnetic phases, respectively. Since the Ising model exhibits a phase transition in 2D but not in 1D, an analogous dimensional dependence would be naturally expected for these driven dissipative systems. This expectation was subsequently experimentally confirmed on continuous platforms, where the detuning was set equal to the dissipation rate and the effective spatial dimension was engineered through a suitably shaped optical driving field, realizing one- and two-dimensional systems with diffusive boundary conditions \\cite{Li2022}.\nL000476\t\nL000477\tDespite these advances, fundamental questions concerning non-equilibrium critical phenomena in driven-dissipative systems remain open. In particular, the general role of spatial dimensionality is far from established, as existing studies have explored only a restricted region of parameter space. Crucially, previous investigations have focused on the specific regime in which the frequency detuning is close to the dissipation rate, leaving open the question of whether the observed dimensional dependence persists away from this fine-tuned condition. At the same time, continuous driven systems offer a unique degree of control over spatial structure, as the effective dimensionality can be engineered directly through the spatial profile of the driving field. This makes it possible to go beyond integer dimensions and to systematically investigate critical behavior in fractional, non-integer spatial dimensions, a regime that has so far remained unexplored.\nL000478\t\nL000479\t\\begin{figure*}[t!]\nL000480\t    \\centering\nL000481\t    \\includegraphics[width=0.95\\linewidth]{figures/patterns_drive+density.pdf}\nL000482\t    \\caption{Driving intensity patterns (top panels) and grayscale maps (bottom panels) of the corresponding steady-state bosonic densities. Each column shows the spatial profile of a fractal pattern along with its associated Hausdorff box-counting dimension $d_H$. The first (fourth) column shows a 2D (1D) pattern with an integer dimension. The second (third) column displays results for a Sierpinski carpet (cross) after three iterations. The last column shows a system with dimension lower than one, a Cantor set with three iterations, corresponding to a system size with side length $L = 3^4l$, where $l$ is defined in the text. All figures obtained with the pump frequency detuning $\\Delta=\\gamma$ and with the driving amplitudes tuned to their respective critical points.}\nL000483\t\nL000484\t    \\label{fig:patterns-driving+densities}\nL000485\t\\end{figure*}\nL000486\t\nL000487\t\nL000488\t\nL000489\tIn this Letter, we show that in a non-equilibrium setting the lower critical dimension is a tunable quantity and can take fractional values. We establish this by studying the phase transition of a driven dissipative, continuous, interacting two dimensional bosonic gas subjected to either homogeneous or fractal shaped driving fields, which impose different Hausdorff dimensions on the system. By analyzing the system size dependence of the long time relaxation rate toward the steady state, we demonstrate that the existence of a critical point is jointly controlled by the fractal dimension and the frequency detuning of the drive. These findings reveal that non equilibrium phase transitions can exhibit a level of richness and controllability that has no direct counterpart in equilibrium critical phenomena and remains largely unexplored.\nL000490\t\nL000491\t\nL000492\t\nL000493\t{\\it Theoretical framework ---}\nL000494\tWe consider a system of interacting bosons whose driven-dissipative dynamics can be described by a two-dimensional non-equilibrium Gross-Pitaevskii equation \\cite{RMP2013, Li2022,Alexandre2014}, namely:\nL000495\t\\iffalse\nL000496\t\\begin{equation}\nL000497\t    \\begin{split}\nL000498\t        i\\frac{d\\psi(\\textbf{r},t)}{dt} & =\\left[-\\Delta-\\frac{\\hbar \\nabla^2}{2m}+g\\left|\\psi(\\textbf{r},t)\\right|^2-i\\frac{\\gamma}{2}\\right]\\psi(\\textbf{r},t)\\\\\nL000499\t        &+iF(\\textbf{r})  .\nL000500\t        \\label{eq:GPE}\nL000501\t    \\end{split}\nL000502\t\\end{equation}\nL000503\t\\fi\nL000504\t\\begin{equation}\nL000505\t        i\\frac{d\\psi}{dt}  =\\left[-\\Delta-\\frac{\\hbar \\nabla^2}{2m}+g\\left|\\psi\\right|^2-i\\frac{\\gamma}{2}\\right]\\psi\nL000506\t        +F(\\textbf{r}) \\,.\nL000507\t        \\label{eq:GPE}\nL000508\t\\end{equation}\nL000509\tHere, $\\psi(\\textbf{r},t)$ denotes the mean value of the bosonic field operator, which depends on the spatial position $\\mathbf{r}$ and the time $t$, and $n(\\textbf{r},t)=|\\psi(\\textbf{r},t)|^2$ is the bosonic density. The equation is written in the so-called pump rotating frame, with $\\Delta$ the detuning between the driving frequency and the frequency of the spatially uniform, lowest-frequency bosonic mode. Moreover, $g$ quantifies the nonlinear repulsive interaction, $\\gamma$ is the natural dissipation rate of the system, and $F(\\textbf{r})$ denotes the spatially dependent driving field. In the following, we express lengths in units of a characteristic length $\\xi = \\sqrt{\\hbar/(2m\\gamma)}$. In all simulations we use $g/(\\gamma\\xi^2)=0.0431$. Note that, within the non-equilibrium Gross-Pitaevskii framework,  changing its value is equivalent to a rescaling of the driving field and bosonic density, hence not affecting the presence or absence of a phase transition \\cite{supp}.\nL000510\t\nL000511\tIn this class of systems, a phase transition is signaled by a sharp increase of the spatially averaged steady state density $\\bar n_{ss}$ when the driving intensity $I=|F|^2$ reaches a critical value $I_c$ \\cite{Foss-Feig2017,Vicentini2018,Li2022}. At the level of a mean-field description of a single-mode driven-dissipative bosonic system, no genuine phase transition is possible. Instead, for detunings $\\Delta>\\sqrt{3}/2 \\gamma$, the mean-field equations display bistability between low and high-density steady state solutions \\cite{RMP2013,Casteels2017,drummond_quantum_1980}. This bistable behavior does not correspond to a phase transition but represents a mean-field precursor of phase coexistence. Whether such coexistence survives and criticality emerges in the thermodynamic limit is decided by fluctuations associated with the full multi-mode dynamics. In particular, the criticality depends crucially on the spatial dimension of the system. Above a critical dimension, fluctuations are sufficiently suppressed and a discontinuous jump of the density persists in the thermodynamic limit, signaling a first-order phase transition from a dark low density state to a bright high density state.\nL000512\t\nL000513\tThe effective spatial dimensional can be controlled with the spatial shape of the driving field $F(r)$: pumping uniformly over a region of the plane results in a two-dimensional system with diffusive boundary conditions (first column of Fig.~\\ref{fig:patterns-driving+densities}), while imposing a different geometry results in a lower dimension. For example, a pump profile that is narrow in one direction and elongated in the other creates an effectively one-dimensional system \\cite{Li2022} (fourth column of Fig.~\\ref{fig:patterns-driving+densities}). This can be extended to non-integer dimensions if the driving field has a fractal shape, as exemplified in the second and third columns of Fig.~\\ref{fig:patterns-driving+densities}, where a Sierpinski carpet and a Sierpinski cross with a finite number of iterations are shown.\nL000514\t\nL000515\tNote that the resulting bosonic density has in general a slightly distorted shape, as shown in the lower panels of Fig.~\\ref{fig:patterns-driving+densities} (more patterns are shown in the Supplementary Material \\cite{supp}). For example, in the second column, smaller holes in the Sierpinski carpet are partially filled and more affected than larger holes. This is due to interference and dispersive effects, as well as boson-boson interactions, that introduce intrinsic length scales in the system. Despite these distortions and the finite size, the resulting patterns possess their own fractal dimension, that can be quantified with the box-counting method \\footnote{The box-counting method~\\cite{Theiler_EstimatingDimension1990} quantifies the fractal dimension by overlaying a grid of $s^2$ square boxes, each of edge length $L/s$, where $L$ is the system size. After applying a thresholding algorithm~\\cite{Otsu_Threshold1979} to extract the structure from a grayscale image, the number of boxes $A$ that intersect the pattern is counted. Assuming a scaling relation $A \\sim s^{d_H}$, the fractal (Hausdorff) dimension $d_H$ is obtained as the slope of $\\log A$ versus $\\log s$ over a range of scales. More details are provided in the Supplementary Materials \\cite{supp}.} and remain fractional and close to the one of the ideal infinite self similar pattern.\nL000516\tThe box counting dimension $d_H$ of the driving patterns and the resulting densities are reported in Fig.~\\ref{fig:patterns-driving+densities}.\nL000517\t\nL000518\t\nL000519\t\nL000520\tWhile for integer-dimensional configuration the system size can be changed continuously, reaching the thermodynamic limit of a fractal system is less straightforward. Here, we consider the limit obtained by increasing the total system size while keeping the length of the smallest structural detail $l$ constant, as illustrated in Fig.~\\ref{fig:ADR-vs-L}(a). This is important to set its ratio to the intrinsic physical lengths, which would otherwise drastically alter the box counting dimension of the resulting bosonic density. In all calculations we take $l = 10\\mu m = 3.45\\xi$ as an example such that $l>\\xi$. This also implies that, at each step, the number of self-similar iterations is increased by one. This procedure results in a system size that increases by integer factors, as shown for the Sierpinski carpet in Fig.~\\ref{fig:ADR-vs-L}(a), for which the linear size triples at each step. Although this exponential growth poses computational challenges, we were able to reach sizes that are much larger than the ones typically implemented in experimental realizations~\\cite{Li2022}, and for which the critical behavior in 2D has already emerged.\nL000521\t\nL000522\t\nL000523\t\nL000524\t\nL000525\t\nL000526\t{\\it Phase transition markers ---}\nL000527\tIn the investigation of phase transitions, several markers serve as indicators for identifying their presence or absence. In our case, one could use the maximal slope of the spatially averaged steady-state density as a function of the input intensity, that diverges when a first-order phase transition occurs~\\cite{Li2022}. Another useful indicator is the asymptotic decay rate $\\lambda$, also referred to as the Liouvillian gap in the Lindbladian framework \\cite{Kessler2012,Minganti2018}, that is the decay rate with which the system relaxes exponentially towards its steady state at long times. At the critical point of a driven-dissipative phase transition, critical slowing down occurs, that is the system requires an infinite amount of time to reach its steady state, and $\\lambda$ tends to zero in the thermodynamic limit~\\cite{Minganti2018, Casteels2017}.\nL000528\tConversely, if in this infinite-size limit the decay rate remains finite for all values of the driving intensity, no phase transition occurs.\nL000529\t\nL000530\t\nL000531\tThe asymptotic decay rate $\\lambda$ can be obtained from the time-dependence of the spatially averaged density $\\bar{n}(t)=\\int \\mathrm{d}^2x\\ n(t,x)$, that at long times evolves as ${\\bar{n}(t) - \\bar{n}_{ss} \\propto e^{-\\lambda t}}$, where $\\bar{n}_{ss}$ is the steady-state value. We compute this value by numerically evolving the dynamical equation~(\\ref{eq:GPE}) and performing a Fourier analysis of $\\bar n(t)$~\\cite{supp}.  This procedure is repeated for different driving intensities $I$ to find the minimal asymptotic decay rate $\\lambda_{\\min}=\\min_I \\lambda(I)$. To probe the presence of a critical behaviour, we compare the values of $\\lambda_{\\min}$ obtained for different system sizes: a critical point is present if this quantity tends to zero for increasing system sizes, while it is absent if if saturates to a finite value.\nL000532\t\nL000533\t\nL000534\t\\begin{figure}[t!]\nL000535\t    \\centering\nL000536\t    \\includegraphics[width=\\linewidth]{figures/LGvsL_comparison.pdf}\nL000537\t   \\caption{(a) Illustration of the approach to the thermodynamic limit by expanding the size of a fractal pattern. At each step, the total linear size $L$ is multiplied by three, while the smallest resolved feature $l$ remains constant. (b–d): Minimal asymptotic decay rate $\\lambda_{\\min}$ as a function of the linear system size $L$ for detuning values $\\Delta = 1.0\\gamma$, $\\Delta = 2.0\\gamma$, and $\\Delta = 3.0\\gamma$. Different markers correspond to different spatial geometries indicated in the legend. The grey dashed line indicates the numerical limit $1/t_f$, which corresponds to the frequency resolution of the simulations set by the finite evolution time $t_f$.\nL000538\t    }\nL000539\t    \\label{fig:ADR-vs-L}\nL000540\t\\end{figure}\nL000541\t\nL000542\t{\\it Results at fixed detuning ---}\nL000543\tWe begin by examining the case $\\Delta = \\gamma$, for which in previous investigations the first-order phase transition was found to occur in 2D, and to be absent in 1D~\\cite{Foss-Feig2017,Vicentini2018,Li2022}. This is confirmed by our calculations of $\\lambda_{\\min}$, whose dependence on the system size is shown in Fig.~\\ref{fig:ADR-vs-L}(b), with green squares for a 2D system and orange bars for a 1D system. In fact, for the 2D case and in the limit of large systems, $\\lambda_{\\min}$ vanishes {(with a precision set by the length $t_f$ of the time evolution).\nL000544\t\nL000545\tThis critical slowing down is instead absent in the one-dimensional system, as $\\lambda_{\\min}$ saturates to a finite value.\nL000546\t\nL000547\t\nL000548\tWe extended this investigation to fractal dimensions. For example, for the Sierpinski carpet (second column of Fig.~\\ref{fig:patterns-driving+densities}) the asymptotic decay rate has a minimum around the expected mean-field critical driving \\cite{supp}, but $\\lambda_{\\min}$ converges to a finite value for increasing system size, as shown in Fig.~\\ref{fig:ADR-vs-L}(b) with empty blue square markers. The system therefore exhibits slowing down, but it is not critical, so that, at least for this value of the detuning, the Sierpinski carpet of dimension $d_H\\simeq 1.84$ is below the critical dimension. This reflects also on the steady-state average density, that does not display a discontinuous jump as a function of $I$, and has instead a smooth crossover from the low density to the high density phase \\cite{supp}. We obtain a similar behavior for the Sierpinski cross (third column of Fig.~\\ref{fig:patterns-driving+densities}), which has $d_H \\simeq 1.5$ and whose convergence of $\\lambda_{\\min}$ to a finite value is shown with red cross markers in Fig.~\\ref{fig:ADR-vs-L}(b). It is interesting to comment that the shape the longest-lived mode associated to $\\lambda_{\\min}$ in a fractal system is non-trivial (see Figure in~\\cite{supp}) and will be the object of further studies.\nL000549\t\nL000550\t\\begin{figure}[t!]\nL000551\t    \\centering\nL000552\t    \\includegraphics[width=\\linewidth]{figures/ADR-vs-dH.pdf}\nL000553\t    \\caption{Minimal asymptotic decay rate $\\lambda_{\\min}$ versus Hausdorff dimension for a fixed detuning $\\Delta=\\gamma$. The patterns for the light blue circular markers are shown in \\cite{supp}. Horizontal error bars show the uncertainty of the box-counting method, which is more significant only for patterns of fractal dimension smaller than one (Cantor sets).}\nL000554\t    \\label{fig:ADR-vs-dH}\nL000555\t\\end{figure}\nL000556\t\nL000557\tBesides the fact that it vanishes or not, the value of $\\lambda_{\\text{min}}$ also quantifies how far the system is from criticality. We found it to depend strongly on the system's dimensionality, as shown in Fig.~\\ref{fig:ADR-vs-dH}, where we plot $\\lambda_{\\text{min}}$ as a function of the Hausdorff dimension $d_H$, for a variety of fractal geometries. These values are the ones for the largest computalionally feasible sizes (ranging from $L=81l$ to $L=216l$, depending on the geometry), and are representative of the thermodynamic limit $\\lim_{L \\to \\infty} \\lambda_{\\text{min}}$. In fact, the difference between $\\lambda_{\\min}$ for the two largest considered sizes gives us a vertical error bar that is always smaller than the marker size. Remarkably, $\\lambda_{\\min}$ exhibits a clear monotonous dependence on the Hausdorff dimension $d_H$. The slowing down continuously approaches a critical one while the dimension is increased, that in this case $\\Delta=\\gamma$ is only reached when the dimension is close to 2, i.e. the lower critical dimension for the first-order phase transition is $d_L(\\Delta = \\gamma) \\approx 2$. This extends previous results~\\cite{Foss-Feig2017,Vicentini2018,Li2022} to fractional dimensions, but, as we show in the following, the lower critical dimension surprisingly decreases significantly from 2 as $\\Delta$ increases.\nL000558\t\nL000559\t\\begin{figure}[t!]\nL000560\t    \\centering\nL000561\t    \\includegraphics[width=\\linewidth]{figures/ADR-vs-Delta.pdf}\nL000562\t     \\caption{Minimal asymptotic decay rate as a function of detuning $\\Delta$ for different spatial dimensions. All data points are obtained for a system size $L = 81l$. The vertical error bars represent the difference in $\\lambda_{\\min}$ between this size and $L = 27l$, providing an estimate of the finite-size effects and our proximity to the thermodynamic limit.\nL000563\tInset: Critical detuning $\\Delta_c$ as a function of the Hausdorff dimension $d_H$. Error bars correspond to the numerical resolution. The gray dashed line shows the critical detuning predicted by the statistical mean-field approach (see main text), above which the phase transition is possible (shaded area). }\nL000564\t    \\label{fig:ADR-vs-Delta}\nL000565\t\\end{figure}\nL000566\t\nL000567\t{\\it Changing the lower critical dimension ---}\nL000568\tAs shown in Figs.~\\ref{fig:ADR-vs-L}(c)-(d) and in Fig.~\\ref{fig:ADR-vs-Delta}, increasing the driving detuning $\\Delta$ leads to a systematic decrease of $\\lambda_{\\min}$, and eventually to its vanishing, for all geometries. This implies that the system is critical and exhibits a first-order phase transition even for dimensions  $d_H < 2$, provided that the ratio $\\Delta/\\gamma$ is large enough. For a fixed dimension $d_H$, we define the critical detuning $\\Delta_c$ as the value above which $\\lambda_{\\min}$ vanishes in the thermodynamical limit.\nL000569\t\nL000570\tFor the 2D system (green squares), $\\Delta_c \\simeq \\gamma$, close to the previously studied case. $\\Delta_c$ is instead larger for lower-dimensional systems. This can be seen in Fig.~\\ref{fig:ADR-vs-L}(c), where, for large enough systems, $\\lambda_{\\min}$ vanishes not only for the 2D square, but also for the Sierpinski carpet, which for $\\Delta=\\gamma$ is not critical. Correspondingly, the smooth crossover in the average density for $\\Delta=\\gamma$, becomes a sharp discontinuity \\cite{supp}. For $\\Delta=2\\gamma$ the lower-dimensional Sierpinski cross and the one-dimensional system are still non-critical, but both become for a higher $\\Delta=3\\gamma$, as shown in Fig.~\\ref{fig:ADR-vs-L}(d). These results show that it is possible to tune the lower critical dimension, or, in other words, to make the phase transition occur at any fixed dimension by increasing $\\Delta$. The inset of Fig.~\\ref{fig:ADR-vs-Delta}, shows that the lower critical dimension decreases continuously as the detuning is increased. Interestingly, also the 1D case and fractals with dimension lower than one (e.g., Cantor sets) can be made critical by increasing $\\Delta/\\gamma$ enough. In fact, in the limit $d_H \\to 0^+$, we can expect $\\Delta_c \\to + \\infty$, since for a zero-dimensional (one-mode) nonlinear bosonic resonator it is known that the asymptotic decay rate vanishes only in the limit of infinite detuning~\\cite{Rodriguez2017,Casteels2017-power_laws}.\nL000571\t\nL000572\tTo complement our numerical results, we gain insight into the existence of a critical detuning by introducing an analytical statistical mean-field theory that incorporates the effect of kinetic energy contributions in the non-equilibrium Gross-Pitaevskii equation \\eqref{eq:GPE}. For a fractal driving pattern, the system contains multiple interfaces between pumped and non-pumped regions, such that the kinetic energy contribution associated with these gradients becomes important. We therefore construct the statistical mean-field approximation by incorporating the kinetic contribution through  the energy cost of a single interface, multiplied by the average number of interfaces within a region of size comparable to the smallest feature of the fractal pattern. This number can be related to the Hausdorff dimension through the average connectivity $\\tilde z=2d_H$, while an analytical estimate of the kinetic contribution can be obtained from a solution of \\eqref{eq:GPE} with $g=0$. This derivation, detailed in the End Matter, yields an equation for the steady-state density with an effective, dimensionality-dependent detuning, which displays bistability when\nL000573\t\\begin{equation}\nL000574\t\\Delta_{eff}=\\Delta-\\frac{4-2d_H}{4}\\sqrt{\\Delta^2+\\frac{\\gamma^2}{4}}>\\frac{\\sqrt{3}}{2}\\gamma.\nL000575\t\\end{equation}\nL000576\tThis provides an estimate of the critical detuning, shown as the dashed gray line in the inset of Fig.~\\ref{fig:ADR-vs-Delta}. Since bistability is a necessary condition for the emergence of critical behavior, this prediction constitutes a lower bound for the critical detuning. It captures well the overall trend of the numerical data obtained from brute-force simulations of the full multimode dynamics, that lie slightly above this lower bound. This shows that, upon decreasing the dimensionality, the phase transition is suppressed at sufficiently low detuning, leading to a lower critical dimension that can be fractal.\nL000577\t\nL000578\t\\iffalse\nL000579\tTo complement our numerical results, we can understand the existence of a critical detuning with an approach we dubbed \\textit{statistical mean-field}. Details can be found in~\\cite{supp}, the key idea being that coarse-grains the driven–dissipative Gross–Pitaevskii dynamics over the characteristic length scale of the fractal pattern. This procedure leads to an effective equation of state identical in form to the single-mode mean-field theory, but with a renormalized detuning that accounts for the reduced connectivity of the fractal support. As a result, the critical detuning for the onset of bistability acquires an explicit dependence on the Hausdorff dimension\nL000580\t\\begin{equation}\nL000581\t    \\Delta_c^{MF}(d_H)=\\frac{\\sqrt{3}}{2}\\gamma+2(2-d_H)J(\\Delta_c^{MF}(d_H))~.\nL000582\t\\end{equation}\nL000583\tHere $J$ encodes the energetic cost of having an interface between a driven and non driven area. This prediction, shown as the dashed line in the inset of Fig.~\\ref{fig:ADR-vs-Delta}, provides a lower bound for the existence of a phase transition and provides intuition on how decreasing effective dimensionality progressively suppresses bistability, ultimately preventing critical behavior at sufficiently low detuning.\nL000584\t\\fi\nL000585\t\nL000586\t\nL000587\t{\\it Conclusions ---}\nL000588\tIn conclusion, we have demonstrated that in driven-dissipative systems of interacting bosons, the lower critical dimension can be continuously tuned with the frequency detuning of the driving field and can be fractional. This establishes a novel paradigm in the study of non-equilibrium phase transitions, where geometry and external drive jointly control critical behavior.\nL000589\t\nL000590\tOur results were obtained by solving the multi-mode mean-field dynamics and analyzing the emergence of critical slowing down as the size of the driving patterns increases, and are supported by an analytical statistical mean-field theory that captures the dependence of the critical detuning on the Hausdorff dimension. An open and important question concerns the fate of the lower critical dimension in the presence of strong quantum boson-boson interactions, beyond the many-mode mean-field regime, particularly in the hard-core boson limit. Three scenarios could take place: (i) the lower critical dimension is the same in the strongly correlated regime; (ii) the lower critical dimension could evolve continuously with interaction strength, or (iii) a discontinuous shift could occur, signaling the emergence of a quantum phase transition with new phases in the strongly quantum correlated regime. Exploring this limit remains a key direction for future research. Another promising avenue is to investigate how fractional dimension and driven-dissipative conditions influence other classes of non-equilibrium phase transitions. This could yield deeper insight into the fundamental role of spatial geometry and dissipation in shaping critical phenomena in classical and quantum open systems.\nL000591\t\nL000592\t\\acknowledgements{We acknowledge support from the French ANR project FracTrans (grant ANR-24-CE30-6983) and  a grant (Polaritonic) from the French Government managed by the\nL000593\tANR under the France 2030 programme with the reference ANR-24-RRII-0001. This work was also funded by the French ministry of research through a CDSN\nL000594\tgrant of ENS Paris-Saclay.}\nL000595\t\nL000596\t\\bibliography{fractal.bib}\nL000597\t\nL000598\t\\newpage\nL000599\t\\clearpage\nL000600\t\nL000601\t\nL000602\t\\onecolumngrid\nL000603\t\nL000604\t\nL000605\t\nL000606\t\\begin{center}\nL000607\t{\\textbf{End Matter}}\nL000608\t\\end{center}\nL000609\t\nL000610\t\\twocolumngrid\nL000611\t\nL000612\t{\\it Statistical mean field approach ---}\nL000613\tThe dissipative phase transition is related to the bistable behavior of the bosonic system, which is predicted within a single-mode mean-field approximation. In this framework, the Gross-Pitaevskii equation~(\\ref{eq:GPE}) in the steady state and for a homogeneous 2D driving reduces to\nL000614\t\\begin{equation}\nL000615\t    0=\\left[-\\Delta+g\\left|\\psi\\right|^2-i\\frac{\\gamma}{2}\\right]\\psi\nL000616\t        +F \\,.\nL000617\t\\end{equation}\nL000618\tBy isolating the driving term on the left-hand side and taking the modulus squared, one obtains, with $n=|\\psi|^2$,\nL000619\t\\begin{equation}\nL000620\t        I=|F|^2=\\left[(gn-\\Delta)^2+\\frac{\\gamma^2}{4}\\right]n\\,.\nL000621\t    \\label{eq:bistability}\nL000622\t\\end{equation}\nL000623\tThis nonlinear relation determines the possible steady-state solutions for the density $n$ at a given driving intensity $I$ and can be interpreted as an equation of state~\\cite{RMP2013}. For $\\Delta>\\sqrt{3}/2~\\gamma$, this equation predicts a bistable behavior, namely the coexistence of two stable density solutions over a finite range of driving intensities~\\cite{drummond_quantum_1980}. While this bistability does not correspond to a phase transition in a single-mode system, it constitutes a necessary condition for the appearance of the dissipative phase transition investigated here. In the homogeneous two-dimensional case, this mean-field analysis yields a critical detuning $\\Delta_c^{MF}(d_H=2)=\\sqrt{3}/2~\\gamma$.\nL000624\t\nL000625\tTo incorporate the role of dimensionality and extend this type of analysis to fractal systems, we introduce what we refer to as a statistical mean-field approach. We start by writing the functional\nL000626\t\\begin{align*}\nL000627\t\\frac{1}{\\hbar} \\mathcal{F}[\\psi]\nL000628\t=\\int \\! dx\\,dy \\,\nL000629\t\\bigg[\nL000630\t& - \\Delta |\\psi|^2\nL000631\t+ \\frac{\\hbar}{2m} \\, |\\nabla \\psi|^2 \\\\\nL000632\t& + \\frac{g}{2} |\\psi|^4\nL000633\t- i \\frac{\\gamma}{2} |\\psi|^2\nL000634\t+ F \\left(\\psi^*+\\psi\\right)\nL000635\t\\bigg]\\;,\nL000636\t\\end{align*}\nL000637\twhose stationarization yields the Gross-Pitaevskii equation\nL000638\t\\begin{align*}\nL000639\t\\frac{1}{\\hbar}\\,\\frac{\\delta \\mathcal{F}}{\\delta \\psi^*} &= 0\\\\\nL000640\t&= - \\Delta \\psi -\\frac{\\hbar}{2m} \\nabla^2 \\psi\nL000641\t- i \\frac{\\gamma}{2} \\psi\nL000642\t + g |\\psi|^2 \\psi\nL000643\t+ F ~.\nL000644\t\\end{align*}\nL000645\tOur goal is to approximate the full functional $\\mathcal{F}[\\psi]$ with a coarse-graining that explicitly accounts for the spatial structure of the driving pattern. Concretely, we partition space into square patches of size $l\\times l$, where $l$ is the smallest characteristic length scale of the fractal pattern, and write the functional as\nL000646\t\\begin{align*}\nL000647\t\\frac{1}{\\hbar} \\mathcal{F}[\\psi]\nL000648\t=\nL000649\t\\sum_p\\int_0^l dx_p \\int_0^l dy_p\nL000650\t\\bigg[ &\nL000651\t- \\Delta |\\psi|^2 +\nL000652\t\\frac{\\hbar}{2m} \\, |\\nabla\\psi|^2 \\\\\nL000653\t& + \\frac{g}{2} |\\psi|^4\nL000654\t- i \\frac{\\gamma}{2} |\\psi|^2\nL000655\t+ F\\psi^*\nL000656\t\\bigg]~,\nL000657\t\\end{align*}\nL000658\twhere the sum runs over the patches and the subscript $p$ labels quantities within each patch.\nL000659\t\nL000660\tWe assume the field to vanish in the non-driven patches ($F(x_p,y_p)=0$) and to be approximately constant, $\\psi(x_p,y_p)\\simeq \\phi$, in the driven ones ($F(x_p,y_p)=F$). The kinetic term requires special care, as it contributes only at the interfaces between driven and undriven regions, where the field varies spatially. An analytical expression for this kinetic contribution can be obtained by computing the energy cost associated with such an interface neglecting $g \\vert \\Psi \\vert^2$. This is a good approximation because the inclusion of this term only slightly distorts the linear solution for the density near the pump edge. This amounts to solving\nL000661\t\\[\nL000662\t\\frac{\\hbar}{2m}\\partial_x^2\\psi(x)=-\\left(\\Delta+i\\frac{\\gamma}{2}\\right)\\psi(x) +F(x)\nL000663\t\\]\nL000664\tfor a step-like driving field $F(x)=\\theta(-x)F$. The solution can be expressed as the sum of the constant bulk solution $\\phi$ in the driven region and a plane-wave contribution with amplitude $\\frac{\\phi}{2}$ and momentum\nL000665\t$$\nL000666\tk^2=\\frac{2m}{\\hbar}\\left(\\Delta+i\\frac{\\gamma}{2}\\right).\nL000667\t$$\nL000668\tBy approximating all interfaces as behaving identically, the kinetic gradient term can thus be replaced by $|\\nabla\\psi|^2\\simeq |k|^2|\\frac{\\phi}{2}|^2$. Counting the number of edges associated with each patch $p$ then yields a contribution proportional to $(z-z_p)$, where $z=4$ is the coordination number of the underlying two-dimensional lattice and $z_p$ is the local coordination number, defined as the number of neighboring driven patches. The functional can therefore be approximated by the following sum over driven patches:\nL000669\t\\begin{align*}\nL000670\t    \\frac{1}{\\hbar} \\mathcal{F}[\\psi]\nL000671\t\\approx\nL000672\t\\sum_p l^2\nL000673\t\\bigg[&\nL000674\t- \\Delta |\\phi|^2\nL000675\t+ (z-z_p)\\frac{\\hbar}{8m} \\, |k|^2|\\phi|^2\\\\\nL000676\t& + \\frac{g}{2} |\\phi|^4\nL000677\t- i \\frac{\\gamma}{2} |\\phi|^2\nL000678\t+ F \\phi^*\nL000679\t\\bigg]~.\nL000680\t\\end{align*}\nL000681\t\nL000682\tWe can now introduce a rescaled and spatially averaged functional by defining the average coordination number $\\tilde{z}$ associated with the specific driving pattern:\nL000683\t\\[\nL000684\tf(\\phi)\nL000685\t=\nL000686\t- \\Delta |\\phi|^2\nL000687\t+(z-\\tilde{z})\\frac{\\hbar}{8m} |k|^2 |\\phi|^2\nL000688\t- i \\frac{\\gamma}{2} |\\phi|^2\nL000689\t+ \\frac{g}{2} |\\phi|^4\nL000690\t+ F \\phi^*~.\nL000691\t\\]\nL000692\tExtremizing this with respect to $\\phi^*$ yields the \\textit{statistical} mean-field steady-state equation\nL000693\t\\begin{equation}\nL000694\t    \\dot\\phi=0=\\left[-\\Delta+(z-\\tilde{z})\\,\\eta(\\Delta)+g|\\phi|^2-i\\frac{\\gamma}{2}\\right]\\phi+F,\nL000695\t\\end{equation}\nL000696\twhere we introduced the interface energy scale\nL000697\t\\begin{equation}\nL000698\t\\eta(\\Delta)=\\frac{\\hbar}{8m} |k|^2=\\frac{1}{4}\\sqrt{\\Delta^2+\\gamma^2/4}~.\nL000699\t\\end{equation}\nL000700\tFrom this expression, we can derive the corresponding equation of state\nL000701\t\\begin{equation}\nL000702\t    I=\\left[ \\left(g|\\phi|^2 -\\Delta+(z-\\tilde{z})\\,\\eta\\right)^2+\\frac{\\gamma^2}{4} \\right]|\\phi|^2.\nL000703\t    \\label{eq:bistability bis}\nL000704\t\\end{equation}\nL000705\tThis formulation extends the usual single-mode description of a uniform system by incorporating an additional term $(z-\\tilde{z})\\,\\eta$ that accounts for the energetic cost of interfaces. We can further relate the average connectivity $\\tilde{z}$ to the fractal dimension through the relation $\\tilde{z}=2d_H$, which holds for integer-dimensional systems.\nL000706\t\nL000707\tAs in Eq.~\\eqref{eq:bistability}, this equation of state exhibits bistability when\nL000708\t\\begin{equation}\nL000709\t    {\\Delta_{eff}=\\Delta-(4-2d_H)\\,\\eta(\\Delta)}>\\frac{\\sqrt{3}}{2}\\gamma~.\nL000710\t\\end{equation}\nL000711\tSince bistability is a necessary condition for the existence of a phase transition, this relation provides a dimensionality-dependent estimate of the critical detuning below which the phase transition cannot occur,\nL000712\t\\begin{equation}\\label{eq:mf-crit-detuning}\nL000713\t\\begin{split}\nL000714\t    \\Delta_c^{MF}(d_H)=&\nL000715\t     \\Delta_c^{MF}(2)+(z-\\tilde{z}) \\, \\eta\\big(\\Delta_c^{MF}(d_H)\\big)\\\\\nL000716\t     =&\\frac{\\sqrt{3}}{2}\\gamma+(4-2d_H)\\,\\eta\\big(\\Delta_c^{MF}(d_H)\\big)\\\\\nL000717\t     =&\\frac{\\sqrt{3}}{2}\\gamma+\\frac{(4-2d_H)}{4}\\sqrt{\\big(\\Delta_c^{MF}(d_H)\\big)^2+\\frac{\\gamma^2}{4}}~.\nL000718\t\\end{split}\nL000719\t\\end{equation}\nL000720\tThis dependence is shown as a dashed line in the inset of Fig.~\\ref{fig:ADR-vs-Delta}. The resulting curve follows the same qualitative trend as the numerical data while remaining below them, as expected for a lower bound. Moreover, Eq.~\\eqref{eq:mf-crit-detuning} predicts that the critical detuning diverges as the dimensionality approaches zero, in agreement with the behavior found in single-mode Kerr resonators \\cite{Rodriguez2017}.\nL000721\t\nL000722\t\nL000723\t\\newpage\nL000724\t\\clearpage\nL000725\t\nL000726\t\\input{SM.tex}\nL000727\t\nL000728\t\\end{document}\nL000729\t===== END FILE: main.tex =====",
+      "role": "user"
+    },
+    {
+      "content": "{\"repair\":{\"instruction\":\"Return one corrected complete ScienceCard JSON object for the same authoritative source. This is a bounded mechanical repair: change only the field or fields needed to satisfy the exact schema/locator diagnostic below. Preserve every other scientific statement, equation, numeric value, uncertainty, domain, claim, source ID, dependency, and locator from the rejected response. Reconcile an unknown reference only with a source-grounded entity already represented in the response and source; do not invent a new scientific entity or fact. For a locator error, use only an exact supporting range in the unchanged numbered source. Return the complete JSON object without Markdown or commentary.\",\"previous_output\":\"{\\n  \\\"assessment\\\": \\\"The source provides the statistical mean-field effective detuning diagnostic delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4) in the main text (lines 573-575) and End Matter (lines 707-710), with the interface energy scale eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4) (lines 697-699). The routing hint specifies public controls delta in [1,3] and d_H in [1,2], and private branches c=1 (statistical-interface correction) and c=0 (homogeneous single-mode baseline). The source supports the formula with c=1 (the (4-2*d_H) factor) and the homogeneous baseline c=0 corresponds to the single-mode mean-field with no interface correction (delta_eff = delta). The source does not explicitly state the domain delta in [1,3] and d_H in [1,2] for this diagnostic; the hint provides these as the intended public controls. The source states the diagnostic is a necessary-condition lower bound for the critical detuning, not the true numerical critical point. The extraction includes one mechanism with the effective detuning equation, two controls (delta, d_H), one readout (delta_eff), and two claims for the two branches. The case is authoring-ready because the source supports a numeric control-to-readout relation with explicit parameters.\\\",\\n  \\\"case_authoring_ready\\\": true,\\n  \\\"source\\\": {\\n    \\\"citation\\\": \\\"Mattheus Burkhard, Tunable Lower Critical Fractal Dimension for a Nonequilibrium Phase Transition, Physical Review Letters (2026), DOI:10.1103/36fj-lsw7\\\",\\n    \\\"journal_doi\\\": \\\"10.1103/36fj-lsw7\\\",\\n    \\\"arxiv_versioned_id\\\": \\\"2506.20617v2\\\"\\n  },\\n  \\\"paper_scope\\\": \\\"The paper investigates a driven-dissipative interacting bosonic system described by a non-equilibrium Gross-Pitaevskii equation, where the effective spatial dimension is controlled by the fractal shape of the driving field. It determines the lower critical fractal dimension for a first-order phase transition and shows it can be tuned via the detuning. The statistical mean-field effective detuning diagnostic provides a lower bound for the critical detuning as a function of the Hausdorff dimension.\\\",\\n  \\\"mechanisms\\\": [\\n    {\\n      \\\"mechanism_id\\\": \\\"statistical_mean_field_effective_detuning\\\",\\n      \\\"statement\\\": \\\"Statistical mean-field theory incorporating kinetic energy contributions at interfaces between driven and undriven regions yields an effective detuning delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4). Bistability, a necessary condition for the phase transition, occurs when delta_eff > sqrt(3)/2 * gamma. This provides a lower bound for the critical detuning.\\\",\\n      \\\"equations\\\": [\\n        \\\"delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4)\\\",\\n        \\\"eta(delta) = (1/4) * sqrt(delta^2 + gamma^2/4)\\\"\\n      ],\\n      \\\"variable_names\\\": [\\n        \\\"delta_eff\\\",\\n        \\\"delta\\\",\\n        \\\"d_H\\\",\\n        \\\"gamma\\\",\\n        \\\"eta\\\"\\n      ],\\n      \\\"parameters\\\": [\\n        {\\n          \\\"name\\\": \\\"gamma_rate\\\",\\n          \\\"value\\\": 1.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"gamma\\\",\\n          \\\"role\\\": \\\"Dissipation rate, used as the unit of detuning; set to 1 in the equation.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 573,\\n              \\\"line_end\\\": 575,\\n              \\\"support\\\": \\\"The equation includes gamma as the dissipation rate; the paper uses gamma as the unit for detuning values.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"sqrt3_over_2_gamma\\\",\\n          \\\"value\\\": 0.8660254037844386,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"gamma\\\",\\n          \\\"role\\\": \\\"Threshold for bistability: delta_eff must exceed this value.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 573,\\n              \\\"line_end\\\": 575,\\n              \\\"support\\\": \\\"The inequality delta_eff > sqrt(3)/2 * gamma is stated.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"eta_coefficient\\\",\\n          \\\"value\\\": 0.25,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Coefficient in the interface energy scale eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4).\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 697,\\n              \\\"line_end\\\": 699,\\n              \\\"support\\\": \\\"eta(delta) = (1/4)*sqrt(delta^2 + gamma^2/4) is given.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"name\\\": \\\"interface_correction_coefficient\\\",\\n          \\\"value\\\": 1.0,\\n          \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n          \\\"unit\\\": \\\"dimensionless\\\",\\n          \\\"role\\\": \\\"Coefficient multiplying (4-2*d_H) in the effective detuning formula; represents the statistical-interface correction.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 573,\\n              \\\"line_end\\\": 575,\\n              \\\"support\\\": \\\"The formula delta_eff = delta - (4-2*d_H)/4 * sqrt(...) includes the factor (4-2*d_H).\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 572,\\n          \\\"line_end\\\": 576,\\n          \\\"support\\\": \\\"The statistical mean-field theory yields an effective detuning that displays bistability when delta_eff > sqrt(3)/2 gamma, providing a lower bound for the critical detuning.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 707,\\n          \\\"line_end\\\": 710,\\n          \\\"support\\\": \\\"The equation of state exhibits bistability when delta_eff = delta - (4-2*d_H)*eta(delta) > sqrt(3)/2 gamma.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"fixed_conditions\\\": [\\n    {\\n      \\\"condition_id\\\": \\\"statistical_interface_correction\\\",\\n      \\\"statement\\\": \\\"The statistical mean-field effective detuning includes the interface correction term (4-2*d_H)*eta(delta), corresponding to c=1 in the diagnostic.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 573,\\n          \\\"line_end\\\": 575,\\n          \\\"support\\\": \\\"The formula includes the (4-2*d_H) factor.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"condition_id\\\": \\\"homogeneous_single_mode_baseline\\\",\\n      \\\"statement\\\": \\\"The homogeneous single-mode baseline corresponds to no interface correction, i.e., c=0, giving delta_eff = delta.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 613,\\n          \\\"line_end\\\": 623,\\n          \\\"support\\\": \\\"The single-mode mean-field equation for homogeneous 2D driving has no interface term, so delta_eff = delta.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"controls\\\": [\\n    {\\n      \\\"name\\\": \\\"delta\\\",\\n      \\\"definition\\\": \\\"Detuning between the driving frequency and the frequency of the spatially uniform, lowest-frequency bosonic mode, in units of gamma.\\\",\\n      \\\"unit\\\": \\\"gamma\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 1.0,\\n      \\\"maximum\\\": 3.0,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The routing hint specifies delta in [1,3] as the public control range.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 568,\\n          \\\"line_end\\\": 570,\\n          \\\"support\\\": \\\"The paper discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma in the context of the lower critical dimension.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"name\\\": \\\"d_H\\\",\\n      \\\"definition\\\": \\\"Hausdorff (box-counting) fractal dimension of the bosonic density pattern.\\\",\\n      \\\"unit\\\": \\\"dimensionless\\\",\\n      \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n      \\\"minimum\\\": 1.0,\\n      \\\"maximum\\\": 2.0,\\n      \\\"allowed_values\\\": [],\\n      \\\"domain_statement\\\": \\\"The routing hint specifies d_H in [1,2] as the public control range.\\\",\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 557,\\n          \\\"line_end\\\": 557,\\n          \\\"support\\\": \\\"The paper discusses fractal dimensions between 1 and 2, and the lower critical dimension is in this range.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"readouts\\\": [\\n    {\\n      \\\"name\\\": \\\"delta_eff\\\",\\n      \\\"definition\\\": \\\"Effective detuning in the statistical mean-field theory, defined as delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4). It is a diagnostic for the necessary condition for bistability and phase transition.\\\",\\n      \\\"unit\\\": \\\"gamma\\\",\\n      \\\"statistic\\\": \\\"Deterministic formula, no statistical aggregation.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"resolution\\\": null,\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 573,\\n          \\\"line_end\\\": 575,\\n          \\\"support\\\": \\\"The definition of delta_eff is given in the equation.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"claims\\\": [\\n    {\\n      \\\"claim_id\\\": \\\"statistical_interface_effective_detuning\\\",\\n      \\\"statement\\\": \\\"For a fractal driving pattern with statistical-interface correction (c=1), the effective detuning is delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4). This is a necessary-condition lower-bound diagnostic for the critical detuning, not the true numerical critical point.\\\",\\n      \\\"quantitative_form\\\": \\\"delta_eff = delta - (4-2*d_H)/4 * sqrt(delta^2 + gamma^2/4)\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"delta_eff\\\": {\\n          \\\"op\\\": \\\"subtract\\\",\\n          \\\"args\\\": [\\n            {\\n              \\\"var\\\": \\\"delta\\\"\\n            },\\n            {\\n              \\\"op\\\": \\\"multiply\\\",\\n              \\\"args\\\": [\\n                {\\n                  \\\"op\\\": \\\"divide\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"subtract\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"param\\\": \\\"four_minus_2dH_coefficient\\\"\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"multiply\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"param\\\": \\\"two_coefficient\\\"\\n                            },\\n                            {\\n                              \\\"var\\\": \\\"d_H\\\"\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    },\\n                    {\\n                      \\\"param\\\": \\\"four_coefficient\\\"\\n                    }\\n                  ]\\n                },\\n                {\\n                  \\\"op\\\": \\\"sqrt\\\",\\n                  \\\"args\\\": [\\n                    {\\n                      \\\"op\\\": \\\"add\\\",\\n                      \\\"args\\\": [\\n                        {\\n                          \\\"op\\\": \\\"power\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"var\\\": \\\"delta\\\"\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"two_coefficient\\\"\\n                            }\\n                          ]\\n                        },\\n                        {\\n                          \\\"op\\\": \\\"divide\\\",\\n                          \\\"args\\\": [\\n                            {\\n                              \\\"op\\\": \\\"power\\\",\\n                              \\\"args\\\": [\\n                                {\\n                                  \\\"param\\\": \\\"gamma_rate\\\"\\n                                },\\n                                {\\n                                  \\\"param\\\": \\\"two_coefficient\\\"\\n                                }\\n                              ]\\n                            },\\n                            {\\n                              \\\"param\\\": \\\"four_coefficient\\\"\\n                            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ]\\n                }\\n              ]\\n            }\\n          ]\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"statistical_mean_field_effective_detuning\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"delta\\\",\\n        \\\"d_H\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"delta\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 1.0,\\n          \\\"maximum\\\": 3.0,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The routing hint specifies delta in [1,3] as the public control range.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 568,\\n              \\\"line_end\\\": 570,\\n              \\\"support\\\": \\\"The paper discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma.\\\"\\n            }\\n          ]\\n        },\\n        {\\n          \\\"control_name\\\": \\\"d_H\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 1.0,\\n          \\\"maximum\\\": 2.0,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The routing hint specifies d_H in [1,2] as the public control range.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 557,\\n              \\\"line_end\\\": 557,\\n              \\\"support\\\": \\\"The paper discusses fractal dimensions between 1 and 2.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"delta_eff\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"statistical_interface_correction\\\"\\n      ],\\n      \\\"applicability\\\": \\\"This diagnostic is a necessary condition for the phase transition; it provides a lower bound for the critical detuning. It is not the true numerical critical point or an exact experimental measurement.\\\",\\n      \\\"statistical_basis\\\": \\\"Analytical mean-field derivation, no statistical aggregation.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 573,\\n          \\\"line_end\\\": 576,\\n          \\\"support\\\": \\\"The equation for delta_eff is given, and it is stated that this provides a lower bound for the critical detuning.\\\"\\n        },\\n        {\\n          \\\"line_start\\\": 707,\\n          \\\"line_end\\\": 710,\\n          \\\"support\\\": \\\"The same equation is given in the End Matter, with the statement that bistability is a necessary condition.\\\"\\n        }\\n      ]\\n    },\\n    {\\n      \\\"claim_id\\\": \\\"homogeneous_single_mode_effective_detuning\\\",\\n      \\\"statement\\\": \\\"For a homogeneous single-mode baseline (c=0), the effective detuning is delta_eff = delta, i.e., no interface correction. This corresponds to the standard single-mode mean-field description.\\\",\\n      \\\"quantitative_form\\\": \\\"delta_eff = delta\\\",\\n      \\\"oracle_outputs\\\": {\\n        \\\"delta_eff\\\": {\\n          \\\"var\\\": \\\"delta\\\"\\n        }\\n      },\\n      \\\"mechanism_ids\\\": [\\n        \\\"statistical_mean_field_effective_detuning\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"delta\\\"\\n      ],\\n      \\\"control_domains\\\": [\\n        {\\n          \\\"control_name\\\": \\\"delta\\\",\\n          \\\"domain_kind\\\": \\\"continuous_interval\\\",\\n          \\\"minimum\\\": 1.0,\\n          \\\"maximum\\\": 3.0,\\n          \\\"allowed_values\\\": [],\\n          \\\"domain_statement\\\": \\\"The routing hint specifies delta in [1,3] as the public control range.\\\",\\n          \\\"anchors\\\": [\\n            {\\n              \\\"line_start\\\": 568,\\n              \\\"line_end\\\": 570,\\n              \\\"support\\\": \\\"The paper discusses detuning values Delta = 1.0 gamma, 2.0 gamma, and 3.0 gamma.\\\"\\n            }\\n          ]\\n        }\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"delta_eff\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"homogeneous_single_mode_baseline\\\"\\n      ],\\n      \\\"applicability\\\": \\\"This is the homogeneous single-mode baseline without interface corrections, used for comparison with the statistical-interface case.\\\",\\n      \\\"statistical_basis\\\": \\\"Analytical mean-field derivation, no statistical aggregation.\\\",\\n      \\\"uncertainty\\\": \\\"source_unspecified\\\",\\n      \\\"depends_on\\\": [],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 613,\\n          \\\"line_end\\\": 623,\\n          \\\"support\\\": \\\"The single-mode mean-field equation for homogeneous 2D driving has no interface term, so delta_eff = delta.\\\"\\n        }\\n      ]\\n    }\\n  ],\\n  \\\"source_ambiguities\\\": [\\n    {\\n      \\\"ambiguity_id\\\": \\\"diagnostic_vs_true_critical_point\\\",\\n      \\\"statement\\\": \\\"The effective detuning diagnostic is a necessary-condition lower bound for the critical detuning, not the true numerical critical point or an exact experimental measurement. The paper explicitly states this is a lower bound.\\\",\\n      \\\"claim_ids\\\": [\\n        \\\"statistical_interface_effective_detuning\\\"\\n      ],\\n      \\\"mechanism_ids\\\": [\\n        \\\"statistical_mean_field_effective_detuning\\\"\\n      ],\\n      \\\"control_names\\\": [\\n        \\\"delta\\\",\\n        \\\"d_H\\\"\\n      ],\\n      \\\"readout_names\\\": [\\n        \\\"delta_eff\\\"\\n      ],\\n      \\\"fixed_condition_ids\\\": [\\n        \\\"statistical_interface_correction\\\"\\n      ],\\n      \\\"anchors\\\": [\\n        {\\n          \\\"line_start\\\": 576,\\n          \\\"line_end\\\": 576,\\n          \\\"support\\\": \\\"The text states: 'Since bistability is a necessary condition for the emergence of critical behavior, this prediction constitutes a lower bound for the critical detuning.'\\\"\\n        }\\n      ]\\n    }\\n  ]\\n}\",\"validation_error\":{\"code\":\"science_card.schema\",\"detail\":\"unsupported expression operator\",\"path\":\"$.claims[0].oracle_outputs.delta_eff.args[1].args[1].op\"}}}",
+      "role": "user"
+    }
+  ],
+  "metadata": {
+    "generation_attempt": 2,
+    "purpose": "temporal_science_card",
+    "repair_reason": "science_card.schema",
+    "source_format": "source_packet"
+  },
+  "response_schema": {
+    "$defs": {
+      "science_expression": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "var": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "var"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "param": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "param"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "add",
+                  "multiply",
+                  "maximum"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "subtract",
+                  "divide",
+                  "power"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "args": {
+                "items": {
+                  "$ref": "#/$defs/science_expression"
+                },
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+              },
+              "op": {
+                "enum": [
+                  "negate",
+                  "exp",
+                  "log",
+                  "sin",
+                  "step"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "args"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "assessment": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "case_authoring_ready": {
+        "type": "boolean"
+      },
+      "claims": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "applicability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "claim_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "control_domains": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed_values": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "control_name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "domain_kind": {
+                    "enum": [
+                      "continuous_interval",
+                      "fixed_value",
+                      "numeric_values",
+                      "symbolic",
+                      "unreported"
+                    ],
+                    "type": "string"
+                  },
+                  "domain_statement": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minimum": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "control_name",
+                  "domain_kind",
+                  "minimum",
+                  "maximum",
+                  "allowed_values",
+                  "domain_statement",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "depends_on": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "oracle_outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/science_expression"
+              },
+              "description": "Source-reported central-value control-to-readout relation; source data and parameter uncertainty are provenance outside this AST.",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "quantitative_form": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "statistical_basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "statement",
+            "quantitative_form",
+            "oracle_outputs",
+            "mechanism_ids",
+            "control_names",
+            "control_domains",
+            "readout_names",
+            "fixed_condition_ids",
+            "applicability",
+            "statistical_basis",
+            "uncertainty",
+            "depends_on",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "controls": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "domain_kind": {
+              "enum": [
+                "continuous_interval",
+                "fixed_value",
+                "numeric_values",
+                "symbolic",
+                "unreported"
+              ],
+              "type": "string"
+            },
+            "domain_statement": {
+              "type": "string"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "domain_kind",
+            "minimum",
+            "maximum",
+            "allowed_values",
+            "domain_statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fixed_conditions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "condition_id",
+            "statement",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "mechanisms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "equations": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "mechanism_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "parameters": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "anchors": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "line_end": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "line_start": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "support": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "line_start",
+                        "line_end",
+                        "support"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "name": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "role": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value",
+                  "uncertainty",
+                  "unit",
+                  "role",
+                  "anchors"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "variable_names": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mechanism_id",
+            "statement",
+            "equations",
+            "variable_names",
+            "parameters",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "paper_scope": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "readouts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchors": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "line_end": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "line_start": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "support": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "line_start",
+                          "line_end",
+                          "support"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "measurement_resolution",
+                        "reporting_increment"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "exclusiveMinimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "kind",
+                    "anchors"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "statistic": {
+              "description": "Aggregation or summary statistic of the source data; this does not describe a future deterministic Oracle query.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "uncertainty": {
+              "description": "Source-reported data uncertainty convention retained as provenance, not per-query Oracle uncertainty.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "unit": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "unit",
+            "statistic",
+            "uncertainty",
+            "resolution",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "source": {
+        "additionalProperties": false,
+        "properties": {
+          "arxiv_versioned_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "citation": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "journal_doi": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "citation",
+          "journal_doi",
+          "arxiv_versioned_id"
+        ],
+        "type": "object"
+      },
+      "source_ambiguities": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity_id": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "anchors": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "line_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "line_start": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "support": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "line_start",
+                  "line_end",
+                  "support"
+                ],
+                "type": "object"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "claim_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "control_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "fixed_condition_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "mechanism_ids": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "readout_names": {
+              "items": {
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "statement": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "ambiguity_id",
+            "statement",
+            "claim_ids",
+            "mechanism_ids",
+            "control_names",
+            "readout_names",
+            "fixed_condition_ids",
+            "anchors"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "assessment",
+      "case_authoring_ready",
+      "source",
+      "paper_scope",
+      "mechanisms",
+      "fixed_conditions",
+      "controls",
+      "readouts",
+      "claims",
+      "source_ambiguities"
+    ],
+    "type": "object"
+  }
+}

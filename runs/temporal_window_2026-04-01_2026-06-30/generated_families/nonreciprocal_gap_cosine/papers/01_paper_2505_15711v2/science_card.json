@@ -1,0 +1,677 @@
+{
+  "assessment": "The source provides an exact analytic formula for the non-interacting PBC dissipative gap delta = 2(Gamma+kappa) - 2*sqrt(Gamma^2+kappa^2+2*Gamma*kappa*cos(theta+phi)) (main.tex lines 115-118). The routing hint requests exposing the transformed control phase_cosine=cos(theta+phi) in [-1,1], which is a valid algebraic transformation of the source formula. Two source-reported branches are identified: g=Gamma/J=0.1, h=kappa/J=0.1 from main figures (line 81, 147, 159, 172, 204, 212) and g=0.5, h=0.1 from supplement figure s3 caption (line 453). The formula is exact and analytic, with no approximation. The extraction is complete and case_authoring_ready is true.",
+  "case_authoring_ready": true,
+  "claims": [
+    {
+      "anchors": [
+        {
+          "line_end": 118,
+          "line_start": 115,
+          "support": "The slowest decaying mode is at k_* and around this value the spectrum reads lambda_k=delta+alpha(k-k_*)^2, with the dissipative gap delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))."
+        },
+        {
+          "line_end": 81,
+          "line_start": 81,
+          "support": "Other parameters: Gamma=kappa=0.1J"
+        }
+      ],
+      "applicability": "Valid for non-interacting (Delta=0) fermions under PBC, with Gamma/J=0.1 and kappa/J=0.1. The formula is exact for all real theta and phi.",
+      "claim_id": "gap_formula_g01_h01",
+      "control_domains": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "The gap formula contains cos(theta+phi), and the source states the gap closes along phi=-theta, which corresponds to cos(theta+phi)=1."
+            },
+            {
+              "line_end": 119,
+              "line_start": 119,
+              "support": "In the phi,theta plane the gap is finite everywhere, except along the line phi=-theta where it closes as delta proportional to |phi-phi_c|^2."
+            }
+          ],
+          "control_name": "phase_cosine",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "The source states the gap is finite everywhere in the phi,theta plane except along the line phi=-theta where it closes (line 119). Since cos(theta+phi) ranges over [-1,1] for real angles, the transformed control phase_cosine spans the full interval [-1,1].",
+          "maximum": 1.0,
+          "minimum": -1.0
+        },
+        {
+          "allowed_values": [
+            0.1
+          ],
+          "anchors": [
+            {
+              "line_end": 81,
+              "line_start": 81,
+              "support": "Other parameters: Gamma=kappa=0.1J"
+            }
+          ],
+          "control_name": "g",
+          "domain_kind": "fixed_value",
+          "domain_statement": "This branch uses Gamma=0.1J, so g=0.1.",
+          "maximum": null,
+          "minimum": null
+        },
+        {
+          "allowed_values": [
+            0.1
+          ],
+          "anchors": [
+            {
+              "line_end": 81,
+              "line_start": 81,
+              "support": "Other parameters: Gamma=kappa=0.1J"
+            }
+          ],
+          "control_name": "h",
+          "domain_kind": "fixed_value",
+          "domain_statement": "This branch uses kappa=0.1J, so h=0.1.",
+          "maximum": null,
+          "minimum": null
+        }
+      ],
+      "control_names": [
+        "phase_cosine",
+        "g",
+        "h"
+      ],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "noninteracting_pbc",
+        "branch_g01_h01"
+      ],
+      "mechanism_ids": [
+        "noninteracting_pbc_gap"
+      ],
+      "oracle_outputs": {
+        "delta_over_J": {
+          "args": [
+            {
+              "args": [
+                {
+                  "param": "gap_coeff_2"
+                },
+                {
+                  "args": [
+                    {
+                      "var": "g"
+                    },
+                    {
+                      "var": "h"
+                    }
+                  ],
+                  "op": "add"
+                }
+              ],
+              "op": "multiply"
+            },
+            {
+              "args": [
+                {
+                  "param": "gap_coeff_2b"
+                },
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "var": "g"
+                            },
+                            {
+                              "param": "gap_exponent_2"
+                            }
+                          ],
+                          "op": "power"
+                        },
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "var": "h"
+                                },
+                                {
+                                  "param": "gap_exponent_2"
+                                }
+                              ],
+                              "op": "power"
+                            },
+                            {
+                              "args": [
+                                {
+                                  "param": "gap_cross_coeff"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "var": "g"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "var": "h"
+                                        },
+                                        {
+                                          "var": "phase_cosine"
+                                        }
+                                      ],
+                                      "op": "multiply"
+                                    }
+                                  ],
+                                  "op": "multiply"
+                                }
+                              ],
+                              "op": "multiply"
+                            }
+                          ],
+                          "op": "add"
+                        }
+                      ],
+                      "op": "add"
+                    },
+                    {
+                      "param": "gap_sqrt_exponent"
+                    }
+                  ],
+                  "op": "power"
+                }
+              ],
+              "op": "multiply"
+            }
+          ],
+          "op": "subtract"
+        }
+      },
+      "quantitative_form": "delta/J = 2*(g+h) - 2*sqrt(g^2+h^2+2*g*h*phase_cosine) with g=0.1, h=0.1",
+      "readout_names": [
+        "delta_over_J"
+      ],
+      "statement": "For non-interacting PBC with Gamma/J=0.1 and kappa/J=0.1, the dissipative gap normalized by J is delta/J = 2*(0.1+0.1) - 2*sqrt(0.1^2+0.1^2+2*0.1*0.1*phase_cosine), where phase_cosine=cos(theta+phi).",
+      "statistical_basis": "Exact analytic expression; no statistical aggregation.",
+      "uncertainty": "Exact, no uncertainty reported."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 118,
+          "line_start": 115,
+          "support": "The slowest decaying mode is at k_* and around this value the spectrum reads lambda_k=delta+alpha(k-k_*)^2, with the dissipative gap delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))."
+        },
+        {
+          "line_end": 453,
+          "line_start": 453,
+          "support": "Time evolution of the local particle density for Gamma = 0.5J and kappa = 0.1J"
+        }
+      ],
+      "applicability": "Valid for non-interacting (Delta=0) fermions under PBC, with Gamma/J=0.5 and kappa/J=0.1. The formula is exact for all real theta and phi.",
+      "claim_id": "gap_formula_g05_h01",
+      "control_domains": [
+        {
+          "allowed_values": [],
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "The gap formula contains cos(theta+phi), and the source states the gap closes along phi=-theta, which corresponds to cos(theta+phi)=1."
+            },
+            {
+              "line_end": 119,
+              "line_start": 119,
+              "support": "In the phi,theta plane the gap is finite everywhere, except along the line phi=-theta where it closes as delta proportional to |phi-phi_c|^2."
+            }
+          ],
+          "control_name": "phase_cosine",
+          "domain_kind": "continuous_interval",
+          "domain_statement": "The source states the gap is finite everywhere in the phi,theta plane except along the line phi=-theta where it closes (line 119). Since cos(theta+phi) ranges over [-1,1] for real angles, the transformed control phase_cosine spans the full interval [-1,1].",
+          "maximum": 1.0,
+          "minimum": -1.0
+        },
+        {
+          "allowed_values": [
+            0.5
+          ],
+          "anchors": [
+            {
+              "line_end": 453,
+              "line_start": 453,
+              "support": "Time evolution of the local particle density for Gamma = 0.5J and kappa = 0.1J"
+            }
+          ],
+          "control_name": "g",
+          "domain_kind": "fixed_value",
+          "domain_statement": "This branch uses Gamma=0.5J, so g=0.5.",
+          "maximum": null,
+          "minimum": null
+        },
+        {
+          "allowed_values": [
+            0.1
+          ],
+          "anchors": [
+            {
+              "line_end": 453,
+              "line_start": 453,
+              "support": "Time evolution of the local particle density for Gamma = 0.5J and kappa = 0.1J"
+            }
+          ],
+          "control_name": "h",
+          "domain_kind": "fixed_value",
+          "domain_statement": "This branch uses kappa=0.1J, so h=0.1.",
+          "maximum": null,
+          "minimum": null
+        }
+      ],
+      "control_names": [
+        "phase_cosine",
+        "g",
+        "h"
+      ],
+      "depends_on": [],
+      "fixed_condition_ids": [
+        "noninteracting_pbc",
+        "branch_g05_h01"
+      ],
+      "mechanism_ids": [
+        "noninteracting_pbc_gap"
+      ],
+      "oracle_outputs": {
+        "delta_over_J": {
+          "args": [
+            {
+              "args": [
+                {
+                  "param": "gap_coeff_2"
+                },
+                {
+                  "args": [
+                    {
+                      "var": "g"
+                    },
+                    {
+                      "var": "h"
+                    }
+                  ],
+                  "op": "add"
+                }
+              ],
+              "op": "multiply"
+            },
+            {
+              "args": [
+                {
+                  "param": "gap_coeff_2b"
+                },
+                {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "var": "g"
+                            },
+                            {
+                              "param": "gap_exponent_2"
+                            }
+                          ],
+                          "op": "power"
+                        },
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "var": "h"
+                                },
+                                {
+                                  "param": "gap_exponent_2"
+                                }
+                              ],
+                              "op": "power"
+                            },
+                            {
+                              "args": [
+                                {
+                                  "param": "gap_cross_coeff"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "var": "g"
+                                    },
+                                    {
+                                      "args": [
+                                        {
+                                          "var": "h"
+                                        },
+                                        {
+                                          "var": "phase_cosine"
+                                        }
+                                      ],
+                                      "op": "multiply"
+                                    }
+                                  ],
+                                  "op": "multiply"
+                                }
+                              ],
+                              "op": "multiply"
+                            }
+                          ],
+                          "op": "add"
+                        }
+                      ],
+                      "op": "add"
+                    },
+                    {
+                      "param": "gap_sqrt_exponent"
+                    }
+                  ],
+                  "op": "power"
+                }
+              ],
+              "op": "multiply"
+            }
+          ],
+          "op": "subtract"
+        }
+      },
+      "quantitative_form": "delta/J = 2*(g+h) - 2*sqrt(g^2+h^2+2*g*h*phase_cosine) with g=0.5, h=0.1",
+      "readout_names": [
+        "delta_over_J"
+      ],
+      "statement": "For non-interacting PBC with Gamma/J=0.5 and kappa/J=0.1, the dissipative gap normalized by J is delta/J = 2*(0.5+0.1) - 2*sqrt(0.5^2+0.1^2+2*0.5*0.1*phase_cosine), where phase_cosine=cos(theta+phi).",
+      "statistical_basis": "Exact analytic expression; no statistical aggregation.",
+      "uncertainty": "Exact, no uncertainty reported."
+    }
+  ],
+  "controls": [
+    {
+      "allowed_values": [],
+      "anchors": [
+        {
+          "line_end": 117,
+          "line_start": 117,
+          "support": "The gap formula contains cos(theta+phi), and the source states the gap closes along phi=-theta, which corresponds to cos(theta+phi)=1."
+        },
+        {
+          "line_end": 119,
+          "line_start": 119,
+          "support": "In the phi,theta plane the gap is finite everywhere, except along the line phi=-theta where it closes as delta proportional to |phi-phi_c|^2."
+        }
+      ],
+      "definition": "Cosine of the sum of the gain and loss phases, cos(theta+phi). This is a transformed control derived from the source phases theta and phi; the source formula depends on the combination theta+phi only through its cosine.",
+      "domain_kind": "continuous_interval",
+      "domain_statement": "The source states the gap is finite everywhere in the phi,theta plane except along the line phi=-theta where it closes (line 119). Since cos(theta+phi) ranges over [-1,1] for real angles, the transformed control phase_cosine spans the full interval [-1,1].",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "name": "phase_cosine",
+      "unit": "dimensionless"
+    },
+    {
+      "allowed_values": [
+        0.1,
+        0.5
+      ],
+      "anchors": [
+        {
+          "line_end": 81,
+          "line_start": 81,
+          "support": "Other parameters: Gamma=kappa=0.1J"
+        },
+        {
+          "line_end": 453,
+          "line_start": 453,
+          "support": "Time evolution of the local particle density for Gamma = 0.5J and kappa = 0.1J"
+        }
+      ],
+      "definition": "Gain rate Gamma normalized by the hopping J, g = Gamma/J.",
+      "domain_kind": "numeric_values",
+      "domain_statement": "Two source-reported values: g=0.1 from main figures (Gamma=0.1J) and g=0.5 from supplement figure s3 (Gamma=0.5J).",
+      "maximum": null,
+      "minimum": null,
+      "name": "g",
+      "unit": "dimensionless"
+    },
+    {
+      "allowed_values": [
+        0.1
+      ],
+      "anchors": [
+        {
+          "line_end": 81,
+          "line_start": 81,
+          "support": "Other parameters: Gamma=kappa=0.1J"
+        },
+        {
+          "line_end": 453,
+          "line_start": 453,
+          "support": "Time evolution of the local particle density for Gamma = 0.5J and kappa = 0.1J"
+        }
+      ],
+      "definition": "Loss rate kappa normalized by the hopping J, h = kappa/J.",
+      "domain_kind": "fixed_value",
+      "domain_statement": "Both source-reported branches use kappa=0.1J, so h=0.1 is fixed.",
+      "maximum": null,
+      "minimum": null,
+      "name": "h",
+      "unit": "dimensionless"
+    }
+  ],
+  "fixed_conditions": [
+    {
+      "anchors": [
+        {
+          "line_end": 86,
+          "line_start": 86,
+          "support": "We start by discussing the non-interacting limit Delta=0"
+        },
+        {
+          "line_end": 99,
+          "line_start": 99,
+          "support": "For periodic boundary conditions (PBC), we can compute exactly the dynamics"
+        }
+      ],
+      "condition_id": "noninteracting_pbc",
+      "statement": "Non-interacting limit (Delta=0) with periodic boundary conditions (PBC)."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 81,
+          "line_start": 81,
+          "support": "Other parameters: Gamma=kappa=0.1J"
+        },
+        {
+          "line_end": 147,
+          "line_start": 147,
+          "support": "Other parameters: Gamma = kappa = 0.1J"
+        },
+        {
+          "line_end": 159,
+          "line_start": 159,
+          "support": "Other parameters: L=16, Gamma=kappa=0.1J"
+        },
+        {
+          "line_end": 172,
+          "line_start": 172,
+          "support": "Other parameters: Gamma = kappa = 0.1J"
+        },
+        {
+          "line_end": 204,
+          "line_start": 204,
+          "support": "Other parameters: L=20 and Gamma=kappa=0.1J"
+        },
+        {
+          "line_end": 212,
+          "line_start": 212,
+          "support": "Other parameters: Gamma=kappa=0.1J"
+        }
+      ],
+      "condition_id": "branch_g01_h01",
+      "statement": "Branch with Gamma/J = 0.1 and kappa/J = 0.1 (i.e., g=0.1, h=0.1), as used in main figures."
+    },
+    {
+      "anchors": [
+        {
+          "line_end": 453,
+          "line_start": 453,
+          "support": "Time evolution of the local particle density for Gamma = 0.5J and kappa = 0.1J in a system with OBC. Other simulation parameters: phi = -theta = pi/2."
+        }
+      ],
+      "condition_id": "branch_g05_h01",
+      "statement": "Branch with Gamma/J = 0.5 and kappa/J = 0.1 (i.e., g=0.5, h=0.1), as used in supplement figure s3."
+    }
+  ],
+  "mechanisms": [
+    {
+      "anchors": [
+        {
+          "line_end": 118,
+          "line_start": 115,
+          "support": "The slowest decaying mode is at k_* and around this value the spectrum reads lambda_k=delta+alpha(k-k_*)^2, with the dissipative gap delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))."
+        }
+      ],
+      "equations": [
+        "delta = 2*(Gamma+kappa) - 2*sqrt(Gamma^2+kappa^2+2*Gamma*kappa*cos(theta+phi))"
+      ],
+      "mechanism_id": "noninteracting_pbc_gap",
+      "parameters": [
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))"
+            }
+          ],
+          "name": "gap_coeff_2",
+          "role": "multiplicative coefficient in the dissipative gap formula",
+          "uncertainty": "exact, no uncertainty",
+          "unit": "dimensionless",
+          "value": 2.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))"
+            }
+          ],
+          "name": "gap_coeff_2b",
+          "role": "multiplicative coefficient in the square-root term of the dissipative gap formula",
+          "uncertainty": "exact, no uncertainty",
+          "unit": "dimensionless",
+          "value": 2.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))"
+            }
+          ],
+          "name": "gap_cross_coeff",
+          "role": "coefficient of the Gamma*kappa*cos(theta+phi) term inside the square root",
+          "uncertainty": "exact, no uncertainty",
+          "unit": "dimensionless",
+          "value": 2.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))"
+            }
+          ],
+          "name": "gap_exponent_2",
+          "role": "exponent for the squared terms Gamma^2 and kappa^2",
+          "uncertainty": "exact, no uncertainty",
+          "unit": "dimensionless",
+          "value": 2.0
+        },
+        {
+          "anchors": [
+            {
+              "line_end": 117,
+              "line_start": 117,
+              "support": "delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))"
+            }
+          ],
+          "name": "gap_sqrt_exponent",
+          "role": "exponent for the square root (1/2 power)",
+          "uncertainty": "exact, no uncertainty",
+          "unit": "dimensionless",
+          "value": 0.5
+        }
+      ],
+      "statement": "For non-interacting fermions (Delta=0) under periodic boundary conditions, the dissipative gap delta is given exactly by delta = 2(Gamma+kappa) - 2*sqrt(Gamma^2+kappa^2+2*Gamma*kappa*cos(theta+phi)).",
+      "variable_names": [
+        "delta",
+        "Gamma",
+        "kappa",
+        "theta",
+        "phi"
+      ]
+    }
+  ],
+  "paper_scope": "The paper studies an interacting fermionic chain with non-reciprocal gain and loss, focusing on the dissipative gap and phase transition. The extracted cluster is the exact non-interacting PBC dissipative gap formula, with two source-reported parameter branches.",
+  "readouts": [
+    {
+      "anchors": [
+        {
+          "line_end": 118,
+          "line_start": 115,
+          "support": "The slowest decaying mode is at k_* and around this value the spectrum reads lambda_k=delta+alpha(k-k_*)^2, with the dissipative gap delta = 2 (Gamma + kappa) - 2 sqrt(Gamma^2+kappa^2+2 Gamma kappa cos(theta+phi))."
+        }
+      ],
+      "definition": "Dissipative gap delta normalized by the hopping J, i.e., delta/J. The dissipative gap is the minimum of the decay spectrum lambda_k, given by delta = 2(Gamma+kappa) - 2*sqrt(Gamma^2+kappa^2+2*Gamma*kappa*cos(theta+phi)).",
+      "name": "delta_over_J",
+      "resolution": null,
+      "statistic": "Exact analytic expression; no statistical aggregation.",
+      "uncertainty": "Exact, no uncertainty reported.",
+      "unit": "dimensionless"
+    }
+  ],
+  "source": {
+    "arxiv_versioned_id": "2505.15711v2",
+    "citation": "Rafael D. Soares, Dissipative Phase Transition of Interacting Nonreciprocal Fermions, Physical Review Letters (2026), DOI:10.1103/n8xv-kygx",
+    "journal_doi": "10.1103/n8xv-kygx"
+  },
+  "source_ambiguities": [
+    {
+      "ambiguity_id": "phase_cosine_transformation",
+      "anchors": [
+        {
+          "line_end": 117,
+          "line_start": 117,
+          "support": "The gap formula contains cos(theta+phi)."
+        }
+      ],
+      "claim_ids": [
+        "gap_formula_g01_h01",
+        "gap_formula_g05_h01"
+      ],
+      "control_names": [
+        "phase_cosine"
+      ],
+      "fixed_condition_ids": [
+        "noninteracting_pbc"
+      ],
+      "mechanism_ids": [
+        "noninteracting_pbc_gap"
+      ],
+      "readout_names": [
+        "delta_over_J"
+      ],
+      "statement": "The source formula uses cos(theta+phi) directly. The routing hint requests exposing the transformed control phase_cosine=cos(theta+phi) in [-1,1]. This is an algebraic transformation of the source expression, not a new physical quantity. The source does not explicitly define phase_cosine as a variable, but the transformation is exact and preserves the formula."
+    }
+  ]
+}
