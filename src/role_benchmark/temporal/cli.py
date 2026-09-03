@@ -135,6 +135,14 @@ def _parser() -> argparse.ArgumentParser:
             "visible in named assets from the fixed arXiv source archive"
         ),
     )
+    acquire.add_argument(
+        "--manual-linkage-reviews",
+        help=(
+            "optional DOI-keyed JSON with frozen match decisions for candidates "
+            "found through offline title or search-engine retrieval, or with a "
+            "reviewed source version for the same arXiv work"
+        ),
+    )
     arxiv_match = commands.add_parser(
         "arxiv-match",
         help="resolve every journal record in a census JSON array against arXiv",
@@ -197,6 +205,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 if args.figure_evidence_addenda
                 else None
             )
+            manual_linkage_reviews = (
+                _json_object(args.manual_linkage_reviews)
+                if args.manual_linkage_reviews
+                else None
+            )
             acquisition = acquire_temporal_window(
                 start=date.fromisoformat(args.start),
                 end=date.fromisoformat(args.end),
@@ -214,6 +227,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 max_results=args.max_results,
                 publisher_reconciliation=reconciliation,
                 figure_evidence_addenda=figure_evidence_addenda,
+                manual_linkage_reviews=manual_linkage_reviews,
                 pause=time.sleep,
             )
             print(json.dumps(acquisition, ensure_ascii=False, indent=2, sort_keys=True))
@@ -226,6 +240,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 resolution = resolve_arxiv_paper(
                     paper,
                     max_results=args.max_results,
+                    pause=time.sleep,
+                    request_interval_s=3.0,
                 )
                 matches.append(
                     {

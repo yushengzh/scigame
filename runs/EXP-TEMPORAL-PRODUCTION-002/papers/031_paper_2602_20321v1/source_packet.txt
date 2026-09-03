@@ -1,0 +1,877 @@
+===== BEGIN FILE: manuscript.tex =====
+\documentclass[english,a4paper,twocolumn,prl,amsmath,amssymb,tightenlines,reprint]{revtex4-2}
+\usepackage{bm}
+\usepackage{graphicx,xcolor}
+\usepackage{soul}
+\definecolor{linkcolor}{HTML}{004191}
+\usepackage[colorlinks,linkcolor=linkcolor,citecolor=linkcolor, urlcolor=linkcolor]{hyperref}
+\usepackage{nicematrix}
+\usepackage{mlmodern}
+
+
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\td}[2]{\frac{\dd #1}{\dd #2}}
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\fd}[2]{\frac{\delta #1}{\delta #2}}
+\newcommand{\mean}[1]{\langle #1 \rangle}
+
+\newcommand{\Int}[1]{\int\dd #1\;}
+\newcommand{\IInt}[3]{\int_{#2}^{#3}\dd #1\;}
+\newcommand{\adj}{\mathrm{adj}}
+\renewcommand{\vec}[1]{\bm{\mathbf{#1}}}
+\newcommand{\mat}[1]{\bm{\mathbf{#1}}}
+\DeclareMathOperator{\tr}{tr}
+
+
+\newcommand{\al}{\alpha}
+\newcommand{\gam}{\gamma}
+\newcommand{\ep}{\epsilon}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\kap}{\kappa}
+\newcommand{\lam}{\lambda}
+\newcommand{\vhi}{\varphi}
+\newcommand{\sig}{\sigma}
+\newcommand{\om}{\omega}
+\newcommand{\Om}{\Omega}
+
+\newcommand{\im}{\text{i}}
+\newcommand{\x}{\vec r}
+\newcommand{\X}{\vec R}
+\newcommand{\meps}{\boldsymbol\epsilon}
+\newcommand{\msig}{\boldsymbol\sig}
+\newcommand{\mOm}{\boldsymbol\Omega}
+\newcommand{\id}{\mathbf 1}
+\newcommand{\Dr}{D_\text{r}}
+\newcommand{\kT}{k_\text{B}T}
+\newcommand{\mur}{\mu_\text{r}}
+\newcommand{\W}{\vec W_{i}}
+\newcommand{\kp}{k_{+I}}
+\newcommand{\km}{k_{-I}}
+\newcommand{\kpm}{k_{\pm I}}
+\newcommand{\tup}[2]{\tau_{#1}^{/ #2}}
+\newcommand{\tdown}[2]{\tau_{#1\backslash #2}}
+
+
+\newcommand{\rev}[1]{{\color{blue} #1}}
+\newcommand{\comment}[1]{{\color{red} #1}}
+
+\begin{document}
+
+\title{Mutual Linearity is a Generic Property of Steady-State Markov Networks}
+
+\author{Robin Bebon}
+\author{Thomas Speck}
+\email{thomas.speck@itp4.uni-stuttgart.de}
+\affiliation{Institute for Theoretical Physics IV, University of Stuttgart, Heisenbergstr.~3, 70569 Stuttgart, Germany}
+
+\date{\today}
+
+\begin{abstract}
+  Understanding and predicting how complex systems respond to external perturbations is a central challenge in nonequilibrium statistical physics. Here we consider continuous-time Markov networks, which we subject to perturbations along a single edge. We find that in steady state the probabilities of any two states are linearly related to one another. We show that this mutual linearity of probabilities extends to a broad class of observables, including currents but also generic counting and state-dependent observables. Moreover, we derive an exact relation between the relative response of any state's probability and the ratio of two steady-state probabilities. Leveraging the Markov chain tree theorem, we further show that probabilities and the considered observables are constrained by the topological and kinetic properties of the network and provide analytical expressions in terms of spanning tree polynomials. Our results are general, holding for arbitrary rate parameterizations and extending far from equilibrium.
+\end{abstract}
+
+\maketitle
+
+
+
+\emph{Introduction.}---Predicting how physical systems respond to external perturbations is a longstanding challenge in physics. For small perturbations, linear response theory provides a direct connection between the basic properties of an unperturbed system, in form of its transport coefficients, and its response~\cite{kubo57, hanggi82, baroni87}. In thermal equilibrium, this response is entirely characterized by equilibrium fluctuations via the well-known fluctuation-dissipation theorem~\cite{kubo66}. More recently, the development of stochastic thermodynamics~\cite{seifert12, peliti21, seifert25} has sparked growing interest in understanding the response of nonequilibrium systems that capture the dissipative dynamics of, e.g., chemical reaction networks~\cite{rao16, gaspard04a, mcquarrie67, mou86, schmiedl07b}, or active matter~\cite{dalcengio19, caprini21a, bebon25, kirkpatrick25, davis24}. Numerous generalizations and extensions of the fluctuation-dissipation theorem have since been proposed~\cite{agarwal72, speck06, blickle07, speck09, seifert10, seifert10a, prost09, altaner16, baiesi09, dechant20, aslyamov25, ptaszynski24a, chun21, zheng24a}.
+
+In parallel, predominantly for continuous-time Markov jump processes, a variety of approaches have been explored to characterize the nonequilibrium response of different observables. Drawing inspiration from thermodynamic uncertainty relations~\cite{barato15, horowitz17, horowitz20, dieball23}, the response of steady-state observables~\cite{owen20, fernandesmartins23}---and their precision~\cite{ptaszynski24, aslyamov25, ptaszynski25}---is fundamentally constrained by dissipation. Similarly, topological constraints encoded in the incidence matrix provide exact response relations~\cite{aslyamov24a} and structural features such as the size of the support of the perturbation~\cite{owen23} delineates the sensitivity of steady-state observables.
+
+A particularly intriguing response property was unveiled by Harunari et al.~\cite{harunari24} in proving that, upon perturbing a single edge's rates, any two currents are linearly related. This holds arbitrarily far from equilibrium and follows independent of thermodynamic consistency constraints, i.e., local-detailed balance, making it a fundamental property of any irreducible Markov jump process. Further works were devoted to enrich the results of Ref.~\cite{harunari24} by assigning response coefficients a clear physical interpretation in form of first-passage times~\cite{khodabandehlou25} and proving mutual linearity relations for currents to hold more generally in cases where perturbations are supported by multiple edges~\cite{dalcengio25}. In this letter, we prove an even more fundamental linear relation between any two state-steady probabilities, from which it is straightforward to show that mutual linearity holds for edge currents. We apply our result to a broad class of observables, including state dependent and generic counting observables. As a consequence, any combination of such observables, e.g., the probability to occupy state $n$ and the traffic through edge $n\leftrightarrow m$, are linearly related, and we provide two different analytical expressions for their respective susceptibilities. Additionally, as a corollary, we find that the relative response of any state in the system is identical and determined by the ratio of only two probabilities---the probabilities of the states connected via the input edge.
+
+
+
+\emph{Setup and Results.}---We consider continuous-time Markov networks consisting of a discrete set of $|\mathcal{N}|$ vertices (or states) $n\in \mathcal{N}$ that are connected via edges. Transitions between two states $n$ and $m$ occur with transition rates $k_{nm}$ from $n\to m$. We assume networks to be irreducible, meaning that every state $n$ can be reached from any other state $m$ within the network in finite time; this also guarantees the existence of a unique stationary state~\cite{ross14}. Probability rates and the network topology are encoded in the rate matrix $\mat{W}$ with off-diagonal $[\mat{W}]_{n,m} = k_{mn}$ and diagonal entries $\left[\mat{W}\right]_{n,n} = -\sum_{m\neq n} k_{nm}$ such that columns sum to zero to ensure probability conservation. The time evolution of the probability distribution is governed by the master equation $\partial_t \vec p = \mat{W} \vec p$ and we collect occupation probabilities of the stationary solution ($\partial_t \vec p =0$) in the normalized vector $\vec p = (p_1, p_2, \ldots, p_{|\mathcal{N}|})^\top$.
+
+Inspired by recent results~\cite{aslyamov24a,harunari24,khodabandehlou25}, we study the stationary response of Markovian jump processes to changes in the rates $\kp \equiv k_{ij}$ and $\km \equiv k_{ji}$ of an externally controlled edge $I \equiv i\leftrightarrow j$ [see Fig.~\ref{fig:4state}(a)], henceforth referred to as the input edge. In general, we allow simultaneous variation of both input rates, or each individually, while the remaining network is kept unchanged. As one of the fundamental quantities of a Markov network, we focus our attention on steady-state probabilities and leverage the relation
+\begin{align}
+  \partial_k \vec{p} = - \mat{W}_n^{-1} \left( \partial_k \mat{W}_n \right)\vec p,
+  \label{eq:response_prob}
+\end{align}
+which has been derived recently and provides a linear algebra-based method to determine nonequilibrium responses~\cite{aslyamov24a}. Here $k$ denotes an arbitrary rate, or more generally rate parameter, and we define $\mat{W}_n$ as the rate matrix $\mat{W}$ with the $n$th row replaced by ones [cf.~Eq.~\eqref{app_eq:W_n}]. Unlike the Markov generator matrix, $\mat{W}_n$ is invertible for any $n$~\cite{aslyamov24,aslyamov24a,harunari24} and normalization dictates $\mat{W}_n \vec p = \vec e_n$, where $\vec e_n$ is the unit vector with one as its $n$th element. Equation~\eqref{eq:response_prob} follows from simple differentiation.
+
+\begin{figure}
+  \includegraphics{figures/4state_updated.pdf}
+  \caption{(a) Markov network consisting of four states. The controlled input edge $I$ (orange) is spanned by states $i = 1$ and $j = 2$. (b) Occupation probabilities as function of rate $\kp$ while $\km$ is fixed. Probabilities are colored according to the labels in (a). (c) Linear relation [Eq.~\eqref{eq:linearity}] between probabilities. All probabilities are linear in the reference probability $p_2$. Dashed lines depict the limits of values accessible to $p_2$ [Eq.~\eqref{eq:bounds}]. (d) Probability $p_4$ over $p_2$ together with the rectangular phase space region spanned by their respective bounds and markers indicate the corners of the diagonal that contains the possible solutions. The affine coefficient $p_{4,2}^{(0)}$ and susceptibility $\chi_{4,2}$ entering Eq.~\eqref{eq:linearity} are indicated in orange.}
+  \label{fig:4state}
+\end{figure}
+
+Plugging $\W$ and $k=\kpm$ into Eq.~\eqref{eq:response_prob}, we find that the responses of any two states $n$ and $m\in \mathcal{N}$ satisfy $\partial_{\kpm} p_n /(\partial_{\kpm} p_m) = \chi_{n,m}$, where $\chi_{n,m}$ is independent of rates $\kpm$. The probabilities thus satisfy
+\begin{align}
+  p_n(\kpm) = p_{n,m}^{(0)} + \chi_{n,m} p_m(\kpm)
+  \label{eq:linearity}
+\end{align}
+for all values of $\kpm$ associated with the freely chooseable input edge $I$~\footnote{Probability conservation enforces $\sum_{n=1}^{|\mathcal{N}|} p_{n,m}^{(0)} = 1$ and $\sum_{n=1}^{|\mathcal{N}|} \chi_{n,m}=0$.}. This constitutes our first main result. For a detailed proof, see \emph{Appendix A}. Although probabilities are nonlinear functions of the transition rates [cf.~Fig.~\ref{fig:4state}(b)], Eq.~\eqref{eq:linearity} states that changing the rates of a single edge triggers a linear response between any two states $n$ and $m$ [cf.~Fig.~\ref{fig:4state}(c)], with $\chi_{n,m}$ denoting the probability-probability susceptibility---i.e., the sensitivity of probability $p_n$ to changes in $p_m$. It is given by the algebraic expression
+\begin{align}
+  \chi_{n,m} \equiv \frac{\left[\adj\left(\W\right)\right]_{n, j}}{\left[\adj\left(\W\right)\right]_{m, j}},
+  \label{eq:suscs}
+\end{align}
+where $\left[\adj(\mat{M})\right]_{n, m} \equiv (-1)^{n+m}\det\left(\mat M_{\backslash (m,n)}\right)$ denotes elements of the adjugate matrix, or equivalently the transpose of the cofactor matrix, of a square matrix $\mat{M}$. The subscript ``$\backslash(n,m)$'' indicates deletion of the $n$th row and $m$th column. Susceptibilities defined through Eq.~\eqref{eq:suscs} remain invariant to changes in the input rates since they appear only in the $j$th row of $\W$ [cf.~Eq.~\eqref{app_eq:W_n}]. Furthermore, they are invariant under global rescaling of rates and satisfy the identities
+\begin{align}
+  \chi_{n,m} = \frac{1}{\chi_{m,n}} \qquad \frac{\chi_{n,m}}{\chi_{n,l}} = \chi_{l,m} \qquad \frac{\chi_{n,m}}{\chi_{l,m}} = \chi_{n,l}.
+  \label{eq:susc_relation}
+\end{align}
+Remarkably, a change of reference state, e.g., $m\to l$ in Eq.~\eqref{eq:suscs}, results in a global rescaling of all susceptibilities by the constant factor $1/\chi_{l,m}$. The same holds for changes in the target probability. Thus, the normalized magnitude of susceptibilities is universal within any network. If both states coincide, $\chi_{n,n} = 1$, as expected. At this stage the affine coefficients in Eq.~\eqref{eq:linearity} remain undetermined integration constants. We will derive exact expressions for these offsets later.
+
+As a direct corollary of Eqs.~\eqref{eq:linearity} and~\eqref{eq:suscs}, we obtain a relation between the ratio of an arbitrary state's response to changes in the forward and backward rates along the input edge and the probability of states that span that edge
+\begin{align}
+  -\frac{\partial_{\kp} p_n}{\partial_{\km} p_n} = \frac{p_{i}}{p_{j}}.
+  \label{eq:ratio}
+\end{align}
+For $p_j = 0$ the response $\partial_{\km} p_n$ vanishes [Eq.~\eqref{eq:response}] and taking the ratio is mathematically undefined. From an operational perspective, Eq.~\eqref{eq:ratio} allows the direct inference of each state's relative sensitivity from the occupation probabilities of only two states; and vice versa. Moreover, if the input edge obeys detailed balance, $p_{i}\kp = p_{j}\km$, Eq.~\eqref{eq:ratio} reduces to $-\partial_{\kp} p_n/(\partial_{\km} p_n) = \km/\kp$, and links the nonequilibrium responses of all states in the system to the equilibrium thermodynamic potentials encoded in the transition rates of a single edge. Employing the results of Ref.~\cite{liang24}, we show in \cite{sm} that the response ratio in Eq.~\eqref{eq:ratio} can be bounded in terms of pseudo-equilibrium quantities that depend on thermodynamic properties only.
+
+\emph{Probability bounds.}---Next we use standard graph theory identities to bound the region of phase space accessible to stationary probabilities when controlling a single edge's transition rates. According to Kirchhoff's Markov chain tree theorem~\cite{hill66, schnakenberg76, tutte05} the stationary probability of a given state $n$ can be expressed as $p_n=\tau_n /\sum_y \tau_y$. Here, $\tau_n = \sum_{\mu} w(\mathcal{T}^\mu_n)$ sums over all spanning trees $\mu$, and $w(\mathcal{T}^\mu_n)$ is the product of transition rates along the directed tree $\mathcal{T}_n^\mu$ rooted at $n$~\footnote{Rooted trees $\mathcal{T}^\mu_n$ are defined as directed subgraphs containing all nodes and no cycles, with every node---except the root $n$---having outdegree one.}. To isolate the influence of the external control, we introduce the decomposition~\cite{harunari24}
+\begin{equation}
+  \tau_n = \tau_{n\backslash i \leftrightarrow j} + \kp \tau_{n}^{/i\to j} + \km \tau_{n}^{/j\to i},
+  \label{eq:split}
+\end{equation}
+where the first term on the right-hand side denotes the sum over the subset of trees that exclude any transitions through edge $I$. The term $\tau_{n}^{/i\to j}$ (resp.~$\tau_{n}^{/j\to i}$) represents the sum over trees that do contain transition $i\to j$ (resp.~$j\to i$) while rate $\kp$ (resp.~$\km$) is factored out of the product. The decomposition Eq.~\eqref{eq:split} is a linear function of the input rates, while residual polynomials [$\tau$'s on the right-hand-side of Eq.~\eqref{eq:split}] are independent of $\kpm$. These polynomials are easily evaluated numerically~\cite{sm}.
+
+Using the Markov chain tree theorem together with Eq.~\eqref{eq:split}, we can formally evaluate the limits $\lim_{\kpm\to \infty}p_n$ to obtain the (asymptotically exact) bounds
+\begin{align}
+  \mathcal{B}^+_n \equiv  \frac{\tau_n^{/i\to j}}{\sum_l \tau_l^{/i\to j}} \qquad \mathcal{B}^-_n\equiv \frac{\tau_n^{/j \to i}}{\sum_l \tau_l^{/j\to i}},
+  \label{eq:bounds}
+\end{align}
+that limit the achievable values of $p_n$. Due to the non-monotonic response of probabilities with respect to input rates [cf.~Fig.~\ref{fig:4state}(b)], determining which of the bounds from Eq.~\eqref{eq:bounds} corresponds to the upper [$\max(\mathcal{B}^+_n,\mathcal{B}^-_n)$] and lower boundary [$\min(\mathcal{B}^+_n,\mathcal{B}^-_n)$] of solution space, must be done \emph{a posteriori} and separately for each state $n$~\footnote{For a concrete example, consider Fig.~\ref{fig:4state}(d). Here, the upper $\mathcal{B}^+_2$ ($\mathcal{B}^-_4$) and lower $\mathcal{B}^-_2$ ($\mathcal{B}^+_4$) bounds of $p_2$ and $p_4$ are mirrored due to their different scalings  with $k_{+I}$ [cf.~Fig.~\ref{fig:4state}(b)].}.
+
+For any pair of states $n$ and $m$, the bounds [Eq.~\eqref{eq:bounds}] span a (rectangular) region in the $(p_n,p_m)$-plane that contains all steady-state solutions achievable through changes in input edge $I$. Invoking the mutual linearity condition from Eq.~\eqref{eq:linearity}, we know \emph{a priori} that all possible solution pairs $(p_n,p_m)$ condense onto a straight line and thus all permitted solutions lie on the diagonal spanned between $(\mathcal{B}^-_n, \mathcal{B}^-_m)$ and $(\mathcal{B}^+_n, \mathcal{B}^+_m)$; the corners of the rectangular phase space region [cf.~Fig.~\ref{fig:4state}(d)]. The offset and slope of the diagonal provide explicit expressions for the affine coefficient and susceptibility of Eq.~\eqref{eq:linearity}
+\begin{align}
+  p_{n,m}^{(0)} = \frac{\mathcal{B}^-_n\mathcal{B}^+_m - \mathcal{B}^-_m \mathcal{B}^+_n}{\mathcal{B}^+_m-\mathcal{B}^-_m} \qquad
+  \chi_{n,m} = \frac{\mathcal{B}^+_n-\mathcal{B}^-_n}{\mathcal{B}^+_m-\mathcal{B}^-_m}.
+  \label{eq:offset_suscs}
+\end{align}
+The latter presents an alternative to the linear algebra-based susceptibilities from Eq.~\eqref{eq:suscs} in terms of spanning tree ensembles. Note that $\mathcal{B}^+_{i} = 0$ since transitions $i\to j$ are prohibited for any tree rooted in $i$ and hence $\tau_{i}^{/ i \to j} = 0$; the same holds for $\mathcal{B}^-_{j}$. As a result, the offset in Eq.~\eqref{eq:offset_suscs} simplifies to, e.g., $p_{n,j}^{(0)} = \mathcal{B}^-_{n}$ [cf.~Fig.~\ref{fig:4state}].
+
+In \emph{Appendix B} we provide additional bounds for the case of single rate control or unidirectional input edges. The corresponding susceptibilities and offsets follow in analogy to Eq.~\eqref{eq:offset_suscs}.
+
+\emph{General observables.}---We now shift our attention to a broad class of observables that we express as
+\begin{align}
+  \mathcal{O}_A \equiv  \al \sum_{m\in A} c_m p_m + \beta \sum_{\substack{l,m \in A \backslash \lbrace I \rbrace}} d_{ml} k_{ml} p_m
+  \label{eq:obs}
+\end{align}
+with constant coefficients $c_m$ and $d_{mn}$. The sums run over all states and transitions contained in $A \subseteq \mathcal{N}$, excluding $I$. For $\beta = 0$, Eq.~\eqref{eq:obs} describes a state dependent observable that weighs state occupation with weights $c_m$. Conversely, $\al=0$ defines a counting observable that is either traffic or current-like depending on the signs of increments $d_{ml}$. In case $d_{ml} = d_{lm}$, Eq.~\eqref{eq:obs} is time-symmetric and, for unit coefficients, reduces to the dynamical activity (rate)~\cite{merolle05, maes17a, maes17, diterlizzi19} (closely related to frenesy~\cite{maes20a}) of all edges supported by the states of $A\backslash \lbrace I \rbrace$. Similarly, for $d_{ml} = -d_{lm} = 1$, Eq.~\eqref{eq:obs} measures directed flows and reduces to the edge current $j_{ml}$ if $A$ encompasses only states $m$ and $l$.
+
+As a straight forward generalization of Eq.~\eqref{eq:linearity}, we find that all observables of the form in Eq.~\eqref{eq:obs} are likewise linear to each other and satisfy
+\begin{align}
+  \mathcal{O}_A = \left(\mathcal{O}_{A,n}^{(0)} - \frac{\mathcal{X}_{A,n}}{\mathcal{X}_{B,n}} \mathcal{O}_{B,n}^{(0)} \right) + \frac{\mathcal{X}_{A,n}}{\mathcal{X}_{B,n}} \mathcal{O}_B,
+  \label{eq:obs_lin}
+\end{align}
+with
+\begin{align}
+  \begin{bmatrix}
+  \mathcal{O}_{A,n}^{(0)} \\[.7ex]
+  \mathcal{X}_{A,n} \\[.7ex]
+  \mathcal{B}^\pm_{\mathcal{O}_A}
+  \end{bmatrix}
+  &\equiv  \al \sum_{m\in A} c_m
+  \begin{bmatrix}
+    p_{m,n}^{(0)} \\[.7ex]
+    \chi_{m,n} \\[.7ex]
+    \mathcal{B}^\pm_n
+  \end{bmatrix} + \beta \sum_{\substack{l,m \in A \backslash \lbrace I \rbrace}} d_{ml} k_{ml}
+  \begin{bmatrix}
+    p_{m,n}^{(0)} \\[.7ex]
+    \chi_{m,n} \\[.7ex]
+    \mathcal{B}^\pm_n
+  \end{bmatrix}.
+  \label{eq:offset_sucs_bounds}
+\end{align}
+The last line defines the generalization of the bounds from Eq.~\eqref{eq:bounds}, which can be used to determine mesoscopic susceptibilities $\mathcal{X}_{A,n}$ and $\mathcal{O}^{(0)}_{A,n}$ through Eq.~\eqref{eq:offset_suscs}. In case $\mathcal{O}_B = 0$ for all $\kpm$, i.e., $\mathcal{B}^\pm_{\mathcal{O}_B} = 0$, Eq.~\eqref{eq:obs_lin} no longer holds since susceptibilities are mathematically undefined~\footnote{One example are currents through bridges, which are zero regardless of input rates.}.
+
+For single-rate perturbations and time-asymmetric counting observables on edge~$I$, i.e., $d_{ij} = -d_{ji}$, the second summation in Eq.~\eqref{eq:obs} can be extended to include edge~$I$, as the explicit dependence on the rates~$\kpm$ cancels~\cite{sm}. This allows us to immediately recover the key results of Refs.~\cite{harunari24,khodabandehlou25}, where the linearity of currents was derived by other means. Our findings augments these works by proving that mutual linearity is a fundamental property of steady-state probabilities [Eq.~\eqref{eq:linearity}], from which it naturally extends to a broad class of observables [see Eqs.~\eqref{eq:obs} and~\eqref{eq:obs_lin}], including currents.
+
+\begin{figure*}
+  \includegraphics{figures/chemotaxis_new.pdf}
+  \caption{(a)~Adaptation model for a chemoreceptor with a total of $|\mathcal{N}|=2(M+1)$ states comprising the activity state $a\in\lbrace 0,1\rbrace$ and the methylation level $m \in \lbrace 0, \ldots, M \rbrace$ (purple triangles). Occupation probabilities are denoted as $p(m,a)$. (b)~Mutual linearity between the average methylation $\langle m \rangle$ [Eq.~\eqref{app_eq:avgm}], average activity $\langle a \rangle$ [Eq.~\eqref{app_eq:ptumble}], mesoscopic edge traffic $t^{(1)}_{0\leftrightarrow M}$ [Eq.~\eqref{app_eq:traf}], and current through the input edge $j_{m^\ast}^{(1)\to (0)}$ [Eq.~\eqref{app_eq:cur}], and probabilities $p(4,0)$ and $p(4,1)$. (c)~Comparison between the ratio of probabilities connected by the input edge $p(2,1)/p(2,0)$ (colors) and the relative response $-\partial_{\kp} p(0,1)/[\partial_{\km} p(0,1)]$ (wireframe). For the dashed green line, edge $I$ obeys detailed balance and the probability and response ratios equal $\km/\kp$. The solid orange line indicates the protocol we adopt for input rates in panels (b) and (d). In panels (b) and (c) we consider a sensory network with $M=4$ methylation levels, $\Delta \mu=1.3$, and the input edge connects activity states at methylation level $m^\ast=2$. (d)~Normalized susceptibilities of the adaptation model with $M=20$ methylation levels as we vary the driving strength $\Delta \mu$. Each circle corresponds to a state of the active $a=1$ (top) or passive $a=0$ branch (bottom) and is colored according to its susceptibility obtained from normalizing the results of Eq.~\eqref{eq:suscs}, with reference probability $p(10,1)$. The input edge is located at $m^\ast = 10$ and indicated in orange.}
+  \label{fig:chemotaxis}
+\end{figure*}
+
+\emph{Sensory adaptation.}---To illustrate the results of this letter, we adopt an idealized biophysical model of sensory adaptation that is motivated by the chemotaxis pathway in \emph{E.~coli}~\cite{tu08, lan12, murugan17}. The process is described through the Markovian network shown in Fig.~\ref{fig:chemotaxis}(a) and captures the mesoscopic dynamics of the binary activity state $a\in \lbrace 0,1\rbrace$ and the degree of methylation $m$ of a concentration sensing chemoreceptor~\cite{barkai97, tu13}.
+We assume that the transition rates between the activity states at $m=m^\ast$ are sensitive to an external signal and we treat it as input edge in the following. For chemotaxis adaptation, this signal relates to the (logarithmic) concentration of chemoattractants~\cite{endres06,kalinin09, skoge13}. The remaining rates between activity states are left constant and biased according to the arrows in Fig.~\ref{fig:chemotaxis}(a). For given activity, transitions are independent of the degree of methylation and the system relaxes into the energetically favored state of low (high) methylation for the inactive (active) branch, unless the chemical energy input $\Delta \mu$ is sufficiently strong to drive transitions uphill the free energy landscape [cf.~Fig.~\ref{fig:probabilities_chemo} in \emph{Appendix D}]. Further details are provided in the Supplementary Material~\cite{sm}.
+
+In Fig.~\ref{fig:chemotaxis}(b) and (c), we illustrate our main results from Eqs.~\eqref{eq:linearity},~\eqref{eq:obs_lin}, and~\eqref{eq:ratio} for an adaptation ladder containing $M=4$ methylation levels and an input edge connecting activity states at $m^\ast=2$. Figure~\ref{fig:chemotaxis}(b) depicts the linear relationship between various state observables ($\langle a \rangle$, $\langle m \rangle$), counting observables ($j_{m^\ast}^{(1)\to (0)}$, $t_{0\leftrightarrow M}^{(1)}$) and probabilities $p(m,a)$. Susceptibilities and offsets follow from Eqs.~\eqref{eq:suscs},~\eqref{eq:offset_suscs}, and~\eqref{eq:offset_sucs_bounds} respectively.
+For the relative response of, e.g., probability $p(0,1)$, we confirm Eq.~\eqref{eq:ratio} in Fig.~\ref{fig:chemotaxis}(c), which thus enables the inference of the networks sensitivity to changes in rates $\kpm$ through limited knowledge in form of the two probabilities $p(2, \lbrace 0,1\rbrace)$. Specifically, for $\kp > \km$, probabilities are more responsive to changes in $\kp$ and vice versa. For $\kp = \km$ probabilities are equally responsive which, owing to the symmetric choice of transition time scales along activity axes, coincides with a vanishing current through the controlled edge.
+
+Depending on the chemical energy input $\Delta \mu$ the system operates in either of two different modes: sensitive or adaptive~\cite{kharbanda24}. For $\Delta \mu < \Delta \mu_c$ the system's activity is highly sensitive to alterations in the external signal, biasing relaxation into either the active $p(M,1)$ or inactive $p(0,0)$ state. Conversely, beyond a critical driving strength $\Delta \mu > \Delta \mu_\mathrm{c}$ the system compensates changes in the external signal by adapting its internal methylation state and ensures a robust activity output $\langle a \rangle$ by stabilizing dissipative cycles around the adapted level of methylation (here $m^\ast$ for $S=0$)~\cite{sm}. Indeed, Ref.~\cite{sartori15} shows that the onset of adaptation for such models can be described as a (continuous) nonequilibrium phase transition with $\Delta \mu$ acting as control parameter.
+
+Employing Eq.~\eqref{eq:linearity} to an extended system with $M=20$ levels, we find in Fig.~\ref{fig:chemotaxis}(d) that the adaptation onset coincides with a pronounced change in the susceptibilities. Notably, the depicted normalized susceptibilities are, apart from their sign, independent of the chosen reference state [cf.~Eq.~\eqref{eq:susc_relation}]. The susceptibility patterns are most easily understood by considering how probability is redistributed within the system [cf.~Fig.~\ref{fig:probabilities_chemo}]: For $\Delta \mu < \Delta \mu_\mathrm{c}$, probability is concentrated in the energetically favored states $p(0,0)$ and $p(M,1)$. Because these states are highly populated, even small perturbations in the input produce comparatively large changes in their stationary weights, rendering them most susceptible. Conversely, if the critical driving strength is exceeded, input-induced changes predominantly redistribute probability among the states that participate in dissipatively stabilized cycles, causing susceptibilities to localize around the adapted methylation level $m^\ast$. The number of methylation levels traversed by these cycles increases with $\Delta \mu$ until probability is collected in $p(M,0)$ and $p(0,1)$ through persistent edge currents.
+
+
+\emph{Discussion.}---In this letter, we prove that any two steady-state probabilities of continuous-time Markov networks are linearly related [Eq.~\eqref{eq:linearity}]. We show that this linearity relation translates to a broad class of observables [Eq.~\eqref{eq:obs_lin}], including state-dependent and counting observables, which allows us to recover and considerably extend earlier results on the mutual linearity of steady-state currents reported in Refs.~\cite{harunari24,khodabandehlou25}.
+
+All coefficients entering our main results in Eqs.~\eqref{eq:linearity} and~\eqref{eq:obs_lin} are empirically accessible through measuring two combinations of probabilities (e.g.~through fluorescence techniques~\cite{tietz06, chung12,chung13}, force~\cite{stigler11, petrosyan21} or plasmon ruler spectroscopy~\cite{ye18, vollmar24}, etc.) or observables under different external input. Hence, additional measurements have predictive power and comparing susceptibilities offers a robust method for proof testing viable candidate models~\cite{harunari24}. Moreover, once coefficients of affine transformations are established (e.g., between a current and the total dynamical activity), measurement of either of the two quantities allows simultaneous inference of the other. We present two methods to numerically evaluate susceptibilities: (i) Through the linear-algebra based expression in Eq.~\eqref{eq:suscs}, or (ii) by evaluating tree polynomials that enter the bounds in Eq.~\eqref{eq:bounds} [resp.~Eq.~\eqref{eq:offset_sucs_bounds}]. These bounds additionally offer analytical expressions for the affine coefficients entering Eqs.~\eqref{eq:linearity} and~\eqref{eq:obs_lin} and delineate the space of possible solutions.
+
+Our results are general, hold arbitrarily far from thermal equilibrium, and make no assumptions about the parametrization of transition rates. If instead one assumes an explicit parametrization in form of Arrhenius~\cite{arrhenius89} or Eyring-like~\cite{eyring35} rates, we prove a set of response relations for observables $\mathcal{O}_A$ [Eq.~\eqref{eq:obs}] in Ref.~\cite{sm} that encompass previous identities~\cite{aslyamov24} upon choosing the corresponding observables, but also hold more broadly for nonlocal responses. Furthermore, edge transitions are not required to be bidirectional (see~\emph{Appendix C}) and transitions over an edge can occur through multiple reaction channels.
+
+Throughout, we focused on continuous-time Markov networks and leverages the properties of the rate matrix $\vec W$ to derive Eq.~\eqref{eq:linearity} and corollary results. Since similar type of matrices are encountered in various other contexts, e.g., for the voter model~\cite{clifford73, sood05, angelesserrano09, masuda09}, it would be interesting to explore the ramifications of our work also in these systems.
+
+
+\begin{acknowledgments}
+	\emph{Acknowledgments.}---We acknowledge financial support by the Deutsche Forschungsgemeinschaft (DFG) through the collaborative research centers TRR 146 (grant no. 233630050) and SFB 1551 (grant no. 464588647).
+\end{acknowledgments}
+
+
+
+
+
+
+
+
+
+
+\begin{thebibliography}{93}
+\makeatletter
+\providecommand \@ifxundefined [1]{
+ \@ifx{#1\undefined}
+}
+\providecommand \@ifnum [1]{
+ \ifnum #1\expandafter \@firstoftwo
+ \else \expandafter \@secondoftwo
+ \fi
+}
+\providecommand \@ifx [1]{
+ \ifx #1\expandafter \@firstoftwo
+ \else \expandafter \@secondoftwo
+ \fi
+}
+\providecommand \natexlab [1]{#1}
+\providecommand \enquote  [1]{``#1''}
+\providecommand \bibnamefont  [1]{#1}
+\providecommand \bibfnamefont [1]{#1}
+\providecommand \citenamefont [1]{#1}
+\providecommand \href@noop [0]{\@secondoftwo}
+\providecommand \href [0]{\begingroup \@sanitize@url \@href}
+\providecommand \@href[1]{\@@startlink{#1}\@@href}
+\providecommand \@@href[1]{\endgroup#1\@@endlink}
+\providecommand \@sanitize@url [0]{\catcode `\\12\catcode `\$12\catcode `\&12\catcode `\#12\catcode `\^12\catcode `\_12\catcode `\%12\relax}
+\providecommand \@@startlink[1]{}
+\providecommand \@@endlink[0]{}
+\providecommand \url  [0]{\begingroup\@sanitize@url \@url }
+\providecommand \@url [1]{\endgroup\@href {#1}{\urlprefix }}
+\providecommand \urlprefix  [0]{URL }
+\providecommand \Eprint [0]{\href }
+\providecommand \doibase [0]{https://doi.org/}
+\providecommand \selectlanguage [0]{\@gobble}
+\providecommand \bibinfo  [0]{\@secondoftwo}
+\providecommand \bibfield  [0]{\@secondoftwo}
+\providecommand \translation [1]{[#1]}
+\providecommand \BibitemOpen [0]{}
+\providecommand \bibitemStop [0]{}
+\providecommand \bibitemNoStop [0]{.\EOS\space}
+\providecommand \EOS [0]{\spacefactor3000\relax}
+\providecommand \BibitemShut  [1]{\csname bibitem#1\endcsname}
+\let\auto@bib@innerbib\@empty
+
+\bibitem [{\citenamefont {Kubo}(1957)}]{kubo57}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Kubo}},\ }\bibfield  {title} {\bibinfo {title} {Statistical-{{Mechanical Theory}} of {{Irreversible Processes}}. {{I}}. {{General Theory}} and {{Simple Applications}} to {{Magnetic}} and {{Conduction Problems}}},\ }\href {https://doi.org/10.1143/JPSJ.12.570} {\bibfield  {journal} {\bibinfo  {journal} {J. Phys. Soc. Jpn.}\ }\textbf {\bibinfo {volume} {12}},\ \bibinfo {pages} {570} (\bibinfo {year} {1957})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {H{\"a}nggi}\ and\ \citenamefont {Thomas}(1982)}]{hanggi82}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {H{\"a}nggi}}\ and\ \bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Thomas}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic processes: {{Time}} evolution, symmetries and linear response},\ }\href {https://doi.org/10.1016/0370-1573(82)90045-X} {\bibfield  {journal} {\bibinfo  {journal} {Physics Reports}\ }\textbf {\bibinfo {volume} {88}},\ \bibinfo {pages} {207} (\bibinfo {year} {1982})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Baroni}\ \emph {et~al.}(1987)\citenamefont {Baroni}, \citenamefont {Giannozzi},\ and\ \citenamefont {Testa}}]{baroni87}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Baroni}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Giannozzi}},\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Testa}},\ }\bibfield  {title} {\bibinfo {title} {Green's-function approach to linear response in solids},\ }\href {https://doi.org/10.1103/PhysRevLett.58.1861} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {58}},\ \bibinfo {pages} {1861} (\bibinfo {year} {1987})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Kubo}(1966)}]{kubo66}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Kubo}},\ }\bibfield  {title} {\bibinfo {title} {The fluctuation-dissipation theorem},\ }\href {https://doi.org/10.1088/0034-4885/29/1/306} {\bibfield  {journal} {\bibinfo  {journal} {Rep. Prog. Phys.}\ }\textbf {\bibinfo {volume} {29}},\ \bibinfo {pages} {255} (\bibinfo {year} {1966})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Seifert}(2012)}]{seifert12}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic thermodynamics, fluctuation theorems and molecular machines},\ }\href {https://doi.org/10.1088/0034-4885/75/12/126001} {\bibfield  {journal} {\bibinfo  {journal} {Rep. Prog. Phys.}\ }\textbf {\bibinfo {volume} {75}},\ \bibinfo {pages} {126001} (\bibinfo {year} {2012})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Peliti}\ and\ \citenamefont {Pigolotti}(2021)}]{peliti21}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Peliti}}\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Pigolotti}},\ }\href@noop {} {\emph {\bibinfo {title} {Stochastic Thermodynamics: An Introduction}}}\ (\bibinfo  {publisher} {Princeton University Press},\ \bibinfo {address} {Princeton : Oxford},\ \bibinfo {year} {2021})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Seifert}(2025)}]{seifert25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\href {https://doi.org/10.1017/9781009024358} {\emph {\bibinfo {title} {Stochastic {{Thermodynamics}}}}},\ \bibinfo {edition} {1st}\ ed.\ (\bibinfo  {publisher} {Cambridge University Press},\ \bibinfo {year} {2025})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Rao}\ and\ \citenamefont {Esposito}(2016)}]{rao16}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Rao}}\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\bibfield  {title} {\bibinfo {title} {Nonequilibrium {{Thermodynamics}} of {{Chemical Reaction Networks}}: {{Wisdom}} from {{Stochastic Thermodynamics}}},\ }\href {https://doi.org/10.1103/PhysRevX.6.041064} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. X}\ }\textbf {\bibinfo {volume} {6}},\ \bibinfo {pages} {041064} (\bibinfo {year} {2016})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Gaspard}(2004)}]{gaspard04a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Gaspard}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation theorem for nonequilibrium reactions},\ }\href {https://doi.org/10.1063/1.1688758} {\bibfield  {journal} {\bibinfo  {journal} {J. Chem. Phys.}\ }\textbf {\bibinfo {volume} {120}},\ \bibinfo {pages} {8898} (\bibinfo {year} {2004})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {McQuarrie}(1967)}]{mcquarrie67}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {D.~A.}\ \bibnamefont {McQuarrie}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic approach to chemical kinetics},\ }\href {https://doi.org/10.2307/3212214} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Applied Probability}\ }\textbf {\bibinfo {volume} {4}},\ \bibinfo {pages} {413} (\bibinfo {year} {1967})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Mou}\ \emph {et~al.}(1986)\citenamefont {Mou}, \citenamefont {Luo},\ and\ \citenamefont {Nicolis}}]{mou86}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.~Y.}\ \bibnamefont {Mou}}, \bibinfo {author} {\bibfnamefont {J.-l.}\ \bibnamefont {Luo}},\ and\ \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Nicolis}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic thermodynamics of nonequilibrium steady states in chemical reaction systems},\ }\href {https://doi.org/10.1063/1.450623} {\bibfield  {journal} {\bibinfo  {journal} {J. Chem. Phys.}\ }\textbf {\bibinfo {volume} {84}},\ \bibinfo {pages} {7011} (\bibinfo {year} {1986})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Schmiedl}\ and\ \citenamefont {Seifert}(2007)}]{schmiedl07b}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Schmiedl}}\ and\ \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic thermodynamics of chemical reaction networks},\ }\href {https://doi.org/10.1063/1.2428297} {\bibfield  {journal} {\bibinfo  {journal} {J. Chem. Phys.}\ }\textbf {\bibinfo {volume} {126}},\ \bibinfo {pages} {044101} (\bibinfo {year} {2007})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Dal~Cengio}\ \emph {et~al.}(2019)\citenamefont {Dal~Cengio}, \citenamefont {Levis},\ and\ \citenamefont {Pagonabarraga}}]{dalcengio19}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Dal~Cengio}}, \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Levis}},\ and\ \bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Pagonabarraga}},\ }\bibfield  {title} {\bibinfo {title} {Linear {{Response Theory}} and {{Green-Kubo Relations}} for {{Active Matter}}},\ }\href {https://doi.org/10.1103/PhysRevLett.123.238003} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {123}},\ \bibinfo {pages} {238003} (\bibinfo {year} {2019})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Caprini}\ \emph {et~al.}(2021)\citenamefont {Caprini}, \citenamefont {Puglisi},\ and\ \citenamefont {Sarracino}}]{caprini21a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Caprini}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Puglisi}},\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Sarracino}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation--{{Dissipation Relations}} in {{Active Matter Systems}}},\ }\href {https://doi.org/10.3390/sym13010081} {\bibfield  {journal} {\bibinfo  {journal} {Symmetry}\ }\textbf {\bibinfo {volume} {13}},\ \bibinfo {pages} {81} (\bibinfo {year} {2021})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Bebon}\ \emph {et~al.}(2025)\citenamefont {Bebon}, \citenamefont {Robinson},\ and\ \citenamefont {Speck}}]{bebon25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Bebon}}, \bibinfo {author} {\bibfnamefont {J.~F.}\ \bibnamefont {Robinson}},\ and\ \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Speck}},\ }\bibfield  {title} {\bibinfo {title} {Thermodynamics of {{Active Matter}}: {{Tracking Dissipation}} across {{Scales}}},\ }\href {https://doi.org/10.1103/PhysRevX.15.021050} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. X}\ }\textbf {\bibinfo {volume} {15}},\ \bibinfo {pages} {021050} (\bibinfo {year} {2025})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Kirkpatrick}\ and\ \citenamefont {Belitz}(2025)}]{kirkpatrick25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.~R.}\ \bibnamefont {Kirkpatrick}}\ and\ \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Belitz}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation-response relation in nonequilibrium systems and active matter},\ }\href {https://doi.org/10.1103/PhysRevE.111.014102} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. E}\ }\textbf {\bibinfo {volume} {111}},\ \bibinfo {pages} {014102} (\bibinfo {year} {2025})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Davis}\ \emph {et~al.}(2024)\citenamefont {Davis}, \citenamefont {Proesmans},\ and\ \citenamefont {Fodor}}]{davis24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {L.~K.}\ \bibnamefont {Davis}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Proesmans}},\ and\ \bibinfo {author} {\bibfnamefont {{\'E}.}~\bibnamefont {Fodor}},\ }\bibfield  {title} {\bibinfo {title} {Active {{Matter}} under {{Control}}: {{Insights}} from {{Response Theory}}},\ }\href {https://doi.org/10.1103/PhysRevX.14.011012} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. X}\ }\textbf {\bibinfo {volume} {14}},\ \bibinfo {pages} {011012} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Agarwal}(1972)}]{agarwal72}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {G.~S.}\ \bibnamefont {Agarwal}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation-dissipation theorems for systems in non-thermal equilibrium and applications},\ }\href {https://doi.org/10.1007/BF01391621} {\bibfield  {journal} {\bibinfo  {journal} {Z. Physik}\ }\textbf {\bibinfo {volume} {252}},\ \bibinfo {pages} {25} (\bibinfo {year} {1972})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Speck}\ and\ \citenamefont {Seifert}(2006)}]{speck06}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Speck}}\ and\ \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Restoring a fluctuation-dissipation theorem in a nonequilibrium steady state},\ }\href {https://doi.org/10.1209/epl/i2005-10549-4} {\bibfield  {journal} {\bibinfo  {journal} {Europhys. Lett.}\ }\textbf {\bibinfo {volume} {74}},\ \bibinfo {pages} {391} (\bibinfo {year} {2006})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Blickle}\ \emph {et~al.}(2007)\citenamefont {Blickle}, \citenamefont {Speck}, \citenamefont {Lutz}, \citenamefont {Seifert},\ and\ \citenamefont {Bechinger}}]{blickle07}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Blickle}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Speck}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Lutz}}, \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ and\ \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Bechinger}},\ }\bibfield  {title} {\bibinfo {title} {Einstein {{Relation Generalized}} to {{Nonequilibrium}}},\ }\href {https://doi.org/10.1103/PhysRevLett.98.210601} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {98}},\ \bibinfo {pages} {210601} (\bibinfo {year} {2007})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Speck}\ and\ \citenamefont {Seifert}(2009)}]{speck09}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Speck}}\ and\ \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Extended fluctuation-dissipation theorem for soft matter in stationary flow},\ }\href {https://doi.org/10.1103/PhysRevE.79.040102} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. E}\ }\textbf {\bibinfo {volume} {79}},\ \bibinfo {pages} {040102} (\bibinfo {year} {2009})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Seifert}\ and\ \citenamefont {Speck}(2010)}]{seifert10}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}}\ and\ \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Speck}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation-dissipation theorem in nonequilibrium steady states},\ }\href {https://doi.org/10.1209/0295-5075/89/10007} {\bibfield  {journal} {\bibinfo  {journal} {Europhys. Lett.}\ }\textbf {\bibinfo {volume} {89}},\ \bibinfo {pages} {10007} (\bibinfo {year} {2010})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Seifert}(2010)}]{seifert10a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Generalized {{Einstein}} or {{Green-Kubo Relations}} for {{Active Biomolecular Transport}}},\ }\href {https://doi.org/10.1103/PhysRevLett.104.138101} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {104}},\ \bibinfo {pages} {138101} (\bibinfo {year} {2010})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Prost}\ \emph {et~al.}(2009)\citenamefont {Prost}, \citenamefont {Joanny},\ and\ \citenamefont {Parrondo}}]{prost09}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Prost}}, \bibinfo {author} {\bibfnamefont {J.-F.}\ \bibnamefont {Joanny}},\ and\ \bibinfo {author} {\bibfnamefont {J.~M.~R.}\ \bibnamefont {Parrondo}},\ }\bibfield  {title} {\bibinfo {title} {Generalized {{Fluctuation-Dissipation Theorem}} for {{Steady-State Systems}}},\ }\href {https://doi.org/10.1103/PhysRevLett.103.090601} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {103}},\ \bibinfo {pages} {090601} (\bibinfo {year} {2009})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Altaner}\ \emph {et~al.}(2016)\citenamefont {Altaner}, \citenamefont {Polettini},\ and\ \citenamefont {Esposito}}]{altaner16}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Altaner}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Polettini}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation-{{Dissipation Relations Far}} from {{Equilibrium}}},\ }\href {https://doi.org/10.1103/PhysRevLett.117.180601} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {117}},\ \bibinfo {pages} {180601} (\bibinfo {year} {2016})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Baiesi}\ \emph {et~al.}(2009)\citenamefont {Baiesi}, \citenamefont {Maes},\ and\ \citenamefont {Wynants}}]{baiesi09}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Baiesi}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Maes}},\ and\ \bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Wynants}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuations and {{Response}} of {{Nonequilibrium States}}},\ }\href {https://doi.org/10.1103/PhysRevLett.103.010602} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {103}},\ \bibinfo {pages} {010602} (\bibinfo {year} {2009})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Dechant}\ and\ \citenamefont {Sasa}(2020)}]{dechant20}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Dechant}}\ and\ \bibinfo {author} {\bibfnamefont {S.-i.}\ \bibnamefont {Sasa}},\ }\bibfield  {title} {\bibinfo {title} {Fluctuation--response inequality out of equilibrium},\ }\href {https://doi.org/10.1073/pnas.1918386117} {\bibfield  {journal} {\bibinfo  {journal} {Proc. Natl. Acad. Sci. U.S.A.}\ }\textbf {\bibinfo {volume} {117}},\ \bibinfo {pages} {6430} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Aslyamov}\ \emph {et~al.}(2025)\citenamefont {Aslyamov}, \citenamefont {Ptaszy{\'n}ski},\ and\ \citenamefont {Esposito}}]{aslyamov25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Aslyamov}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Ptaszy{\'n}ski}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\bibfield  {title} {\bibinfo {title} {Nonequilibrium {{Fluctuation-Response Relations}}: {{From Identities}} to {{Bounds}}},\ }\href {https://doi.org/10.1103/PhysRevLett.134.157101} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {134}},\ \bibinfo {pages} {157101} (\bibinfo {year} {2025})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Ptaszy{\'n}ski}\ \emph {et~al.}(2024)\citenamefont {Ptaszy{\'n}ski}, \citenamefont {Aslyamov},\ and\ \citenamefont {Esposito}}]{ptaszynski24a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Ptaszy{\'n}ski}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Aslyamov}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\bibfield  {title} {\bibinfo {title} {Dissipation {{Bounds Precision}} of {{Current Response}} to {{Kinetic Perturbations}}},\ }\href {https://doi.org/10.1103/PhysRevLett.133.227101} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {133}},\ \bibinfo {pages} {227101} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Chun}\ \emph {et~al.}(2021)\citenamefont {Chun}, \citenamefont {Gao},\ and\ \citenamefont {Horowitz}}]{chun21}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.-M.}\ \bibnamefont {Chun}}, \bibinfo {author} {\bibfnamefont {Q.}~\bibnamefont {Gao}},\ and\ \bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Horowitz}},\ }\bibfield  {title} {\bibinfo {title} {Nonequilibrium {{Green-Kubo}} relations for hydrodynamic transport from an equilibrium-like fluctuation-response equality},\ }\href {https://doi.org/10.1103/PhysRevResearch.3.043172} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Research}\ }\textbf {\bibinfo {volume} {3}},\ \bibinfo {pages} {043172} (\bibinfo {year} {2021})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Zheng}\ and\ \citenamefont {Lu}(2024)}]{zheng24a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Zheng}}\ and\ \bibinfo {author} {\bibfnamefont {Z.}~\bibnamefont {Lu}},\ }\href {https://doi.org/10.48550/ARXIV.2403.10952} {\bibinfo {title} {Universal {{Non-equilibrium Response Theory Beyond Steady States}}}} (\bibinfo {year} {2024})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Barato}\ and\ \citenamefont {Seifert}(2015)}]{barato15}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.~C.}\ \bibnamefont {Barato}}\ and\ \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Thermodynamic uncertainty relation for biomolecular processes},\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {114}},\ \bibinfo {pages} {158101} (\bibinfo {year} {2015})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Horowitz}\ and\ \citenamefont {Gingrich}(2017)}]{horowitz17}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Horowitz}}\ and\ \bibinfo {author} {\bibfnamefont {T.~R.}\ \bibnamefont {Gingrich}},\ }\bibfield  {title} {\bibinfo {title} {Proof of the finite-time thermodynamic uncertainty relation for steady-state currents},\ }\href@noop {} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. E}\ }\textbf {\bibinfo {volume} {96}},\ \bibinfo {pages} {020103} (\bibinfo {year} {2017})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Horowitz}\ and\ \citenamefont {Gingrich}(2020)}]{horowitz20}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Horowitz}}\ and\ \bibinfo {author} {\bibfnamefont {T.~R.}\ \bibnamefont {Gingrich}},\ }\bibfield  {title} {\bibinfo {title} {Thermodynamic uncertainty relations constrain non-equilibrium fluctuations},\ }\href {https://doi.org/10.1038/s41567-019-0702-6} {\bibfield  {journal} {\bibinfo  {journal} {Nat. Phys.}\ }\textbf {\bibinfo {volume} {16}},\ \bibinfo {pages} {15} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Dieball}\ and\ \citenamefont {Godec}(2023)}]{dieball23}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Dieball}}\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Godec}},\ }\bibfield  {title} {\bibinfo {title} {Direct {{Route}} to {{Thermodynamic Uncertainty Relations}} and {{Their Saturation}}},\ }\href {https://doi.org/10.1103/PhysRevLett.130.087101} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {130}},\ \bibinfo {pages} {087101} (\bibinfo {year} {2023})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Owen}\ \emph {et~al.}(2020)\citenamefont {Owen}, \citenamefont {Gingrich},\ and\ \citenamefont {Horowitz}}]{owen20}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~A.}\ \bibnamefont {Owen}}, \bibinfo {author} {\bibfnamefont {T.~R.}\ \bibnamefont {Gingrich}},\ and\ \bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Horowitz}},\ }\bibfield  {title} {\bibinfo {title} {Universal {{Thermodynamic Bounds}} on {{Nonequilibrium Response}} with {{Biochemical Applications}}},\ }\href {https://doi.org/10.1103/PhysRevX.10.011066} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. X}\ }\textbf {\bibinfo {volume} {10}},\ \bibinfo {pages} {011066} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Fernandes~Martins}\ and\ \citenamefont {Horowitz}(2023)}]{fernandesmartins23}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Fernandes~Martins}}\ and\ \bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Horowitz}},\ }\bibfield  {title} {\bibinfo {title} {Topologically constrained fluctuations and thermodynamics regulate nonequilibrium response},\ }\href {https://doi.org/10.1103/PhysRevE.108.044113} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. E}\ }\textbf {\bibinfo {volume} {108}},\ \bibinfo {pages} {044113} (\bibinfo {year} {2023})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Ptaszynski}\ \emph {et~al.}(2024)\citenamefont {Ptaszynski}, \citenamefont {Aslyamov},\ and\ \citenamefont {Esposito}}]{ptaszynski24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Ptaszynski}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Aslyamov}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\href {https://doi.org/10.48550/ARXIV.2412.10233} {\bibinfo {title} {Nonequilibrium {{Fluctuation-Response Relations}} for {{State Observables}}}} (\bibinfo {year} {2024})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Ptaszynski}\ \emph {et~al.}(2025)\citenamefont {Ptaszynski}, \citenamefont {Aslyamov},\ and\ \citenamefont {Esposito}}]{ptaszynski25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Ptaszynski}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Aslyamov}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\href {https://doi.org/10.48550/ARXIV.2506.08877} {\bibinfo {title} {Nonequilibrium fluctuation-response relations for state-current correlations}} (\bibinfo {year} {2025})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Aslyamov}\ and\ \citenamefont {Esposito}(2024{\natexlab{a}})}]{aslyamov24a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Aslyamov}}\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\bibfield  {title} {\bibinfo {title} {Nonequilibrium {{Response}} for {{Markov Jump Processes}}: {{Exact Results}} and {{Tight Bounds}}},\ }\href {https://doi.org/10.1103/PhysRevLett.132.037101} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {132}},\ \bibinfo {pages} {037101} (\bibinfo {year} {2024}{\natexlab{a}})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Owen}\ and\ \citenamefont {Horowitz}(2023)}]{owen23}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~A.}\ \bibnamefont {Owen}}\ and\ \bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Horowitz}},\ }\bibfield  {title} {\bibinfo {title} {Size limits the sensitivity of kinetic schemes},\ }\bibfield  {journal} {\bibinfo  {journal} {Nat Commun}\ }\textbf {\bibinfo {volume} {14}},\ \href {https://doi.org/10.1038/s41467-023-36705-8} {10.1038/s41467-023-36705-8} (\bibinfo {year} {2023})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Harunari}\ \emph {et~al.}(2024)\citenamefont {Harunari}, \citenamefont {Dal~Cengio}, \citenamefont {Lecomte},\ and\ \citenamefont {Polettini}}]{harunari24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.~E.}\ \bibnamefont {Harunari}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Dal~Cengio}}, \bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Lecomte}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Polettini}},\ }\bibfield  {title} {\bibinfo {title} {Mutual {{Linearity}} of {{Nonequilibrium Network Currents}}},\ }\href {https://doi.org/10.1103/PhysRevLett.133.047401} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {133}},\ \bibinfo {pages} {047401} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Khodabandehlou}\ \emph {et~al.}(2025)\citenamefont {Khodabandehlou}, \citenamefont {Maes},\ and\ \citenamefont {Neto{\v c}n{\'y}}}]{khodabandehlou25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {F.}~\bibnamefont {Khodabandehlou}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Maes}},\ and\ \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Neto{\v c}n{\'y}}},\ }\bibfield  {title} {\bibinfo {title} {Affine relationships between steady currents},\ }\href {https://doi.org/10.1088/1751-8121/adc8ea} {\bibfield  {journal} {\bibinfo  {journal} {J. Phys. A: Math. Theor.}\ }\textbf {\bibinfo {volume} {58}},\ \bibinfo {pages} {155002} (\bibinfo {year} {2025})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Dal~Cengio}\ \emph {et~al.}(2025)\citenamefont {Dal~Cengio}, \citenamefont {Harunari}, \citenamefont {Lecomte},\ and\ \citenamefont {Polettini}}]{dalcengio25}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Dal~Cengio}}, \bibinfo {author} {\bibfnamefont {P.~E.}\ \bibnamefont {Harunari}}, \bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Lecomte}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Polettini}},\ }\bibfield  {title} {\bibinfo {title} {Mutual multilinearity of nonequilibrium network currents},\ }\href {https://doi.org/10.21468/SciPostPhys.19.4.111} {\bibfield  {journal} {\bibinfo  {journal} {SciPost Phys.}\ }\textbf {\bibinfo {volume} {19}},\ \bibinfo {pages} {111} (\bibinfo {year} {2025})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Ross}(2014)}]{ross14}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.~M.}\ \bibnamefont {Ross}},\ }\href@noop {} {\emph {\bibinfo {title} {Introduction to Probability Models}}},\ \bibinfo {edition} {eleventh edition}\ ed.\ (\bibinfo  {publisher} {Academic Press is an imprint of Elsevier},\ \bibinfo {address} {Amsterdam},\ \bibinfo {year} {2014})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Aslyamov}\ and\ \citenamefont {Esposito}(2024{\natexlab{b}})}]{aslyamov24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Aslyamov}}\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Esposito}},\ }\bibfield  {title} {\bibinfo {title} {General {{Theory}} of {{Static Response}} for {{Markov Jump Processes}}},\ }\href {https://doi.org/10.1103/PhysRevLett.133.107103} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {133}},\ \bibinfo {pages} {107103} (\bibinfo {year} {2024}{\natexlab{b}})}\BibitemShut {NoStop}
+\bibitem [{Note1()}]{Note1}
+  \BibitemOpen
+  \bibinfo {note} {Probability conservation enforces $\DOTSB \sum@ \slimits@ _{n=1}^{|\protect \mathcal {N}|} p_{n,m}^{(0)} = 1$ and $\DOTSB \sum@ \slimits@ _{n=1}^{|\protect \mathcal {N}|} \chi _{n,m}=0$.}\BibitemShut {Stop}
+\bibitem [{\citenamefont {Liang}\ \emph {et~al.}(2024)\citenamefont {Liang}, \citenamefont {De~Los~Rios},\ and\ \citenamefont {Busiello}}]{liang24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Liang}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {De~Los~Rios}},\ and\ \bibinfo {author} {\bibfnamefont {D.~M.}\ \bibnamefont {Busiello}},\ }\bibfield  {title} {\bibinfo {title} {Thermodynamic {{Bounds}} on {{Symmetry Breaking}} in {{Linear}} and {{Catalytic Biochemical Systems}}},\ }\href {https://doi.org/10.1103/PhysRevLett.132.228402} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {132}},\ \bibinfo {pages} {228402} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{sm()}]{sm}
+  \BibitemOpen
+  \href@noop {} {}\bibinfo {note} {See Supplemental Material at [url] for additional results, proofs, details on the examples, and Refs.~\cite{maes13, cetiner22,mallory20}}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Hill}(1966)}]{hill66}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {T.~L.}\ \bibnamefont {Hill}},\ }\bibfield  {title} {\bibinfo {title} {Studies in irreversible thermodynamics {{IV}}. diagrammatic representation of steady state fluxes for unimolecular systems},\ }\href {https://doi.org/10.1016/0022-5193(66)90137-8} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Theoretical Biology}\ }\textbf {\bibinfo {volume} {10}},\ \bibinfo {pages} {442} (\bibinfo {year} {1966})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Schnakenberg}(1976)}]{schnakenberg76}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Schnakenberg}},\ }\bibfield  {title} {\bibinfo {title} {Network theory of microscopic and macroscopic behavior of master equation systems},\ }\href {https://doi.org/10.1103/RevModPhys.48.571} {\bibfield  {journal} {\bibinfo  {journal} {Rev. Mod. Phys.}\ }\textbf {\bibinfo {volume} {48}},\ \bibinfo {pages} {571} (\bibinfo {year} {1976})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Tutte}\ and\ \citenamefont {{Nash-Williams}}(2005)}]{tutte05}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {W.~T.}\ \bibnamefont {Tutte}}\ and\ \bibinfo {author} {\bibfnamefont {C.~S. J.~A.}\ \bibnamefont {{Nash-Williams}}},\ }\href@noop {} {\emph {\bibinfo {title} {Graph Theory}}},\ \bibinfo {series} {Encyclopedia of Mathematics and Its Applications}\ No.~\bibinfo {number} {21}\ (\bibinfo  {publisher} {Cambridge Univ. Press},\ \bibinfo {address} {Cambridge},\ \bibinfo {year} {2005})\BibitemShut {NoStop}
+\bibitem [{Note2()}]{Note2}
+  \BibitemOpen
+  \bibinfo {note} {Rooted trees $\protect \mathcal {T}^\mu _n$ are defined as directed subgraphs containing all nodes and no cycles, with every node---except the root $n$---having outdegree one.}\BibitemShut {Stop}
+\bibitem [{Note3()}]{Note3}
+  \BibitemOpen
+  \bibinfo {note} {For a concrete example, consider Fig.~\ref {fig:4state}(d). Here, the upper $\protect \mathcal {B}^+_2$ ($\protect \mathcal {B}^-_4$) and lower $\protect \mathcal {B}^-_2$ ($\protect \mathcal {B}^+_4$) bounds of $p_2$ and $p_4$ are mirrored due to their different scalings with $k_{+I}$ [cf.~Fig.~\ref {fig:4state}(b)].}\BibitemShut {Stop}
+\bibitem [{\citenamefont {Merolle}\ \emph {et~al.}(2005)\citenamefont {Merolle}, \citenamefont {Garrahan},\ and\ \citenamefont {Chandler}}]{merolle05}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Merolle}}, \bibinfo {author} {\bibfnamefont {J.~P.}\ \bibnamefont {Garrahan}},\ and\ \bibinfo {author} {\bibfnamefont {D.}~\bibnamefont {Chandler}},\ }\bibfield  {title} {\bibinfo {title} {Space--time thermodynamics of the glass transition},\ }\href {https://doi.org/10.1073/pnas.0504820102} {\bibfield  {journal} {\bibinfo  {journal} {Proc. Natl. Acad. Sci. U.S.A.}\ }\textbf {\bibinfo {volume} {102}},\ \bibinfo {pages} {10837} (\bibinfo {year} {2005})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Maes}(2017{\natexlab{a}})}]{maes17a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Maes}},\ }\bibfield  {title} {\bibinfo {title} {Frenetic {{Bounds}} on the {{Entropy Production}}},\ }\href {https://doi.org/10.1103/PhysRevLett.119.160601} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {119}},\ \bibinfo {pages} {160601} (\bibinfo {year} {2017}{\natexlab{a}})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Maes}(2017{\natexlab{b}})}]{maes17}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Maes}},\ }\href@noop {} {\emph {\bibinfo {title} {Non-Dissipative Effects in Nonequilibrium Systems}}}\ (\bibinfo  {publisher} {Springer Berlin Heidelberg},\ \bibinfo {address} {New York, NY},\ \bibinfo {year} {2017})\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Di~Terlizzi}\ and\ \citenamefont {Baiesi}(2019)}]{diterlizzi19}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {I.}~\bibnamefont {Di~Terlizzi}}\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Baiesi}},\ }\bibfield  {title} {\bibinfo {title} {Kinetic uncertainty relation},\ }\href {https://doi.org/10.1088/1751-8121/aaee34} {\bibfield  {journal} {\bibinfo  {journal} {J. Phys. A: Math. Theor.}\ }\textbf {\bibinfo {volume} {52}},\ \bibinfo {pages} {02LT03} (\bibinfo {year} {2019})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Maes}(2020)}]{maes20a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Maes}},\ }\bibfield  {title} {\bibinfo {title} {Frenesy: {{Time-symmetric}} dynamical activity in nonequilibria},\ }\href {https://doi.org/10.1016/j.physrep.2020.01.002} {\bibfield  {journal} {\bibinfo  {journal} {Physics Reports}\ }\textbf {\bibinfo {volume} {850}},\ \bibinfo {pages} {1} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{Note4()}]{Note4}
+  \BibitemOpen
+  \bibinfo {note} {One example are currents through bridges, which are zero regardless of input rates.}\BibitemShut {Stop}
+\bibitem [{\citenamefont {Tu}(2008)}]{tu08}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Tu}},\ }\bibfield  {title} {\bibinfo {title} {The nonequilibrium mechanism for ultrasensitivity in a biological switch: {{Sensing}} by {{Maxwell}}'s demons},\ }\href {https://doi.org/10.1073/pnas.0804641105} {\bibfield  {journal} {\bibinfo  {journal} {Proc. Natl. Acad. Sci. U.S.A.}\ }\textbf {\bibinfo {volume} {105}},\ \bibinfo {pages} {11737} (\bibinfo {year} {2008})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Lan}\ \emph {et~al.}(2012)\citenamefont {Lan}, \citenamefont {Sartori}, \citenamefont {Neumann}, \citenamefont {Sourjik},\ and\ \citenamefont {Tu}}]{lan12}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Lan}}, \bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Sartori}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Neumann}}, \bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Sourjik}},\ and\ \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Tu}},\ }\bibfield  {title} {\bibinfo {title} {The energy--speed--accuracy trade-off in sensory adaptation},\ }\href {https://doi.org/10.1038/nphys2276} {\bibfield  {journal} {\bibinfo  {journal} {Nature Phys}\ }\textbf {\bibinfo {volume} {8}},\ \bibinfo {pages} {422} (\bibinfo {year} {2012})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Murugan}\ and\ \citenamefont {Vaikuntanathan}(2017)}]{murugan17}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Murugan}}\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Vaikuntanathan}},\ }\bibfield  {title} {\bibinfo {title} {Topologically protected modes in non-equilibrium stochastic systems},\ }\href {https://doi.org/10.1038/ncomms13881} {\bibfield  {journal} {\bibinfo  {journal} {Nat Commun}\ }\textbf {\bibinfo {volume} {8}},\ \bibinfo {pages} {13881} (\bibinfo {year} {2017})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Barkai}\ and\ \citenamefont {Leibler}(1997)}]{barkai97}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {N.}~\bibnamefont {Barkai}}\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Leibler}},\ }\bibfield  {title} {\bibinfo {title} {Robustness in simple biochemical networks},\ }\href {https://doi.org/10.1038/43199} {\bibfield  {journal} {\bibinfo  {journal} {Nature}\ }\textbf {\bibinfo {volume} {387}},\ \bibinfo {pages} {913} (\bibinfo {year} {1997})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Tu}(2013)}]{tu13}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Tu}},\ }\bibfield  {title} {\bibinfo {title} {Quantitative {{Modeling}} of {{Bacterial Chemotaxis}}: {{Signal Amplification}} and {{Accurate Adaptation}}},\ }\href {https://doi.org/10.1146/annurev-biophys-083012-130358} {\bibfield  {journal} {\bibinfo  {journal} {Annu. Rev. Biophys.}\ }\textbf {\bibinfo {volume} {42}},\ \bibinfo {pages} {337} (\bibinfo {year} {2013})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Endres}\ and\ \citenamefont {Wingreen}(2006)}]{endres06}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.~G.}\ \bibnamefont {Endres}}\ and\ \bibinfo {author} {\bibfnamefont {N.~S.}\ \bibnamefont {Wingreen}},\ }\bibfield  {title} {\bibinfo {title} {Precise adaptation in bacterial chemotaxis through ``assistance neighborhoods''},\ }\href {https://doi.org/10.1073/pnas.0603101103} {\bibfield  {journal} {\bibinfo  {journal} {Proc. Natl. Acad. Sci. U.S.A.}\ }\textbf {\bibinfo {volume} {103}},\ \bibinfo {pages} {13040} (\bibinfo {year} {2006})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Kalinin}\ \emph {et~al.}(2009)\citenamefont {Kalinin}, \citenamefont {Jiang}, \citenamefont {Tu},\ and\ \citenamefont {Wu}}]{kalinin09}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {Y.~V.}\ \bibnamefont {Kalinin}}, \bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Jiang}}, \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Tu}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Wu}},\ }\bibfield  {title} {\bibinfo {title} {Logarithmic {{Sensing}} in {{Escherichia}} coli {{Bacterial Chemotaxis}}},\ }\href {https://doi.org/10.1016/j.bpj.2008.10.027} {\bibfield  {journal} {\bibinfo  {journal} {Biophysical Journal}\ }\textbf {\bibinfo {volume} {96}},\ \bibinfo {pages} {2439} (\bibinfo {year} {2009})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Skoge}\ \emph {et~al.}(2013)\citenamefont {Skoge}, \citenamefont {Naqvi}, \citenamefont {Meir},\ and\ \citenamefont {Wingreen}}]{skoge13}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Skoge}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Naqvi}}, \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Meir}},\ and\ \bibinfo {author} {\bibfnamefont {N.~S.}\ \bibnamefont {Wingreen}},\ }\bibfield  {title} {\bibinfo {title} {Chemical {{Sensing}} by {{Nonequilibrium Cooperative Receptors}}},\ }\href {https://doi.org/10.1103/PhysRevLett.110.248102} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {110}},\ \bibinfo {pages} {248102} (\bibinfo {year} {2013})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Kharbanda}\ and\ \citenamefont {Sabass}(2024)}]{kharbanda24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Kharbanda}}\ and\ \bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Sabass}},\ }\bibfield  {title} {\bibinfo {title} {Sensory adaptation in a continuum model of bacterial chemotaxis---working range, cost-accuracy relation, and coupled systems},\ }\href {https://doi.org/10.1088/1367-2630/ad26ba} {\bibfield  {journal} {\bibinfo  {journal} {New J. Phys.}\ }\textbf {\bibinfo {volume} {26}},\ \bibinfo {pages} {023045} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Sartori}\ and\ \citenamefont {Tu}(2015)}]{sartori15}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Sartori}}\ and\ \bibinfo {author} {\bibfnamefont {Y.}~\bibnamefont {Tu}},\ }\bibfield  {title} {\bibinfo {title} {Free {{Energy Cost}} of {{Reducing Noise}} while {{Maintaining}} a {{High Sensitivity}}},\ }\href {https://doi.org/10.1103/PhysRevLett.115.118102} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {115}},\ \bibinfo {pages} {118102} (\bibinfo {year} {2015})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Tietz}\ \emph {et~al.}(2006)\citenamefont {Tietz}, \citenamefont {Schuler}, \citenamefont {Speck}, \citenamefont {Seifert},\ and\ \citenamefont {Wrachtrup}}]{tietz06}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Tietz}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Schuler}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Speck}}, \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Wrachtrup}},\ }\bibfield  {title} {\bibinfo {title} {Measurement of {{Stochastic Entropy Production}}},\ }\href {https://doi.org/10.1103/PhysRevLett.97.050602} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {97}},\ \bibinfo {pages} {050602} (\bibinfo {year} {2006})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Chung}\ \emph {et~al.}(2012)\citenamefont {Chung}, \citenamefont {McHale}, \citenamefont {Louis},\ and\ \citenamefont {Eaton}}]{chung12}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.~S.}\ \bibnamefont {Chung}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {McHale}}, \bibinfo {author} {\bibfnamefont {J.~M.}\ \bibnamefont {Louis}},\ and\ \bibinfo {author} {\bibfnamefont {W.~A.}\ \bibnamefont {Eaton}},\ }\bibfield  {title} {\bibinfo {title} {Single-{{Molecule Fluorescence Experiments Determine Protein Folding Transition Path Times}}},\ }\href {https://doi.org/10.1126/science.1215768} {\bibfield  {journal} {\bibinfo  {journal} {Science}\ }\textbf {\bibinfo {volume} {335}},\ \bibinfo {pages} {981} (\bibinfo {year} {2012})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Chung}\ and\ \citenamefont {Eaton}(2013)}]{chung13}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.~S.}\ \bibnamefont {Chung}}\ and\ \bibinfo {author} {\bibfnamefont {W.~A.}\ \bibnamefont {Eaton}},\ }\bibfield  {title} {\bibinfo {title} {Single-molecule fluorescence probes dynamics of barrier crossing},\ }\href {https://doi.org/10.1038/nature12649} {\bibfield  {journal} {\bibinfo  {journal} {Nature}\ }\textbf {\bibinfo {volume} {502}},\ \bibinfo {pages} {685} (\bibinfo {year} {2013})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Stigler}\ \emph {et~al.}(2011)\citenamefont {Stigler}, \citenamefont {Ziegler}, \citenamefont {Gieseke}, \citenamefont {Gebhardt},\ and\ \citenamefont {Rief}}]{stigler11}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Stigler}}, \bibinfo {author} {\bibfnamefont {F.}~\bibnamefont {Ziegler}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Gieseke}}, \bibinfo {author} {\bibfnamefont {J.~C.~M.}\ \bibnamefont {Gebhardt}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {Rief}},\ }\bibfield  {title} {\bibinfo {title} {The {{Complex Folding Network}} of {{Single Calmodulin Molecules}}},\ }\href {https://doi.org/10.1126/science.1207598} {\bibfield  {journal} {\bibinfo  {journal} {Science}\ }\textbf {\bibinfo {volume} {334}},\ \bibinfo {pages} {512} (\bibinfo {year} {2011})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Petrosyan}\ \emph {et~al.}(2021)\citenamefont {Petrosyan}, \citenamefont {Narayan},\ and\ \citenamefont {Woodside}}]{petrosyan21}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Petrosyan}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Narayan}},\ and\ \bibinfo {author} {\bibfnamefont {M.~T.}\ \bibnamefont {Woodside}},\ }\bibfield  {title} {\bibinfo {title} {Single-{{Molecule Force Spectroscopy}} of {{Protein Folding}}},\ }\href {https://doi.org/10.1016/j.jmb.2021.167207} {\bibfield  {journal} {\bibinfo  {journal} {Journal of Molecular Biology}\ }\textbf {\bibinfo {volume} {433}},\ \bibinfo {pages} {167207} (\bibinfo {year} {2021})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Ye}\ \emph {et~al.}(2018)\citenamefont {Ye}, \citenamefont {G{\"o}tz}, \citenamefont {Celiksoy}, \citenamefont {T{\"u}ting}, \citenamefont {Ratzke}, \citenamefont {Prasad}, \citenamefont {Ricken}, \citenamefont {Wegner}, \citenamefont {{Ahijado-Guzm{\'a}n}}, \citenamefont {Hugel},\ and\ \citenamefont {S{\"o}nnichsen}}]{ye18}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {W.}~\bibnamefont {Ye}}, \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {G{\"o}tz}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Celiksoy}}, \bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {T{\"u}ting}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Ratzke}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Prasad}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Ricken}}, \bibinfo {author} {\bibfnamefont {S.~V.}\ \bibnamefont {Wegner}}, \bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {{Ahijado-Guzm{\'a}n}}}, \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Hugel}},\ and\ \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {S{\"o}nnichsen}},\ }\bibfield  {title} {\bibinfo {title} {Conformational {{Dynamics}} of a {{Single Protein Monitored}} for 24 h at {{Video Rate}}},\ }\href {https://doi.org/10.1021/acs.nanolett.8b03342} {\bibfield  {journal} {\bibinfo  {journal} {Nano Lett.}\ }\textbf {\bibinfo {volume} {18}},\ \bibinfo {pages} {6633} (\bibinfo {year} {2018})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Vollmar}\ \emph {et~al.}(2024)\citenamefont {Vollmar}, \citenamefont {Bebon}, \citenamefont {Schimpf}, \citenamefont {Flietel}, \citenamefont {Celiksoy}, \citenamefont {S{\"o}nnichsen}, \citenamefont {Godec},\ and\ \citenamefont {Hugel}}]{vollmar24}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {L.}~\bibnamefont {Vollmar}}, \bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Bebon}}, \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Schimpf}}, \bibinfo {author} {\bibfnamefont {B.}~\bibnamefont {Flietel}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Celiksoy}}, \bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {S{\"o}nnichsen}}, \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Godec}},\ and\ \bibinfo {author} {\bibfnamefont {T.}~\bibnamefont {Hugel}},\ }\bibfield  {title} {\bibinfo {title} {Model-free inference of memory in conformational dynamics of a multi-domain protein},\ }\href {https://doi.org/10.1088/1751-8121/ad6d1e} {\bibfield  {journal} {\bibinfo  {journal} {J. Phys. A: Math. Theor.}\ }\textbf {\bibinfo {volume} {57}},\ \bibinfo {pages} {365001} (\bibinfo {year} {2024})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Arrhenius}(1889)}]{arrhenius89}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Arrhenius}},\ }\bibfield  {title} {\bibinfo {title} {\"uber die {{Reaktionsgeschwindigkeit}} bei der {{Inversion}} von {{Rohrzucker}} durch {{S\"auren}}},\ }\href {https://doi.org/10.1515/zpch-1889-0416} {\bibfield  {journal} {\bibinfo  {journal} {Z. F\"ur Phys. Chem.}\ }\textbf {\bibinfo {volume} {4U}},\ \bibinfo {pages} {226} (\bibinfo {year} {1889})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Eyring}(1935)}]{eyring35}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Eyring}},\ }\bibfield  {title} {\bibinfo {title} {The {{Activated Complex}} in {{Chemical Reactions}}},\ }\href {https://doi.org/10.1063/1.1749604} {\bibfield  {journal} {\bibinfo  {journal} {J. Chem. Phys.}\ }\textbf {\bibinfo {volume} {3}},\ \bibinfo {pages} {107} (\bibinfo {year} {1935})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Clifford}\ and\ \citenamefont {Sudbury}(1973)}]{clifford73}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {P.}~\bibnamefont {Clifford}}\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Sudbury}},\ }\bibfield  {title} {\bibinfo {title} {A model for spatial conflict},\ }\href {https://doi.org/10.1093/biomet/60.3.581} {\bibfield  {journal} {\bibinfo  {journal} {Biometrika}\ }\textbf {\bibinfo {volume} {60}},\ \bibinfo {pages} {581} (\bibinfo {year} {1973})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Sood}\ and\ \citenamefont {Redner}(2005)}]{sood05}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {V.}~\bibnamefont {Sood}}\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Redner}},\ }\bibfield  {title} {\bibinfo {title} {Voter {{Model}} on {{Heterogeneous Graphs}}},\ }\href {https://doi.org/10.1103/PhysRevLett.94.178701} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {94}},\ \bibinfo {pages} {178701} (\bibinfo {year} {2005})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {{\'A}ngeles~Serrano}\ \emph {et~al.}(2009)\citenamefont {{\'A}ngeles~Serrano}, \citenamefont {Klemm}, \citenamefont {Vazquez}, \citenamefont {Egu{\'i}luz},\ and\ \citenamefont {San~Miguel}}]{angelesserrano09}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {{\'A}ngeles~Serrano}}, \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Klemm}}, \bibinfo {author} {\bibfnamefont {F.}~\bibnamefont {Vazquez}}, \bibinfo {author} {\bibfnamefont {V.~M.}\ \bibnamefont {Egu{\'i}luz}},\ and\ \bibinfo {author} {\bibfnamefont {M.}~\bibnamefont {San~Miguel}},\ }\bibfield  {title} {\bibinfo {title} {Conservation laws for voter-like models on random directed networks},\ }\href {https://doi.org/10.1088/1742-5468/2009/10/P10024} {\bibfield  {journal} {\bibinfo  {journal} {J. Stat. Mech.}\ }\textbf {\bibinfo {volume} {2009}},\ \bibinfo {pages} {P10024} (\bibinfo {year} {2009})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Masuda}\ and\ \citenamefont {Ohtsuki}(2009)}]{masuda09}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {N.}~\bibnamefont {Masuda}}\ and\ \bibinfo {author} {\bibfnamefont {H.}~\bibnamefont {Ohtsuki}},\ }\bibfield  {title} {\bibinfo {title} {Evolutionary dynamics and fixation probabilities in directed networks},\ }\href {https://doi.org/10.1088/1367-2630/11/3/033012} {\bibfield  {journal} {\bibinfo  {journal} {New J. Phys.}\ }\textbf {\bibinfo {volume} {11}},\ \bibinfo {pages} {033012} (\bibinfo {year} {2009})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Maes}\ and\ \citenamefont {Neto{\v c}n{\'y}}(2013)}]{maes13}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {C.}~\bibnamefont {Maes}}\ and\ \bibinfo {author} {\bibfnamefont {K.}~\bibnamefont {Neto{\v c}n{\'y}}},\ }\bibfield  {title} {\bibinfo {title} {Heat {{Bounds}} and the {{Blowtorch Theorem}}},\ }\href {https://doi.org/10.1007/s00023-012-0214-8} {\bibfield  {journal} {\bibinfo  {journal} {Ann. Henri Poincar\'e}\ }\textbf {\bibinfo {volume} {14}},\ \bibinfo {pages} {1193} (\bibinfo {year} {2013})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {{\c C}etiner}\ and\ \citenamefont {Gunawardena}(2022)}]{cetiner22}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {{\c C}etiner}}\ and\ \bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Gunawardena}},\ }\bibfield  {title} {\bibinfo {title} {Reformulating nonequilibrium steady states and generalized {{Hopfield}} discrimination},\ }\href {https://doi.org/10.1103/PhysRevE.106.064128} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. E}\ }\textbf {\bibinfo {volume} {106}},\ \bibinfo {pages} {064128} (\bibinfo {year} {2022})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Mallory}\ \emph {et~al.}(2020)\citenamefont {Mallory}, \citenamefont {Kolomeisky},\ and\ \citenamefont {Igoshin}}]{mallory20}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.~D.}\ \bibnamefont {Mallory}}, \bibinfo {author} {\bibfnamefont {A.~B.}\ \bibnamefont {Kolomeisky}},\ and\ \bibinfo {author} {\bibfnamefont {O.~A.}\ \bibnamefont {Igoshin}},\ }\bibfield  {title} {\bibinfo {title} {Kinetic control of stationary flux ratios for a wide range of biochemical processes},\ }\href {https://doi.org/10.1073/pnas.1920873117} {\bibfield  {journal} {\bibinfo  {journal} {Proc. Natl. Acad. Sci. U.S.A.}\ }\textbf {\bibinfo {volume} {117}},\ \bibinfo {pages} {8884} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Evans}\ and\ \citenamefont {Majumdar}(2011)}]{evans11}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.~R.}\ \bibnamefont {Evans}}\ and\ \bibinfo {author} {\bibfnamefont {S.~N.}\ \bibnamefont {Majumdar}},\ }\bibfield  {title} {\bibinfo {title} {Diffusion with {{Stochastic Resetting}}},\ }\href {https://doi.org/10.1103/PhysRevLett.106.160601} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {106}},\ \bibinfo {pages} {160601} (\bibinfo {year} {2011})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Fuchs}\ \emph {et~al.}(2016)\citenamefont {Fuchs}, \citenamefont {Goldt},\ and\ \citenamefont {Seifert}}]{fuchs16}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {J.}~\bibnamefont {Fuchs}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Goldt}},\ and\ \bibinfo {author} {\bibfnamefont {U.}~\bibnamefont {Seifert}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic thermodynamics of resetting},\ }\href {https://doi.org/10.1209/0295-5075/113/60009} {\bibfield  {journal} {\bibinfo  {journal} {EPL}\ }\textbf {\bibinfo {volume} {113}},\ \bibinfo {pages} {60009} (\bibinfo {year} {2016})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Pal}\ and\ \citenamefont {Reuveni}(2017)}]{pal17}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Pal}}\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Reuveni}},\ }\bibfield  {title} {\bibinfo {title} {First {{Passage}} under {{Restart}}},\ }\href {https://doi.org/10.1103/PhysRevLett.118.030603} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {118}},\ \bibinfo {pages} {030603} (\bibinfo {year} {2017})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Evans}\ \emph {et~al.}(2020)\citenamefont {Evans}, \citenamefont {Majumdar},\ and\ \citenamefont {Schehr}}]{evans20}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {M.~R.}\ \bibnamefont {Evans}}, \bibinfo {author} {\bibfnamefont {S.~N.}\ \bibnamefont {Majumdar}},\ and\ \bibinfo {author} {\bibfnamefont {G.}~\bibnamefont {Schehr}},\ }\bibfield  {title} {\bibinfo {title} {Stochastic resetting and applications},\ }\href {https://doi.org/10.1088/1751-8121/ab7cfe} {\bibfield  {journal} {\bibinfo  {journal} {J. Phys. A: Math. Theor.}\ }\textbf {\bibinfo {volume} {53}},\ \bibinfo {pages} {193001} (\bibinfo {year} {2020})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Bebon}\ and\ \citenamefont {Godec}(2023)}]{bebon23}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {R.}~\bibnamefont {Bebon}}\ and\ \bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Godec}},\ }\bibfield  {title} {\bibinfo {title} {Controlling {{Uncertainty}} of {{Empirical First-Passage Times}} in the {{Small-Sample Regime}}},\ }\href {https://doi.org/10.1103/PhysRevLett.131.237101} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Lett.}\ }\textbf {\bibinfo {volume} {131}},\ \bibinfo {pages} {237101} (\bibinfo {year} {2023})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Pal}\ \emph {et~al.}(2021{\natexlab{a}})\citenamefont {Pal}, \citenamefont {Reuveni},\ and\ \citenamefont {Rahav}}]{pal21}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Pal}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Reuveni}},\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Rahav}},\ }\bibfield  {title} {\bibinfo {title} {Thermodynamic uncertainty relation for systems with unidirectional transitions},\ }\href {https://doi.org/10.1103/PhysRevResearch.3.013273} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Research}\ }\textbf {\bibinfo {volume} {3}},\ \bibinfo {pages} {013273} (\bibinfo {year} {2021}{\natexlab{a}})}\BibitemShut {NoStop}
+\bibitem [{\citenamefont {Pal}\ \emph {et~al.}(2021{\natexlab{b}})\citenamefont {Pal}, \citenamefont {Reuveni},\ and\ \citenamefont {Rahav}}]{pal21a}
+  \BibitemOpen
+  \bibfield  {author} {\bibinfo {author} {\bibfnamefont {A.}~\bibnamefont {Pal}}, \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Reuveni}},\ and\ \bibinfo {author} {\bibfnamefont {S.}~\bibnamefont {Rahav}},\ }\bibfield  {title} {\bibinfo {title} {Thermodynamic uncertainty relation for first-passage times on {{Markov}} chains},\ }\href {https://doi.org/10.1103/PhysRevResearch.3.L032034} {\bibfield  {journal} {\bibinfo  {journal} {Phys. Rev. Research}\ }\textbf {\bibinfo {volume} {3}},\ \bibinfo {pages} {L032034} (\bibinfo {year} {2021}{\natexlab{b}})}\BibitemShut {NoStop}
+\end{thebibliography}
+
+
+
+\onecolumngrid
+\section*{End Matter}
+\twocolumngrid
+\renewcommand{\theequation}{A\arabic{equation}}
+\setcounter{equation}{0}
+
+\emph{Appendix A: Proof of linearity of steady-state probabilities.}---We use Eq.~\eqref{eq:response_prob} to calculate the response of steady-state probabilities subjected to perturbations in the rates $\kpm$. We consider the matrix
+\begin{align}
+ \mat{W}_{i} = \begin{pNiceMatrix}[last-col,first-row]
+  & i  & j  & & \\
+  \ddots& &  & &\\
+  & 1 & 1 & & i\\[1ex]
+  & \kp & -\km-\ldots & & j  \\
+       &  &  & \ddots & \\
+\end{pNiceMatrix}
+\label{app_eq:W_n}
+\end{align}
+in which the appearance of input rates $\kpm$ is reduced to only two entries: $(i,j)$ and the diagonal element $(j,j)$. We find
+\begin{align}
+  \partial_{\kp} p_n &= - \left[\mat{W}^{-1}_{i}\right]_{n,j} p_{i} = - \frac{\left[\adj\left(\mat{W}_{i}\right)\right]_{n,j}}{\det\left( \mat{W}_{i}\right)}  p_{i} \nonumber \\
+  \partial_{\km} p_n &=  \left[\mat{W}^{-1}_{i}\right]_{n,j} p_{j} =  \frac{\left[\adj\left(\mat{W}_{i}\right)\right]_{n,j}}{\det\left( \mat{W}_{i}\right)}  p_{j}
+  \label{eq:response}
+\end{align}
+for an arbitrary vertex $n$. The second equalities are obtained by exploiting the relation between adjugate matrix $\adj\left(\mat{W}_{i}\right)$, with $\left[\adj(\W)\right]_{n, m} \equiv (-1)^{n+m}\det\left(\mat{W}_{i\backslash (m,n)}\right)$---this is equivalent to the transpose of the cofactor matrix of $\W$---and inverse of $\mat{W}_i$
+\begin{align}
+  \adj\left(\mat{W}_{i}\right) =  \mat{W}^{-1}_{i}\det\left( \mat{W}_{i}\right).
+  \label{eq:adj}
+\end{align}
+As our main results, we find from Eqs.~\eqref{eq:response} and~\eqref{eq:adj}
+\begin{align}
+  \frac{\partial_{\kpm} p_n}{\partial_{\kpm} p_m} = \frac{\left[\adj\left(\W\right)\right]_{n, j}}{\left[\adj\left(\W\right)\right]_{m, j}} \equiv \chi_{n,m}.
+\end{align}
+The mutual linearity relation in Eq.~\eqref{eq:linearity} then follows immediately. The relation holds except if $p_m = 0$ for all $\kpm$, which is generally impossible for irreducible graphs unless transition rates are infinitely large.
+
+\emph{Appendix B: Probability bounds for unidirectional control.}---While the bounds in Eq.~\eqref{eq:bounds} also hold if only one of the input rates is controlled or if the edge is totally irreversible, the bound corresponding to the fixed (or zero) rate overestimates the range of accessible values. Instead, $\lim_{\kpm \to 0} p_n$ results in the bounds
+\begin{align}
+  \mathcal{U}^+_n \equiv  \frac{\tau_{n\backslash i \to j} }{\sum_l \tau_{l \backslash i\to j}} \qquad \mathcal{U}^-_n \equiv \frac{\tau_{n\backslash j\to i} }{\sum_l \tau_{l \backslash j \to i}},
+  \label{eq:tight_bounds}
+\end{align}
+that  limit all possible solutions. Note that writing $\tau_{n\backslash i\to j} = \tau_{n\backslash i\leftrightarrow j} + \km \tau_{n}^{/ j\to i}$, and analog for $\tau_{n\backslash j\to i}$, the bounds are independent of the controlled rate. Analytical expressions for the affine coefficients and susceptibilities follow from Eq.~\eqref{eq:offset_suscs} upon replacing $\mathcal{B}_{\lbrace n,m\rbrace}^\pm \to \mathcal{U}_{\lbrace n,m\rbrace}^\mp$ for the respective cases.
+
+\begin{figure}[b!]
+  \includegraphics{figures/calmodulin_updated.pdf}
+  \caption{(a) Calmodulin folding network~\cite{stigler11} with an added unidirectional resetting transition with rate $r$ (orange) from an intermediate ``$3$'' to the unfolded state ``$1$''. The unidirectional rate is subject to external control. (b) Linear relation between steady-state probabilities and $p_1$. The black dashed lines and grey shaded areas indicate the bounds on $p_1$ given by Eqs.~\eqref{eq:bounds} and~\eqref{eq:tight_bounds} respectively. The grey dotted line shows the bound $\mathcal{B}_1^-$ [Eq.~\eqref{eq:bounds}]. (c) Currents through the two different folding pathways $\mathcal{J}_1 \equiv j_{15} + j_{56}$ and $\mathcal{J}_2\equiv j_{12}+j_{26}$, as well as the resetting flux $\mathcal{J}_r \equiv p_3r$ (see inset) over the resetting rate $r$. (d) The same observables as in (c) plotted over the entropy production rate of all microscopically reversible transitions $\sig_\mathrm{rev} \equiv \sum_{n < m\in \mathcal{N}\backslash \lbrace I \rbrace} j_{nm} \ln(k_{nm}/k_{mn})$.}
+  \label{fig:calmodulin}
+\end{figure}
+
+\emph{Appendix C: Calmodulin folding.}---For a second concrete illustration, we consider an experimentally inferred folding network of single calmodulin proteins~\cite{stigler11}, which we augment by a unidirectional irreversible transition that stochastically ``resets''~\cite{evans11, fuchs16, pal17, evans20} the protein from the intermediate state ``$3$'' to the unfolded state ``$1$'' with rate $\kp \equiv r$ [Fig.~\ref{fig:calmodulin}(a)]. This unidirectional transition is subjected to external control while the remaining rates are fixed and satisfy detailed balance~\cite{sm, bebon23}, i.e., for $r=0$ the system is in thermal equilibrium. Importantly, the irreducibility assumption entering Eq.~\eqref{eq:linearity} is satisfied by networks containing unidirectional transitions, provided absorbing states are absent and all bridges---edges that connect otherwise isolated subsets of states---are microscopically reversible.
+
+While the probabilities to observe different protein configurations are nonlinear functions of $r$, they are linearly related to each other [Eq.~\eqref{eq:linearity}]. For instance, all probabilities vary linearly with $p_1$---the probability of the unfolded state---as depicted in Fig.~\ref{fig:calmodulin}(b). However, although we allow $r\geq 0$ to take arbitrarily large values, the redistribution of probability among states is intrinsically limited by the topology and kinetic properties of the network, which restricts viable solutions to the values bounded by $\mathcal{B}_n^+$ [Eq.~\eqref{eq:bounds}] and $\mathcal{U}_n^+$ [Eq.~\eqref{eq:tight_bounds}]. The latter replaces $\mathcal{B}^-_n$ for the unidirectional input edge considered here (see \emph{Appendix B}).
+
+Along similar lines, observables expressed through Eq.~\eqref{eq:obs} depend non-trivially on the controlled rate $r$ [Fig.~\eqref{fig:calmodulin}(c)]. Among themselves, however, any two observables are linearly related according to Eq.~\eqref{eq:obs_lin}. In Fig.~\eqref{fig:calmodulin}(d) we illustrate the linear relationship between the mesoscopic currents $\mathcal{J}_ {\lbrace 1, 2 \rbrace}$ through different folding pathways, the resetting flux $\mathcal{J}_r$ (see inset), and the entropy production rate of all microscopically reversible transitions $\sig_\mathrm{rev}$~\cite{pal21, pal21a}. The associated affine coefficients, susceptibilities, and bounds follow straightforwardly from Eq.~\eqref{eq:offset_sucs_bounds}.
+
+\emph{Appendix D: Sensory adaptation.}---To illustrate the broad range of applicability of the linearity relations in Eqs.~\eqref{eq:linearity} and~\eqref{eq:obs_lin}, we examine various observables in Fig.~\ref{fig:chemotaxis}(b). As state observables we consider the average methylation level, defined as
+\begin{align}
+  \mean{m} \equiv \sum_{m=0}^M  m \left[p(m,0) +p(m,1) \right]
+  \label{app_eq:avgm}
+\end{align}
+and the average output activity
+\begin{align}
+  \langle a \rangle \equiv \sum_{m=0}^{M}  p(m,1),
+  \label{app_eq:ptumble}
+\end{align}
+that characterized the fraction of time the receptor spends in its active, $a=1$, state.
+As counting observables we consider the mesoscopic traffic along the activity axis $a=1$
+\begin{align}
+t_{0\leftrightarrow M}^{(1)} &\equiv \sum_{m=0}^{M-1} \left[p(m,1) \om_+^{(0)} + p(m+1,1) \om_-^{(0)}\right],
+\label{app_eq:traf}
+\end{align}
+and the current through the input edge at $m^\ast=2$
+\begin{align}
+j^{(1)\rightarrow (0)}_{m^\ast} &\equiv p(m^\ast,1) k_{m^\ast}^{(0)} - p(m^\ast,0)k_{m^\ast}^{(1)}. \label{app_eq:cur}
+\end{align}
+For a proof that the input current indeed satisfies a linearity relation, although it appears to depend on $\kpm$ explicitly, see the Supplemental Material~\cite{sm}.
+
+To corroborate the discussion of the sensory adaptation model, Fig.~\ref{fig:probabilities_chemo} depicts the steady-state probabilities of a network with $M=20$ methylation levels. The same model is considered in Fig.~\ref{fig:chemotaxis}(d).
+\begin{figure}
+  \includegraphics{figures/chemo_probabilities.pdf}
+  \caption{Steady-state probabilities of a chemotaxis ladder with $M=20$ methylation levels for various driving strengths $\Delta \mu$ (in steps of $0.5$). Each circle corresponds to a state of the active $a=1$ (top) and passive $a=0$ (bottom) branch. Colors indicate the occupation probabilities, where we cap the colorbar at a value of $0.08$ to improve readability. The input edge located at $m^\ast = 10$ is highlighted in orange. Here, we use $S=0$, such that cycles are centered around $m^\ast$~\cite{sm}.}
+  \label{fig:probabilities_chemo}
+\end{figure}
+
+\clearpage
+\newpage
+\onecolumngrid
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\setcounter{equation}{0}
+\setcounter{figure}{0}
+\setcounter{page}{1}
+\setcounter{section}{0}
+
+\begin{center}\textbf{{\small Supplemental Material for} \\ Mutual Linearity is a Generic Property of Steady-State Markov Networks}\\[0.2cm]
+Robin Bebon and Thomas Speck\\
+\emph{Institute for Theoretical Physics IV, University of Stuttgart, Heisenbergstr.~3, 70569 Stuttgart, Germany}\\[0.6cm]\end{center}
+
+
+\section{Mutual linearity for observables containing the input edge}
+In Eq.~(9) of the main text we define a general class of observables that display linear relationships among themselves. However, the summation over transitions excludes those through edge $I$ to circumvent explicit dependencies on the perturbed, and therefore non-constant, rates $\kpm$. In this section, we show that this restriction can be lifted for two commonly encountered cases: (i) For time-asymmetric counting observables through edge $I$, i.e., $d_{ij} = -d_{ji}$, and (ii) if only a single transition rate is perturbed. The former holds for all current-like observables and the latter is ensured for unidirectional input edges, or if only one of the rates $\kpm$ is independent of the external control (e.g., when modeling the binding $\leftrightarrow$ unbinding dynamics of receptors or enzymes in response to changes in solute concentration).
+
+To achieve our goal, it suffices to show that a counting observable on the subset of states $\mathcal{I} = \lbrace i,j \rbrace$ satisfies a linear affine relation with the probability $p_n$ of a given state $n$. Generalization to other observables follows by virtue of Eqs.~(2) and~(10) of the main text. Thus, we consider
+\begin{align}
+\mathcal{O}_\mathcal{I} = d_{ij} \kp p_i + d_{ji} \km p_j = d_{ij} \kp \left( p_{i,n}^{(0)} + \chi_{i,n} p_n  \right)  +  d_{ji} \km \left( p_{j,n}^{(0)} + \chi_{j,n} p_n  \right) \overset{?}{=} \mathcal{O}^{(0)}_{\mathcal{I}, n} + \mathcal{X}_{\mathcal{I},n} p_n
+\label{eq_SI:obs}
+\end{align}
+and determine the conditions under which the last equality holds. For the second equality we use Eq.~(2) of the main text and, without loss of generality, take the multiplicative factor $\beta=1$. Employing Eq.~(8) together with Eq.~(7) of the main text, we express
+\begin{align}
+  p_{i,n}^{(0)} = \frac{\tup{i}{j \to i} \tup{n}{i \to j}}{\Omega} \qquad \text{and} \qquad \chi_{i,n} =- \frac{\tup{i}{j\to i} \sum_l \tup{l}{i\to j} } {\Omega},
+\end{align}
+and analogous for $j$. Both share the normalization factor $\Omega \equiv (\mathcal{B}_n^+ - \mathcal{B}_n^-) \sum_{l} \tup{l}{i\to j} \sum_m \tup{m}{j \to i}$ and we realize $\tup{i}{i\to j} = \tup{j}{j\to i} = 0$, since per definition of rooted trees the outdegree of the root state is zero. With that, terms containing susceptibilities in Eq.~\eqref{eq_SI:obs} can be expressed as
+\begin{align}
+  d_{ij} \kp \chi_{i,n} + d_{ji} \km \chi_{j,n}  = \frac{1}{\Omega} \left[ d_{ij} \sum_l \left( \tdown{l}{i \leftrightarrow j} - \tau_l \right) +  (d_{ij}+ d_{ji}) \km \sum_l \tup{l}{j\to i} \right] \tup{i}{j \to i},
+  \label{eq_SI:susc}
+\end{align}
+where we further used the fact that $\tup{j}{i\to j} = \tup{i}{j\to i}$, alongside the decomposition from Eq.~(6) of the main text. In a similar fashion, the remaining terms of Eq.~\eqref{eq_SI:obs} can be rewritten as
+\begin{align}
+  d_{ij} \kp p_{i,n}^{(0)} + d_{ji} \km p_{j,n}^{(0)} = \frac{1}{\Omega} \left[ d_{ij} \sum_l \tau_l p_n - d_{ij} \tdown{n}{i\leftrightarrow j} - (d_{ij} + d_{ji}) \km \tup{n}{j\to i}\right] \tup{i}{j\to i}.
+  \label{eq_SI:offset}
+\end{align}
+Identification of $p_n$ in the first term follows by multiplying with $\sum_l \tau_l / (\sum_l \tau_l)$ and the Markov chain tree theorem. Note that the explicit dependence on $\km$ in Eqs.~\eqref{eq_SI:susc} and~\eqref{eq_SI:offset} can be expressed in terms of rate $\kp$ if required.
+
+Collecting terms, Eq.~\eqref{eq_SI:obs} can be written in the desired form
+\begin{align}
+  \mathcal{O}_\mathcal{I} &= \underbrace{\frac{ \tup{i}{j\to i}}{\Omega} \left[- d_{ij} \tdown{n}{i\leftrightarrow j}  - (d_{ij}+d_{ji}) \km \tup{n}{j\to i} \right]}_{\equiv \mathcal{O}^{(0)}_{\mathcal{I},n}} + \underbrace{\frac{ \tup{i}{j\to i}}{\Omega} \left[ d_{ij} \sum_l \tdown{l}{i \leftrightarrow j} + (d_{ij} +d_{ji}) \km \sum_l \tup{l}{j\to i}  \right]}_{\equiv \mathcal{X}_{\mathcal{I},n}} p_n,
+\end{align}
+which defines the affine coefficient $\mathcal{O}^{(0)}_{\mathcal{I},n}$ and susceptibility $\mathcal{X}_{\mathcal{I},n}$. Notably, both are constant in case a single rate (here $\kp$) is perturbed, if the input edge is unidirectional ($\km = 0$), or if increments $d_{ij} = -d_{ji}$ are asymmetric.
+
+
+\section{Thermodynamic bounds on the relative response of steady-state probabilities}
+
+To assign trees $\mathcal{T}^\mu$ with a physically meaningful measure of relevance, the authors of Ref.~\cite{liang24} introduce the quantity $K_{nm}^\mu \equiv \om(\mathcal{T}_n^\mu)/ \om(\mathcal{T}_m^\mu)$. Given two states $n$ and $m$, each tree $\mathcal{T}^\mu$ defines a unique reaction pathway connecting the two and $K_{nm}^\mu$ corresponds to the ratio of products between forward and backward rates along edges of the pathway. Rates of transitions that are not contained in the reaction pathway cancel. For an illustration see Fig.~\ref{fig:4state_LDB}(a) and (b). If transition rates obey local detailed balance, $K_{ij}^\mu$ is a pseudo-equilibrium quantity that is solely determined by the thermodynamic affinity associated with specific reaction pathways in the system, which are shown to upper and lower bound the ratio of steady state probabilities~\cite{liang24} (see also Refs.~\cite{maes13, cetiner22})
+\begin{align}
+  \min_\mu \left( K_{nm}^\mu\right) \leq \frac{p_n}{p_m} \leq \max_\mu\left(K_{nm}^\mu\right).
+  \label{eq_SI:bounds_prob}
+\end{align}
+Thus, the probability ratio of any two states is upper (lower) bounded by the maximal (minimal) affinity of all reaction pathways that connect these two states.
+
+Leveraging Eq.~(5) of the main text, we immediately find the spin-off relation
+\begin{align}
+  \min_\mu \left( K_{ij}^\mu\right) \leq -\frac{\partial_{\kp} p_n}{\partial_{\km} p_n} \leq \max_\mu\left(K_{ij}^\mu\right),
+  \label{eq_SI:TD_bounds}
+\end{align}
+upon substituting the probabilities of states $i$ and $j$ that span input $I$ into Eq.~\eqref{eq_SI:bounds_prob}. Intriguingly, Eq.~\eqref{eq_SI:TD_bounds} reveals that the sensitivity of probabilities is fundamentally bounded by the affinity of pathways connecting the states that span the input edge. In case of perturbations around thermal equilibrium, Eq.~\eqref{eq_SI:TD_bounds} saturates as both the upper and lower bound reduce to the Boltzmann factor.
+
+
+To illustrate Eq.~\eqref{eq_SI:TD_bounds}, we revisit the 4-state model from Fig.~1(a) of the main text in Fig.~\ref{fig:4state_LDB}(c). Here, rates are parameterized such that local detailed balance is obeyed (for details see Sec.~\ref{sec:4stateLDB}). For the considered parameter range, the lower bound corresponds to the three step pathway ($1 \leftrightarrow 4 \leftrightarrow 3 \leftrightarrow 2$), whereas the upper bound---and consequently the maximal affinity---follows from transitions through the input edge ($1\leftrightarrow 2$) itself.
+
+\begin{figure}
+  \centering
+  \includegraphics{figures/4state_LDB.pdf}
+  \caption{We revisit the 4-state model from Fig.~1(a) of the main text. (a)~Spanning trees $\mathcal{T^\mu}$ of the network. (b)~Pictorial calculation of $K_{ij}^\mu$ for an example tree. Taking the ratio of rate polynomials leaves an unique reaction pathway (blue). (c)~Upper (orange) and lower (red) bounds on the relative response of steady-state probabilities (black). The pathways that correspond to the respective bound are indicated in the inset.}
+  \label{fig:4state_LDB}
+\end{figure}
+
+\section{Specific rate parametrization and response relations}
+Throughout the main text, no assumptions were made about the specific parametrization of transition rates. Here we want to change this and assume rates in the form of (setting $\kT=1$)
+\begin{align}
+  k_{nm} = \kap \exp{\left(E_{n}-B_{nm} + \theta_{n} F_{nm} \right)} \qquad k_{mn} = \kap \exp{\left(E_{m}- B_{mn} + \theta_{m} F_{mn} \right)},
+  \label{eq_SI:parametrization}
+\end{align}
+where $E_{\lbrace n,m \rbrace}$ are state parameters of the states $n$ and $m$, $B_{nm}=B_{mn}$ are symmetric edge parameters, $F_{nm}= -F_{mn}$ are asymmetric edge parameters, and $\theta_{\lbrace n, m \rbrace}$ are load sharing factors that satisfy $\theta_{n} + \theta_{m} =1$. This parametrization obeys local detailed balance. Instead of the whole rate, we will now consider perturbations to only the (a)symmetric edge parameter of the input $I$. For the response of steady-state probabilities to changes in the symmetric parameter $B_{ij}$ we find
+\begin{align}
+  \pd{p_n}{B_{ij}} &= \pd{p_n}{\kp} \pd{\kp}{B_{ij}} + \pd{p_n}{\km} \pd{\km}{B_{ij}} \nonumber\\
+  &= -\pd{p_n}{\kp} \left( \kp - \km \frac{p_j}{p_i}  \right) \label{eq_SI:response_sym} \\ \nonumber
+  & = \frac{\left[\adj(\mat{W}_i)\right]_{n, j}}{\det(\mat{W}_i)} j_{ij}.
+\end{align}
+For the second equality we used Eq.~(5) of the main text and the last equality was obtained by inserting Eq.~(A2). Note that the final line recovers a response relation previously derived by Aslyamov \& Esposito~\cite{aslyamov24}. Analogously we find for the asymmetric edge parameter
+\begin{align}
+  \pd{p_n}{F_{ij}} &=  \pd{p_n}{\kp} \left(\theta_{i} \kp + \theta_{j} \km  \frac{p_j}{p_i} \right) \nonumber \\
+  &= -\frac{\left[\adj(\mat{W}_i)\right]_{n, j}}{\det(\mat{W}_i)} \left(\theta_{i} \kp p_i + \theta_{j} \km p_j   \right).
+  \label{eq_SI:response_asym}
+\end{align}
+In case of symmetric load sharing ($\theta_{i} = \theta_{j} = 1/2$) the term in parentheses reduces to $t_{ij}/2$ and we again recover the result from Ref.~\cite{aslyamov24}. In case the load is fully carried by one of the transitions (e.g., $\theta_{i}=1$) the parentheses instead reduce to the probability flux along the load carrying transition ($J_{i\to j} = p_i k_{+I}$). Note that perturbing state parameters (or energies) $E_n$ would influence all rates leading out of the state and is thus not permitted here. However, it was found that perturbation of such kinetic properties results in a constant ratio of currents withing the network~\cite{mallory20}.
+
+The results from Eqs.~\eqref{eq_SI:response_sym} and~\eqref{eq_SI:response_asym} extend straightforwardly to the general observables from Eq.~(9) of the main text, yielding the response relations
+\begin{multline}
+  \begin{bmatrix}
+  \partial_{B_{ij}} \\[.7ex]
+  \partial_{F_{ij}}
+  \end{bmatrix}
+  \mathcal{O}_A
+  = \frac{1}{\det(\mat{W}_i)} \left\lbrace \al \sum_{m\in A} c_m \left[\adj(\mat{W}_i)\right]_{m, j} + \beta \sum_{\substack{l,m \in A}} d_{ml} k_{ml} \left[\adj(\mat{W}_i)\right]_{m, j} \right\rbrace
+  \begin{bmatrix}
+  j_{ij} \\[.7ex]
+  (\theta_i \kp p_i + \theta_j \km p_j)
+  \end{bmatrix}
+  \\
+  + \delta_{I \in A} \beta
+  \begin{bmatrix}
+  -(d_{ij} \kp p_i + d_{ji} \km p_j) \\[.7ex]
+  (d_{ij}\theta_i \kp p_i - d_{ji} \theta_j \km p_j)
+  \end{bmatrix}.
+  \label{eq_SI:obs_response}
+\end{multline}
+Note that we include possible transitions through the input edge by summing over all transitions between the states of $A$ and $\delta_{I \in A}$ is unity if $i$ and $j \in A$ and zero otherwise. Equation~\eqref{eq_SI:obs_response} offers analytical expressions for the response of observables $\mathcal{O}_A$ to changes in a single rate parameter. For $\mathcal{O}_A= \lbrace j_{ij}, t_{ij} \rbrace$ and $\theta_i=\theta_j=1/2$, we once more recover the results of Ref.~\cite{aslyamov24} and augment them with additional response relations that hold for non-local perturbations.
+
+\section{Numerical evaluation of spanning-tree polynomials}
+To conveniently calculate spanning tree polynomials we make use of the matrix-tree theorem for weighted graphs~\cite{hill66, schnakenberg76, tutte05}. First we define the weighted Laplacian matrix
+\begin{align}
+ \left[\bm{\mathcal{L}}\right]_{n,m} = -\left[\vec W\right]_{n,m}=
+ \begin{cases}
+   \sum_{l\neq n} k_{nl} &\text{for $n=m$} \\
+   - k_{mn} &\text{otherwise,}
+ \end{cases}
+\end{align}
+as minus the generator $\vec W$ of the Markovian jump process.
+The matrix-tree theorem then states that the sum of all rooted spanning tree polynomials is given by
+\begin{align}
+  \tau_n = \det(\bm{\mathcal{L}}_{\backslash (n,n)})
+\end{align}
+with the reduced Laplacian matrix $\bm{\mathcal{L}}_{\backslash (n,n)}$ obtained by deleting the $n$th row and column. Similarly, one can calculate any $\tau_{n\backslash i\to j} = \det(\bm{\mathcal{L}}_{\backslash (n,n)|\kp=0})$ by evaluating the reduced matrix at $\kp = 0$; $\tau_{n\backslash j\to i}$ follows analogously. From aboves expressions one can straightforwardly deduce
+\begin{align}
+  \tau_n^{/i\to j } = \left[ \det(\bm{\mathcal{L}}_{\backslash (n,n)}) - \det(\bm{\mathcal{L}}_{\backslash (n,n)|\kp=0} ) \right]_{\kp =1},
+\end{align}
+and similar for $\tau_n^{/j\to i}$. Note that one has to evaluate at $\kp = 1$ since, by definition, $\tau_n^{/i\to j}$ does not contain the rate associated to the transition $i \to j$. These equations offer a simple way to numerically evaluate spanning tree polynomials and offers a direct route to calculate the coefficients of the affine transformations in Eqs.~(2) and (10) through the bounds in Eqs.~(7) and (11).
+
+
+\section{Illustrations}
+In this section, we provide additional details on the examples we study in Figs.~1, 2, and 3 of the main text and Fig.~\ref{fig:4state_LDB} above.
+\subsection{4-state model}
+\subsubsection{Figure 1}
+For the 4-state model depicted in Fig.~1(a), we randomly sample transition rates $k_{nm}$ from a uniform distribution spanning the interval $0\leq k_{nm} \leq 10$. The results depicted in Fig.~1(b)-(d) were obtained for the transition rates given in Table~\ref{tab:4state}. We designate $1\leftrightarrow 2$ as input edge and assume rate $\kp \equiv k_{12}$ to be the subject of external control, taking values $k_{12}\in[0, 10^4]$.
+\begin{table}[h]
+  \centering
+  \caption{Transition rates for the 4-state model studied in Fig.~1 of the main text. The input edge is $I \equiv 1 \leftrightarrow 2$ and we choose to perturb rate $k_{12}$.}
+  \begin{tabular}{@{\hskip 1em}cc@{\hskip 1em}|@{\hskip 1em}cc@{\hskip 1em}|@{\hskip 1em}cc@{\hskip 1em}|@{\hskip 1em}cc@{\hskip 1em}|@{\hskip 1em}cc@{\hskip 1em}}
+  \hline
+  \hline
+  \rule{0pt}{2ex}  transition & rate $k_{nm}$&  transition & rate $k_{nm}$ & transition & rate $k_{nm}$ & transition & rate $k_{nm}$ & transition & rate $k_{nm}$ \rule[-1ex]{0pt}{0pt}\\
+  \hline
+  \hline
+  $1 \to 2$ & $[0,10^4]$ & $2 \to 3$ & 7.2097 & $1 \to 3$ & 0.5077 & $3 \to 4$ & 3.0227 & $1 \to 4$ & 5.8359 \\
+  $2 \to 1$ & 2.8911 & $3 \to 2$ & 0.2162 & $3 \to 1$ & 2.0592 & $4 \to 3$ & 6.6391 & $4\to 1$ &  3.0811 \\
+  \hline
+  \hline
+  \end{tabular}
+  \label{tab:4state}
+\end{table}
+
+\subsubsection{Figure~\ref{fig:4state_LDB}}
+\label{sec:4stateLDB}
+In deriving the thermodynamic bounds of Eq.~\eqref{eq_SI:TD_bounds}, rates are assumed to obey local detailed balance. This is not the case for the rates we employed in Fig.~1 (cf. Table~\ref{tab:4state}) and here we instead use rates parametrized according to Eq.~\eqref{eq_SI:parametrization}. For convenience, we take $\kap=1$, assume transitions to share the load equally ($\theta_n = \theta_m =1/2$), and set all symmetric edge parameters to zero ($B_{nm}=0$). Energies and asymmetric parameters are drawn from uniform distributions over the intervals $0 \leq E_n \leq 1$ and $-1 \leq F_{nm} \leq 1$. We perturb the transition rates of edge $I= 1\leftrightarrow 2$, by varying $F_{12} = -F_{21} \in [-1,1]$. The remaining values we used for Fig.~\ref{fig:4state_LDB}(c) are documented in Table~\ref{tab:4state_LDB}.
+
+\begin{table}[h]
+  \centering
+  \caption{State $E_n$ and asymmetric edge parameters $F_{nm}$ for the four state network studied in Fig.~\ref{fig:4state_LDB}. Transition rates that obey local detailed balance are constructed according to Eq.~\eqref{eq_SI:parametrization}.}
+  \begin{tabular}{@{\hskip 1em}c@{\hskip 1em}c@{\hskip 1em}|@{\hskip 1em}c@{\hskip 1em}c@{\hskip 1em}||@{\hskip 1em}c@{\hskip 1em}c@{\hskip 1em}|@{\hskip 1em}c@{\hskip 1em}c@{\hskip 1em}}
+  \hline
+  \hline
+  $E_1$ & 0.8734 & $E_3$ & 0.8692 & $F_{13}=-F_{31}$ &  -0.1391& $F_{34}=-F_{43}$ & -0.1953 \\
+  $E_2$ & 0.9385 & $E_4$ & 0.5309 & $F_{23}=-F_{32}$  & -0.9772 &  $F_{41}=-F_{14}$ & 0.0453 \\
+  \hline
+  \hline
+  \end{tabular}
+  \label{tab:4state_LDB}
+\end{table}
+
+\subsection{Sensory adaptation---Figure~2}
+
+\begin{figure}
+  \centering
+  \includegraphics{figures/chemo_SI_updated.pdf}
+  \caption{(a)~Linear free energy surfaces corresponding to inactive ($a=0$) and active ($a=1$) in the adaptation model of Fig.~2 of the main text. Colored arrows indicate probability currents if $\Delta \mu$ is smaller (blue) or larger than $\Delta \mu_\mathrm{c} = 2$ (purple). In the former case, the system relaxes into either of the two states indicated by blue markers, whereas the latter stabilizes dissipative cycles that grow with $\Delta \mu$ [cf.~arrow color and the colorbar in (c)]. (b) Perturbations in the external signal $S$ shifts the free energy crossover within the local environment of $m^\ast$. (c) Average activity $\langle a \rangle$ [Eq.~(A7)] as a function of the input signal $S$. Colors indicate the strength of driving $\Delta \mu$. The white dashed line corresponds to the onset of adaptation at $\Delta \mu_\mathrm{c} = 2$ and the dotted black line depicts the adapted activity level at $\langle a \rangle =0.5$.}
+  \label{fig:chemo_SI}
+\end{figure}
+
+In Fig.~2, we apply our results to a simplified sensory adaptation model that is motivated by the \emph{Escherichia Coli} chemotaxis pathway~\cite{tu08, lan12, murugan17}. Only the input edge at $m=m^\ast$ depends on the external signal $S$ and we parametrize transition rates $k_m^{(1)}$ from inactive to active and $k_m^{(0)}$ from active to inactive as
+\begin{align}
+  k_m^{(1)} \equiv
+  \begin{cases}
+    \tilde{\kap}_0 & (m<m^\ast) \\
+    \displaystyle \frac{\kap_0}{1+\exp(-S)} & (m=m^\ast)  \\
+    \kap_0 & (m>m^\ast)
+  \end{cases}
+  \qquad \qquad
+  k_m^{(0)} \equiv
+  \begin{cases}
+    \kap_0 & (m<m^\ast) \\
+    \displaystyle \frac{\kap_0}{1+\exp(S)} & (m=m^\ast)\\
+    \tilde{\kap}_0 & (m > m^\ast),
+    \label{eq:rates_act}
+  \end{cases}
+\end{align}
+respectively. For simplicity, we set $\kT =1$, choose the constant rates $\kap_0=1$, $\tilde{\kap}_0 = 10^{-3}$, and vary $S\in[-12, 12]$.
+Transitions between different $m$ along the activity axes are externally driven up the free energy landscape through affinity $\Delta \mu$ and we parametrize rates as
+\begin{align}
+  \om^{(0)}_+ &= \frac{\om \exp(\Delta \mu)}{1+\exp[\Delta F^{(0)}]} \qquad \om^{(0)}_- = \frac{\om}{1+\exp[-\Delta F^{(0)}]} \\
+  \om^{(1)}_+ &= \frac{\om }{1+\exp[\Delta F^{(1)}]} \qquad \om^{(1)}_- = \frac{\om \exp(\Delta \mu)}{1+\exp[-\Delta F^{(1)}]},
+  \label{eq:rates_meth}
+\end{align}
+where the free energy differences between consecutive methylation levels are taken as $\Delta F^{(0)} = - \Delta F^{(1)} = 2$ and attempt rate $\om = 2$ defines the transition timescale. The corresponding effective free energy landscape is depicted in Fig.~\ref{fig:chemo_SI}(a). The free energy surfaces are linear with respect to the methylation level $m$, with offset and slope that depend on $a$ so that both surfaces intersect at $m^\ast$. For small driving $\Delta \mu < \Delta \mu_\mathrm{c}$ (for the chosen parameters $\Delta \mu_c =2$, see~\cite{sartori15}) the system relaxes into either $(m=0, a=0)$ or $(m=M, a=1)$ as indicated by the blue arrows and markers. Which of the two is favored depends on the input signal $S$. Since its influence is restricted to the input edge at $m=m^\ast$, changing $S$ effectively shifts the free energy crossover within the local environment $m^\ast \pm 1$ to bias relaxation into either of the two states, while the other becomes metastable [Fig.~\ref{fig:chemo_SI}(b)]. The situation depicted in Fig.~\ref{fig:chemo_SI}(a) corresponds to $S=0$ where relaxation into both states is equally likely. For $S<0$ ($S>0$), relaxation into the passive $a=0$ (active $a=1$) state becomes energetically favorable and renders the output activity highly sensitive to $S$ [see Fig.~\ref{fig:chemo_SI}(c)].
+
+Conversely, for strong driving $\Delta \mu > \Delta \mu_\mathrm{c}$ a stable cycle around the adapted methylation level ($m^\ast$ for $S=0$) emerges through driving transitions against the free energy gradient [purple arrows in Fig.~\ref{fig:chemo_SI}(a)]. This mechanism assures a robust activity output that is sustained irrespective of external influences [Fig.~\ref{fig:chemo_SI}(c)]. The adaptation error, i.e., deviations to the dotted line in Fig.~\ref{fig:chemo_SI}(c), reduces upon increasing $\Delta \mu$. An increase in $\Delta \mu$ results in cycles that traverse through more levels before switching the surfaces, which are ultimately constrained and stabilized along the system's boundary [color gradient in the purple arrows of Fig.~\ref{fig:chemo_SI}(a)].
+
+\subsection{Stochastic resetting in calmodulin folding---Figure~3}
+
+We also illustrate our results for unidirectional input edges by considering the experimentally inferred folding network of calmodulin protein~\cite{stigler11}, which we augment by an unidirectional resetting edge. The transition rate through the resetting edge is externally controlled, taking values $r \in [0, 10^4]$ in Figs.~3(b) and (d). The remaining rates are taken from the Supplemental Material of Ref.~\cite{bebon23} (see Table~\ref{tab:calmodulin}), where the rates for a pretension of $9\,\mathrm{pN}$ (see Supplemental Material of Ref.~\cite{stigler11}) are adjusted within the experimental error bars to exactly satisfy detailed balance.
+
+For completeness, the bounds on the entropy production rate depicted in Fig.~3(d) are obtained from Eq.~(11) of the main text as
+\begin{align}
+  \mathcal{B}_{\sig_\mathrm{rev}}^+ = \sum_{n<m \in \mathcal{N}\backslash \lbrace I \rbrace} \left(\mathcal{B}_n^+ k_{nm} - \mathcal{B}_m^+ k_{mn} \right) \ln\left( \frac{k_{nm}}{k_{mn}}\right)
+\end{align}
+and $\mathcal{U}_{\sig_\mathrm{rev}}^+ = 0$ follows from the vanishing currents as the equilibrium limit ($r\to 0$) is approached.
+
+
+\begin{table}[h]
+  \centering
+  \caption{Experimentally determined transition rates for the folding dynamics of a single calmodulin protein subjected to a pretension of $9\,\mathrm{pN}$~\cite{stigler11}. To account for experimental uncertainties that lead to slight deviations from detailed balance, we take the modified rates from the Supplemental Material of Ref.~\cite{bebon23}.}
+  \begin{tabular}{@{\hskip 1em}cc@{\hskip 2em}|@{\hskip 2em}cc@{\hskip 2em}|@{\hskip 2em}cc@{\hskip 1em}}
+  \hline
+  \hline
+  \rule{0pt}{2ex} transition & rate $k_{nm}$ & transition & rate $k_{nm}$ & transition & rate $k_{nm}$ \rule[-1ex]{0pt}{0pt}\\
+  \hline
+  \hline
+  $1 \to 2$ & 5.997 & $1 \to 4$ & 13.439 & $1 \to 5$ & 15.330 \\
+  $2 \to 1$ & 0.774 & $4 \to 1$ & 127.968 & $5 \to 1$ & 0.121 \\
+  \hline
+  \hline
+  $5 \to 6$ & 3.749 & $2 \to 3$ & 1514.820 & $2 \to 6$ & 13.441 \\
+  $6 \to 5$ & 13.326 & $3 \to 2$ & 53.066 & $6 \to 2$ & 2.922 \\
+  \hline
+  \hline
+  \end{tabular}
+  \label{tab:calmodulin}
+\end{table}
+
+\end{document}
+===== END FILE: manuscript.tex =====

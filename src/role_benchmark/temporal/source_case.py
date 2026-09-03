@@ -114,8 +114,9 @@ def deterministic_condition_design(
     relation: MinimalQuantitativeRelation,
     *,
     maximum_hidden_count: int = 3,
+    minimum_diagnostic_count: int = 1,
 ) -> Tuple[Tuple[Mapping[str, float], ...], Tuple[Mapping[str, float], ...]]:
-    """Create a compact one-factor-at-a-time design and disjoint held-out points."""
+    """Create a compact diagnostic design and disjoint held-out points."""
 
     if (
         isinstance(maximum_hidden_count, bool)
@@ -123,6 +124,12 @@ def deterministic_condition_design(
         or maximum_hidden_count < 1
     ):
         raise ValueError("maximum_hidden_count must be a positive integer")
+    if (
+        isinstance(minimum_diagnostic_count, bool)
+        or not isinstance(minimum_diagnostic_count, int)
+        or minimum_diagnostic_count < 1
+    ):
+        raise ValueError("minimum_diagnostic_count must be a positive integer")
     domains = {item.control_name: item for item in relation.domain.controls}
     control_names = tuple(item.name for item in relation.controls)
     levels = {name: _domain_levels(domains[name]) for name in control_names}
@@ -133,6 +140,11 @@ def deterministic_condition_design(
         condition = dict(lower)
         condition[name] = levels[name][-1]
         diagnostic.append(condition)
+
+    target_diagnostic_count = max(
+        len(diagnostic),
+        minimum_diagnostic_count,
+    )
 
     diagnostic_keys = {
         _condition_key(item, control_names) for item in diagnostic
@@ -151,11 +163,23 @@ def deterministic_condition_design(
     add_candidate([levels[name][-1] for name in control_names])
     add_candidate([levels[name][max(0, (len(levels[name]) - 1) // 3)] for name in control_names])
     add_candidate([levels[name][min(len(levels[name]) - 1, 2 * (len(levels[name]) - 1) // 3)] for name in control_names])
+    required_candidate_count = (
+        target_diagnostic_count - len(diagnostic) + maximum_hidden_count
+    )
     for values in itertools.product(*(levels[name] for name in control_names)):
         add_candidate(values)
-        if len(candidates) >= maximum_hidden_count:
+        if len(candidates) >= required_candidate_count:
             break
-    hidden = tuple(candidates[:maximum_hidden_count])
+
+    promoted_count = target_diagnostic_count - len(diagnostic)
+    if len(candidates) <= promoted_count:
+        raise TemporalCaseConstructionError(
+            "the source-supported Cartesian domain has no held-out condition "
+            "after allocating the minimum diagnostic observations required "
+            "for Identification"
+        )
+    diagnostic.extend(candidates[:promoted_count])
+    hidden = tuple(candidates[promoted_count:][:maximum_hidden_count])
     if not hidden:
         raise TemporalCaseConstructionError(
             "the source-supported domain has no held-out condition disjoint "
@@ -385,9 +409,24 @@ def compile_temporal_source_case(
     ):
         raise ValueError("case_index must be a positive integer")
     relation = card.relations[0]
-    diagnostics, hidden = deterministic_condition_design(
+    parameter_count = len(relation.parameters)
+    readout_count = len(relation.readouts)
+    minimum_diagnostic_count = max(
+        1,
+        math.ceil(parameter_count / readout_count),
+    )
+    source_diagnostics, source_hidden = deterministic_condition_design(
         relation,
         maximum_hidden_count=maximum_hidden_count,
+        minimum_diagnostic_count=minimum_diagnostic_count,
+    )
+    diagnostics = tuple(
+        {_canonical_name(name): value for name, value in condition.items()}
+        for condition in source_diagnostics
+    )
+    hidden = tuple(
+        {_canonical_name(name): value for name, value in condition.items()}
+        for condition in source_hidden
     )
     parameter_values = {
         _canonical_name(item.name): float(item.value)

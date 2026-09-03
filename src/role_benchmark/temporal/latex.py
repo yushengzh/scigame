@@ -7,8 +7,10 @@ Binary figures and executable files remain outside this minimal packet.
 
 from __future__ import annotations
 
+import gzip
 import io
 import json
+import re
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +24,11 @@ _PACKET_FORMATS = {
     ".dat": "data",
     ".txt": "text",
 }
+
+_STANDALONE_TEX_MARKER = re.compile(
+    r"(?m)^[ \t]*\\(?:documentclass|documentstyle|begin[ \t]*\{document\}|"
+    r"input(?:[ \t]|\{)|magnification\b|bye\b)"
+)
 
 
 class NoTexSourceError(ValueError):
@@ -319,12 +326,70 @@ def append_figure_evidence_addendum(
     )
 
 
+def _latex_bundle_from_packet_files(
+    packet_files: Tuple[SourcePacketFile, ...],
+    *,
+    archive_member_paths: Tuple[str, ...],
+) -> LatexBundle:
+    tex_packet_files = tuple(
+        item for item in packet_files if item.format == "latex"
+    )
+    if not tex_packet_files:
+        raise NoTexSourceError("arXiv source archive contains no .tex files")
+    files = tuple(
+        LatexSourceFile(path=item.path, text=item.text)
+        for item in tex_packet_files
+    )
+    tex_text, tex_packet_locators = _merge_packet_files(tex_packet_files)
+    packet_text, packet_locators = _merge_packet_files(packet_files)
+    return LatexBundle(
+        files=files,
+        merged_text=tex_text,
+        member_locators=tuple(
+            LatexMemberLocator(
+                item.path, item.global_line_start, item.global_line_end
+            )
+            for item in tex_packet_locators
+        ),
+        packet_files=packet_files,
+        packet_text=packet_text,
+        packet_member_locators=packet_locators,
+        archive_member_paths=archive_member_paths,
+    )
+
+
+def _latex_bundle_from_single_gzip(payload: bytes) -> LatexBundle:
+    try:
+        uncompressed = gzip.decompress(payload)
+    except (gzip.BadGzipFile, EOFError, OSError) as exc:
+        raise ValueError(
+            "arXiv source is neither a valid gzip-compressed tar archive nor "
+            "a valid gzip-compressed single TeX file"
+        ) from exc
+    path = "source.tex"
+    decoded = _decode_text(uncompressed, path=path, required=True)
+    assert decoded is not None
+    if _STANDALONE_TEX_MARKER.search(decoded) is None:
+        raise NoTexSourceError(
+            "gzip-compressed single file is not recognizable TeX source"
+        )
+    source = SourcePacketFile(
+        path=path,
+        format="latex",
+        text=_strip_tex_comments_preserving_lines(decoded),
+    )
+    return _latex_bundle_from_packet_files(
+        (source,), archive_member_paths=(path,)
+    )
+
+
 def latex_bundle_from_tar_gz(payload: bytes) -> LatexBundle:
-    """Read a minimal textual packet from one arXiv ``tar.gz`` in memory.
+    """Read an arXiv ``tar.gz`` or gzip-compressed single TeX file in memory.
 
     A paper still needs at least one TeX member.  In addition, UTF-8 CSV, TSV,
     DAT, and TXT members are retained as inert scientific evidence.  Other
-    archive members are ignored.
+    tar members are ignored.  A single gzip member is accepted only when its
+    strictly decoded UTF-8 text contains a standalone TeX document marker.
     """
 
     if not isinstance(payload, bytes) or not payload:
@@ -369,33 +434,11 @@ def latex_bundle_from_tar_gz(payload: bytes) -> LatexBundle:
                         text=decoded,
                     )
                 )
-    except (tarfile.TarError, EOFError, OSError) as exc:
-        raise ValueError("arXiv source is not a valid gzip-compressed tar archive") from exc
+    except (tarfile.TarError, EOFError, OSError):
+        return _latex_bundle_from_single_gzip(payload)
 
-    tex_packet_files = tuple(
-        item for item in packet_files if item.format == "latex"
-    )
-    if not tex_packet_files:
-        raise NoTexSourceError("arXiv source archive contains no .tex files")
-    files = tuple(
-        LatexSourceFile(path=item.path, text=item.text)
-        for item in tex_packet_files
-    )
-    tex_text, tex_packet_locators = _merge_packet_files(tex_packet_files)
-    packet_text, packet_locators = _merge_packet_files(tuple(packet_files))
-    return LatexBundle(
-        files=files,
-        merged_text=tex_text,
-        member_locators=tuple(
-            LatexMemberLocator(
-                item.path, item.global_line_start, item.global_line_end
-            )
-            for item in tex_packet_locators
-        ),
-        packet_files=tuple(packet_files),
-        packet_text=packet_text,
-        packet_member_locators=packet_locators,
-        archive_member_paths=archive_member_paths,
+    return _latex_bundle_from_packet_files(
+        tuple(packet_files), archive_member_paths=archive_member_paths
     )
 
 

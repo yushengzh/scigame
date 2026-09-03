@@ -19,6 +19,7 @@ from .arxiv import (
     ARXIV_SOURCE_URL,
     ArxivPaper,
     ArxivResolution,
+    arxiv_base_id,
     arxiv_paper_to_payload,
     arxiv_resolution_to_payload,
     arxiv_search_url,
@@ -28,6 +29,7 @@ from .arxiv import (
     parse_arxiv_feed,
     parse_versioned_arxiv_id,
     resolve_arxiv_paper,
+    resolve_manually_reviewed_arxiv_paper,
     search_arxiv_papers,
 )
 from .acquisition import (
@@ -354,6 +356,7 @@ __all__ = [
     "build_minimal_science_card_repair_request",
     "build_minimal_science_card_request",
     "build_temporal_provenance_mapping",
+    "arxiv_base_id",
     "arxiv_paper_to_payload",
     "arxiv_resolution_to_payload",
     "arxiv_search_url",
@@ -386,6 +389,7 @@ __all__ = [
     "original_research_rejection_code",
     "parse_arxiv_feed",
     "parse_versioned_arxiv_id",
+    "resolve_manually_reviewed_arxiv_paper",
     "parse_candidate_json",
     "parse_candidate_payload",
     "parse_case_draft_batch_json",

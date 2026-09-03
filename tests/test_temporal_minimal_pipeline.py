@@ -389,6 +389,38 @@ class TemporalMinimalPipelineTests(unittest.TestCase):
         )
         self.assertEqual(formula_mapping["line_ranges"], [_anchor(1)])
 
+    def test_compiler_canonicalizes_source_control_names_in_generated_conditions(self):
+        payload = _provider_payload()
+        relation = payload["relations"][0]
+        relation["formula"]["outputs"] = {
+            "ResponseY": {
+                "op": "multiply",
+                "args": [
+                    {"param": "Scale"},
+                    {"var": "InputX"},
+                ],
+            }
+        }
+        relation["parameters"][0]["name"] = "Scale"
+        relation["controls"][0]["name"] = "InputX"
+        relation["readouts"][0]["name"] = "ResponseY"
+        relation["domain"]["controls"][0]["control_name"] = "InputX"
+        card = parse_minimal_science_card_provider_payload(
+            payload,
+            source=_source(),
+        )
+
+        build = compile_temporal_source_case(_admission(card), case_index=7)
+
+        self.assertEqual(tuple(item.name for item in build.spec.controls), ("inputx",))
+        self.assertEqual(tuple(item.name for item in build.spec.readouts), ("responsey",))
+        self.assertTrue(
+            all(set(condition) == {"inputx"} for condition in build.spec.diagnostic_conditions)
+        )
+        self.assertTrue(
+            all(set(condition) == {"inputx"} for condition in build.spec.hidden_conditions)
+        )
+
     def test_compiler_does_not_publish_model_authored_free_text(self):
         payload = _provider_payload()
         leaked_text = "The fitted scale equals 2.0."
@@ -484,7 +516,11 @@ class TemporalMinimalPipelineTests(unittest.TestCase):
                 "unit": "1",
                 "anchors": [_anchor(1)],
             }
-            for name, value in (("first_scale", 1.0), ("second_scale", 2.0))
+            for name, value in (
+                ("first_scale", 1.0),
+                ("second_scale", 2.0),
+                ("third_scale", 3.0),
+            )
         ]
         relation["formula"]["outputs"]["response_y"] = {
             "op": "multiply",
@@ -494,6 +530,7 @@ class TemporalMinimalPipelineTests(unittest.TestCase):
                     "args": [
                         {"param": "first_scale"},
                         {"param": "second_scale"},
+                        {"param": "third_scale"},
                     ],
                 },
                 {"var": "input_x"},
@@ -506,6 +543,118 @@ class TemporalMinimalPipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(
             TemporalCaseConstructionError,
             "not locally identifiable",
+        ):
+            compile_temporal_source_case(_admission(card), case_index=7)
+
+    def test_compiler_expands_diagnostics_for_identifiable_parameters(self):
+        payload = _provider_payload()
+        relation = payload["relations"][0]
+        relation["parameters"] = [
+            {
+                "name": name,
+                "value": value,
+                "unit": "1",
+                "anchors": [_anchor(1)],
+            }
+            for name, value in (
+                ("constant", 1.0),
+                ("linear", 2.0),
+                ("quadratic", 3.0),
+                ("cubic", 4.0),
+            )
+        ]
+        x = {"var": "input_x"}
+        relation["formula"]["outputs"]["response_y"] = {
+            "op": "add",
+            "args": [
+                {"param": "constant"},
+                {
+                    "op": "multiply",
+                    "args": [{"param": "linear"}, x],
+                },
+                {
+                    "op": "multiply",
+                    "args": [{"param": "quadratic"}, x, x],
+                },
+                {
+                    "op": "multiply",
+                    "args": [{"param": "cubic"}, x, x, x],
+                },
+            ],
+        }
+        card = parse_minimal_science_card_provider_payload(
+            payload,
+            source=_source(),
+        )
+
+        build = compile_temporal_source_case(_admission(card), case_index=7)
+
+        self.assertEqual(len(build.spec.diagnostic_conditions), 4)
+        self.assertEqual(build.spec.budget, 4)
+        self.assertEqual(len(build.spec.hidden_conditions), 1)
+        self.assertFalse(
+            {
+                tuple(sorted(condition.items()))
+                for condition in build.spec.diagnostic_conditions
+            }
+            & {
+                tuple(sorted(condition.items()))
+                for condition in build.spec.hidden_conditions
+            }
+        )
+
+    def test_compiler_reserves_held_out_before_expanding_diagnostics(self):
+        payload = _provider_payload()
+        relation = payload["relations"][0]
+        relation["parameters"] = [
+            {
+                "name": name,
+                "value": value,
+                "unit": "1",
+                "anchors": [_anchor(1)],
+            }
+            for name, value in (
+                ("constant", 1.0),
+                ("linear", 2.0),
+                ("quadratic", 3.0),
+                ("cubic", 4.0),
+            )
+        ]
+        x = {"var": "input_x"}
+        relation["formula"]["outputs"]["response_y"] = {
+            "op": "add",
+            "args": [
+                {"param": "constant"},
+                {
+                    "op": "multiply",
+                    "args": [{"param": "linear"}, x],
+                },
+                {
+                    "op": "multiply",
+                    "args": [{"param": "quadratic"}, x, x],
+                },
+                {
+                    "op": "multiply",
+                    "args": [{"param": "cubic"}, x, x, x],
+                },
+            ],
+        }
+        relation["domain"]["controls"][0].update(
+            {
+                "domain_kind": "numeric_values",
+                "minimum": None,
+                "maximum": None,
+                "allowed_values": [1.0, 2.0, 3.0],
+            }
+        )
+        card = parse_minimal_science_card_provider_payload(
+            payload,
+            source=_source(),
+        )
+
+        with self.assertRaisesRegex(
+            TemporalCaseConstructionError,
+            "no held-out condition.*minimum diagnostic observations",
         ):
             compile_temporal_source_case(_admission(card), case_index=7)
 

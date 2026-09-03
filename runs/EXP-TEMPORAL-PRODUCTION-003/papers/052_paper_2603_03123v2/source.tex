@@ -1,0 +1,313 @@
+===== BEGIN FILE: main.tex =====
+\documentclass[aps,prl,twocolumn,superscriptaddress]{revtex4-2}
+
+\bibliographystyle{apsrev4-2}
+\usepackage{breqn}
+\usepackage{graphicx}
+\usepackage{dcolumn}
+\usepackage{bm}
+\usepackage{amssymb}
+\usepackage{soul}
+\usepackage{gensymb}
+\usepackage{enumerate}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{makecell}
+\usepackage{pifont}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage[breaklinks=true,colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
+\def  \rpol {\rho_\mathrm{pol}}
+\def  \nsep {n_\mathrm{sep}}
+\def  \grillix {\texttt{GRILLIX}{}}
+\usepackage{float}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{0pt}
+\setlength{\textfloatsep}{10pt}
+\setlength{\intextsep}{10pt}
+
+
+\begin{document}
+
+\title{Turbulent Nature of the Quasicontinuous Exhaust Regime for Fusion Plasmas}
+
+\author{Kaiyu Zhang}
+\email{kaiyu.zhang@ipp.mpg.de}
+\author{Wladimir Zholobenko}
+\author{Andreas Stegmeir}
+\author{Michael Faitsch}
+\author{Konrad Eder}
+\author{Christoph Pitzal}
+\author{Frank Jenko}
+\author{ASDEX Upgrade Team}
+\thanks{See author list of T. Pütterich et al, 2026 Nucl. Fusion 66 116002 https://doi.org/10.1088/1741-4326/ae61c8}
+\affiliation{Max Planck Institute for Plasma Physics$,$ Boltzmannstr.~2$,$ 85748~Garching$,$ Germany}
+
+
+\begin{abstract}
+
+{We demonstrate a turbulence mechanism that reconciles high plasma confinement with efficient heat exhaust --- a central challenge for fusion energy. Global two-fluid turbulence simulations of the reactor-relevant Quasicontinuous Exhaust regime on the ASDEX Upgrade tokamak reveal that a quasicoherent mode drives mesoscopic oscillations of the pedestal boundary across the magnetic separatrix and ejects ballistic filaments (blobs), reproducing both the mean profiles and turbulent fluctuations observed experimentally.
+This behavior arises from a synergistic interplay between kinetic ballooning modes and resistive X-point modes straddling the separatrix.
+These first-principles results place extrapolations to future fusion reactors on a firm physical footing.}
+
+\end{abstract}
+\pacs{52.65.y,52.35.Mw,52.35.Ra}
+
+\maketitle
+
+Prospective magnetic confinement fusion reactors must reconcile high energy confinement with tolerable heat exhaust to achieve net gain while protecting plasma-facing components \cite{siccinio2020demo}.
+After years of exploration \cite{Viezzer2018}, experiments across multiple tokamaks \cite{harrerParameterDependencesSmall2018,labit2019dependence,faitsch2025quasi} have identified an operational “sweet spot” called the Quasicontinuous Exhaust (QCE) regime, accessed \cite{dunne2024quasi,faitsch2023analysis} through strong plasma shaping and high plasma density $\nsep$ at the magnetic separatrix.
+QCE integrates H-mode \cite{wagner1982regime} operation with reactor-relevant heat exhaust solutions: Type-I edge-localized modes (ELMs) \cite{zohm1996edge} are naturally suppressed \cite{harrerParameterDependencesSmall2018}, the scrape-off layer (SOL) heat flux decay length \cite{Eich2013} is broadened \cite{faitsch2021broadening}, and the high $\nsep$ favors detached operation \cite{wischmeier2015high}.
+These merits are phenomenologically attributed to: (i) a quasicoherent mode (QCM) across the separatrix \cite{mazurenko2002experimental,kalis2023experimental,terry2005transport}, whose sufficient transport tailors the pedestal and prevents ELMs, and (ii) intense filamentary blobs \cite{d2011convective} in the SOL, whose propagation broadens $\lambda_q$ \cite{faitsch2021broadening}.
+The extrapolation to future devices is hindered by the hitherto unresolved nature of the QCM and blobs, i.e.~the generation, interaction, and regulation of those dynamics.
+A first-principles understanding requires resolving turbulence across the separatrix, where nonlinear, electromagnetic, and intermittent dynamics are further compounded by {the transition in magnetic topology.}
+
+
+Here we address the challenge with the
+
+two-fluid electromagnetic turbulence code \texttt{GRILLIX} \cite{stegmeir2019global,zhang2024magnetic,zhang2025dynamical,zholobenko2024tokamak,zholobenkoFast}, well suited for the highly collisional QCE regime.
+The code adopts a locally field-aligned method \cite{stegmeirFieldLineMap2016, stegmeirAdvancesFluxcoordinateIndependent2017} to maintain turbulence-relevant resolution across the separatrix and X-point \cite{stegmeirAnalysisLocallyalignedNonaligned2023}.
+{The background and fluctuating components of plasma quantities evolve together, and are fully incorporated into the evolution equations and physical coefficients.}
+Our simulation employs the magnetic equilibrium of ASDEX Upgrade (AUG) discharge \#36165 at {$6.1\si{s}$} in the QCE phase \cite{faitsch2021broadening} reproducing the experimentally observed QCM and SOL blobs.
+Fig.~\ref{fig:snaps} illustrates this with density fluctuations $\tilde{n}=n-\bar{n}$, {where the overbar denotes a toroidal and time average over the saturated phase, \mbox{$3.4$--$3.9~\si{ms}$}, used consistently throughout this study.}
+The left panel shows a poloidal cross-section of the simulation domain, which includes the separatrix (dashed) and a secondary separatrix (dotted), yielding four parallel boundary regions treated with volume penalization \cite{stegmeir2019global, stegmeirAnalysisLocallyalignedNonaligned2023}.
+The QCM is localized near the separatrix on the low-field side, displaying sinusoidal fluctuations and a coherent mode structure.
+At the outboard mid-plane (OMP), the poloidal wavenumber is $k_{\mathrm{pol}}\rho_{s}=0.033$, within the typical range of QCM measured in AUG \cite{kalis2023experimental}, where $\rho_{s}$ is the sound Larmor radius.
+\begin{figure}[b]
+\centering
+    \centering
+    \includegraphics[trim=0.2cm 0.6cm 0.2cm 0.1cm, clip, width=0.982\linewidth]{fig/2d_qcm_blob_pen.pdf}
+    \caption{Composite view of {modeled} plasma density fluctuations.
+    The color scale is saturated near the divertors.
+
+    The top-right inset shows toroidal fluctuations; the bottom-right inset shows the time series of the QCM ejecting blobs.}
+    \label{fig:snaps}
+\end{figure}
+In the SOL, the outer layer of the QCM evolves into blobs, which propagate ballistically into the far-SOL with radial velocity around $1 \, \si{km/s}$, in good agreement with QCE experiments \cite{grienerContinuousObservationFilaments2020}.
+These blobs have a perpendicular scale of $1 \, \si{cm}$ and are strongly elongated with parallel extents over $10 \, \si{m}$ along the magnetic field.
+This is illustrated by the top-right inset, which shows the fluctuations at the secondary separatrix versus toroidal angle $\varphi_{\mathrm{tor}}$, with the poloidal coordinate mapped to the connection length to the OMP.
+Such filamentary structures extend from the OMP to the divertor plates.
+
+The plasma profiles evolve according to these dynamics and, in the saturated state, agree well with the experiment.
+
+Fig.~\ref{fig:profiles}(a--c) compares the mean density and temperature profiles with experimental integrated data analysis (IDA) \cite{fischer2010integrated} at OMP.
+{Adaptive numerical sources are applied at $\rpol<0.92$ to match the experimental core conditions,
+whereas a zero-Neumann boundary condition is used at $\rpol=1.06$, allowing the profiles to evolve.}
+{
+The core boundary particle source is negligible in steady state, while the heat source saturates at $3.2 \si{MW}$.}
+Ionization/recombination sources are obtained by coupling to a three-moment neutral gas model with recycling boundary conditions \cite{eder2025self}, which results in a high $\nsep=4\times10^{19}/\si{m^3}$ free of ad hoc manipulation.
+For parallel viscosity and heat conduction, we apply neoclassical corrections \cite{Hirshman1981,Rozhansky2009,zholobenko2024tokamak} and a Landau-fluid closure \cite{hammett1990fluid,pitzal2023landau}, respectively, extending the Braginskii model \cite{braginskii1965transport} to a wider range of pedestal collisionalites, while eliminating any free parameters from the model that could otherwise be tuned to adjust the profiles.
+
+The first principles profiles of $n$, $T_e$, and $T_i$ remain within experimental uncertainty across the edge and SOL.
+The fluctuation envelope, visualized by the shaded bands, highlights the strong QCM fluctuations at the separatrix and the positively skewed blob statistics in the SOL.
+Validation extends from the means to the fluctuations.
+Fig.~\ref{fig:profiles}(d) shows instantaneous $T_e$ profiles
+
+whose variability agrees well with Thomson scattering measurements at different radii.
+QCM drives mesoscale radial oscillations of the pedestal foot across the separatrix in the simulation, consistent with the radial spread of the Thomson data at the separatrix.
+This pattern is reminiscent of the experimental helium beam spectroscopy \cite{harrerQuasicontinuousExhaustScenario2022,grienerContinuousObservationFilaments2020}, which shows a coherent structure periodically crossing the separatrix.
+
+\begin{figure}
+    \centering
+    \includegraphics[trim=0.2cm 0.2cm 0.2cm 0.2cm, clip, width=1\linewidth]{fig/omp_all.pdf}
+
+
+    \caption{{OMP profiles.}
+    (a-c) $n$, $T_e$, and $T_i$ vs. experimental estimates (black markers, error bars indicate uncertainties). Shaded bands show the fluctuation envelope spanning the \(1\%\)--\(99\%\) quantiles.
+    (d) Fluctuating $T_e$ sampled every $0.01\, \si{ms}$ over $0.5\, \si{ms}$ on a logarithmic y-axis, compared to Thomson scattering. The blue and red dashed lines denote linear regressions of the mean $T_e$ in the simulation.
+
+    (e) Histogram of $\tilde{n}$. The dashed lines mark the $\pm 2.5\sigma$ thresholds.
+
+
+    }
+
+    \label{fig:profiles}
+\end{figure}
+
+A key experimental signature of the QCE regime is that the $T_e$ fall-off lengths $\lambda_{T_e}=|\partial_r \ln \bar{T_e}|^{-1}$ within and beyond the separatrix are decoupled.
+{This facilitates simultaneous high confinement and heat flux broadening} \cite{faitsch2021broadening} and is shown in Fig.~\ref{fig:profiles}(d), where $\lambda_{T_e}$ appears as linear slopes on a log-scale \cite{faitsch2021broadening,sun2015study}.
+Both experiment and simulation show a distinct SOL decay length (red dashed) that is clearly separated from the near-separatrix decay (blue dashed), the latter of which is linked to the presence of blobs.
+We identify blobs by intermittency: localized, positively skewed density fluctuations exceeding $2.5$ standard deviations $\sigma$ \cite{manz2015origin}.
+Fig.~\ref{fig:profiles}(e) shows probability histograms of $\tilde{n}$ at the OMP.
+Near the separatrix, the QCM converts fluctuations from negatively skewed distributions for $\rpol<1$ to positively skewed distributions for $\rpol>1$.
+Away from the separatrix, clear signatures of voids ($<-2.5\sigma$) occur for $\rpol<1$ and blobs ($>2.5\sigma$) for $\rpol>1$.
+Notably, around $\rpol=1.01$ ($r-r_{\mathrm{sep}}=6.5\si{mm}$), where the QCM terminates, $\sigma$ drops sharply while the distribution retains a long positive tail.
+This radius coincides with the blob-launching surface in Fig.~\ref{fig:snaps} and with the beginning of $\lambda_{T_e}^{\mathrm{sol}}$ in Fig.~\ref{fig:profiles}(d).
+
+We now investigate the microinstabilities underlying the QCM and blob formation. Fig.~\ref{fig:fourier}(a) shows the real frequency $\omega_r$ versus binormal wavenumber $k_y$ at $\rpol=0.999$, evaluated in the plasma frame. The dominant branch propagates in the ion diamagnetic direction ($\omega_r<0$) and follows the theoretical kinetic ballooning mode (KBM) frequency $\omega_{\mathrm{kbm}}$.
+This branch also lies close to $\omega_{*i}/2$, consistent with the experimentally inferred QCM frequency scaling across multiple discharges \cite{kalis2023experimental}.
+A secondary branch propagates weakly in the electron direction ($\omega_r>0$) and follows the resistive-mode dispersion $\omega_{\mathrm{resi}}$.
+These theoretical dispersions follow from a linear analysis of the two-fluid model in \texttt{GRILLIX}:
+\begin{equation}\label{eqn:disp}
+\omega_{\mathrm{kbm}}=\frac{\frac{1}{6}+\eta_i}{1+\eta_i}\omega_{*i},\quad
+\omega_{\mathrm{resi}} = \frac{\omega_{*e} + 0.71\eta_e\omega_* + \omega_{*i}}{3}\,.
+\end{equation}
+Here $\eta_i=L_n/L_{T_i}$, $\eta_e=L_n/L_{T_e}$, $L_n=|\partial_r \ln \bar{n} |^{-1}$, $L_{T_i}=|\partial_r \ln \bar{T_i}|^{-1}$, $L_{T_e}=|\partial_r \ln \bar{T_e}|^{-1}$. The diamagnetic frequency is $\omega_*=c_s k_y\rho_s/L_n$, with $\omega_{*i}=-(1+\eta_i)\omega_*$ and $\omega_{*e}=(1+\eta_e)\omega_*$. The KBM expression differs slightly from the $\omega_{*i}/2$ estimate reported in \cite{aleynikova2017quantitative} due to the inclusion of the time dependence of the ion diamagnetic velocity, $\partial_t\mathbf{u}_*$, in the polarization drift. And $\omega_{\mathrm{resi}}$ differs from the conventional resistive mode form \cite{ara1978magnetic,porcelli1986ion,kotschenreuther2019gyrokinetic,gupta2002violating,myra2005edge} due to the thermal-force contribution $0.71\eta_e\omega_*$ that is included in our model.
+\eqref{eqn:disp} are obtained asymptotically by truncating higher-order terms in $L_n/R_0$ ($\approx 0.01$ in the simulation).
+In addition, $\omega_{\mathrm{kbm}}$ assumes the long-wavelength ordering $k_{\perp}^2\rho_s^2\ll 1$, whereas $\omega_{\mathrm{resi}}$ assumes strong magnetic diffusion, $\omega_{\eta}=\eta_\parallel k_{\perp}^2/\mu_0\gg\omega_*$ with $\eta_\parallel$ the parallel Spitzer resistivity.
+For these orderings constrain $k_\perp$ in opposite ways, they are most simultaneously satisfied in different regions: KBM is favored near the OMP, where $k_\perp\sim k_y$ is relatively small, while the resistive mode is favored closer to the X-point, where $k_\perp\gg k_y$ rises sharply due to the diverging connection length.
+This argument is supported by the results in Fig.~\ref{fig:fourier}(b,c).
+We first consider the surface $\rpol=0.999$.
+The KBM, characterized by a kinetic-shear-Alfv\'en-wave-like \cite{doerk2016gyrokinetic} anti-correlation between $\tilde{\phi}$ and $\tilde{n}$ (the normalized covariance
+
+$c_{\phi,n}=\langle\tilde{\phi}\tilde{n}\rangle/(\langle\tilde{\phi}^2\rangle\langle\tilde{n}^2\rangle)^{1/2}<0$, where $\langle \circ \rangle$ denotes the time and toroidal average), dominates at OMP and is progressively stabilized by field-line bending when approaching the X-point.
+Resistivity is insufficient for a resistive ballooning mode to outcompete the KBM at the OMP.
+Yet resistive drive dominates near the X-point, where $\omega_\eta$ increases due to the rapid growth of $k_\perp$, exciting a resistive X-point mode (RXM) \cite{MyraDippolito2000,mazurenko2002experimental} with the drift-interchange nature $c_{\phi,n}>0$.
+
+{Importantly, the QCM in Fig.~\ref{fig:snaps} is driven by the KBM rather than the RXM, while blobs are ejected when the RXM interacts with the KBM.}
+The highly shaped equilibrium, an access criterion for QCE, lengthens the parallel connection from OMP to the X-point region, making room for KBM and RXM to coexist at the same flux surface.
+Inevitably, KBM's and RXM's eigenfunctions with opposite signs of $c_{\phi,n}$ will meet and produce the interchange dynamics $c_{\phi,n}=0$ at some point (marked by \ding{73} in Fig.~\ref{fig:fourier}(c)).
+At $\rpol=0.999$, the interchange couples close enough to the X-point to remain outside the poloidal extent of the QCM’s strong-fluctuation region (marked by $\lozenge$).
+In the SOL, coupling strengthens as the connection length decreases and resistivity increases, shifting the interchange point toward the OMP as $\rpol$ rises.
+By $\rpol=1.007$, the interchange lies within the QCM’s strong-fluctuation region.
+Here, $E\times B$ advection efficiently expels the QCM’s positive density perturbations outward, launching the blobs seen in Fig.~\ref{fig:snaps} \cite{krasheninnikov2001scrape,d2011convective}.
+Consistently, a Fourier analysis of the phase shift,  $\alpha_{\phi,n}(k)=\mathrm{Arg}(\tilde{\phi}_k/\tilde{n}_k)$ with poloidal wavenumber $k$, peaks at the QCM poloidal scale near $\pi$ for $\rpol=0.999$ and gradually decreases to $\pi/2$ for $\rpol=1.007$.
+\begin{figure}
+\centering
+    \centering
+    \includegraphics[trim=0.2cm 0.2cm 0.2cm 0.2cm, clip, width=0.496\linewidth]{fig/fourier_disp_rho0p999_h.pdf}
+    \includegraphics[trim=0.25cm 0.2cm 0.2cm 0.2cm, clip, width=0.492\linewidth]{fig/eigen_function_alpha_c1.pdf}
+    \vspace{-0.3cm}
+    \caption{(a) Binormal Fourier spectra at $\rho_{\mathrm{pol}} = 0.999$ in the plasma frame. The dashed and dash–dotted lines indicate the KBM and RXM dispersion in \eqref{eqn:disp}, respectively.
+
+    (b) Production of fluctuations $\hat{\sigma}_\phi\hat{\sigma}_n$ ($\hat{\sigma}$ is the standard deviation normalized against its value at OMP) at $\rho_{\mathrm{pol}} = 0.999$ as a function of the parallel connection length to OMP, comparing Ref. and case C1 with lower collisionality.
+    (c) Cross correlation between $\tilde{\phi}$ and $\tilde{n}$, plotted at different flux surfaces.
+    $\lozenge$ and $\circ$ denote the heights $Z=-0.5\si{m}$ (where QCM reaches half-value) and $Z=-0.8\si{m}$ (near the X-point), respectively. \ding{73}  marks the zero-cross (where interchange occurs).}
+    \label{fig:fourier}
+\end{figure}
+
+We substantiate the above interpretation with a comparative simulation.
+Relative to the
+reference case, we repeat the run with identical parameters except for a reduced neutral density imposed at the divertor plates (case C1).
+This yields a lower $\nsep=3\times10^{19}/\si{m}^3$ in the saturated state.
+Case C1 exhibits a QCM similar to Fig.~\ref{fig:snaps}, but differs in four aspects.
+(1) The RXM branch is absent in the Fourier spectrum; only the KBM branch remains, with $\omega_r\approx 1.1\, \omega_{\mathrm{kbm}}$, higher harmonics, and stronger coherency.
+The dotted line in Fig.~\ref{fig:fourier}(b) confirms that KBM fluctuations decay toward the X-point without the emergence of another mode.
+(2) The radial profile of the QCM phase shift drops very sharply from $\alpha_{\phi,n}\sim\pi$ to $\alpha_{\phi,n}\sim0$ at the outmost layer of QCM, without forming a robust interchange spectrum.
+(3) The SOL is dominated by continuous fluctuations with $\tilde{n}<2.5\sigma$, with no blob signatures, {despite a higher $E\times B$ shear rate in the SOL}.
+(4) $T_e$ exhibits a single exponential decay from the separatrix down to $20\,\si{eV}$ in the SOL, with no decoupling between $\lambda_{T_e}^{\mathrm{sep}}$ and $\lambda_{T_e}^{\mathrm{sol}}$.
+Table~\ref{tab:sop} compares key separatrix parameters following \cite{faitsch2023analysis}: the MHD ballooning parameter $\alpha_m\sim \nsep T_{e,\mathrm{sep}}/\langle \lambda_p\rangle$  ($\langle \circ \rangle$ is the flux-surface average) and the edge collisionality $\nu^{*}_{e,\mathrm{O}}\sim \nsep/T_{e,\mathrm{sep}}^2$ measured at OMP, {and in addition, $\nu^{*}_{e,\mathrm{X}}$ measured at the orthogonal projection of the X-point onto flux surface $\rpol=0.999$.}
+Both cases evolve to nearly identical $\alpha_m$, close to the ideal-ballooning threshold $\alpha_{c}$ that is calculated with \texttt{HELENA} for the magnetic equilibrium used here \cite{radovanovicDevelopingPhysicsUnderstanding2022}.
+{Poloidally inhomogeneous collisionalities differentiate the two cases.
+Particularly, a threefold lower $\nu^{*}_{e,\mathrm{X}}$ explains the absence of the RXM in case C1.}
+Overall, case C1 resembles the Enhanced D-$\alpha$ regime in AUG, featuring a more coherent QCM but weaker blobs \cite{gil2020stationary}.
+
+{The pedestal-foot transport is primarily set by the KBM nature of the QCM, rather than by a direct collisionality effect or by the RXM.}
+Notably, KBM can also be unstable in the absence of a QCM during the inter-ELM phase \cite{zholobenko2024tokamak,snyder2011first,Dickinson2012}.
+To examine the difference between inter-ELM KBM and QCM, we include a third simulation C2 based on the inter-ELM phase of an ELMy H-mode equilibrium of AUG \#40411 \cite{zholobenko2024tokamak}.
+In this case, neither the QCM nor blobs are observed, yet KBM remains at the pedestal foot.
+Despite similar $k_y\rho_s\approx 0.2$ and $\alpha_{\phi,n}\approx \pi$, the QCMs differ from the inter-ELM KBM by larger radial correlation length $L_c$ \cite{wessonTokamaks2011} in Table~\ref{tab:sop}.
+The $L_c$ of QCMs can even exceed the background pressure gradient length $\lambda_p= 8 \si{mm}$ at the separatrix, enabling mesoscopic heat-transport events from the pedestal to the SOL, in line with the pedestal oscillations in Fig.~\ref{fig:profiles}(d) and the streamer-like structures observed experimentally \cite{kalis2023experimental,grienerContinuousObservationFilaments2020,harrerQuasicontinuousExhaustScenario2022}.
+The effective particle diffusivity $D^{\mathrm{eff}}$ and electron/ion heat conductivities $\chi_e^{\mathrm{eff}}$/$\chi_i^{\mathrm{eff}}$ are computed using a Fick-like relation \cite{callen2010analysis}.
+While Fick coefficients may be insufficient for describing non-local KBMs \cite{hahm2018mesoscopic,ashourvan2016mesoscopic}, they may serve as useful metrics radially inward where KBMs are first destabilized; these are reported in Table~\ref{tab:sop}.
+Transport in the QCM cases is substantially higher than inter-ELM KBM, corroborating the established view that sufficient transport by QCM limits pedestal widening and thereby avoids ELMs \cite{harrerParameterDependencesSmall2018,dunne2024quasi,snyder2011first}.
+{A detailed comparison yields the transport-strength ordering $\mathrm{C1}>\mathrm{Ref.}>\mathrm{C2}$, which clearly tracks $L_c$ rather than the collisionalities.}
+In our model, $L_c$ is limited by $E\times B$ shear, shifting the focus to the radial electric field $E_r$.
+
+\begin{table}[]
+\centering
+\begin{tabular}{c|cccccccccc}
+
+& QCM & blob &\makecell{${\nsep}$} & $\alpha_{m}/\alpha_c$ & {$\nu^*_{e,\mathrm{O}}/\nu^*_{e,\mathrm{X}}$}
+
+& \makecell{$L_c$}
+& \makecell{$D^{\mathrm{eff}}$}  &
+\makecell{$\chi_e^{\mathrm{eff}}$}
+& \makecell{$\chi_i^{\mathrm{eff}}$}
+\\ \hline
+{Ref.}
+& Yes & Yes & ${3.9}$ & $2.3/2.7$ & {${10}/28$}
+
+&$12$
+& $0.27$ & $0.56$ & $1.2$  \\
+{C1}
+& Yes & No & $3.0$
+& $2.3/2.7$
+& {$5.2/10$ }
+
+& $17$
+& $0.34$ & $0.70$ & $1.6$ \\
+{C2}
+& No & No & $2.2$ & $1.2/2.9$ & {$5.3/7.1$}
+
+& $5.5$& $0.12$ & $0.23$ & $0.6$ \\
+\end{tabular}
+\caption{Comparison of key parameters for the reference case (Ref.), the case with same equilibrium but lower $\nsep$ (C1), and the case under ELMy equilibrium (C2). Here $\nsep$ is in $[10^{19}\, \si{m^{-3}}]$, and $L_c$ in $[\si{mm}]$. $D^{\mathrm{eff}}$, $\chi_e^{\mathrm{eff}}$, and $\chi_i^{\mathrm{eff}}$ in $[\si{m^2/s}]$ are measured at the start of the KBM-unstable $\rpol$.}
+\label{tab:sop}
+\end{table}
+
+The role of $E_r$ in accessing QCE and avoiding Type-I ELMs has been noted in the experiments \cite{harrerQuasicontinuousExhaustScenario2022} and the MHD simulations \cite{cathey2022mhd}; here, we ground this role in first-principles dynamics underlying turbulence self-organization and transport regulation.
+In our model, $E_r$ is not imposed but evolves through the vorticity dynamics.
+The radial force balance,
+$E_r = ({\partial_r p_i})/({en}) + u_{\varphi} B_{\theta} -  u_{\theta} B_{\varphi} \,,$
+is satisfied, where the ion pressure $p_i$ is shaped by transport, and the toroidal and poloidal flows  ($u_{\varphi}$, $u_{\theta}$) account for the neoclassical physics \cite{Rozhansky2009} and the turbulence effect \cite{diamond1991theory}.
+In turn, $E\times B$ shear feeds back on the QCM by regulating its $L_c$ and radial location.
+In the reference simulation, the $E_r$ well at the OMP coincides radially with the peak of the fluctuation intensity of QCM (represented by the square of potential fluctuation $\tilde{\phi}^2$), as shown by the blue curves in Fig.~\ref{fig:self}.
+Near the separatrix, $E_r$ is dominated by $(\partial_r p_i)/(en)$, as the flow contributions $u_{\theta}B_{\varphi}$ and $u_{\varphi}B_{\theta}$ largely cancel.
+
+Given $E_r\approx(\partial_r p_i)/(en)$, a high $\nsep$ becomes a primary lever for flattening the $E_r$ well and establishing QCM with a large $L_c$.
+This may largely explain why $\nsep$ appears as a main discriminator between QCE/EDA and ELMy operation in experiments \cite{faitsch2023analysis,miller2025determination}.
+Additionally, at fixed $\nsep$, the estimation of $L_c$ is complicated by the $E_r\propto \partial_r p_i$ dependence.
+The stiffness of $\partial_r p_i$ is determined by the transport whose saturation mechanism entails the zonal flow.
+The zonally averaged poloidal flow $\langle u_{\theta}\rangle$ (zonal flow) is driven by the flow nonlinearity $\langle \tilde{u}_{r}\tilde{u}_{\theta}\rangle$ (Reynolds stress) \cite{smolyakov2000role,zholobenko2021electric,diamond2005zonal}.
+At high $\alpha_m$, the zonal flow can be depleted by the magnetic nonlinearity $\langle \tilde{b}_{r} \tilde{b}_{\theta}\rangle$ (Maxwell stress) \cite{scott2005energetics,naulin2005shear}, which is found to be relevant to the present QCM cases.
+The QCM efficiently produces Maxwell stress, characterised by the phase shift $\alpha_{{b}_{r},{b}_{\theta}}\approx 0$ at the QCM's wavenumber.
+This Maxwell stress has a notable impact on the macroscopic profiles. This is confirmed by comparison with a control case derived from the reference case, in which the $\tilde{b}_{r}\tilde{b}_{\theta}$ nonlinearity is disabled, shown by orange curves in Fig.~\ref{fig:self}(a).
+In this case, while $\nsep$ remains essentially unchanged, both $E_r$ and $\partial_rp_i$ evolve much deeper, and the QCM fluctuation vanishes.
+This outcome can be understood in two steps: (i) without Maxwell-stress depletion, the poloidal-flow contribution $-u_{\theta}B_{\varphi}$ exceeds the toroidal one, driving $E_r$ to deviate from $(\partial_r p_i)/(en)$; and (ii) the loss of QCM decreases the transport and steepens the $p_i$ pedestal, further deepening $(\partial_r p_i)/(en)$ and driving the system toward to an ELMy-H-mode-like state.
+We therefore conclude that Maxwell stress is a key component in the self-sustained QCM.
+
+\begin{figure}[h]
+\centering
+    \centering
+    \includegraphics[trim=0.2cm 0.2cm 0.2cm 0.2cm, clip, width=0.49\linewidth]{fig/Er_Maxwell.pdf}
+    \includegraphics[trim=0.2cm 0.2cm 0.2cm 0.2cm, clip, width=0.48\linewidth]{fig/cross_FLR.pdf}
+    \caption{(a) Mean profiles of $E_r$, $(\partial_rp_i)/(en)$ and $\tilde{\phi}^2$, comparing the reference case and the test where the Maxwell stress is removed. (b) Cross coherence between $\tilde{\phi}$ and $\tilde{n}$, comparing the reference case and the test without FLR.}
+    \label{fig:self}
+\end{figure}
+
+Despite the large fluctuations and long $L_c$, QCM-driven transport does not fully flatten the pedestal due to $\alpha_{\phi,n}\approx \pi$ (similarly for $\alpha_{\phi,T_e}$ and $\alpha_{\phi,T_i}$).
+This anti-correlated phase shift, also observed experimentally \cite{grenfell2024multi}, resembles kinetic-shear-Alfv\'en-wave oscillations \cite{scott2021turbulence} and reduces the efficiency of nonlinear transport.
+This behavior can be traced to the linear ballooning eigenproblem that governs the KBM,
+which is derived from the two-fluid model used in \grillix{} and has the form
+\begin{equation} \label{eqn:kbm:sim_eqn}
+    \frac{\mathrm{d}}{\mathrm{d} \theta } f_{\theta}\frac{\mathrm{d}\Phi}{\mathrm{d} \theta } = \bigg(
+    C_{0,\theta} + C_{2,\theta} {\omega}^2+ C_{1,\theta} {\omega}+\frac{C_{-1,\theta}}{{\omega}-{\omega}_1}\bigg)\Phi\,,
+\end{equation}
+where $\Phi={\tilde{A}_{\parallel,\mathbf{k}}}/({k_\parallel R_0 })$ is the Fourier eigenfunction to be solved, $\omega=\omega_r+\gamma i$ is the complex eigenfrequency and $\theta$ is the ballooning angle~\cite{connor1978shear}. $f_{\theta}=1+(s \theta-\alpha_m \sin \theta)^2$ is a function of $\theta$ depending on $\alpha_m$ and the magnetic shear $s$.
+Inside the bracket is a polynomial of $\omega^j$ with the prefactor $C_{j,\theta}$, which assembles the key physics determining the instability of the system.
+The $C_{0,\theta}$ and $C_{2,\theta}$ terms recover the ideal ballooning mode \cite{connor1978shear},
+which has a quadratic form of $\omega$ and hence $\omega_r=0$ and the approximated interchange-like phase shift $\alpha_{\phi,n} \approx \arg(\omega) = \pi/2$.
+The $C_{-1,\theta}$ term represents the ion magnetic drift resonance, originating from the ion's perpendicular heat conduction as a two-fluid effect in toroidal geometry, and destabilizes the system by reducing $\alpha_m$ threshold given a high $\eta_i$.
+Importantly, the $C_{1,\theta}$ term occurs when the diamagnetic polarization, i.e.~finite Larmor radius (FLR) term $\nabla\cdot (\partial_t+\mathbf{u}_{E} \cdot \nabla ) \mathbf{u}_{*}$ is retained in the vorticity equation.
+Its inclusion introduces a significant real frequency component $\omega_r=\omega_{\mathrm{kbm}}<0$ consistent with \cite{aleynikova2017quantitative}.
+Consequently, when KBM is marginally unstable, we expect $\alpha_{\phi,n}\approx \pi$ for $\gamma \ll \omega_{\mathrm{kbm}}$.
+The significance of FLR physics in the KBM turbulence is further substantiated by performing a test branched from the reference case, wherein we disable the term $\nabla\cdot(\mathbf{u}_{E} \cdot \nabla \mathbf{u}_{*})$.
+Fig.~\ref{fig:self}(b) compares the cross-coherence between $\tilde{\phi}$ and $\tilde{n}$ at $\rpol=0.999$ near the OMP for the reference case and the no-FLR test.
+The probability density increases linearly from the outer to the inner contours.
+When FLR is removed, the picture shifts from a coherent pattern aligned diagonally  ($\alpha_{\phi,n}\approx \pi$) to broadband turbulence aligned horizontally ($\alpha_{\phi,n}\approx \pi/2$).
+The no-FLR case, subject to interchange-like dynamics, exhibits a tenfold increase in $E\times B$ heat flux, leading to pedestal collapse and thus discrepancy with the experiment.
+These results underscore that FLR stabilization is essential for sustaining the coherent QCM structure with $\alpha_{\phi,n}\approx \pi$, and for preventing its transport from degrading the confinement.
+
+{To summarize, validated simulations reveal the turbulent nature of the Quasicontinuous Exhaust regime, a promising scenario for fusion reactors.
+The experimentally observed QCM and blob dynamics, reproduced in the simulations, are governed by two separatrix-spanning modes.
+The QCM is a kinetic ballooning mode (KBM) that develops an extended, mesoscopic radial correlation length via electromagnetic self-organization of turbulence, thereby driving enhanced transport.
+Blob launching occurs via interchange dynamics when this upstream KBM activity interacts with a resistive mode originating from the X-point region (RXM).}
+
+{This work provides a sound physics basis for extrapolations to future reactors.
+Our results suggest, first, that access to the KBM-dominated QCM should depend primarily on the beta-related ballooning parameter \cite{dunne2024quasi,faitsch2025quasi}, rather than on collisionality-related parameters \cite{Zeiler1998,scott2005drift,eich2020turbulence} as assumed in extrapolations based on resistivity-dominated modes \cite{faitsch2023analysis}.
+However, the experimentally observed separatrix density dependence \cite{faitsch2023analysis,miller2025determination} may instead reflect the requirement for reduced $E\times B$ shear.
+Quantitatively predicting whether QCM transport is sufficient to suppress ELMs, yet not so excessive as to degrade confinement, will require parameterizing the $E\times B$ shear weakening by Maxwell stress and interchange stabilization by finite-Larmor-radius physics, respectively.
+Second, blob-enhanced exhaust requires the coexistence of those KBMs with an RXM destabilized by elevated local collisionality near the X-point, rather than the excitation of a resistive ballooning mode by high upstream collisionality.
+Thus, despite the more constrained access to high outboard-midplane separatrix collisionality in reactor-scale devices such as ITER \cite{labit2019dependence,faitsch2025quasi}, the mechanisms elucidated herein may nevertheless remain applicable for reconciling high confinement with effective heat exhaust in future fusion plasmas.
+}
+
+\section*{Acknowledgements}
+The authors would like to thank P. Manz, T. Pütterich, G. Birkenmeier, {M. Dunne, A. Cathey}, P. Ulbl, J. Kalis, J. Pfennig, L. Radovanovic, and B. Frei for fruitful discussions on many intricate topics.
+This work was carried out within the framework of the EUROfusion Consortium, funded by the European Union via the Euratom Research and Training Programme (Grant Agreement No 101052200 — EUROfusion).
+Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Commission. Neither the European Union nor the European Commission can be held responsible for them.
+The simulations were performed on the national supercomputer HPE Apollo Hawk at the High Performance Computing Center Stuttgart (HLRS) under the grant number GRILLIX/44281.
+
+\input{myrefs.bbl}
+\end{document}
+===== END FILE: main.tex =====

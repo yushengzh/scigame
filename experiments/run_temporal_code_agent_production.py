@@ -168,6 +168,15 @@ def _source_identity(source: Mapping[str, Any]) -> ScienceSource:
 def _validate_manifest(payload: Any) -> list[Mapping[str, Any]]:
     if not isinstance(payload, dict) or not isinstance(payload.get("sources"), list):
         raise ProductionAdapterError("frozen source manifest must contain sources")
+    family_index_offset = payload.get("family_index_offset", 0)
+    if (
+        isinstance(family_index_offset, bool)
+        or not isinstance(family_index_offset, int)
+        or family_index_offset < 0
+    ):
+        raise ProductionAdapterError(
+            "family_index_offset must be a non-negative integer"
+        )
     sources = payload["sources"]
     if not sources:
         raise ProductionAdapterError("frozen source manifest must not be empty")
@@ -546,7 +555,8 @@ def _validate_case(spec: Any) -> Mapping[str, Any]:
 def compile_cases(
     output: Path, *, paper_ids: Sequence[str] = ()
 ) -> Mapping[str, Any]:
-    _, sources = _load_frozen_sources(output)
+    manifest, sources = _load_frozen_sources(output)
+    family_index_offset = int(manifest.get("family_index_offset", 0))
     selected = _select_sources(sources, paper_ids)
     completed = []
     skipped = []
@@ -597,11 +607,10 @@ def compile_cases(
                 _write_json(paper_directory / "construction" / "result.json", result)
                 completed.append(result)
                 continue
-            build = compile_temporal_source_case(
-                admission, case_index=int(source["order"])
-            )
+            case_index = family_index_offset + int(source["order"])
+            build = compile_temporal_source_case(admission, case_index=case_index)
             module = render_temporal_source_case_module(
-                admission, case_index=int(source["order"])
+                admission, case_index=case_index
             )
             construction = paper_directory / "construction"
             module_path = construction / "cases" / (build.spec.family + ".py")
@@ -678,7 +687,8 @@ def summarize(output: Path, *, target_family_count: int = 20) -> Mapping[str, An
         or target_family_count < 1
     ):
         raise ProductionAdapterError("target family count must be positive")
-    _, sources = _load_frozen_sources(output)
+    manifest, sources = _load_frozen_sources(output)
+    family_index_offset = int(manifest.get("family_index_offset", 0))
     denominator = len(sources)
     prepared = 0
     responses = 0
@@ -792,6 +802,7 @@ def summarize(output: Path, *, target_family_count: int = 20) -> Mapping[str, An
         "schema": SUMMARY_SCHEMA,
         "cohort_size": denominator,
         "fixed_denominator": denominator,
+        "family_index_offset": family_index_offset,
         "authoring_interface": "interactive_code_agent",
         "authoring_model_labels": sorted(model_labels),
         "api_invoked_by_adapter": False,

@@ -40,17 +40,18 @@ def _paper(doi, title, venue, *, citations=4):
     )
 
 
-def _feed(doi="10.1103/example"):
+def _feed(doi="10.1103/example", versioned_id="2607.01234v2"):
+    doi_xml = "<arxiv:doi>%s</arxiv:doi>" % doi if doi else ""
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<feed xmlns="http://www.w3.org/2005/Atom" '
         'xmlns:arxiv="http://arxiv.org/schemas/atom">'
-        '<entry><id>https://arxiv.org/abs/2607.01234v2</id>'
+        '<entry><id>https://arxiv.org/abs/%s</id>'
         '<published>2026-06-30T12:34:56Z</published>'
         '<updated>2026-07-01T01:02:03Z</updated>'
         '<title>A research result</title>'
         '<author><name>Ada Lovelace</name></author>'
-        '<arxiv:doi>%s</arxiv:doi></entry></feed>' % doi
+        '%s</entry></feed>' % (versioned_id, doi_xml)
     ).encode("utf-8")
 
 
@@ -111,6 +112,17 @@ class TemporalAcquisitionTests(unittest.TestCase):
             }
             addenda_path = Path(directory) / "figure_evidence.json"
             addenda_path.write_text(json.dumps(addenda), encoding="utf-8")
+            linkage_reviews = {
+                "10.1103/example": {
+                    "arxiv_versioned_id": "2607.01234v2",
+                    "decision": "match",
+                    "evidence_locator": "record-linkage-review.json",
+                    "rationale": "The official records have the same authors and results.",
+                    "reviewer": "Record-linkage reviewer A",
+                }
+            }
+            linkage_path = Path(directory) / "linkage.json"
+            linkage_path.write_text(json.dumps(linkage_reviews), encoding="utf-8")
             stdout = io.StringIO()
             with patch(
                 "role_benchmark.temporal.cli.acquire_temporal_window",
@@ -134,6 +146,8 @@ class TemporalAcquisitionTests(unittest.TestCase):
                         str(reconciliation_path),
                         "--figure-evidence-addenda",
                         str(addenda_path),
+                        "--manual-linkage-reviews",
+                        str(linkage_path),
                     ]
                 )
         self.assertEqual(code, 0)
@@ -144,6 +158,9 @@ class TemporalAcquisitionTests(unittest.TestCase):
         )
         self.assertEqual(
             acquire.call_args.kwargs["figure_evidence_addenda"], addenda
+        )
+        self.assertEqual(
+            acquire.call_args.kwargs["manual_linkage_reviews"], linkage_reviews
         )
 
     def test_derives_one_verified_cohort_and_preserves_every_disposition(self):
@@ -279,6 +296,23 @@ class TemporalAcquisitionTests(unittest.TestCase):
         )
         self.assertEqual(on_disk["retrieved_at"], "2026-08-01T00:00:00+00:00")
         self.assertEqual(on_disk["citation_snapshot_at"], on_disk["retrieved_at"])
+        self.assertEqual(
+            on_disk["identity"]["automatic_match_methods"],
+            ["crossref_has_preprint_doi", "doi"],
+        )
+        self.assertEqual(
+            on_disk["identity"]["manual_review_candidate_sources"],
+            [
+                "crossref_non_doi_relation",
+                "arxiv_title_search",
+                "search_engine",
+            ],
+        )
+        self.assertIn("separate DOI-string", on_disk["query"]["arxiv_recall"])
+        self.assertIn(
+            "never automatic identity adjudication",
+            on_disk["query"]["general_search_engine"],
+        )
         query = parse_qs(urlparse(calls[0]).query)["search_query"][0]
         self.assertIn('all:"10.1103/example"', query)
         self.assertNotIn("doi:", query)
@@ -322,6 +356,220 @@ class TemporalAcquisitionTests(unittest.TestCase):
         self.assertEqual(
             result["paper_results"][0]["disposition"], "tex_decode_failed"
         )
+
+    def test_manual_linkage_candidate_is_not_downloaded(self):
+        journal_paper = _paper(
+            "10.1103/example",
+            "A research result",
+            "Physical Review Letters",
+            citations=None,
+        )
+        candidate = ArxivPaper(
+            versioned_id="2607.01234v2",
+            title=journal_paper.title,
+            first_author=journal_paper.first_author,
+            first_author_family=journal_paper.first_author_family,
+            doi=None,
+            entry_url="https://arxiv.org/abs/2607.01234v2",
+            first_submitted_at=datetime(2026, 6, 30, tzinfo=timezone.utc),
+            version_updated_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        )
+        resolution = ArxivResolution(
+            "manual_review_required",
+            None,
+            (candidate,),
+            None,
+            1,
+            failure_reason="exact_title_first_author_requires_manual_review",
+            doi_recalled_count=0,
+            title_recalled_count=1,
+            doi_recall_limit_reached=False,
+            title_recall_limit_reached=False,
+        )
+
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "role_benchmark.temporal.acquisition.resolve_arxiv_paper",
+            return_value=resolution,
+        ), patch(
+            "role_benchmark.temporal.acquisition.download_arxiv_source"
+        ) as download:
+            result = acquire_census_snapshot(
+                CensusSnapshot((journal_paper,), (), ()),
+                start=date(2026, 7, 1),
+                end=date(2026, 7, 31),
+                venues=("Physical Review Letters",),
+                output_directory=Path(directory) / "acquired",
+                publisher_reconciliation=_reconciliation(),
+                request_interval_s=0,
+            )
+
+        self.assertEqual(result["cohort"]["papers"], [])
+        self.assertEqual(
+            result["paper_results"][0]["disposition"],
+            "arxiv_manual_review_required",
+        )
+        self.assertEqual(
+            result["paper_results"][0]["resolution"]["candidates"][0][
+                "versioned_id"
+            ],
+            "2607.01234v2",
+        )
+        download.assert_not_called()
+
+    def test_frozen_manual_linkage_review_reenters_acquisition(self):
+        journal_paper = _paper(
+            "10.1103/example",
+            "A journal title that changed after review",
+            "Physical Review Letters",
+            citations=None,
+        )
+        empty_feed = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<feed xmlns="http://www.w3.org/2005/Atom" '
+            'xmlns:arxiv="http://arxiv.org/schemas/atom"></feed>'
+        ).encode("utf-8")
+        calls = []
+
+        def arxiv_transport(url, timeout):
+            calls.append(url)
+            if "id_list=" in url:
+                return _feed(doi=None)
+            return empty_feed
+
+        review = {
+            journal_paper.doi: {
+                "arxiv_versioned_id": "2607.01234v2",
+                "decision": "match",
+                "evidence_locator": "frozen-linkage-review.json#record-1",
+                "rationale": "Official author lists and reported results agree.",
+                "reviewer": "Record-linkage reviewer A",
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            result = acquire_census_snapshot(
+                CensusSnapshot((journal_paper,), (), ()),
+                start=date(2026, 7, 1),
+                end=date(2026, 7, 31),
+                venues=("Physical Review Letters",),
+                output_directory=Path(directory) / "acquired",
+                publisher_reconciliation=_reconciliation(),
+                manual_linkage_reviews=review,
+                arxiv_transport=arxiv_transport,
+                source_transport=lambda url, timeout: _archive(
+                    [
+                        (
+                            "main.tex",
+                            "\\documentclass{article}\\begin{document}x\\end{document}",
+                        )
+                    ]
+                ),
+                request_interval_s=0,
+            )
+
+        self.assertEqual(result["selection_counts"]["selected"], 1)
+        resolution = result["paper_results"][0]["resolution"]
+        self.assertEqual(resolution["match_method"], "manual_review")
+        self.assertTrue(resolution["manual_linkage_review_applied"])
+        self.assertEqual(resolution["manual_linkage_review"], review[journal_paper.doi])
+        self.assertEqual(resolution["automatic_resolution"]["status"], "not_found")
+        self.assertTrue(any("id_list=2607.01234v2" in url for url in calls))
+
+    def test_manual_linkage_review_requires_snapshot_doi_and_complete_record(self):
+        journal_paper = _paper(
+            "10.1103/example",
+            "A research result",
+            "Physical Review Letters",
+            citations=None,
+        )
+        valid_review = {
+            "arxiv_versioned_id": "2607.01234v2",
+            "decision": "match",
+            "evidence_locator": "frozen-linkage-review.json#record-1",
+            "rationale": "Official author lists and reported results agree.",
+            "reviewer": "Record-linkage reviewer A",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "not present in the census"):
+                acquire_census_snapshot(
+                    CensusSnapshot((journal_paper,), (), ()),
+                    start=date(2026, 7, 1),
+                    end=date(2026, 7, 31),
+                    venues=("Physical Review Letters",),
+                    output_directory=Path(directory) / "unknown-review",
+                    publisher_reconciliation=_reconciliation(),
+                    manual_linkage_reviews={"10.1103/other": valid_review},
+                    request_interval_s=0,
+                )
+
+        incomplete = dict(valid_review)
+        del incomplete["evidence_locator"]
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "must contain exactly"):
+                acquire_census_snapshot(
+                    CensusSnapshot((journal_paper,), (), ()),
+                    start=date(2026, 7, 1),
+                    end=date(2026, 7, 31),
+                    venues=("Physical Review Letters",),
+                    output_directory=Path(directory) / "incomplete-review",
+                    publisher_reconciliation=_reconciliation(),
+                    manual_linkage_reviews={journal_paper.doi: incomplete},
+                    request_interval_s=0,
+                )
+
+    def test_manual_review_can_select_an_earlier_version_of_resolved_work(self):
+        journal_paper = _paper(
+            "10.1103/example",
+            "A research result",
+            "Physical Review Letters",
+            citations=None,
+        )
+        calls = []
+
+        def arxiv_transport(url, timeout):
+            calls.append(url)
+            if "id_list=2607.01234v1" in url:
+                return _feed(versioned_id="2607.01234v1", doi=journal_paper.doi)
+            return _feed(versioned_id="2607.01234v3", doi=journal_paper.doi)
+
+        review = {
+            journal_paper.doi: {
+                "arxiv_versioned_id": "2607.01234v1",
+                "decision": "match",
+                "evidence_locator": "frozen-linkage-review.json#record-1",
+                "rationale": "The first version is the selected source version.",
+                "reviewer": "Record-linkage reviewer A",
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            result = acquire_census_snapshot(
+                CensusSnapshot((journal_paper,), (), ()),
+                start=date(2026, 7, 1),
+                end=date(2026, 7, 31),
+                venues=("Physical Review Letters",),
+                output_directory=Path(directory) / "acquired",
+                publisher_reconciliation=_reconciliation(),
+                manual_linkage_reviews=review,
+                arxiv_transport=arxiv_transport,
+                source_transport=lambda url, timeout: _archive(
+                    [
+                        (
+                            "main.tex",
+                            "\\documentclass{article}\\begin{document}x\\end{document}",
+                        )
+                    ]
+                ),
+                request_interval_s=0,
+            )
+
+        resolution = result["paper_results"][0]["resolution"]
+        self.assertEqual(resolution["paper"]["versioned_id"], "2607.01234v1")
+        self.assertEqual(resolution["match_method"], "manual_review")
+        self.assertTrue(resolution["manual_linkage_review_applied"])
+        self.assertEqual(
+            resolution["automatic_resolution"]["paper"]["versioned_id"],
+            "2607.01234v3",
+        )
+        self.assertTrue(any("id_list=2607.01234v1" in url for url in calls))
 
     def test_citation_rank_is_explicit_and_limit_is_not_warmup_hard_coded(self):
         snapshot = CensusSnapshot(

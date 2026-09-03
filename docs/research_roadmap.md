@@ -1,7 +1,7 @@
 ---
 title: Role Benchmark 研究计划与实验记录
 status: active
-version: 0.6.0
+version: 0.7.2
 created: 2026-09-02
 last_updated: 2026-09-03
 target: ICLR-level submission
@@ -81,6 +81,7 @@ language: zh
 - 确定性 Oracle 是主要方案；可选 LLM presentation 只能严格呈现确定性 observation，且仍待 Oracle 准确性审计。
 - 新 Temporal authoring 实现把 LLM 输出限制为 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；实验预算、diagnostic conditions、held-out conditions、public template 和 provenance mapping 由确定性代码生成。
 - `EXP-TEMPORAL-AUTHORING-001` 已冻结既有两次 authoring run 的同一批 37 个 source packets、原顺序和逐论文调用上限。历史运行未保存不可变 authoring-model snapshot，当前也没有运行凭据，因此重新运行尚未执行，pipeline 修改的因果效应目前不可识别。
+- 四次独立登记的 operational Temporal production runs 已在 2026-01-01 至 2026-09-03 的来源窗口内构造出 22 个不同 source papers 对应的 candidate families，超过预定的至少 20 个目标。这 22 个 families 仍是运行产物，不属于上述 9 个公开 Temporal families；在独立人工或领域专家 source review、去重和 release review 完成前，不计入公开 benchmark 规模。
 
 每次这些数字变化时，必须同时更新来源文件或运行产物链接，不得只修改本文数字。
 
@@ -226,6 +227,8 @@ Y^T_{m,c,A}-Y^T_{m,c,F}.
 
 除非存在可审计的排除机制，不使用 `unseen` 或 `contamination-free`。
 
+Journal record 与 arXiv record 的对齐严格区分 candidate retrieval 和 identity resolution。Crossref `has-preprint` relation、独立 arXiv DOI-string/title-only queries 和带引号的完整标题搜索都可用于召回候选；第一作者不作为 retrieval 硬条件，通用搜索引擎的非命中只记为 unresolved。arXiv API 没有 DOI search field，因此 `all:"<DOI>"` 只是对可搜索文本字段的字符串检索，不是 DOI metadata lookup。自动确认仅接受 Crossref 中以 arXiv DOI 表示且可由官方 arXiv metadata 解析的 direct/reciprocal relation，或已召回官方 arXiv record 中唯一等于期刊 DOI 的 journal DOI。Crossref 不验证 non-DOI identifiers，因此 `id-type=arxiv` relation、标题候选和搜索候选均进入人工复核。冻结 positive review 后，代码仍须核验同一带版本 arXiv ID 并拒绝显式 DOI conflict。标题中的年份、测量值、百分比、单位、指数、化学计量数、上下标和数学符号不是 record identity evidence；只有按相应语法完整解析的 DOI 或 arXiv identifier 才可作为 identifier evidence，后者本身仍不证明语义上属于同一工作。详细规则和审查样本见 [`temporal_case_pipeline.md`](temporal_case_pipeline.md) 与 [`../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md`](../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md)。
+
 ### 4.2 旧 LLM 改写
 
 旧 LLM 可以用于 authoring method ablation，不能作为 evaluated language-model agent 未接触 source 的证据。Temporal evaluation 的主要 prompt 应由经过审核的 `ScienceCard` 通过确定性模板生成。
@@ -283,6 +286,27 @@ Stopping rule: 37 篇 source packets 全部按冻结顺序和逐论文调用上�
 历史描述值为首次结构合格 `3/37`、repair 后结构合格 `13/37`、source-review retention `0/37` 和最终 acceptance `0/37`。旧 review 对 13 张结构合格 cards 的结果是直接通过 `0/13`、要求修改 `6/13`、拒绝 `7/13`；要求修改必须单列，不能计为 retained，也不能追溯地改判为新版单关系 admission。
 
 该研究当前不能执行为受控比较：历史产物只记录可变 model alias `deepseek-v4-flash`，没有保存不可变 checkpoint 或 snapshot ID；运行环境也缺少 API 凭据。若以后恢复可由 provider 直接调用的历史 snapshot，必须在任何模型调用前提交一份有记录的 registration amendment：两个 snapshot 字段写入同一标识，将历史比较状态改为 `controlled`，并将实验状态改为 `ready_for_execution`；runner 会把该 snapshot 标识直接作为 provider request 的 `model` 值。只匹配同名 alias 的运行最多是描述性 replication，必须另行登记，不能把比例差异归因于 pipeline 修改。当前没有新结果，结果登记保持为空。
+
+### Temporal operational production
+
+状态：`completed`
+
+`EXP-TEMPORAL-PRODUCTION-001` 至 `004` 是为取得至少 20 个近期来源 candidate families 而执行的 operational production，不是 `EXP-TEMPORAL-AUTHORING-001` 的受控转换率比较。后续 cohort 是在看到前序产出后另行登记和选择的，来源组成与部分运行条件不同。因此，只分别报告各 cohort 的 acquisition/construction funnel；不得汇总为预注册转换率、pipeline 修改效应或模型能力结果。
+
+| Experiment ID | 固定 source papers | 非空定量关系 | Source review retained | 最终构造通过 | 解释 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `EXP-TEMPORAL-PRODUCTION-001` | 36 | 20 | 14 | 7 | 初始 frozen cohort |
+| `EXP-TEMPORAL-PRODUCTION-002` | 59 | 18 | 15 | 5 | 看过首批产出后独立登记 |
+| `EXP-TEMPORAL-PRODUCTION-003` | 91 | 12 | 10 | 6 | 看过累计 12 个通过后独立登记 |
+| `EXP-TEMPORAL-PRODUCTION-004` | 51 | 11 | 10 | 4 | Nature-priority cohort；两篇符合 source gate 的 Nature records 先处理，均未抽取出非空关系；四个通过项均来自 Physical Review Letters |
+
+四次运行共得到 22 个不同 source papers 对应的 candidate families。这个数字只说明构造目标已经达到，不说明 benchmark coverage、代表性、难度或模型能力。每个通过项均满足非空 minimal ScienceCard、separate-context source review retention、确定性构造以及 Identification/Discovery known-truth validation；Code Agent contexts 只提供 process separation，不等同于独立人工或领域专家 source review。authoring runtime 的 immutable snapshot 和 documented knowledge cutoff 均未知，因此不得称这些 families 为 post-cutoff、unseen 或 contamination-free。逐次 protocol、完整分母和结果见实验登记与 [`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json)。
+
+Post-hoc record-linkage conformance review 将 22 项按最强已记录依据分类为：18 项 exact journal DOI、3 项保存了 Crossref `has-preprint` relation、规范化 arXiv target 和 official `id_list` resolution 但未冻结原始 identifier type、1 项人工核对官方记录。没有通过项仅依赖标题或数字；但现有本地材料不足以证明前述 3 项 relation-only records 满足当前 automatic resolution rule，它们须在 release 前重新冻结官方 Crossref relation tuple 或完成独立人工复核。该结果不消除原始 HTTP payload 未全部冻结、个别早晚记录不一致及人工项不能离线重放的限制；见 [`accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md)。
+
+对 14 个具有完整 journal/arXiv metadata 的 pairs 所做的描述性 record-linkage 审查发现：8 对标题完全一致，1 对只有数学或数字排版差异，5 对发生实质性改题；7 对由唯一 exact DOI 确认，5 对由官方 metadata 人工确认，1 对拒绝，1 对 unresolved。该 complete-case sample 非随机且不含所有漏检记录，不能用于估计 linkage precision 或 recall；其中未见实质性数字冲突，也不能据此假设标题数字匹配是可靠的身份判据。
+
+补充 reciprocal-relation recall audit 覆盖同一窗口内 4,435 个去重 Nature/Science journal records。133 个 records 的 137 个 `has-preprint`/`asserted-by=object` entries 全部指向其他 preprint repository DOI，严格 arXiv targets 为 0，因此修正 reciprocal semantics 没有新增 arXiv candidate。该结果只适用于此 Crossref snapshot，不表示这些论文没有 arXiv 版本，也不估计总体 recall；见 [`nature_science_reciprocal_relation_candidate_audit.json`](../runs/EXP-TEMPORAL-PRODUCTION-005/nature_science_reciprocal_relation_candidate_audit.json)。
 
 ### Phase 1，方法学 pilot study
 
@@ -383,11 +407,11 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 按依赖关系排序，下一步只做以下三件事：
 
-1. 按冻结配置执行 `EXP-METHOD-PILOT-001`，并完整记录缺失与基础设施失败；
-2. 按预先定义的 failure criteria 决定停止、修订协议或进入正式规模；
+1. 对 22 个 production candidate families 完成独立人工或领域专家 source review、跨 cohort 去重和 release review；在此之前不扩大公开 Temporal registry；
+2. 按冻结配置执行 `EXP-METHOD-PILOT-001`，并按预先定义的 failure criteria 决定停止、修订协议或进入正式规模；
 3. 在任何 capability claim 前补充不可变 model checkpoints 并完成 P0.7。
 
-在 Phase 1 通过前，不优先扩大模型数量、增加 leaderboard、优化论文语言或扩充 Temporal case 数量。
+当前至少 20 个 candidate families 的 operational production 目标已经达到。在 Phase 1 通过前，不再为了增加数量扩大来源窗口或放宽 record identity、source support、可执行性、可辨识性和 validation gates，也不优先扩大模型数量、增加 leaderboard 或优化论文语言。
 
 ## 7. 已否决或被替代的方案
 
@@ -398,6 +422,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | D-003 | 用较旧 authoring LLM 证明 Temporal benchmark instance 对较新的 evaluated language-model agent 未知 | `rejected` | authoring model 的版本不改变 evaluated model 的训练数据暴露 | 旧 LLM 只用于 prompt paraphrase sensitivity analysis |
 | D-004 | 仅使用 prior-only baseline 和 adaptive experimental design 分离证据使用与实验选择 | `rejected` | 两种方法的表现差异同时包含对观测的使用和实验选择，无法分别估计 | 增加 fixed experimental design |
 | D-005 | 要求每篇 Temporal source 同时提供两个可配对的 source-reported conditions 才能进入 case construction | `superseded` | 该要求把 source-supported quantitative relation 的 eligibility 与另一种条件是否存在混为一体，并额外扩大 LLM 输出合同 | Temporal admission 接受至少一个经来源支持、可执行的定量关系；第二个 source-reported condition 可选，counterfactual variant 由独立 pipeline 构造 |
+| D-006 | 将搜索命中、non-DOI Crossref relation、规范化标题与第一作者一致或标题中的数字一致直接作为 journal–arXiv automatic match | `rejected` | 搜索结果只提高候选召回；Crossref 不验证 non-DOI identifier；论文可能实质性改题，数字可能是科学内容而非 identifier，且已观察到标题检索产生完全不同论文的候选 | 搜索和 non-DOI relation 只用于 candidate retrieval；automatic identity resolution 仅接受 Crossref arXiv DOI relation 或官方 arXiv metadata 中唯一 exact journal DOI；冻结的人工 match 必须保留 reviewer、rationale、evidence locator 和带版本 ID，再由代码核验 official record 与 DOI conflict |
 
 ## 8. 实验登记表
 
@@ -406,6 +431,10 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | Experiment ID | 问题 | Cohort | Models | Primary estimand | Status | Protocol | Results | Decision |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EXP-TEMPORAL-AUTHORING-001 | 最小 ScienceCard 与单关系 Temporal admission 是否提高 paper-to-case conversion | 同一批 37 个冻结 source packets；顺序和逐论文调用上限不变 | 历史 alias 为 `deepseek-v4-flash`；不可变历史 snapshot 未保存，当前凭据缺失 | 首次结构合格率、repair 后结构合格率、source-review retention rate、最终 acceptance rate；分母均为 37 | `blocked` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/registration.json)；[`frozen_sources.json`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/frozen_sources.json) | 未运行 | 不可变历史 snapshot 与凭据缺失；当前无法识别 pipeline 修改的因果效应 |
+| EXP-TEMPORAL-PRODUCTION-001 | 在不改变 scientific gates 的条件下构造近期来源 Temporal candidate families | 36 个 frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-001/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-001/summary.json) | 7 个 candidate families；待独立人工或领域专家 review |
+| EXP-TEMPORAL-PRODUCTION-002 | 扩大独立 frozen source cohort，继续构造 candidate families | 59 个 frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-002/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-002/summary.json) | 5 个 candidate families；与前序 cohort 分开报告 |
+| EXP-TEMPORAL-PRODUCTION-003 | 在冻结 PRL relation cohort 上继续构造 candidate families | 91 个 frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-003/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-003/summary.json) | 6 个 candidate families；与前序 cohort 分开报告 |
+| EXP-TEMPORAL-PRODUCTION-004 | Nature 优先并处理完整 frozen cohort，使累计 candidate families 达到至少 20 | 2 个 Nature 与 49 个 Physical Review Letters frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-004/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/summary.json)；[`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json) | 本批 4 个、累计 22 个 candidate families；数量目标完成，release review 未完成 |
 | EXP-METHOD-PILOT-001 | 三种 evaluation methods 能否分别测量无观测、固定观测和自适应实验条件下的表现 | 6 个 H/C families（easy/hard）与 3 个独立 Temporal families；2 repeats | `deepseek-v4-flash` API alias；snapshot 与 cutoff 为 unknown；deterministic Oracle；独立 post-hoc Evaluator | `held_out_prediction_score` 的 \(\Delta_0,\Delta_F,\Delta_A\)；Temporal 独立报告 | `ready` | [`registration.json`](../experiments/registrations/EXP-METHOD-PILOT-001/registration.json) | 未运行 | development method pilot；不作 capability 或 post-checkpoint claim |
 | EXP-HC-CONFIRM-001 | 固定实验观测能否改变 Counterfactual condition 下的初始预测 | 20 matched task families；formal evaluation 需要 private benchmark instances | 待冻结 | \(\Delta_0,\Delta_F\) | `blocked` | 待补 | 待补 | 等待 pilot study |
 | EXP-TEMPORAL-001 | 独立近期来源 benchmark instances 在三种 evaluation methods 下的表现差异 | 数量待 power analysis，以 source paper 计 | 待冻结 | \(Y^T_F-Y^T_0\) 和 \(Y^T_A-Y^T_F\) | `blocked` | 待补 | 待补 | 等待 temporal contamination audit 和 private evaluation workflow |
@@ -452,7 +481,10 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 | Result ID | Experiment ID | Date | Code/config identity | Coverage | Primary result | Uncertainty | Interpretation status | Artifact |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 暂无 |  |  |  |  |  |  |  |  |
+| R-TEMPORAL-PRODUCTION-001 | EXP-TEMPORAL-PRODUCTION-001 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 36/36 source papers processed | 20 nonempty relations；14 retained；7 constructed candidate families | Operational count；无预注册转换率 estimand | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-001/summary.json) |
+| R-TEMPORAL-PRODUCTION-002 | EXP-TEMPORAL-PRODUCTION-002 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 59/59 source papers processed | 18 nonempty relations；15 retained；5 constructed candidate families | Operational count；cohort 在前序结果后选择 | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-002/summary.json) |
+| R-TEMPORAL-PRODUCTION-003 | EXP-TEMPORAL-PRODUCTION-003 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 91/91 source papers processed | 12 nonempty relations；10 retained；6 constructed candidate families | Operational count；cohort 在前序结果后选择 | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-003/summary.json) |
+| R-TEMPORAL-PRODUCTION-004 | EXP-TEMPORAL-PRODUCTION-004 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 51/51 source papers processed | 11 nonempty relations；10 retained；4 constructed candidate families；累计 22 | Operational count；Nature 优先但不是 venue comparison | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/summary.json)；[`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json) |
 
 解释状态只能使用：
 
@@ -476,6 +508,8 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | R-006 | Fixed experimental design 不可辨识或偏向预先规定的数据生成关系 | 方法间表现差异无法解释 | Phase 1 执行 pilot study | reference baselines 与 competing-hypothesis tests 通过 | open |
 | R-007 | 大规模运行先于评测方法 pilot | 产生昂贵但不可解释的数据 | P0.1–P0.6 已完成；先冻结并执行 Phase 1 | pilot study 通过后才扩展 | controlled |
 | R-008 | 历史 Temporal authoring run 没有不可变 model snapshot | 即使 source packets、alias 和调用预算相同，也不能把新旧转换率差异归因于 pipeline 修改 | `EXP-TEMPORAL-AUTHORING-001` 保持 blocked；历史值仅作描述性基线 | 找到并可调用与历史运行相同的不可变 snapshot，或另行登记同一新 snapshot 下的新旧 pipeline 同期比较 | open |
+| R-009 | Journal–arXiv record linkage 出现 false match 或漏召回 | False match 会污染 source truth；漏召回会降低并改变可构造 cohort | Candidate retrieval 与 identity resolution 分离；自动确认只用 Crossref arXiv DOI relation 或唯一 exact journal DOI；non-DOI relation 与标题/搜索候选人工复核；relation provenance 与明确版本不得丢弃；非命中记 unresolved | 在独立标注样本上报告 record-linkage precision/recall，并复核全部 release candidates | open |
+| R-010 | Code Agent source review 被误写为 independent expert review | 高估来源核验强度并使 benchmark release 缺少领域判断 | 运行记录只声明 separate-context process review；22 个 candidates 不进入公开 registry | 独立人工或领域专家完成 source review、去重与 release review | open |
 
 ## 11. 文档维护规则
 
@@ -508,6 +542,9 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 | Version | Date | Change | Evidence/reason | Author |
 | --- | --- | --- | --- | --- |
+| 0.7.2 | 2026-09-03 | 收紧 22 个 accepted candidates 的 linkage 证据表述：EXP-003 的 3 项 relation-only records 未冻结原始 identifier type，不能据现有本地材料认定符合当前 automatic resolution rule；将重新冻结官方 relation tuple 或独立人工复核列为 release 前条件 | [`../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md)；最终只读代码与证据复核 | project team |
+| 0.7.1 | 2026-09-03 | 更正 arXiv API 没有 DOI search field，明确 `all:"<DOI>"` 只是 DOI-string candidate retrieval；修复 relation provenance tuple、请求节流和同一 arXiv work 的固定 source-version selection；逐项复核 22 个 accepted candidates 的 linkage evidence | [`temporal_case_pipeline.md`](temporal_case_pipeline.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md) | project team |
+| 0.7.0 | 2026-09-03 | 记录四次 operational Temporal production runs、累计 22 个 candidate families 及其非确认性解释边界；冻结 journal–arXiv candidate retrieval/identity resolution 分离规则，否决搜索命中、non-DOI relation、标题数字或 title/author agreement 直接自动匹配；增加冻结人工 match 的正式回流与 exact-version/DOI-conflict validation；把独立人工或领域专家 release review 列为下一步 | [`../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json)；[`temporal_case_pipeline.md`](temporal_case_pipeline.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md`](../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-005/nature_science_reciprocal_relation_candidate_audit.json`](../runs/EXP-TEMPORAL-PRODUCTION-005/nature_science_reciprocal_relation_candidate_audit.json) | project team |
 | 0.6.0 | 2026-09-03 | 将 Temporal admission 改为至少一个 source-supported executable quantitative relation；第二个 source-reported condition 改为可选，counterfactual construction 独立；LLM 仅抽取六类 ScienceCard 字段，其余由确定性代码生成；登记同一批 37 篇的 conversion study | [`../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/)；历史不可变 snapshot 与运行凭据缺失，故未执行且不作因果比较 | project team |
 | 0.5.0 | 2026-09-03 | 冻结 `EXP-METHOD-PILOT-001` 的 cohort、model profile、2 repeats、主要 outcome/estimands、deterministic Oracle 与 Temporal source dates；状态改为 `ready`，结果仍为未运行 | [`../experiments/registrations/EXP-METHOD-PILOT-001/`](../experiments/registrations/EXP-METHOD-PILOT-001/)；API snapshot/cutoff 缺失保持 unknown | project team |
 | 0.4.0 | 2026-09-03 | 将 P0.1–P0.6 标为完成；记录三方法、连续主指标、condition role、事实/unknown exposure 合同、Oracle 双接口与 H/C 变体边界；`EXP-METHOD-PILOT-001` 保持待主任务冻结且未运行 | 对应核心模块与聚焦测试；不新增实验结果 | project team |

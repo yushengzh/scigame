@@ -18,7 +18,9 @@ def _write_json(path: Path, payload) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _manifest(source_packet: Path, *, count: int = 1) -> dict:
+def _manifest(
+    source_packet: Path, *, count: int = 1, family_index_offset: int = 0
+) -> dict:
     sources = []
     for index in range(1, count + 1):
         sources.append(
@@ -40,7 +42,10 @@ def _manifest(source_packet: Path, *, count: int = 1) -> dict:
                 },
             }
         )
-    return {"cohort_size": count, "sources": sources}
+    manifest = {"cohort_size": count, "sources": sources}
+    if family_index_offset:
+        manifest["family_index_offset"] = family_index_offset
+    return manifest
 
 
 def _provider_payload() -> dict:
@@ -123,7 +128,10 @@ class TemporalCodeAgentProductionTests(unittest.TestCase):
                 encoding="utf-8",
             )
             manifest_path = root / "frozen_sources.json"
-            _write_json(manifest_path, _manifest(source_packet))
+            _write_json(
+                manifest_path,
+                _manifest(source_packet, family_index_offset=1000),
+            )
             output = root / "run"
 
             preparation = prepare(manifest_path, output)
@@ -176,6 +184,9 @@ class TemporalCodeAgentProductionTests(unittest.TestCase):
             construction = compile_cases(output)
             self.assertEqual(construction["failed_count"], 0)
             self.assertEqual(construction["completed"][0]["status"], "case_accepted")
+            self.assertEqual(
+                construction["completed"][0]["family"], "temporal_source_1001"
+            )
             canary = json.loads(
                 (paper / "construction" / "validation.json").read_text(
                     encoding="utf-8"
@@ -191,6 +202,7 @@ class TemporalCodeAgentProductionTests(unittest.TestCase):
             self.assertTrue(summary["target_met"])
             self.assertEqual(summary["fixed_denominator"], 1)
             self.assertEqual(summary["distinct_family_count"], 1)
+            self.assertEqual(summary["family_index_offset"], 1000)
             self.assertEqual(summary["funnel"]["final_acceptance"]["rate"], 1.0)
             self.assertFalse(
                 summary["review_independence"]["established_by_adapter"]
@@ -245,4 +257,3 @@ class TemporalCodeAgentProductionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -13,9 +14,12 @@ from role_benchmark.wire import canonical_json_dumps
 
 from .arxiv import (
     ArxivTransport,
+    arxiv_base_id,
     arxiv_resolution_to_payload,
     download_arxiv_source,
+    parse_versioned_arxiv_id,
     resolve_arxiv_paper,
+    resolve_manually_reviewed_arxiv_paper,
 )
 from .census import (
     CensusPaper,
@@ -251,6 +255,55 @@ def _canonical_reconciliations(
     return result
 
 
+def _canonical_manual_linkage_reviews(
+    payload: Optional[Mapping[str, Any]],
+) -> Mapping[str, Mapping[str, str]]:
+    """Validate frozen positive record-linkage decisions keyed by journal DOI."""
+
+    if payload is None:
+        return {}
+    if not isinstance(payload, Mapping):
+        raise ValueError("manual_linkage_reviews must be a DOI-keyed JSON object")
+    required = {
+        "arxiv_versioned_id",
+        "decision",
+        "evidence_locator",
+        "rationale",
+        "reviewer",
+    }
+    result = {}
+    for raw_doi, raw_review in payload.items():
+        if not isinstance(raw_doi, str):
+            raise ValueError("manual linkage review DOI keys must be text")
+        doi = canonicalize_doi(raw_doi)
+        if doi in result:
+            raise ValueError("duplicate canonical manual linkage review DOI: %s" % doi)
+        if not isinstance(raw_review, Mapping) or set(raw_review) != required:
+            raise ValueError(
+                "manual linkage review for %s must contain exactly %s"
+                % (doi, ", ".join(sorted(required)))
+            )
+        values = {}
+        for field in ("evidence_locator", "rationale", "reviewer"):
+            value = raw_review[field]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    "manual linkage review %s for %s must be non-empty text"
+                    % (field, doi)
+                )
+            values[field] = value.strip()
+        if raw_review["decision"] != "match":
+            raise ValueError(
+                "manual linkage review decision for %s must be match" % doi
+            )
+        values["decision"] = "match"
+        values["arxiv_versioned_id"] = parse_versioned_arxiv_id(
+            raw_review["arxiv_versioned_id"]
+        )
+        result[doi] = values
+    return result
+
+
 def _canonical_figure_evidence_addenda(
     payload: Optional[Mapping[str, Any]],
 ) -> Mapping[str, FigureEvidenceAddendum]:
@@ -393,6 +446,7 @@ def acquire_census_snapshot(
     request_interval_s: float = 3.0,
     publisher_reconciliation: Optional[Mapping[str, Any]] = None,
     figure_evidence_addenda: Optional[Mapping[str, Any]] = None,
+    manual_linkage_reviews: Optional[Mapping[str, Any]] = None,
 ) -> Mapping[str, Any]:
     """Acquire fixed sources and emit the only cohort rows downstream may use.
 
@@ -422,6 +476,8 @@ def acquire_census_snapshot(
         or request_interval_s < 0
     ):
         raise ValueError("request_interval_s must be non-negative")
+    if pause is None and arxiv_transport is None:
+        pause = time.sleep
 
     acquired_at = _utc_timestamp(retrieved_at)
     output = Path(output_directory)
@@ -435,6 +491,7 @@ def acquire_census_snapshot(
     figure_addenda = _canonical_figure_evidence_addenda(
         figure_evidence_addenda
     )
+    linkage_reviews = _canonical_manual_linkage_reviews(manual_linkage_reviews)
     unknown_addendum_dois = sorted(
         set(figure_addenda) - {paper.doi for paper in snapshot.papers}
     )
@@ -442,6 +499,14 @@ def acquire_census_snapshot(
         raise ValueError(
             "figure evidence DOI is not present in the census snapshot: %s"
             % ", ".join(unknown_addendum_dois)
+        )
+    unknown_linkage_review_dois = sorted(
+        set(linkage_reviews) - {paper.doi for paper in snapshot.papers}
+    )
+    if unknown_linkage_review_dois:
+        raise ValueError(
+            "manual linkage review DOI is not present in the census snapshot: %s"
+            % ", ".join(unknown_linkage_review_dois)
         )
 
     papers = snapshot.papers
@@ -532,8 +597,48 @@ def acquire_census_snapshot(
             max_results=max_results,
             timeout=timeout,
             transport=arxiv_transport,
+            pause=pause,
+            request_interval_s=request_interval_s,
         )
+        automatic_resolution_payload = arxiv_resolution_to_payload(resolution)
+        linkage_review = linkage_reviews.get(paper.doi)
+        linkage_review_applied = False
+        if resolution.status != "resolved" and linkage_review is not None:
+            if pause is not None:
+                pause(float(request_interval_s))
+            resolution = resolve_manually_reviewed_arxiv_paper(
+                paper,
+                versioned_id=linkage_review["arxiv_versioned_id"],
+                timeout=timeout,
+                transport=arxiv_transport,
+            )
+            linkage_review_applied = True
+        elif resolution.status == "resolved" and linkage_review is not None:
+            assert resolution.paper is not None
+            automatic_id = resolution.paper.versioned_id
+            reviewed_id = linkage_review["arxiv_versioned_id"]
+            if arxiv_base_id(automatic_id) != arxiv_base_id(reviewed_id):
+                raise ValueError(
+                    "manual linkage review for %s conflicts with automatic arXiv work identity"
+                    % paper.doi
+                )
+            if automatic_id.casefold() != reviewed_id.casefold():
+                if pause is not None:
+                    pause(float(request_interval_s))
+                resolution = resolve_manually_reviewed_arxiv_paper(
+                    paper,
+                    versioned_id=reviewed_id,
+                    timeout=timeout,
+                    transport=arxiv_transport,
+                )
+                linkage_review_applied = True
         resolution_payload = arxiv_resolution_to_payload(resolution)
+        if linkage_review is not None:
+            resolution_payload["manual_linkage_review"] = dict(linkage_review)
+            resolution_payload["manual_linkage_review_applied"] = (
+                linkage_review_applied
+            )
+            resolution_payload["automatic_resolution"] = automatic_resolution_payload
         if resolution.status != "resolved" or resolution.paper is None:
             results.append(
                 _paper_result(
@@ -582,6 +687,8 @@ def acquire_census_snapshot(
             if pause is not None and index + 1 < len(papers):
                 pause(float(request_interval_s))
             continue
+        if pause is not None:
+            pause(float(request_interval_s))
         try:
             bundle = download_arxiv_source(
                 arxiv_paper,
@@ -800,9 +907,25 @@ def acquire_census_snapshot(
         "identity": {
             "journal_key": "canonical_doi",
             "arxiv_key": "versioned_id",
-            "match_rule": "exact_arxiv_doi_else_exact_normalized_title_first_author",
+            "automatic_match_methods": ["crossref_has_preprint_doi", "doi"],
+            "reviewed_match_method": "manual_review",
+            "manual_review_candidate_sources": [
+                "crossref_non_doi_relation",
+                "arxiv_title_search",
+                "search_engine",
+            ],
+            "match_rule": (
+                "crossref_arxiv_doi_relation_or_unique_exact_arxiv_journal_doi"
+            ),
         },
         "figure_evidence_addenda": _figure_evidence_payload(figure_addenda),
+        "manual_linkage_reviews": {
+            "application_rule": (
+                "used when automatic identity resolution is unresolved or to select "
+                "a reviewed version of the same arXiv work"
+            ),
+            "records": dict(linkage_reviews),
+        },
         "paper_results": results,
         "publisher_reconciliation": {
             "records": dict(reconciliations),
@@ -811,8 +934,13 @@ def acquire_census_snapshot(
         "query": {
             "arxiv_max_results": max_results,
             "arxiv_recall": (
-                "all:canonical_doi plus title/first-author fallbacks for plain-text "
-                "titles; embedded-markup titles use DOI recall only"
+                "Crossref has-preprint id_list candidate retrieval first; non-DOI relation "
+                "targets require manual review unless independently confirmed by exact journal DOI; "
+                "otherwise separate DOI-string and title-only API requests for plain-text titles; "
+                "embedded-markup titles use DOI-string recall only"
+            ),
+            "general_search_engine": (
+                "offline candidate retrieval only; never automatic identity adjudication"
             ),
         },
         "retrieved_at": acquired_at.isoformat(),
@@ -859,6 +987,7 @@ def acquire_temporal_window(
     request_interval_s: float = 3.0,
     publisher_reconciliation: Optional[Mapping[str, Any]] = None,
     figure_evidence_addenda: Optional[Mapping[str, Any]] = None,
+    manual_linkage_reviews: Optional[Mapping[str, Any]] = None,
 ) -> Mapping[str, Any]:
     """Run census, linkage, source acquisition, and cohort derivation once."""
 
@@ -890,6 +1019,7 @@ def acquire_temporal_window(
         request_interval_s=request_interval_s,
         publisher_reconciliation=publisher_reconciliation,
         figure_evidence_addenda=figure_evidence_addenda,
+        manual_linkage_reviews=manual_linkage_reviews,
     )
 
 

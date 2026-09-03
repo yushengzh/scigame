@@ -8,13 +8,14 @@
 
 1. 对预先冻结的期刊和闭区间时间窗做完整 journal-record census；
 2. 用 DOI-keyed publisher record 核对 article category、publication date、original-research 与 withdrawal/retraction 状态；缺失或无效记录不能入 cohort；
-3. 以期刊 DOI、标题和第一作者在一次 arXiv query 中召回 candidates：唯一 DOI 相等优先；只有 candidate 未声明 DOI 时，才允许唯一的规范化精确标题＋第一作者姓 fallback；
-4. 固定匹配记录的 arXiv 版本，下载 `/src/{versioned_id}` source bundle，并显式要求至少一个 `.tex` 文件；只对 `.tex` 去除不进入成文论文的注释、对其他 UTF-8 `.csv/.tsv/.dat/.txt` 保持原文，再合并为带文件边界的 textual source packet；
-5. 让 LLM 只从带全局行号的 source packet 抽取最小 `ScienceCard`：`formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；每张 card 至多提交一个定量关系；
-6. 由独立 source review 核对公式、参数、变量、适用域和原文位置；至少一个关系通过复核，才满足 Temporal admission；
-7. 由确定性代码生成 budget、diagnostic conditions、held-out conditions、public template 和 provenance mapping，并完成可执行性、域和信息边界检查；
-8. 只有研究设计明确要求 counterfactual variant 时，才把已接受的关系送入独立的 counterfactual construction pipeline；第二个 source-reported condition 不是这一步的前提；
-9. 最后只从合格 cases 中选 cohort，不为凑满目标数降低标准。
+3. 把 journal→arXiv record linkage 分成 candidate retrieval 与 identity adjudication：先读取 Crossref journal record 中由成员显式登记的 `has-preprint` relation，包括当前 record 的 `asserted-by=subject` 与由相关 record 的显式登记形成的 reciprocal `asserted-by=object`；无可用 relation 时依次运行相互独立的 DOI-string recall 与 title-only recall，第一作者只用于候选复核而不作为检索硬条件。对仍未解析的记录，可在主 acquisition 之外用引号包围的完整期刊标题做补充检索；
+4. 使用官方期刊、Crossref 与 arXiv metadata 判定候选：Crossref 中以 arXiv DOI 表示的显式 relation，以及候选 metadata 中唯一相等的 journal DOI，是两种 automatic match methods。`id-type=arxiv` relation、规范化精确标题与第一作者一致，以及任何搜索结果都只产生 `manual_review_required` candidates；经冻结的人工 record-linkage review 可指定一个带版本的 arXiv ID，代码随后用官方 `id_list` 核验该精确版本并拒绝显式 DOI conflict，才允许进入 source 下载。搜索排名与数字相同都不是身份证据；
+5. 固定通过身份判定的 arXiv 版本，下载 `/src/{versioned_id}` source bundle，并显式要求至少一个 `.tex` 文件；只对 `.tex` 去除不进入成文论文的注释、对其他 UTF-8 `.csv/.tsv/.dat/.txt` 保持原文，再合并为带文件边界的 textual source packet；
+6. 让 LLM 只从带全局行号的 source packet 抽取最小 `ScienceCard`：`formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；每张 card 至多提交一个定量关系；
+7. 由独立 source review 核对公式、参数、变量、适用域和原文位置；至少一个关系通过复核，才满足 Temporal admission；
+8. 由确定性代码生成 budget、diagnostic conditions、held-out conditions、public template 和 provenance mapping，并完成可执行性、域和信息边界检查；
+9. 只有研究设计明确要求 counterfactual variant 时，才把已接受的关系送入独立的 counterfactual construction pipeline；第二个 source-reported condition 不是这一步的前提；
+10. 最后只从合格 cases 中选 cohort，不为凑满目标数降低标准。
 
 论文在概念上不是 case 的一对一容器：一篇论文可能没有适合的低维可操作主张，也可能含有多个互不重复的定量关系。当前最小合同为每篇论文、每次抽取至多一个关系；主要转换率以论文为单位，每篇论文最多贡献一次成功。若独立复核后得到 \(F\) 个单关系 Temporal cases，并交叉两个 task settings，则产生：
 
@@ -33,8 +34,8 @@ F source cases × 2 task settings = 2F instances
 | 步骤 | LLM 角色 | 最终 authority | 原因 |
 | --- | --- | --- | --- |
 | 按期刊和日期窗枚举记录，以及 article type 等 metadata filter | 不需要 | Crossref/期刊记录 + 确定性规则 | 输入已结构化，LLM 不增加信息。 |
-| 用标题和第一作者召回 arXiv candidates | 不需要 | arXiv API | 这一步只提高 recall，不决定记录同一性。 |
-| 确认 journal↔arXiv 身份、固定版本、下载 `/src` 并检查 `.tex` | 不需要 | DOI 优先；无 DOI candidate 才用精确标题＋姓 fallback；再检查 source archive | 身份和文件存在性应该是可重复的 gate，不由模型猜测。 |
+| 召回 arXiv candidates | 不需要 | Crossref `has-preprint` relation、相互独立的 arXiv DOI-string 与 title-only API queries；未解析记录可在主 acquisition 之外补充完整标题检索 | arXiv API 没有 DOI search field；第一作者不作为 retrieval 硬条件；检索只提高 recall，不决定记录同一性；非命中只能记为 unresolved。 |
+| 确认 journal↔arXiv 身份、固定版本、下载 `/src` 并检查 `.tex` | 只有非 DOI relation 或搜索候选需要人工 review | Crossref arXiv DOI direct/reciprocal relation 或唯一 exact journal DOI 可自动确认；`id-type=arxiv` relation 和 title/search candidates 必须 manual adjudication；所有 relation 的 identifier type 与 `asserted-by` provenance 必须保留 | 搜索结果、主题接近或数字重合不是身份证据；人工 match 必须冻结 reviewer、rationale、evidence locator 和带版本 arXiv ID，代码仍核验官方记录和 DOI conflict。 |
 | 从 source packet 定位一个 quantitative relation | **需要或非常有用** | LLM 只提交 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；source review 决定能否继续 | 这是跨段落、公式和 caption 的语义映射，纯规则难以覆盖论文写法。 |
 | 判断公式、参数、controls、readouts、domain 和 anchors 是否与 source 一致 | LLM 可做初步检查 | 独立科学 reviewer | 候选输出不能自行确认来源支持。 |
 | 生成 budget、diagnostic conditions、held-out conditions、public template 和 provenance mapping | 不需要 | 确定性代码 | 这些字段可从通过验证的最小 ScienceCard 和固定规则唯一生成。 |
@@ -52,11 +53,11 @@ Abstractor 是 **benchmark authoring 阶段**的离线工具，不是 episode �
 
 | Module | 当前职责 |
 | --- | --- |
-| [`census.py`](../src/role_benchmark/temporal/census.py) | `collect_crossref_census()` 在固定闭区间内通过 Crossref `/journals/{issn}/works` 穷尽三刊记录，执行 cursor 分页、DOI 规范化与去重；`CensusPaper` 保留用于 arXiv 召回的 title 和 first-author family。 |
+| [`census.py`](../src/role_benchmark/temporal/census.py) | `collect_crossref_census()` 在固定闭区间内通过 Crossref `/journals/{issn}/works` 穷尽三刊记录，执行 cursor 分页、DOI 规范化与去重；`CensusPaper` 额外保留可严格解析的 member-deposited `has-preprint` arXiv identifier、identifier type、`asserted-by` provenance 和 relation 中明确给出的 version suffix。三个 provenance 字段必须同时存在，冲突 relation fail closed；无 relation 的旧 JSON 保持兼容。 |
 | [`acquisition.py`](../src/role_benchmark/temporal/acquisition.py) | 正式、确定性的 journal window → publisher reconciliation → arXiv identity → TeX gate → textual source packet → cohort handoff；保留兼容的 `source.tex`，并写入 coordinator 实际使用的 `source_packet.txt`。 |
-| [`arxiv.py`](../src/role_benchmark/temporal/arxiv.py) | 用 DOI、完整 title，以及仅删除独立英文冠词 `a/an/the` 的 title 变体单次查询 arXiv Atom API，记录有上限查询返回的 `recalled_count`；冠词变体只用于 recall，唯一 DOI 相等优先，只对无 DOI candidate 使用唯一 exact-title+first-author-family fallback；保留固定版本 ID、v1 `first_submitted_at` 和该版本 `version_updated_at`，并从 `/src/{versioned_id}` 下载 source bundle。 |
+| [`arxiv.py`](../src/role_benchmark/temporal/arxiv.py) | 有 Crossref `has-preprint` 时先通过 arXiv API `id_list` 精确取回并检查 identifier 与显式 DOI conflict；relation 中给定版本时必须返回同一版本。Crossref arXiv DOI relation 或唯一 exact journal DOI 可自动解析；non-DOI relation 与 title-only query results 一律输出 `manual_review_required`。`resolve_manually_reviewed_arxiv_paper()` 只核验冻结人工 match 指定的精确版本和 DOI conflict，不代替人工判断。模块记录分通道返回数与 result-limit 状态，并只为已解析记录下载 `/src/{versioned_id}`。通用搜索引擎不是实时依赖。 |
 | [`metadata.py`](../src/role_benchmark/temporal/metadata.py) | `SourcePaper` enrichment contract、三刊/日期/最早公开时间/article type/LaTeX/撤稿 metadata gates，以及对合格集合的冻结 citation-count 排序；不发 HTTP 请求。 |
-| [`latex.py`](../src/role_benchmark/temporal/latex.py) | 在内存中读取 tar.gz；至少要求一个 UTF-8 `.tex`，并附加可解码的 `.csv/.tsv/.dat/.txt`。仅 TeX 成员逐行去注释且保持行数，数据/文本附件中的 `%` 等内容不改；packet 保留明确文件边界、逐文件行坐标和 packet-global 行坐标，二进制附件不进入模型文本。 |
+| [`latex.py`](../src/role_benchmark/temporal/latex.py) | 在内存中读取 gzip-compressed tar archive；同时处理实测出现的 gzip-compressed single TeX response。single-file 路径仍要求严格 UTF-8 与独立 TeX 文档标记，不把任意 gzip 文本当作论文源文件。tar archive 至少要求一个 UTF-8 `.tex`，并附加可解码的 `.csv/.tsv/.dat/.txt`。仅 TeX 成员逐行去注释且保持行数，数据/文本附件中的 `%` 等内容不改；packet 保留明确文件边界、逐文件行坐标和 packet-global 行坐标，二进制附件不进入模型文本。 |
 | [`minimal_science_card.py`](../src/role_benchmark/temporal/minimal_science_card.py) | 当前默认的最小 ScienceCard contract；每个 provider output 至多包含一个 relation，字段恰为 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`，并校验 expression、声明闭包、适用域与 source-line locators。 |
 | [`minimal_card_extract.py`](../src/role_benchmark/temporal/minimal_card_extract.py) | 当前单次 LLM extraction request 与限定的 schema/locator repair；不要求第二个 source condition，也不生成 case-design 字段。 |
 | [`admission.py`](../src/role_benchmark/temporal/admission.py) | 独立 source-review contract 与 Temporal admission；只有经复核的 source-supported executable quantitative relation 可以进入构造，第二个 source-reported condition 不属于 gate。 |
@@ -79,7 +80,7 @@ Abstractor 是 **benchmark authoring 阶段**的离线工具，不是 episode �
 | [`run_temporal_conversion.py`](../experiments/run_temporal_conversion.py) | 按 `EXP-TEMPORAL-AUTHORING-001` 的 37 篇冻结清单、原顺序和逐论文调用上限运行新版抽取、source review、确定性构造与 admission，并报告四项注册比例。当前因历史不可变 snapshot 和运行凭据缺失而未执行。 |
 | [`compare_temporal_conversion.py`](../experiments/compare_temporal_conversion.py) | 在 37 篇固定分母上复核逐论文结果与调用预算，报告四项历史值、新值、百分点差和新版 exact binomial confidence interval；历史 snapshot 未知时只输出 `descriptive_only`。 |
 
-当前 CLI 是刻意分步的：Crossref 和 arXiv 公开 API 不需要 LLM API key；LLM provider credentials 仍只在调用方 runtime 中配置，仓库不绑定某个供应商。正式 handoff 使用 `acquire`；低层命令只用于诊断。连续 arXiv 查询间固定等待 3 秒，以符合 [arXiv API terms](https://info.arxiv.org/help/api/tou.html)。
+当前 CLI 是刻意分步的：Crossref 和 arXiv 公开 API 不需要 LLM API key；LLM provider credentials 仍只在调用方 runtime 中配置，仓库不绑定某个供应商。正式 handoff 使用 `acquire`；低层命令只用于诊断。CLI 在同一 record 的 DOI-string 与 title-only API queries 之间、metadata 与 source requests 之间以及相邻 records 之间等待 3 秒，以符合 [arXiv API terms](https://info.arxiv.org/help/api/tou.html)。
 
 进入评测后，每个 Temporal instance 支持 prior-only baseline、固定实验设计和自适应实验设计。固定与自适应方法使用相同的 family-specific observation budget \(B\)，三种方法共享最终可执行 `expression`、held-out conditions 和 scorer。主要结果是连续 `held_out_prediction_score`；二元 pass 与 protocol completion 分开报告。P0.6 的每条 exposure record 对应一个 model profile × Temporal instance，只记录可核对的来源、模型和 exposure 事实；资料不足时保留 `unknown`，不得推断为 unseen 或 contamination-free。
 
@@ -102,9 +103,12 @@ PYTHONPATH=src:. python experiments/run_temporal_conversion.py \
 
 ```bash
 # 1. 正式 acquisition；publisher_reconciliation.json 由期刊侧记录整理。
+# manual_linkage_reviews.json 是可选的冻结人工 match；用于自动解析未通过的候选，
+# 或为已确认的同一 arXiv work 选择经复核的固定 source version。
 PYTHONPATH=src python -m role_benchmark.temporal acquire acquired_2026_07/ \
   --start 2026-07-01 --end 2026-07-31 \
   --publisher-reconciliation publisher_reconciliation.json \
+  --manual-linkage-reviews manual_linkage_reviews.json \
   --selection-policy citation_rank --cohort-limit 60
 
 # 2. 运行有序开发 warm-up，累计 10 个 accepted families；review 缺失时正常暂停。
@@ -171,7 +175,7 @@ Python API 可直接组合 `acquire_temporal_window(...)`、`extract_science_car
 
 | 已有工作 | 应给的 credit | 与本项目的边界 |
 | --- | --- | --- |
-| [Crossref 的 preprint–journal matching 方法](https://www.crossref.org/blog/discovering-relationships-between-preprints-and-journal-articles/) | 记录对齐应优先利用明示 relation/DOI；无 relation 时可将 title、authors 和 year 用于 candidate retrieval 与高精度 matching | Crossref 的改进方法包含评分和阈值；当前最小实现更保守：唯一 DOI 相等优先；未声明 DOI 的 candidate 才可用唯一规范化精确标题＋第一作者姓；明示 DOI 冲突不能被题名/作者覆盖 |
+| [Crossref 的 preprint–journal matching 方法](https://www.crossref.org/blog/discovering-relationships-between-preprints-and-journal-articles/) | 记录对齐应优先利用明示 relation/DOI；无 relation 时可将 title、authors 和 year 用于 candidate retrieval 与经验证的 matching | Crossref 的方法使用在标注数据上验证的相似度与阈值；当前实现不把该外部 heuristic score 直接迁移到本数据。只有 Crossref arXiv DOI relation 或唯一 exact journal DOI 自动解析；non-DOI relation 与 title/search candidates 均要求人工复核，明示 DOI conflict 不能被题名或作者覆盖 |
 | [RealMath](https://arxiv.org/abs/2505.12575)（[retriever code](https://github.com/ethz-spylab/RealMath/blob/618d666452ffbc9f0f40d982fc21dbf913abfea1/helpers/arxiv_retriever.py#L54-L161)） | 按 arXiv submission-date 窗口检索、分页、result-ID 去重、获取 source，并把 benchmark 设计为可刷新 | 它以 arXiv 记录为母集并从数学论文提取固定答案；这里先 census 指定期刊已发表记录，再对齐 arXiv，产物是 Player 可主动查询的实验世界 |
 | [LiveMathematicianBench](https://arxiv.org/abs/2604.01754) | 月度获取、规则优先与 agentic extraction 结合、质量筛选、过量生成后再选择 | 它生成 theorem-grounded MCQ；这里的产物是可执行 Oracle 与 matched tracks |
 | [LiveBench](https://github.com/LiveBench/LiveBench) | 定期加入近期材料、日期化 release、尽量使用客观 ground truth | “近期来源”只能降低部分污染风险，不能证明 contamination-free |
@@ -201,24 +205,40 @@ Nature 的 [journal information](https://www.nature.com/nature/journal-informati
 
 已实现的主入口使用 [Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/)，对每个期刊 ISSN 调用 `/journals/{issn}/works`。命令把 `from-pub-date` 和 `until-pub-date` 固定为用户给出的闭区间，并按 [Crossref cursor 规则](https://www.crossref.org/documentation/retrieve-metadata/rest-api/tips-for-using-the-crossref-rest-api/)取到最后一页；print/online ISSN 的重复记录按规范化 DOI 合并。没有 `--limit`，因为 census 不能在选择阶段之前截断。
 
-输出 `CensusPaper`，只保留 Crossref 直接提供或可确定性解析的 DOI、title、第一作者显示名/姓、canonical venue、publication date、article type 与 citation count。标题和第一作者用于下游 arXiv candidate retrieval；期刊 DOI 用于身份确认和聚类分析。Crossref 不能单独证明 `earliest_public_date`、TeX availability 或完整 withdrawal/retraction 状态，所以 census 不为这些字段编造默认值。
+输出 `CensusPaper`，保留 Crossref 直接提供或可确定性解析的 DOI、title、第一作者显示名/姓、canonical venue、publication date、article type、citation count，以及可解析的 `has-preprint` arXiv relation。明示 relation 是下游 arXiv candidate retrieval 的第一入口；标题和第一作者只用于补充召回；期刊 DOI 用于身份确认和聚类分析。Crossref 不能单独证明 `earliest_public_date`、TeX availability 或完整 withdrawal/retraction 状态，所以 census 不为这些字段编造默认值。
 
 正式 `acquire` 已要求调用方提供 DOI-keyed publisher reconciliation；缺失记录会得到 `publisher_reconciliation_required`，不会进入 cohort。代码只验证这份普通 JSON 的字段、类型和与后续 handoff 的一致性，并不自行连接 publisher。Nature/Science/APS feed 的自动采集、记录证据 provenance、补漏和 completeness 验证仍待实现。其作用是核对 DOI、article type 与日期语义，而不是改变用户给出的时间窗。
 
 ### 4.3 Journal record 对齐 arXiv
 
-对齐分为 retrieval 和 resolution 两步。retrieval 按 [arXiv API 字段语法](https://info.arxiv.org/help/api/user-manual.html)发出一次 DOI、完整题名和“仅删除独立 `a/an/the`”题名变体的 OR query，目标是尽量召回 candidates，不是就地决定身份。这个 recall 变体来自实际期刊题名与预印本题名仅差英文冠词的 failure case；它不改变后续身份判据。resolution 只接受两类高精度证据：
+对齐分为 candidate retrieval 和 identity resolution 两步。retrieval 首先读取 Crossref journal record 中由成员显式登记的 `has-preprint` relation。Crossref 在登记关系的 record 上标为 `asserted-by=subject`，并可在被指向的 record 上生成 `asserted-by=object` reciprocal relation；后者表示显式登记来自关系另一侧，不是相似度算法生成的 match。实现保留 assertion side、identifier type 和明确给出的 arXiv version。若缺失可用 relation，则先发 DOI-string query；仅在该 query 未解析时，再单独发完整 title-only query，其中可包含“仅删除独立 `a/an/the`”的 recall 变体。根据 [arXiv API 字段语法](https://info.arxiv.org/help/api/user-manual.html)，可搜索字段只有 title、author、abstract、comment、journal reference、category、report number 和 arXiv identifier；返回结果中的 `<arxiv:doi>` 不是 search field。因此 `all:"<journal DOI>"` 只是对可搜索文本字段的字符串检索，不是 DOI metadata lookup；即使 arXiv record 的 DOI metadata 完整，这个 query 也可能漏召回。第一作者不进入 query，避免作者顺序变化、团体作者或 metadata 缺失造成检索假阴性；它只用于描述候选一致性。DOI string 与 title 不进入同一个 OR query，避免一个分支占满 `max_results` 后制造另一个分支的伪唯一。Crossref 明确区分成员登记的 relation 与其另行发布的 heuristic matching dataset；这里不把相似度算法输出当作 member-deposited relation。automatic resolution 只接受以下 identifier evidence：
 
-1. candidate 中存在唯一的 DOI 与期刊 DOI 相等的记录；
-2. 否则，只在**未声明 DOI**的 candidates 中寻找唯一的“规范化后标题完全相等，且第一作者 family name 相等”记录。
+1. journal record 中唯一、可解析、identifier type 为 DOI 且 provenance 为 `subject` 或 `object` 的 arXiv `has-preprint` relation，并由官方 arXiv record 返回同一 identifier；
+2. candidate 中存在唯一的 DOI 与期刊 DOI 相等的记录。
 
-arXiv candidate 如果明示声明了与 journal DOI 不同的 DOI，就存在显式身份矛盾；即使题名和第一作者相同，也不能用 fallback 覆盖这个矛盾。
+[Crossref relationship schema](https://www.crossref.org/documentation/schema-library/markup-guide-metadata-segments/relationships/) 明确说明 DOI relation 会建立双向记录，同时也说明 non-DOI identifiers 不由 Crossref 验证。因此，`id-type=arxiv` relation 是成员提交的结构化身份声明，但不是由 Crossref 独立核实的事实。实现还要求 identifier 通过严格语法解析、由官方 arXiv `id_list` 返回同一 base identifier，并把显式 journal DOI conflict 转入人工复核；公开 release 前仍须由人工或领域专家复核 source identity。这个限制同样提醒我们：即使 relation 或 DOI 足以支持确定性的 record resolution，也不能把 metadata provider 当成绝对无误的真值来源。
 
-`ArxivResolution.recalled_count` 记录本次 query 实际返回的 entry 数（受 `max_results`限制，不声称是 arXiv 中所有搜索 hits）；`candidates` 只保留真正通过 DOI 或 strict title-author 规则的记录。因此 `not_found` 需要再分为 `recalled_count == 0`（zero returned hits）和 `recalled_count > 0`（有召回，但无高精度 match）；多个合格记录是 `ambiguous`。这些情况都不自动进入抽取。当前不加 fuzzy-title 阈值、LLM identity judge 或多个外部图谱。这是有意识的 precision-first 选择：漏掉一篇会降低 retention，错把另一篇论文当成真值来源则会直接污染 Oracle。如后续召回率过低，应预先冻结并验证新的 linkage 规则，不在生产 cohort 中临时放宽。这一边界与 [Crossref 的 preprint matching 工作](https://www.crossref.org/blog/discovering-relationships-between-preprints-and-journal-articles/)一致：标题/作者是有用的匹配特征，但不应把一个宽松搜索结果直接当成 confirmed relation。
+`id-type=arxiv` relation 和所有 title-only query results 只生成 `manual_review_required` candidates；规范化后标题与第一作者是否相等作为 review evidence 记录，不提供 automatic authority。candidate 是否声明 DOI 不影响其被保存，显式 DOI conflict 必须保留在 resolution payload 中。
+
+arXiv candidate 如果明示声明了与 journal DOI 不同的 DOI，就存在显式身份矛盾；即使题名和第一作者相同，也不能自动覆盖。Crossref relation target 出现该矛盾时，resolution 使用 `manual_review_required` 与明确 failure reason，并保存完整 candidate metadata；不得写成 `not_found`。
+
+`ArxivResolution.recalled_count` 保留为兼容字段，记录本次 resolution 中各 API request 实际返回 entry 数之和；`doi_recalled_count` 与 `title_recalled_count` 分别记录 DOI-string 与 title-only 两个通道。任何通道返回数达到 `max_results` 时，相应 `*_recall_limit_reached` 为 true；由于当前 parser 没有使用 feed 的 `opensearch:totalResults`，这个判据有意保守，返回数恰等于上限时可能产生 false rejection，但不会建立伪唯一性。DOI-string 通道达到上限时直接进入 `manual_review_required`。`candidates` 保存 exact DOI matches、title-only query results，以及需要人工处理的 identifier-conflict records。含 JATS/MathML markup 的期刊题名只运行 DOI-string query，以避免把 XML 当作 title phrase；这会降低无 DOI metadata 时的 recall，不能把返回空集解释为没有预印本。
+
+通用搜索引擎或外部索引找到的候选通过 `--manual-linkage-reviews` 回到正式 acquisition。输入是 journal-DOI-keyed JSON；每个 positive match 必须固定 `decision=match`、`arxiv_versioned_id`、`reviewer`、`rationale` 和 `evidence_locator`。代码随后用官方 arXiv `id_list` 重新取回完全相同的版本；未返回该版本或存在不同的显式 journal DOI 时仍拒绝。若 automatic resolution 已确认同一个 arXiv base identifier，人工 review 可以选择较早的固定 source version；base identifier 不同时视为 work-identity conflict。自动结果、人工 review 和是否实际应用 review 同时写入 acquisition artifact。这样，搜索引擎负责 candidate retrieval，人工负责 semantic identity decision 和 source-version selection，确定性代码负责 identifier、version 和 conflict validation；三者不相互替代。
+
+`manual_linkage_reviews` 刻意只接收 positive matches，因为否决某个候选不能证明该 journal record 没有其他 arXiv version。Negative 和 unresolved decisions 应保存在独立、冻结的 candidate-retrieval/adjudication artifact 中；主 acquisition 对没有 positive match 的 record 继续保留 `manual_review_required` 或 `not_found`，不得改写为“无预印本”。
+
+通用搜索引擎严格属于补充 candidate retrieval，不属于 identity adjudication，也不是主 acquisition 的实时依赖。若使用，应在独立离线步骤冻结 provider、逐字 query、retrieval timestamp 与全部候选 URL；随后仅依据官方期刊、Crossref 与 arXiv metadata 做 manual adjudication。搜索排名、snippet、主题接近、数字重合与搜索非命中均不构成 identity evidence。当前不加 fuzzy-title 阈值、LLM identity judge 或多个外部图谱。这是有意识的 precision-first 选择：漏掉一篇会降低 retention，错把另一篇论文当作真值来源则会直接污染 Oracle。如后续召回率过低，应预先冻结并验证新的 linkage 规则，不在生产 cohort 中临时放宽。这一边界与 [Crossref 的 preprint matching 工作](https://www.crossref.org/blog/discovering-relationships-between-preprints-and-journal-articles/)一致：标题/作者是有用的匹配特征，但不应把一个宽松搜索结果直接当成 confirmed relation。
+
+现有 14 个完整 journal–arXiv metadata pairs 的描述性审查中，8 对标题一致，1 对只存在数学或数字排版差异，5 对发生实质性改题；其中 7 对由 exact DOI 确认，5 对由官方 metadata 人工确认，1 对被拒绝，1 对保持 unresolved。这个 complete-case sample 不是随机样本，也不包含所有漏检记录，因而不能估计 linkage precision 或 recall；样本中没有发现实质性数字冲突，也不能外推为此类冲突不存在。逐对证据见 [`title_numeric_linkage_audit.md`](../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md) 和 [`title_numeric_linkage_audit.json`](../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.json)。
+
+对四次 production runs 中 22 个 `case_accepted` candidates 的 post-hoc conformance review 得到：18 项有 exact journal DOI，3 项保存了 Crossref `has-preprint` relation、规范化 arXiv target 和 official `id_list` resolution 但未冻结原始 identifier type，1 项依赖人工核对官方记录。没有通过项仅依赖标题或数字；但现有本地材料不足以证明前述 3 项 relation-only records 满足当前 automatic resolution rule，它们须在 release 前重新冻结官方 Crossref relation tuple 或完成独立人工复核。该审查不验证 ScienceCard 或 Oracle，也不能弥补部分原始 HTTP responses 未冻结的 provenance 缺口；见 [`accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md)。
+
+在同一 2026-01-01 至 2026-09-03 窗口内，对 Nature 和 Science 的完整 Crossref snapshot 另做了 reciprocal-relation recall audit：4,435 个去重 journal records 中，133 个 records 含 `has-preprint`/`asserted-by=object`，共 137 个 relation entries；但全部是 bioRxiv、Research Square、ChemRxiv 等其他 repository DOI，`id-type=arxiv` 与 `10.48550/arXiv.*` 均为 0。因此 reciprocal semantics 的修正确保了实现语义正确，却在该 snapshot 中新增 **0** 个 arXiv candidates。这个零结果不表示这些论文没有 arXiv 版本，也不估计完整 journal-to-arXiv recall；它进一步说明显式 relation 不能取代 DOI-string、title 和 search-engine candidate retrieval。完整分母、查询 URL、137 条排除记录和 structural-zero gates 见 [`nature_science_reciprocal_relation_candidate_audit.json`](../runs/EXP-TEMPORAL-PRODUCTION-005/nature_science_reciprocal_relation_candidate_audit.json)。
 
 ### 4.4 固定 arXiv source 版本与 TeX gate
 
-匹配成功后保留带版本的 arXiv ID（例如 `2401.01234v2`），并取 `https://arxiv.org/src/{versioned_id}`。[arXiv 的 media-type 文档](https://info.arxiv.org/help/mimetypes.html)说明 `/src` 始终返回 gzip-compressed tar archive；固定版本避免同一记录后续更新时改变 abstractor 输入。bundle 在内存中展开：`.tex` 是必需的科学叙事，能按 UTF-8 解码的 `.csv/.tsv/.dat/.txt` 是可选数值或补充材料。所有文本按 source path 排序，用 `BEGIN/END FILE` 边界合并；每个成员同时记录本文件的 `1..N` 行和 packet-global 行区间。旧 `source.tex` 仍只含 TeX，正式 coordinator 优先读取 `source_packet.txt`。
+匹配成功后保留带版本的 arXiv ID（例如 `2401.01234v2`），并取 `https://arxiv.org/src/{versioned_id}`。[arXiv 的 media-type 文档](https://info.arxiv.org/help/mimetypes.html)说明 `/src` 应返回 gzip-compressed tar archive；但本项目在固定版本 `2603.06063v1` 上重复观察到合法的 gzip-compressed single TeX response。解析器因此先尝试 tar archive，仅在 tar 解析失败后尝试 single-file gzip；后者必须严格按 UTF-8 解码并含独立 TeX 文档标记。这个兼容路径修复传输封装差异，不改变“必须有 TeX source”的资格标准。固定版本避免同一记录后续更新时改变 abstractor 输入。bundle 在内存中展开：`.tex` 是必需的科学叙事，能按 UTF-8 解码的 `.csv/.tsv/.dat/.txt` 是可选数值或补充材料。所有文本按 source path 排序，用 `BEGIN/END FILE` 边界合并；每个成员同时记录本文件的 `1..N` 行和 packet-global 行区间。旧 `source.tex` 仍只含 TeX，正式 coordinator 优先读取 `source_packet.txt`。
 
 必须纠正一个事实前提：**arXiv 不保证每篇记录都公开 TeX source**。arXiv 的官方 [PDF submission 说明](https://info.arxiv.org/help/submit_pdf.html)允许在特定条件下提交 PDF；其 [bulk source 文档](https://info.arxiv.org/help/bulk_data_s3.html)也只将 source 描述为“mostly TeX/LaTeX”。因此“匹配到 arXiv”不能代替“archive 中存在 `.tex`”这个显式 gate。无 `.tex` 是正常的 `no_tex_source` eligibility disposition，不是基础设施故障，也不应让 LLM 根据 PDF 或 abstract 补猜公式。
 
@@ -282,11 +302,16 @@ Stage B 的第一步现在输出完整 JSON census。每条记录都继续进入
 
 对每个 journal record 依次做：
 
-1. 用 DOI、完整“标题+第一作者”及仅删除独立英文冠词的题名变体组成一次 arXiv API recall query，保留 `recalled_count`；题名变体不直接建立身份；
-2. 用唯一 DOI 相等优先；只对未声明 DOI 的 candidates 使用唯一规范化精确 title＋first-author-family fallback；
-3. 对 resolver 的 `not_found` 和 `ambiguous` 停止自动处理，formal acquisition 分别记录为 `arxiv_not_found` 和 `arxiv_ambiguous`；
-4. 对 matched record 固定带版本 arXiv ID，下载 `/src/{versioned_id}`；
-5. 展开 tar.gz，若无 `.tex` 则记为 `no_tex_source`；否则把排序后的 TeX 与安全文本附件合并成带文件边界的 source packet。二进制图中若含有闭合公式所必需的适用域，只能由 reviewer 通过带 asset locator 的 figure-evidence addendum 保守转录。
+1. 先读取 Crossref journal record 的 `has-preprint` relation；解析 `asserted-by=subject` 的 direct relation 与 `asserted-by=object` 的 reciprocal relation，并原样记录 assertion side。两者都只接受 official arXiv DOI 或 `id-type=arxiv` identifier。DOI suffix 与 arXiv-ID parser 严格分离，例如 `10.48550/arXiv.arXiv:2601.05846` 必须拒绝；多个不同 arXiv targets 或不可解析 relation fail closed；
+2. 对无可用 relation 的记录，先运行 DOI-string arXiv API query；只有未解析且返回数小于 `max_results` 时，才独立运行完整 title-only query 及仅删除独立英文冠词的题名变体。API 没有 DOI search field，所以前者不能保证召回具有 exact DOI metadata 的 record。第一作者不是 retrieval 硬条件。分别保存 `doi_recalled_count`、`title_recalled_count` 和 result-limit flags；含 JATS/MathML markup 的 title 当前只走 DOI-string query，因此该分支可能产生假阴性；
+3. 只有 Crossref arXiv DOI relation 或已召回 record 中唯一 exact journal DOI 可自动 `resolved`。non-DOI relation、DOI-string query 达到 `max_results`、多个 exact DOI、title query result 或显式 identifier conflict 均为 `manual_review_required`，且在没有冻结人工 match 时不得下载 source；
+4. title candidates 不按 DOI、标题规范化结果或第一作者一致性过滤：全部写入 payload，包括声明不同 journal DOI 的记录。`not_found` 只表示这些有界 API queries 未召回候选，不表示 arXiv 上不存在预印本；
+5. 经复核的搜索候选用 DOI-keyed `manual_linkage_reviews` 输入回流；只有固定带版本 ID 由 official `id_list` 精确返回且不存在 DOI conflict 时才下载 source；
+6. 对未解析记录，可在主 acquisition 之外用引号包围的完整期刊标题进行通用搜索引擎检索。保存 provider、逐字 query、检索时间和全部候选 arXiv URL；非命中仍记为 unresolved，不记为“无 arXiv”；
+7. 通用搜索引擎找到的每个 candidate 都要使用官方期刊与 arXiv 记录进行 manual adjudication，保存 DOI、两侧标题、完整作者列表、摘要/方法核对结论和 decision。明示 DOI 冲突、作者集合无合理重合，或只有主题/数字相似，均必须拒绝；
+8. title-candidate normalization 只做 HTML entity decode、Unicode NFC、大小写与空白规范化；不得删除或改写数字、小数点、正负号、百分号、化学计量数、上下标或数学标记。`O₂`、`O_{2}`、`<sub>2</sub>` 可作为 retrieval variants，但不能与 `O²`、`O^{2}`、`<sup>2</sup>` 合并；`CuO2` 与 `CuO₂` 的显示等价、`Co` 与 `CO` 的大小写差异均只能在 manual adjudication 中判定。数字完全相同不能单独证明记录同一性；
+9. 对通过身份判定的 record 固定带版本 arXiv ID，下载 `/src/{versioned_id}`；
+10. 展开 gzip-compressed tar archive；若响应是 gzip-compressed single file，则仅在严格 UTF-8 且可识别为独立 TeX 文档时接受。若无 TeX source 则记为 `no_tex_source`；否则把排序后的 TeX 与安全文本附件合并成带文件边界的 source packet。二进制图中若含有闭合公式所必需的适用域，只能由 reviewer 通过带 asset locator 的 figure-evidence addendum 保守转录。
 
 这一层不判断论文是否能成为 case；它只确认“期刊记录与 arXiv source 是同一工作”以及“可用 TeX 确实存在”。
 
@@ -653,8 +678,21 @@ source:
   first_submitted_at: YYYY-MM-DDThh:mm:ss+00:00
   version_updated_at: YYYY-MM-DDThh:mm:ss+00:00
   arxiv_resolution:
-    match_method: doi | normalized_exact_title_first_author_family
+    status: resolved | not_found | ambiguous | manual_review_required
+    match_method: crossref_has_preprint_doi | doi | manual_review | null
     recalled_count: 7
+    doi_recalled_count: 3
+    title_recalled_count: 4
+    doi_recall_limit_reached: false
+    title_recall_limit_reached: false
+    failure_reason: null
+    manual_linkage_review:
+      decision: match
+      arxiv_versioned_id: "2401.01234v2"
+      reviewer: "..."
+      rationale: "..."
+      evidence_locator: "..."
+    manual_linkage_review_applied: true
   tex_file_count: 3
   earliest_public_date: YYYY-MM-DD
   retrieved_at: YYYY-MM-DD
@@ -749,10 +787,15 @@ Journal→arXiv→TeX 阶段另外需要互斥的 paper-level dispositions：
 
 | disposition | 含义 |
 | --- | --- |
+| `crossref_preprint_relation_invalid` | Crossref `has-preprint` relation 的结构或 arXiv identifier 无法严格解析；该 journal record 不进入自动 linkage 或补充 title recall |
+| `crossref_preprint_relation_conflict` | 同一 journal record 或重复 ISSN records 明示不同 arXiv targets；整条 record fail closed |
 | `publisher_reconciliation_required` | 当前 DOI 缺少调用方提供的 publisher record |
 | `publisher_reconciliation_invalid` | publisher record 缺字段、类型错误或日期无效 |
-| `arxiv_not_found` | 候选集中没有通过 DOI 或精确 title＋first-author-family 规则的记录 |
-| `arxiv_ambiguous` | 合格候选不唯一，因而不自动决定身份 |
+| `arxiv_not_found` | 有上限的独立 DOI-string/title-only API queries 未解析 journal record；不得解读为“arXiv 上不存在” |
+| `arxiv_ambiguous` | relation lookup 返回多个相同 target records；保留为 fail-closed 状态 |
+| `arxiv_manual_review_required` | Non-DOI Crossref relation、DOI recall 达到 result limit、多个 exact DOI、title candidate 或 identifier conflict 需要人工判定；candidate metadata 被保留，只有另行提供冻结 positive manual linkage review 后才可下载 source |
+| `arxiv_unresolved_after_web_search` | 通用搜索引擎的补充 candidate retrieval 仍未产生可供判定的官方 arXiv 记录 |
+| `arxiv_linkage_failed` | 补充检索候选在官方 DOI、标题、作者或摘要/方法核对中未能确认为同一论文 |
 | `duplicate_arxiv_source` | 多个 journal records 指向同一固定 arXiv source |
 | `preexisting_public_version` | earliest-public gate 不通过 |
 | `no_tex_source` | 固定版本 `/src` bundle 中没有 `.tex`；这是 eligibility 结果，不是 LLM 失败 |
@@ -761,7 +804,7 @@ Journal→arXiv→TeX 阶段另外需要互斥的 paper-level dispositions：
 | `source_acquired` | source acquisition 成功；是否入 cohort 另看 selection 轴 |
 | `no_operational_claim` | `ScienceCard` 中没有兼具可操作 controls、客观 readouts、适用域和可执行机制的 claim cluster |
 
-当前 `ArxivResolution.status` 直接产生 `resolved` / `not_found` / `ambiguous`；source archive 中没有 TeX 时由 `NoTexSourceError` 表达，cohort report 再把它记为 `no_tex_source`。
+当前 `ArxivResolution.status` 直接产生 `resolved` / `not_found` / `ambiguous` / `manual_review_required`；只有 `resolved` 可进入 source 下载。source archive 中没有 TeX 时由 `NoTexSourceError` 表达，cohort report 再把它记为 `no_tex_source`。
 
 以下 parser 与 hard-filter codes 属于旧 paired authoring path：strict parser 使用 `candidate.invalid_json` 与 `candidate.schema`。论文级 parser 另用 `abstraction.duplicate_family` 拒绝 sibling family ID 重复，用 `abstraction.source_identity` 拒绝 candidate citation/journal DOI/versioned arXiv ID 与调用方绑定值不一致。稳定 codes 按判断层分组如下：
 
@@ -779,7 +822,7 @@ Journal→arXiv→TeX 阶段另外需要互斥的 paper-level dispositions：
 ```text
 journal records harvested                       [paper]
   → publisher reconciliation + metadata eligible [paper]
-  → arXiv search completed + recalled_count       [paper]
+  → separate arXiv DOI-string/title recall completed [paper]
   → identity resolved                            [paper]
   → fixed source downloaded                      [paper]
   → source packet available                      [paper]
@@ -830,7 +873,7 @@ journal records harvested                       [paper]
 - journal→arXiv 高精度对齐或 TeX availability 的 retention 太低，以至该三刊时间窗不能作为稳定 source pool；
 - 60 篇 TeX-available papers 的可转化比例太低，以至固定时间窗无法稳定产生 cohort；
 - reviewers 经讨论后仍不能一致确定 paper truth 或 source domain；
-- 大多数 case 只能依赖作者自造 surrogate；
+- 大多数 case 只能依赖 benchmark-authored surrogate model；
 - Player 仅凭公开背景即可检索或回忆论文结论；
 - scripted baseline 都无法在预算内区分两个 source conditions；
 - 不同领域的 Oracle uncertainty 无法用统一 outcome 语义处理。
