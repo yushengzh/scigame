@@ -1,0 +1,170 @@
+{
+  "schema": "role_benchmark.temporal_authoring_experiment_registration.v1",
+  "experiment_id": "EXP-TEMPORAL-AUTHORING-001",
+  "status": "blocked_pending_snapshot_and_credentials",
+  "registered_on": "2026-09-03",
+  "purpose": "Measure whether the minimal ScienceCard and single-relation Temporal admission contract improve paper-to-case conversion on the same 37 frozen source packets used by the historical authoring runs.",
+  "research_question": "Holding source packets, source order, authoring-model snapshot, generation settings, and per-source call limits fixed, does the revised Temporal authoring pipeline improve structural validity, source-review retention, and final acceptance?",
+  "protocol_change": {
+    "temporal_admission": "A Temporal case requires at least one source-supported executable quantitative relation. A second source-reported condition is optional and is not a Temporal admission requirement.",
+    "counterfactual_variants": "A paper enters the separate counterfactual construction pipeline only when a counterfactual variant is requested. Counterfactual-pair requirements are excluded from Temporal admission.",
+    "llm_authored_fields": [
+      "formula",
+      "parameters",
+      "controls",
+      "readouts",
+      "domain",
+      "anchors"
+    ],
+    "deterministically_generated_fields": [
+      "budget",
+      "diagnostic_conditions",
+      "held_out_conditions",
+      "public_template",
+      "provenance_mapping"
+    ],
+    "held_out_condition_policy": {
+      "minimum": 1,
+      "maximum": 3,
+      "selection": "Use the first one to three conditions from the fixed deterministic candidate order after removing diagnostic overlap. Reject only when no held-out condition exists."
+    }
+  },
+  "source_manifest": "frozen_sources.json",
+  "cohort_size": 37,
+  "cohort_policy": {
+    "selection": "Use every source in frozen_sources.json exactly once and in manifest order.",
+    "replacement": "No source replacement, addition, exclusion, or reordering is permitted after registration.",
+    "source_packet_version": "Use the registered frozen source_packet_path; do not reacquire, extend, or rewrite a source packet.",
+    "analysis_unit": "paper",
+    "multiple_relations_or_cases": "A paper contributes at most one success to each primary numerator, even if it yields multiple relations or cases. Relation and case counts may be reported only as secondary descriptive outcomes."
+  },
+  "authoring_model": {
+    "provider": "deepseek",
+    "api": "chat_completions",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "model_id": "deepseek-v4-flash",
+    "checkpoint_or_snapshot_id": "unknown",
+    "knowledge_cutoff": {
+      "status": "unknown",
+      "date": null,
+      "evidence_locator": null
+    },
+    "thinking": "disabled",
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_output_tokens": 32768,
+    "reasoning_effort": null,
+    "timeout_s": 180.0
+  },
+  "credentials": {
+    "environment_variable": "DEEPSEEK_API_KEY",
+    "availability_at_registration": "absent",
+    "artifact_policy": "Read credentials only at runtime and never write them to experiment artifacts."
+  },
+  "call_budget": {
+    "attempt_definition": "One provider call carrying one ScienceCard request, including an initial request or repair request. A call is charged when its request is recorded immediately before provider invocation, even if the response later becomes unavailable.",
+    "family_generation": {
+      "paper_count": 17,
+      "max_total_attempts_per_paper": 2,
+      "maximum_attempts": 34
+    },
+    "expansion_family_generation": {
+      "paper_count": 20,
+      "max_total_attempts_per_paper": 4,
+      "maximum_attempts": 80
+    },
+    "maximum_attempts_total": 114,
+    "repairable_errors": [
+      "minimal_science_card.schema",
+      "minimal_science_card.locator"
+    ],
+    "early_stop": "Stop attempts for a paper after a schema-valid minimal ScienceCard is obtained, including an explicit empty-relations abstention, or after the registered per-paper limit is reached. Empty abstentions do not count as structurally valid nonempty relations.",
+    "interrupted_request": "A recorded provider request without an available response conservatively consumes one per-paper call slot. It does not count as an authoring-model response for response-based validity metrics. Resume with the next call slot only when one remains; if no slot remains, the experiment has missing infrastructure data and cannot be completed or compared.",
+    "no_budget_reallocation": "Unused attempts from one paper cannot be transferred to another paper."
+  },
+  "metric_definitions": {
+    "common_rules": {
+      "fixed_denominator": 37,
+      "unit": "paper",
+      "nonempty_relation_requirement": "A ScienceCard is counted as structurally valid only when its relations array contains exactly one relation and that relation contains formula, parameters, controls, readouts, domain, and anchors that pass the registered minimal ScienceCard parser and validator.",
+      "infrastructure_failure": "A provider, credential, transport, or artifact-write failure is missing data, not a scientific failure. Preserve the scheduled paper position and rerun it with the same snapshot, settings, source packet, and remaining registered attempt budget.",
+      "rates": "Report numerator / 37 for every primary rate. Do not remove failed, rejected, deferred, or unattempted papers from the denominator."
+    },
+    "first_attempt_structural_validity_rate": {
+      "numerator": "Number of papers whose first authoring-model response parses as a structurally valid nonempty minimal ScienceCard without a repair request.",
+      "denominator": 37
+    },
+    "post_repair_structural_validity_rate": {
+      "numerator": "Number of papers that produce a structurally valid nonempty minimal ScienceCard within that paper's registered total-attempt limit.",
+      "denominator": 37
+    },
+    "source_review_retention_rate": {
+      "numerator": "Number of papers for which independent source review confirms that at least one extracted quantitative relation is source-supported, executable over the stated domain, and eligible for Temporal case construction.",
+      "denominator": 37,
+      "secondary_conditional_rate": "Report the same numerator divided by the number of papers counted in post_repair_structural_validity_rate; label this conditional diagnostic explicitly and do not substitute it for the primary rate."
+    },
+    "final_acceptance_rate": {
+      "numerator": "Number of papers that yield at least one complete Temporal case passing deterministic construction, Temporal admission, and final family validation.",
+      "denominator": 37
+    }
+  },
+  "historical_baseline": {
+    "scope": "The two completed historical runs listed below used the same 37 source packets but the previous full ScienceCard and paired-condition admission contract.",
+    "runs": [
+      "runs/temporal_window_2026-04-01_2026-06-30/family_generation",
+      "runs/temporal_window_2026-04-01_2026-06-30/expansion_family_generation"
+    ],
+    "authoring_model_checkpoint_or_snapshot_id": "unknown",
+    "comparison_status": "descriptive_only",
+    "metrics": {
+      "first_attempt_structural_validity_rate": {
+        "numerator": 3,
+        "denominator": 37,
+        "rate": 0.08108108108108109,
+        "comparability": "descriptive historical reconstruction"
+      },
+      "post_repair_structural_validity_rate": {
+        "numerator": 13,
+        "denominator": 37,
+        "rate": 0.35135135135135137,
+        "comparability": "descriptive historical reconstruction under the previous ScienceCard schema"
+      },
+      "source_review_retention_rate": {
+        "numerator": 0,
+        "denominator": 37,
+        "rate": 0.0,
+        "secondary_conditional_numerator": 0,
+        "secondary_conditional_denominator": 13,
+        "secondary_conditional_rate": 0.0,
+        "historical_card_revision_required_count": 6,
+        "historical_source_review_rejected_count": 7,
+        "comparability": "descriptive historical outcome: none of the 13 structurally valid cards passed the previous source-review contract; six required card revision and seven were rejected. Revision-required papers are not retained papers. The previous paired-condition decisions cannot establish revised single-relation eligibility retrospectively."
+      },
+      "final_acceptance_rate": {
+        "numerator": 0,
+        "denominator": 37,
+        "rate": 0.0,
+        "comparability": "descriptive historical outcome"
+      }
+    }
+  },
+  "analysis": {
+    "primary_comparison": "For each registered metric, report the revised-pipeline numerator, rate, and absolute percentage-point difference from the historical descriptive value.",
+    "paired_interpretation": "A causal or paired attribution to the pipeline change is permitted only if the exact immutable historical authoring-model checkpoint or snapshot is identified and used. Matching the mutable model alias alone is insufficient.",
+    "uncertainty": "Report exact binomial confidence intervals for revised-pipeline paper-level rates as descriptive uncertainty. Do not present a significance test as isolating the pipeline effect while the historical snapshot remains unknown.",
+    "no_post_hoc_exclusions": "All 37 registered papers remain in primary denominators regardless of output length, schema failure, review decision, or construction failure."
+  },
+  "stopping_rule": "Process all 37 registered papers subject to their fixed per-paper attempt limits. Stop the complete run only for an infrastructure failure that prevents faithful continuation with the same immutable snapshot and settings; resume from the preserved schedule position after the failure is resolved.",
+  "execution_prerequisites": {
+    "immutable_model_checkpoint_or_snapshot": "missing",
+    "runtime_credentials": "missing",
+    "authoring_model_knowledge_cutoff": "unknown; required for any Temporal post-cutoff claim, but not used to reinterpret this conversion-rate study",
+    "required_before_execution": [
+      "Record an immutable, callable authoring-model checkpoint or snapshot that is demonstrably the same as the historical run snapshot.",
+      "Before any model call, commit a documented registration amendment that places the identical provider-callable snapshot ID in both snapshot fields, sets historical_baseline.comparison_status to controlled, and sets status to ready_for_execution.",
+      "Provide the runtime API credential without storing it in repository artifacts."
+    ],
+    "fallback_interpretation": "If only the model alias can be matched, the new run may be reported as a descriptive replication but cannot be used to claim that the pipeline change caused the observed rate differences. Such a run requires a separately registered experiment rather than modifying this registration."
+  },
+  "results": null
+}

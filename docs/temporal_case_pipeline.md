@@ -1,6 +1,6 @@
 # Temporal case pipeline：从近期论文到主动科学 case
 
-> 设计与实现状态：2026-09-03。当前以 Nature、Science 和 Physical Review Letters（PRL）的期刊记录为 census 母集，再与 arXiv 记录对齐并以固定版本 textual source packet 作为 LLM 输入。authoring 已拆成 `source packet → private ScienceCard → paper eligibility review → case scaffold → deterministic Oracle binding → deterministic filter → family source-closure review → render`；旧的单次 `PaperAbstraction` 仅保留为不渲染的诊断入口。有序 warm-up coordinator 已实现，9 个通过来源审查的 family 已进入独立 Temporal registry。P0.1--P0.6 核心合同已实现。调用方提供、DOI-keyed 的 publisher reconciliation 已是强制 admission gate；尚未实现 publisher feeds 的自动获取、来源证明与 completeness 核验，private rotating deployment 也未完成。“期刊已发表”、“在 arXiv 找到记录”、“有可用 TeX”、“science card 通过来源复核”和“draft 可执行”是不同 gate；“近期发表”也不等于“无污染”。
+> 设计与实现状态：2026-09-03。当前默认 authoring path 是 `source packet → minimal ScienceCard → independent source review and Temporal admission → deterministic source-case construction`。Temporal admission 只要求至少一个经来源支持、可执行的定量关系；第二个 source-reported condition 是可选项。需要 counterfactual variant 时，才进入独立的 counterfactual construction pipeline。旧的双 source-condition authoring path 与 9 个已注册 Temporal families 作为冻结 artifact 继续兼容，但不再定义新 case 的 admission。`EXP-TEMPORAL-AUTHORING-001` 已冻结同一批 37 个 source packets 和调用预算；历史运行没有保存不可变 authoring-model snapshot，当前凭据也缺失，因此尚未重新运行，不能识别 pipeline 修改的因果效应。
 
 ## 1. 结论先行
 
@@ -10,20 +10,21 @@
 2. 用 DOI-keyed publisher record 核对 article category、publication date、original-research 与 withdrawal/retraction 状态；缺失或无效记录不能入 cohort；
 3. 以期刊 DOI、标题和第一作者在一次 arXiv query 中召回 candidates：唯一 DOI 相等优先；只有 candidate 未声明 DOI 时，才允许唯一的规范化精确标题＋第一作者姓 fallback；
 4. 固定匹配记录的 arXiv 版本，下载 `/src/{versioned_id}` source bundle，并显式要求至少一个 `.tex` 文件；只对 `.tex` 去除不进入成文论文的注释、对其他 UTF-8 `.csv/.tsv/.dat/.txt` 保持原文，再合并为带文件边界的 textual source packet；
-5. 让第一个 LLM 只从带全局行号的 source packet 抽取私有 `ScienceCard`：科学发现的公式既保留人读 `quantitative_form`，也用共享 expression grammar 写入可验证的 `oracle_outputs`，同时抽取变量、固定条件、controls、readouts、统计口径、不确定度、适用域和 claim dependency；
-6. 完成 source-level card review 后，让第二个 LLM **只读取 card**，提出一个 `MatchedCaseDraft` scaffold 或明确返回 `not_authorable`；代码从 reviewer 选中的 `ScienceClaim.oracle_outputs` 确定性绑定最终 Oracle，不让第二个模型重写公式；
-7. 对 draft 做 source-lineage、Player/Oracle 信息边界和确定性 hard filter，生成 family review request；family source-closure review 通过后，coordinator 才渲染并运行两个 source-reported conditions 与两个 task settings 的 canary；
-8. 最后只从合格 families 中选 cohort，不为凑满目标数降低标准。
+5. 让 LLM 只从带全局行号的 source packet 抽取最小 `ScienceCard`：`formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；每张 card 至多提交一个定量关系；
+6. 由独立 source review 核对公式、参数、变量、适用域和原文位置；至少一个关系通过复核，才满足 Temporal admission；
+7. 由确定性代码生成 budget、diagnostic conditions、held-out conditions、public template 和 provenance mapping，并完成可执行性、域和信息边界检查；
+8. 只有研究设计明确要求 counterfactual variant 时，才把已接受的关系送入独立的 counterfactual construction pipeline；第二个 source-reported condition 不是这一步的前提；
+9. 最后只从合格 cases 中选 cohort，不为凑满目标数降低标准。
 
-论文在概念上不是 family 的一对一容器：一篇论文可能没有适合的低维可操作主张，也可能含有多个互不重复的定量机制。但当前 coordinator 每次只处理 reviewer 选定的一个 evidence cluster，第二阶段只能返回 `not_authorable` 或恰好一个 draft；自动 cluster 拆分尚未实现。若经独立复核得到 F 个 families，每个 family 保留两个论文报告的条件并交叉两个 task settings，则产生：
+论文在概念上不是 case 的一对一容器：一篇论文可能没有适合的低维可操作主张，也可能含有多个互不重复的定量关系。当前最小合同为每篇论文、每次抽取至多一个关系；主要转换率以论文为单位，每篇论文最多贡献一次成功。若独立复核后得到 \(F\) 个单关系 Temporal cases，并交叉两个 task settings，则产生：
 
 ```text
-F families × 2 source-reported conditions × 2 task settings = 4F instances
+F source cases × 2 task settings = 2F instances
 ```
 
-这不是 F 个 episodes。两个 source conditions 均使用 `source_reported` role 和语义中性的 condition ID，不得解释为 historical/counterfactual。同一源论文抽取的 sibling families 共享文本、学科、作者和机制背景，不能当作统计独立的样本。分析至少应按 source paper/期刊 DOI 聚类标准误或在 source-paper 层做 resampling，并在 family 层报告 condition-specific results。
+这不是 \(F\) 个 episodes。同一 source paper 派生的多个 cases 共享文本、学科、作者和机制背景，不能当作统计独立样本；正式分析仍以 source paper 为最高层独立单位。若论文还提供第二个 source-reported condition，可以把它作为另一项来源关系单独复核，但不能把缺少第二项作为第一项的拒绝理由，也不得自动把两项解释为 Historical/Counterfactual pair。
 
-截至 2026-09-03，Temporal registry 包含 9 个通过来源审查的 family，共 36 个公开实例。最早的严格 development acceptance 是 arXiv `2506.21670v3` 的 Kibble–Zurek incompressible-energy family；其 source-level review、family source-closure review、selector-free Identification projection 与 canary 说明见 [`reports/temporal_source_review_2026-08-27/review.md`](../reports/temporal_source_review_2026-08-27/review.md)。这些公开实例验证了转换路径，但不估计固定时间窗转换率，也不构成抗污染的正式评测。
+截至 2026-09-03，Temporal registry 包含 9 个旧双条件合同下通过来源审查的 family，共 36 个公开实例。最早的严格 development acceptance 是 arXiv `2506.21670v3` 的 Kibble–Zurek incompressible-energy family；其 source-level review、family source-closure review、selector-free Identification projection 与 canary 说明见 [`reports/temporal_source_review_2026-08-27/review.md`](../reports/temporal_source_review_2026-08-27/review.md)。这些冻结实例继续可重放，但不规定新版 admission，不估计固定时间窗转换率，也不构成抗污染的正式评测。
 
 ### 1.1 哪些步骤需要 LLM
 
@@ -34,13 +35,14 @@ F families × 2 source-reported conditions × 2 task settings = 4F instances
 | 按期刊和日期窗枚举记录，以及 article type 等 metadata filter | 不需要 | Crossref/期刊记录 + 确定性规则 | 输入已结构化，LLM 不增加信息。 |
 | 用标题和第一作者召回 arXiv candidates | 不需要 | arXiv API | 这一步只提高 recall，不决定记录同一性。 |
 | 确认 journal↔arXiv 身份、固定版本、下载 `/src` 并检查 `.tex` | 不需要 | DOI 优先；无 DOI candidate 才用精确标题＋姓 fallback；再检查 source archive | 身份和文件存在性应该是可重复的 gate，不由模型猜测。 |
-| 从 TeX bundle 定位 quantitative mechanisms、claims、controls、readouts、fixed conditions、统计口径与 source locators | **需要或非常有用** | LLM 只提交私有 `ScienceCard`；source review 决定能否继续 | 这是跨文件、段落、公式与 caption 的语义映射，纯规则难以覆盖论文写法。 |
-| 判断 proposal 是否满足字段、operator、range、finite evaluation、budget distinguishability 和 one-change | 不需要 | 确定性 hard filter | 这些都是可以直接计算的谓词。 |
-| 判断低维化是否忠实于论文、control 是否真可干预、source locator 是否支持 claim | LLM 可做 soft triage | 科学 reviewer | 这是语义事实核验；candidate 自己不能为自己作证。 |
-| 从 reviewed card 设计 matched twin | LLM 可提出 public interface、branch selection 与实验条件 scaffold | reviewed `ScienceClaim.oracle_outputs` + 确定性 binder + hard filter | 当前 source-only 模式只允许选择论文明确报告的另一 regime/branch；公式和参数不由第二个 LLM 再生成。 |
-| 从两道 review 均通过的 accepted draft 生成 `.py` | **不需要** | coordinator 调用确定性 renderer | LLM 不应直接生成或执行 Python；模板化编译更小、更可复核。 |
+| 从 source packet 定位一个 quantitative relation | **需要或非常有用** | LLM 只提交 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；source review 决定能否继续 | 这是跨段落、公式和 caption 的语义映射，纯规则难以覆盖论文写法。 |
+| 判断公式、参数、controls、readouts、domain 和 anchors 是否与 source 一致 | LLM 可做初步检查 | 独立科学 reviewer | 候选输出不能自行确认来源支持。 |
+| 生成 budget、diagnostic conditions、held-out conditions、public template 和 provenance mapping | 不需要 | 确定性代码 | 这些字段可从通过验证的最小 ScienceCard 和固定规则唯一生成。 |
+| 检查 schema、expression、domain、finite evaluation 和信息边界 | 不需要 | 确定性 validator | 这些都是可以直接计算的谓词。 |
+| 构造 counterfactual variant | 默认不调用 LLM | 独立 counterfactual construction pipeline 与其 validator | 只有明确请求变体时才执行；它不属于 Temporal admission。 |
+| 生成可执行 case | 不需要 | 确定性 compiler 与 renderer | LLM 不直接生成或执行 Python。 |
 
-因此，source packet 到 case 的 LLM 部分准确地说是两次有边界的 proposal：**`line-numbered source packet → ScienceCard`** 与 **`reviewed ScienceCard → MatchedCaseDraft`**。第二次调用不再读取原始 packet，也不能从模型记忆补事实。记录对齐、TeX availability、strict JSON 解析、source-name canonicalization、逐 draft admission 与 `.py` 渲染都不需要 LLM。可计算的 admission rules 不需要 LLM；locator 是否真的支持陈述仍需要 source-level 科学复核。
+因此，当前 source packet 到 Temporal case 只有一次 LLM 抽取：**`line-numbered source packet → minimal ScienceCard`**。LLM 不生成预算、实验条件、公开模板、provenance mapping、counterfactual relation 或代码。记录对齐、TeX availability、strict JSON 解析、source identity、确定性 case construction 和 admission 均不需要 LLM；anchors 是否支持定量关系仍需独立 source review。
 
 Abstractor 是 **benchmark authoring 阶段**的离线工具，不是 episode 中的第三个角色。生成并复核 case 后，bench 主流程仍只有 Player 和实验裁定接口；确定性 `CaseOracle` 是主要方案。可选 LLM presentation 只能严格呈现确定性 observation，不能改变状态、数值、单位或不确定性；其 Oracle 准确性审计尚未完成，在此之前不能用于主要结果。Evaluator 仍只在 trajectory 结束后量化结果。
 
@@ -55,26 +57,48 @@ Abstractor 是 **benchmark authoring 阶段**的离线工具，不是 episode �
 | [`arxiv.py`](../src/role_benchmark/temporal/arxiv.py) | 用 DOI、完整 title，以及仅删除独立英文冠词 `a/an/the` 的 title 变体单次查询 arXiv Atom API，记录有上限查询返回的 `recalled_count`；冠词变体只用于 recall，唯一 DOI 相等优先，只对无 DOI candidate 使用唯一 exact-title+first-author-family fallback；保留固定版本 ID、v1 `first_submitted_at` 和该版本 `version_updated_at`，并从 `/src/{versioned_id}` 下载 source bundle。 |
 | [`metadata.py`](../src/role_benchmark/temporal/metadata.py) | `SourcePaper` enrichment contract、三刊/日期/最早公开时间/article type/LaTeX/撤稿 metadata gates，以及对合格集合的冻结 citation-count 排序；不发 HTTP 请求。 |
 | [`latex.py`](../src/role_benchmark/temporal/latex.py) | 在内存中读取 tar.gz；至少要求一个 UTF-8 `.tex`，并附加可解码的 `.csv/.tsv/.dat/.txt`。仅 TeX 成员逐行去注释且保持行数，数据/文本附件中的 `%` 等内容不改；packet 保留明确文件边界、逐文件行坐标和 packet-global 行坐标，二进制附件不进入模型文本。 |
+| [`minimal_science_card.py`](../src/role_benchmark/temporal/minimal_science_card.py) | 当前默认的最小 ScienceCard contract；每个 provider output 至多包含一个 relation，字段恰为 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`，并校验 expression、声明闭包、适用域与 source-line locators。 |
+| [`minimal_card_extract.py`](../src/role_benchmark/temporal/minimal_card_extract.py) | 当前单次 LLM extraction request 与限定的 schema/locator repair；不要求第二个 source condition，也不生成 case-design 字段。 |
+| [`admission.py`](../src/role_benchmark/temporal/admission.py) | 独立 source-review contract 与 Temporal admission；只有经复核的 source-supported executable quantitative relation 可以进入构造，第二个 source-reported condition 不属于 gate。 |
+| [`source_case.py`](../src/role_benchmark/temporal/source_case.py) | 从通过复核的 relation 确定性生成预算、diagnostic conditions、held-out conditions、public template 和 provenance mapping，并编译单关系 Temporal case。 |
+| [`counterfactual_construction.py`](../src/role_benchmark/temporal/counterfactual_construction.py) | 可选的独立 counterfactual construction；仅在调用方明确请求时，从已接受的 source case 构造量纲和接口不变的 variant。 |
 | [`science_card.py`](../src/role_benchmark/temporal/science_card.py) | 私有 evidence graph 的严格 data contract；每个新 `ScienceClaim` 同时保存人读 `quantitative_form` 与共享 expression grammar 的 `oracle_outputs`，并校验 output/control/linked-parameter 闭包、禁止裸数、operator arity、逐项 line anchors、claim-specific domains、readout semantics、依赖图与 source identity。 |
 | [`card_extract.py`](../src/role_benchmark/temporal/card_extract.py) | 第一阶段 provider-neutral request：读取 line-numbered textual source packet，只做 source extraction，不生成 Player prompt、counterfactual、预算、hidden conditions 或代码；request 明确记录 `source_format=source_packet`。 |
-| [`author.py`](../src/role_benchmark/temporal/author.py) | 第二阶段只读取 `ScienceCard`，返回 `not_authorable` 或一个严格 case scaffold；provider schema 强制 trace ranges 和三个 Oracle 真值字段为空，随后 binder 从模型选择的 card IDs 确定性复制 reviewed anchors，并从 selected claims 编译唯一 selector AST 与参数表，再检查 Player/Oracle 信息边界和数值 lineage。 |
+| [`author.py`](../src/role_benchmark/temporal/author.py) | 旧双 source-condition authoring 的兼容路径；不再用于新版单关系 admission。 |
 | [`extract.py`](../src/role_benchmark/temporal/extract.py) | 早期单次 `PaperAbstraction` 路径，仅为 warm-up 复现保留；它把 evidence extraction 与 case authoring 混在一次调用中，不再推荐。 |
 | [`candidate.py`](../src/role_benchmark/temporal/candidate.py) | `PaperAbstraction{assessment,candidates}` 与单个 candidate 的严格 JSON data contracts：拒绝 Markdown fence、trailing text、duplicate key、unknown/missing field 和非有限数值。 |
-| [`filter.py`](../src/role_benchmark/temporal/filter.py) | 不调用 LLM 的 eligibility gates、稳定 rejection codes、两个 world 的数值可辨识性、每个条件的真实预测器能否被配对条件测试拒绝，以及“能否形成无 private-selector 泄漏的共同 Identification scaffold”检查。 |
-| [`render.py`](../src/role_benchmark/temporal/render.py) | 保留完整私有 selector Oracle，同时把两个 source-reported conditions 的 active AST 保守投影为不包含 condition label 的 Identification model specification；随后安全物化 named parameters 并渲染一个可 import 的 `MatchedFamilySpec` module。DOI URL 由 canonical `journal_doi` 派生，credit 同时保留 `arxiv_versioned_id` 与 locator；不解释或执行模型生成代码。 |
-| [`warmup.py`](../src/role_benchmark/temporal/warmup.py) | 最多 60 篇的有序 development cohort contract、acquisition handoff 校验、独立 paper/family source-review contracts，以及把 reviewer 选定的 evidence cluster 裁成第二阶段唯一输入。Review 用普通 JSON 原样携带被审 ScienceCard 或完整 draft/predictions；LLM 自报的 `case_authoring_ready` 不具有 admission authority。 |
-| [`conditions.py`](../src/role_benchmark/conditions.py) | P0.5 condition contract：curated 条件只能是 `historical`/`counterfactual`；Temporal 两个条件都必须是 `source_reported`，并使用语义中性的 condition ID。 |
+| [`filter.py`](../src/role_benchmark/temporal/filter.py) | 共享的 expression-domain totality validation；其余 paired-candidate checks 继续用于既有双条件 family replay。 |
+| [`render.py`](../src/role_benchmark/temporal/render.py) | 旧 paired artifact 的 deterministic renderer，继续用于既有双条件 family replay。 |
+| [`warmup.py`](../src/role_benchmark/temporal/warmup.py) | 旧双条件 warm-up coordinator，保留已有 artifact 的重放边界；不定义新版单关系 admission。 |
+| [`conditions.py`](../src/role_benchmark/conditions.py) | P0.5 condition contract：curated 条件只能是 `historical`/`counterfactual`；已有 Temporal paired artifacts 的两个条件均为 `source_reported`。新版单关系 case 不要求第二个 condition。 |
 | [`contamination.py`](../src/role_benchmark/temporal/contamination.py) | P0.6 model-profile × Temporal-instance record：只保存来源、模型和 exposure 事实以及显式 unknown，不把 unknown 推断为 unseen 或 contamination-free。 |
 | [`run_temporal_science_card.py`](../experiments/run_temporal_science_card.py) | 单独运行 `paper.tex → ScienceCard`，保存带行号 source、request、raw response 与严格解析结果；便于在任何 case design 之前执行 source review。 |
 | [`run_temporal_authoring.py`](../experiments/run_temporal_authoring.py) | Standalone 两阶段 draft-only 诊断入口，逐 stage、逐 attempt 保存 request/response（每阶段最多四次）；只产出 draft、filter 和 review request，不渲染或接受 case。 |
 | [`run_temporal_case_draft.py`](../experiments/run_temporal_case_draft.py) | Standalone draft-only 入口，从 card 或已记录的 stage-1 response 单独运行第二阶段；只产出 draft、filter 和 review request。 |
-| [`run_temporal_warmup.py`](../experiments/run_temporal_warmup.py) | 唯一 acceptance authority。按 frozen cohort 顺序运行，执行 paper/family 两道外部 review、render 与真实四格 episode/evaluator canary；provider failure 必须显式 skip 或另开新 run。 |
+| [`run_temporal_warmup.py`](../experiments/run_temporal_warmup.py) | 旧双条件 warm-up 的 acceptance authority。按 frozen cohort 顺序运行并保留既有 artifact 兼容；不定义新版单关系 admission。 |
+| [`run_temporal_conversion.py`](../experiments/run_temporal_conversion.py) | 按 `EXP-TEMPORAL-AUTHORING-001` 的 37 篇冻结清单、原顺序和逐论文调用上限运行新版抽取、source review、确定性构造与 admission，并报告四项注册比例。当前因历史不可变 snapshot 和运行凭据缺失而未执行。 |
+| [`compare_temporal_conversion.py`](../experiments/compare_temporal_conversion.py) | 在 37 篇固定分母上复核逐论文结果与调用预算，报告四项历史值、新值、百分点差和新版 exact binomial confidence interval；历史 snapshot 未知时只输出 `descriptive_only`。 |
 
 当前 CLI 是刻意分步的：Crossref 和 arXiv 公开 API 不需要 LLM API key；LLM provider credentials 仍只在调用方 runtime 中配置，仓库不绑定某个供应商。正式 handoff 使用 `acquire`；低层命令只用于诊断。连续 arXiv 查询间固定等待 3 秒，以符合 [arXiv API terms](https://info.arxiv.org/help/api/tou.html)。
 
 进入评测后，每个 Temporal instance 支持 prior-only baseline、固定实验设计和自适应实验设计。固定与自适应方法使用相同的 family-specific observation budget \(B\)，三种方法共享最终可执行 `expression`、held-out conditions 和 scorer。主要结果是连续 `held_out_prediction_score`；二元 pass 与 protocol completion 分开报告。P0.6 的每条 exposure record 对应一个 model profile × Temporal instance，只记录可核对的来源、模型和 exposure 事实；资料不足时保留 `unknown`，不得推断为 unseen 或 contamination-free。
 
 `EXP-METHOD-PILOT-001` 的 development 配置已经冻结，见 [`../experiments/registrations/EXP-METHOD-PILOT-001/`](../experiments/registrations/EXP-METHOD-PILOT-001/)。该实验尚未运行，本文不写入尚未产生的结果。
+
+新版 conversion study 登记为 [`EXP-TEMPORAL-AUTHORING-001`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/)。其 [`frozen_sources.json`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/frozen_sources.json) 固定历史 authoring runs 使用的同一批 37 个 source packets：前 17 篇每篇最多 2 次 ScienceCard 调用，后 20 篇每篇最多 4 次；顺序、source packet、论文集合和逐论文预算均不得改变。主要指标均以 37 篇论文为分母：首次结构合格率、repair 后结构合格率、source-review retention rate 和最终 acceptance rate。
+
+历史描述值分别为 `3/37`、`13/37`、`0/37` 和 `0/37`。旧 review 对 13 张结构合格 cards 的结果是直接通过 `0/13`、要求修改 `6/13`、拒绝 `7/13`；要求修改不计为 retained。旧 paired-condition review 不能追溯地改判新版单关系 admission。历史产物只记录可变 alias `deepseek-v4-flash`，没有不可变 authoring-model checkpoint 或 snapshot ID；当前环境也没有运行凭据。因此本次重新运行尚未执行，`results` 保持为空。只使用同名 alias 的后续结果可以描述，但不能把差异因果归因于 pipeline 修改。
+
+当且仅当登记要求的不可变 snapshot 和 runtime credential 均可用时，运行：
+
+```bash
+PYTHONPATH=src:. python experiments/run_temporal_conversion.py \
+  runs/EXP-TEMPORAL-AUTHORING-001 \
+  --registration experiments/registrations/EXP-TEMPORAL-AUTHORING-001/registration.json \
+  --authoring-snapshot-id SNAPSHOT_ID
+```
+
+以下 acquisition 与 `run_temporal_warmup.py` 命令属于旧双条件 authoring path 或来源准备工具；它们继续支持已冻结 artifact，但不能替代上述注册实验。
 
 ```bash
 # 1. 正式 acquisition；publisher_reconciliation.json 由期刊侧记录整理。
@@ -157,7 +181,7 @@ Python API 可直接组合 `acquire_temporal_window(...)`、`extract_science_car
 | [ScienceAgentBench](https://arxiv.org/abs/2410.05080) | 从论文抽取任务并通过多轮专家验证建立可执行科研任务 | 本项目 credit paper-derived task authoring 与 expert validation；目标不是代码复现，而是 Player 对私有 world 的主动实验 |
 | [NewtonBench](https://arxiv.org/abs/2510.07172) 与 [DiscoveryWorld](https://www.microsoft.com/en-us/research/publication/discoveryworld-a-virtual-environment-for-developing-and-evaluating-automated-scientific-discovery-agents/) | 交互式规律发现、模拟实验与反事实/虚拟世界 | NewtonBench 只作为规律变更、量纲一致性和实验预算的设计参照；不沿用其难度定义。它们也不是本 Temporal source-condition contract |
 
-因此，当前可检验的增量不是任一单点，而是一个窄组合：**从近期论文的固定 source packet 建立带 locator 的私有 evidence graph，再把通过复核的论文内机制分支编译为同一 public interface 下配对的 identification/discovery cases**。真正不存在的 synthetic counterfactual 需要论文外 premise，与“所有科学信息来自论文”不相容；当前 strict temporal 模式不声称同时做到二者。只有在转换成功率、复核一致性和模型实验结果都得到验证后，才能把这个组合写成 contribution。
+因此，当前可检验的增量不是任一单点，而是一个窄组合：**从近期论文的固定 source packet 抽取最小、带 locator 的可执行定量关系，经过独立 source review 后，用确定性代码编译为共享评测合同的 Identification 与 Discovery cases**。Counterfactual variant 使用独立的 benchmark-authored construction pipeline，不属于 Temporal admission。只有在全分母转换率、复核一致性和模型实验结果都得到验证后，才能把这个组合作为 contribution；当前缺少可比 authoring-model snapshot，尚不能用 `EXP-TEMPORAL-AUTHORING-001` 证明转换率提高。
 
 ## 4. 数据源与合法获取
 
@@ -233,9 +257,13 @@ Textual source packet 仍不自动等于完整 scientific evidence：二进制 f
 
 发布级流程仍需补齐 issue date、公开代码和公开数据的首次可见日期，才能声称更完整的 earliest-public provenance。temporal claim 应以最早公开时间为准，而不是只看期刊日期；当前实现的两来源下界必须在报告中明确。
 
+若任何 pipeline LLM 生成的改写文本进入最终 benchmark instance，则该 instance 的保守时间边界取 raw source 的 earliest-public date 与该改写模型有文档依据的 knowledge-cutoff date 中较晚者；任一时间未知时，不得声称该 instance 对 evaluated model 是 post-cutoff。当前最小路径不把 LLM 生成的 public prose 写入 case，LLM 只提交带 source anchors 的结构化抽取；因此它减少了改写引入额外时间信息的风险，但不能替代 model-profile × instance 的 exposure assessment。
+
 ## 5. 最小端到端 pipeline
 
 ![Temporal case pipeline](temporal_case_pipeline.drawio.png)
+
+该图记录旧双 source-condition authoring path；新版单关系路径以本节 Stage D–G 的文字合同为准。旧路径从“Legacy Stage D”起保留，供冻结 artifacts 重放。
 
 ### Stage A：冻结 cohort contract
 
@@ -262,7 +290,56 @@ Stage B 的第一步现在输出完整 JSON census。每条记录都继续进入
 
 这一层不判断论文是否能成为 case；它只确认“期刊记录与 arXiv source 是同一工作”以及“可用 TeX 确实存在”。
 
-### Stage D：source packet → private ScienceCard
+### Stage D：source packet → minimal ScienceCard
+
+Provider output 只允许 `relations`，且至多包含一个 relation。非空 relation 恰好包含六类内容：
+
+```text
+formula
+parameters
+controls
+readouts
+domain
+anchors
+```
+
+Source identity 由调用方从冻结 manifest 注入，不由 LLM 重写。`anchors` 只保存 packet-global line ranges。Validator 检查 JSON、字段闭包、expression grammar、parameter/control 引用、control domain、readout 数量和所有 line ranges。空 `relations` 是结构有效的 abstention，但不满足 Temporal admission，也不计入注册实验的结构合格 numerator。
+
+Repair 只处理已定位的 JSON schema 或 locator 错误；不得增加 source 中没有的科学事实。每篇论文的总调用数严格受冻结 manifest 限制。
+
+### Stage E：independent source review 与 Temporal admission
+
+独立 reviewer 对同一冻结 source packet 核对六类字段，并判断该 relation 是否同时满足：
+
+1. 公式和参数有明确来源支持；
+2. controls 与 readouts 是可操作且数值化的；
+3. 各 control 的声明域构成来源支持的 Cartesian query domain，不遗漏联合约束；
+4. 把该公式作为确定性 central value 执行不会歪曲拟合、近似或渐近语义；
+5. anchors 足以定位并复核上述内容。
+
+至少一个 relation 通过上述审查，Temporal admission 才通过。第二个 source-reported condition 是可选信息，不能作为 admission 的必要条件。Review 未完成、要求修改和不合格必须分开记录；未审论文不能从分母删除。
+
+### Stage F：deterministic source-case construction
+
+通过复核后，确定性 compiler 从 relation 生成：
+
+- observation budget；
+- diagnostic conditions；
+- held-out conditions；
+- Player-facing public template；
+- provenance mapping。
+
+生成规则固定、无 LLM 调用，并检查 diagnostic 与 held-out conditions 互斥、conditions 落在 source-supported domain 内、公式在完整公开 query domain 上有有限输出、Identification 参数在固定设计下具有 full local sensitivity rank，以及 Identification 与 Discovery 使用同一可执行关系和 scorer。连续域只开放来源区间的内部子区间；模型生成的 definitions 与 applicability prose 不直接进入 Player-visible resources，避免将参数值或公式意外暴露给 Player。Compiler 不能扩大 domain、改写公式或补造参数。
+
+### Stage G：optional counterfactual construction
+
+Counterfactual variant 不属于 Temporal admission。只有调用方明确请求 variant 时，已接受的 source case 才进入 [`counterfactual_construction.py`](../src/role_benchmark/temporal/counterfactual_construction.py)。构造保持 controls、readouts、单位、公式结构、评测域、预算和 scorer 不变，只改变预先声明的一个机制参数，并要求请求单位与该参数单位一致。两个候选强度按固定设计上的 tolerance-scaled separation 排序为 `easy` 与 `hard`，必须满足 `easy > hard > 0`；相等或无法排序时拒绝构造。由此得到的 variant 是 benchmark-authored Counterfactual case，必须与原 source case 分开登记和解释。
+
+### 旧双 source-condition authoring path（仅用于冻结 artifact 兼容）
+
+以下原 `ScienceCard → MatchedCaseDraft → paired filter → MatchedFamilySpec` 路径继续支持既有 9 个 Temporal families 和历史运行产物的重放。它要求两项论文报告关系并使用内部 selector，这一要求不适用于新版 Temporal admission，也不能作为拒绝单关系 source case 的理由。
+
+#### Legacy Stage D：source packet → private ScienceCard
 
 第一个 LLM 读取 normalized、逐行编号的完整 textual source packet。它只抽取证据，不设计游戏。严格输出首先围绕论文的科学发现公式建立 mechanism，再补齐该公式的变量、参数、适用域、固定条件、controls、readouts 与统计语义：
 
@@ -317,7 +394,7 @@ identity 到 locator lineage 完整重验；它不会继承“部分通过”状
 
 对本 bench 而言，paper eligibility 不是“主题相关”或“出现过公式”，而是存在一个明确 witness：`(X, Y, A0, A1, Q, C, r0, r1, F0, F1)`。`X` 是 1–5 个论文中实际操纵的数值 controls，`Y` 是 1–2 个 operational numeric readouts，`A0/A1` 是论文支持两支公式成立的适用域，`Q` 是 benchmark 实际开放的有限查询集合或连续子区间，且必须满足 `Q ⊆ A0 ∩ A1`；`C` 是共同固定条件，`r0/r1` 是论文明确报告而非 benchmark 新造的两个 regime/branch，`F0/F1: Q → Y` 是参数与统计语义完整的响应公式。两支必须共享 Player interface，并在预算内有关系级而非仅常数微差的可辨识性；任何命中 selected claims 的 unresolved source ambiguity 都 fail closed。这个 gate 是 paper-derived task curation 与 expert validation 的必要实现，沿用 PaperBench、CLAIM-BENCH、ScienceAgentBench 等工作的质量控制思路，不作为本项目的独立贡献。
 
-### Stage E：reviewed ScienceCard → MatchedCaseDraft
+#### Legacy Stage E：reviewed ScienceCard → MatchedCaseDraft
 
 第二个 LLM 只读取 reviewed card，不再读取原始 source packet。它返回 `not_authorable`，或至多一个 case scaffold：
 
@@ -466,7 +543,7 @@ strict source-only 模式只允许 `reported_regime_selection`。selector 是私
 
 只有 deterministic binding 与 draft lineage 都通过后才进入现有 `filter_candidate()`；机器合格的 draft 先进入 family source-closure review，renderer 只由 coordinator 在该 review 通过后调用。Paper review request 原样包含待审 ScienceCard；family review request 原样包含绑定后的完整 draft、信息边界和 diagnostic/hidden 两世界预测。Reviewer 只修改 verdict 部分，coordinator 对被审普通 JSON 的类型和值做精确比较。两个 LLM 分别提出 evidence graph 与 interaction scaffold；可执行真值只来自 reviewed claim AST 和确定性编译。
 
-### Stage F：逐 candidate 硬筛选
+#### Legacy Stage F：逐 candidate 硬筛选
 
 candidate 只有同时满足以下条件才进入 authoring：
 
@@ -501,7 +578,7 @@ candidate 只有同时满足以下条件才进入 authoring：
 
 当前最小实现只接受 `closed_form`。`released_simulator` 是后续可能扩展，不属于当前可运行路径。对表格做插值会额外发明论文没有声称的规律；若未来使用，应明确叫 `paper-grounded emulator world`，限制作用域并传播不确定性，不能伪装成论文真值。
 
-### Stage G：构造一个双条件 Temporal family
+#### Legacy Stage G：构造一个双条件 Temporal family
 
 对每个通过硬筛选的 candidate，生成一个 `MatchedFamilySpec` 等价对象。当前一次 authoring 调用最多产生一个 candidate；未来若先把同一 source paper 拆成多个独立复核的 evidence clusters，才可产生 sibling families：
 
@@ -532,7 +609,7 @@ Oracle evidence 回显公开的 statistic、uncertainty 与 resolution 语义。
 量纲、公式形式、接口、固定实验设计、预算和 scorer 不变。NewtonBench 在这里仅是
 规律变更、量纲一致性和实验预算的设计参照，不提供本项目的难度定义。
 
-### Stage H：科学与协议 validation
+#### Legacy Stage H：科学与协议 validation
 
 每个 family 通过以下 gate 才能进入 private cohort：
 
@@ -549,7 +626,7 @@ Oracle evidence 回显公开的 statistic、uncertainty 与 resolution 语义。
 
 这里的 independent review 是正常的科研事实核验，不是额外的工程审计或红队项目。
 
-### Stage I：筛选、冻结并运行
+#### Legacy Stage I：筛选、冻结并运行
 
 只对通过 Stage H 的 family 排序。当前代码的实际语义是：
 
@@ -560,9 +637,9 @@ Oracle evidence 回显公开的 statistic、uncertainty 与 resolution 语义。
 - private active cohort 隐藏 DOI/truth，retired cohort 再公开完整 source card 与 case；
 - 正式 episode 禁止 Player 联网，因为论文是公开的，检索标题或结论会把 discovery 变成 retrieval。
 
-## 6. Source-paper record 与 family science card
+## 6. Source-paper record 与 minimal ScienceCard
 
-因为概念映射允许 `1 paper → 0..N families`，来源身份应在 paper 层只记一次，每个 family 再引用它；当前自动路径仍是一次 reviewed cluster 至多一个 family。建议为每篇 source paper 保留：
+来源身份在 paper 层只记录一次，并由确定性代码绑定到 provider output。当前 conversion study 每篇论文、每次抽取最多返回一个 relation；论文仍是主要分析单位。最小记录为：
 
 ```yaml
 source:
@@ -583,12 +660,24 @@ source:
   retrieved_at: YYYY-MM-DD
 science_card:
   status: extracted | source_reviewed | card_revision_required | rejected
-  mechanisms: [mechanism_id_a, mechanism_id_b]
-  claims: [claim_id_a, claim_id_b]
-  unresolved_ambiguities: []
+  relations:
+    - formula: {...}
+      parameters: [...]
+      controls: [...]
+      readouts: [...]
+      domain: {...}
+      anchors: [{line_start: 120, line_end: 128}]
+deterministic_case:
+  budget: <deterministically generated integer>
+  diagnostic_conditions: [...]
+  held_out_conditions: [...]
+  public_template: {...}
+  provenance_mapping: {...}
 ```
 
-每篇论文的私有 `ScienceCard` 是来源事实层；每个由它派生的 draft 另保留一份简单、可读的 authoring record。两者不能合并，因为 source review 必须发生在设计 Player prompt 和 paired conditions 之前：
+Provider 只能生成 `relations` 中的六类字段，不能生成 `deterministic_case`。
+
+以下 expanded ScienceCard 与 `matched_case_draft` 结构只用于旧双 source-condition artifact 的 replay compatibility，不是新版 provider contract：
 
 ```yaml
 source_paper_id: "journal-doi:10.xxxx/..."
@@ -630,7 +719,20 @@ journal DOI、versioned arXiv ID 与 evidence locator 应在 active evaluation �
 
 ## 7. Rejection codes 与漏斗报告
 
-机器 gate 可以同时报告多个问题，便于修正 proposal；cohort funnel 另外记录一个互斥的 primary disposition，便于统计。不要把这两者混成一个 taxonomy。
+机器 gate 可以同时报告多个问题，便于修正 proposal；cohort funnel 另外记录一个互斥的 primary disposition，便于统计。不要把这两者混成一个 taxonomy。新版最小路径的基本漏斗为：
+
+```text
+frozen source packets                         [paper; denominator fixed before calls]
+  → first response structurally valid          [paper]
+  → structurally valid within repair budget    [paper]
+  → independent source review retained         [paper]
+  → Temporal admission accepted                [paper]
+  → deterministic construction valid           [paper]
+```
+
+每个 transition 必须同时报告 numerator 和原始冻结分母；条件比例只能作为明确标注的 secondary diagnostic。空 relation、结构失败、review 要求修改、review 拒绝、构造失败和未执行必须分别记录，不能从主分母排除。Counterfactual construction 有自己的后续漏斗，不进入 Temporal admission denominator。
+
+以下 metadata dispositions 继续适用于 acquisition；旧 paired filter codes 只用于冻结双条件 artifacts。
 
 当前 metadata prefilter 已实现：
 
@@ -661,7 +763,7 @@ Journal→arXiv→TeX 阶段另外需要互斥的 paper-level dispositions：
 
 当前 `ArxivResolution.status` 直接产生 `resolved` / `not_found` / `ambiguous`；source archive 中没有 TeX 时由 `NoTexSourceError` 表达，cohort report 再把它记为 `no_tex_source`。
 
-Strict parser 使用 `candidate.invalid_json` 与 `candidate.schema`。论文级 parser 另用 `abstraction.duplicate_family` 拒绝 sibling family ID 重复，用 `abstraction.source_identity` 拒绝 candidate citation/journal DOI/versioned arXiv ID 与调用方绑定值不一致。当前 hard filter 的稳定 codes 按判断层分组如下：
+以下 parser 与 hard-filter codes 属于旧 paired authoring path：strict parser 使用 `candidate.invalid_json` 与 `candidate.schema`。论文级 parser 另用 `abstraction.duplicate_family` 拒绝 sibling family ID 重复，用 `abstraction.source_identity` 拒绝 candidate citation/journal DOI/versioned arXiv ID 与调用方绑定值不一致。稳定 codes 按判断层分组如下：
 
 | 层 | codes |
 | --- | --- |
@@ -672,7 +774,7 @@ Strict parser 使用 `candidate.invalid_json` 与 `candidate.schema`。论文级
 | conditions | `conditions.missing`, `conditions.diagnostic_over_budget`, `conditions.control_mismatch`, `conditions.out_of_range`, `conditions.control_not_varied`, `conditions.duplicate`, `conditions.hidden_not_held_out`, `conditions.hidden_not_interior`, `conditions.hidden_not_spread` |
 | matched twin | `counterfactual.change_count`, `counterfactual.not_distinguishable`, `counterfactual.false_twin_passes` |
 
-机器 codes 不能表达的科学 disposition 保持少量、互斥：`card_revision_required`、`no_operational_claim`、`scientific_distortion`、`source_review_failed`、`no_valid_reported_regime_twin`。其中 `card_revision_required` 是可修复的 authoring artifact 状态，不进入论文 ineligibility 分母；其余才是当前材料下的论文/case disposition。上表中的 `counterfactual.*` 是既有 runtime code，为兼容当前 evaluator 暂不改动；论文层 disposition 使用更准确的术语。漏斗必须显式标注分母从 paper 切换为 draft/family 的位置：
+旧路径中，机器 codes 不能表达的科学 disposition 保持少量、互斥：`card_revision_required`、`no_operational_claim`、`scientific_distortion`、`source_review_failed`、`no_valid_reported_regime_twin`。其中 `card_revision_required` 是可修复的 authoring artifact 状态，不进入论文 ineligibility 分母；其余才是当前材料下的论文/case disposition。上表中的 `counterfactual.*` 是既有 runtime code，为兼容当前 evaluator 暂不改动；论文层 disposition 使用更准确的术语。下面的漏斗只解释旧 paired artifacts：
 
 ```text
 journal records harvested                       [paper]
@@ -692,7 +794,20 @@ journal records harvested                       [paper]
 
 每期同时报告每个 transition 的计数、retention rate 和 primary disposition，不只报最后成功的 families。例如“cards passing source review / extracted cards”和“machine-eligible drafts / proposed drafts”是两个不同的转化率，不能用一个模糊的总成功率代替。这个全分母比只展示成功例子更能说明 pipeline 是否可扩展。
 
-## 8. Warm-up：先验证 pipeline，而不是直接发布 leaderboard
+## 8. Conversion study 与旧 warm-up
+
+当前受控 conversion study 是 `EXP-TEMPORAL-AUTHORING-001`，只使用登记文件中的 37 篇冻结 source packets，不重新进行论文选择。必须保持同一 authoring-model immutable snapshot、generation settings、原调用预算和 source 顺序，比较：
+
+1. first-attempt structural validity rate；
+2. post-repair structural validity rate；
+3. source-review retention rate；
+4. final acceptance rate。
+
+当前状态是 `blocked` 而不是 `running` 或 `completed`。历史 immutable snapshot 未保存，runtime credential 缺失，因而没有新版 numerator、rate 或 confidence interval。若恢复可由 provider 直接调用的历史 snapshot，必须在任何模型调用前提交 registration amendment，使历史、注册和 provider request 使用同一 snapshot 标识，并将比较与实验状态分别改为 `controlled` 和 `ready_for_execution`。若只恢复 alias 而不能恢复 snapshot，须另行登记 descriptive replication；不能将其结果解释为 pipeline effect。
+
+运行恢复遵循冻结调用预算：已有完整 response 时重放该 response，不重复调用 provider；只有 request 而没有可恢复 response 时，保守地占用一个调用名额并明确记录，剩余名额从下一编号继续。缺失 response 不作为结构失败，也不定义 response-based 首次结构合格指标；若它占用最后一个名额，研究保持 infrastructure data missing，不能生成完成态比较。
+
+以下 stop-first test 与 60-paper warm-up 是旧双条件 authoring path 的历史设计记录，仅用于解释既有 artifacts。
 
 在代表性 yield study 之前，先运行一个更小的 **stop-first development smoke test**：预先冻结不超过 10 篇的有序 purposive cohort，逐篇执行 metadata/TeX gate、ScienceCard 生成、独立 paper eligibility review、一次 draft proposal、hard filter、独立 family source-closure review、render 和四格 episode/evaluator canary；首个合格 case 出现即停止。ScienceCard 和 CaseDraft 都使用上述四次总调用上限；前者仅允许 `science_card.schema` / `science_card.locator`，后者仅允许 `case_draft.schema` / `case_draft.public_lineage` / `case_draft.public_leakage` 触发下一轮 mechanical repair。每轮 attempt 独立记录，第四次仍失败就结束当前论文。bounded repair 只修合同或删除已检测到的公开泄漏，不向输出补入论文事实；非法 JSON、source identity、provider 截断和任何非 allowlisted scientific failure 都不重试。provider transport/runtime failure 停止整次 run，随后需要显式 human skip disposition 或新 run；已完成 stage 一律从普通 JSON artifact 重放，不重复调用。cohort、非秘密 runtime config 和全部 TeX 在首次 provider 调用前冻结。单篇 cohort 可冻结一个 `--science-card-focus`，也可在新 run 中用 `--science-card-review-guidance` 提供上一冻结 run 的待修 card 与逐项 issues；两者可并用，但都不能提供新事实或放宽 locator/domain/review gate，旧 card 的内容也必须逐项回查 source。这个 smoke test 只回答“严格路径能否至少走通一次”，不估计 paper→case conversion rate，也不是 contribution。
 
@@ -726,7 +841,7 @@ journal records harvested                       [paper]
 
 在完成 warm-up 前，建议只写：
 
-> We design a journal-first paper-to-interactive-case pipeline that resolves published records to fixed arXiv source versions, extracts locator-linked private evidence graphs, and compiles claims reviewed against the source into paired identification/discovery cases across paper-reported mechanism regimes when such a pairing exists.
+> We design a journal-first paper-to-interactive-case pipeline that resolves published records to fixed arXiv source versions, extracts one locator-linked executable quantitative relation, independently reviews it against the source, and deterministically compiles the reviewed relation into identification and discovery tasks. Counterfactual variants are constructed and evaluated separately when requested.
 
 不要写：
 
@@ -736,4 +851,4 @@ journal records harvested                       [paper]
 - most influential papers，若排序不是在固定来源、固定时间和冻结 citation snapshot 下完成；
 - autonomous pipeline，若最终真值仍需要独立科学 reviewer。
 
-真正值得报告的证据是：转换漏斗、source-review 一致性、Oracle 重算通过率、source-condition 可辨识性，以及 Temporal family 上的 condition-specific results 是否稳定；不是 pipeline 的步骤数量。
+真正值得报告的证据是：全分母转换漏斗、source-review 一致性、确定性构造通过率、Oracle 重算通过率，以及 Temporal cases 上的结果是否稳定；不是 pipeline 的步骤数量。`EXP-TEMPORAL-AUTHORING-001` 在不可变历史 snapshot 缺失时只能提供描述性证据，不能证明简化本身提高了转换率。

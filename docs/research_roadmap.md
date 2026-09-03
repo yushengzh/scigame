@@ -1,7 +1,7 @@
 ---
 title: Role Benchmark 研究计划与实验记录
 status: active
-version: 0.5.0
+version: 0.6.0
 created: 2026-09-02
 last_updated: 2026-09-03
 target: ICLR-level submission
@@ -55,7 +55,9 @@ language: zh
 - Historical 与 Counterfactual 在同一任务 family 内配对。二者共享实验装置、控制变量、观测变量、测量分辨率、实验预算和评测域，只改变预先规定的数据生成关系。
 - Identification 与 Discovery 是同一实验条件下的两种任务设置，不是难度等级。
 - Temporal benchmark instances 来自独立的近期论文，与 Historical/Counterfactual task families 没有逐项对应关系。
-- Temporal task family 内部的两个 source-reported conditions 不是 Historical/Counterfactual conditions。
+- 新 Temporal admission 只要求至少一个经来源支持、可执行的定量关系；第二个 source-reported condition 是可选项，不再作为 admission 条件。
+- 需要 counterfactual variant 时，已通过 Temporal admission 的关系进入独立的 counterfactual construction pipeline；该变体不改变原 Temporal case 的来源属性。
+- 现有 9 个 Temporal task families 是旧版 paired source-condition contract 下形成的已冻结产物。它们继续兼容既有运行，但不定义新版 Temporal admission。
 - curated H/C family 的 `easy` 使用原 counterfactual，`hard` 使用 Historical 与原 Counterfactual 规律坐标的中点；两者保持量纲、公式形式、唯一机制变化、接口、固定实验设计、预算和 scorer。
 - 四个 Temporal 主题另有独立的 benchmark-authored H/C pack：`self_similar_spreading_radius_ratio`、`statistical_mean_field_effective_detuning`、`stealthy_hyperuniform_localization_scaling` 和 `uamo_lyapunov`。其 `easy`/`hard` 变更强度为 `0.75`/`0.5`，不改写原 Temporal source conditions。
 - NewtonBench 只作为规律变更、量纲一致性与实验预算的设计参照；本项目不采用其难度定义。
@@ -68,14 +70,17 @@ language: zh
 截至 2026-09-03：
 
 - 20 个 Historical/Counterfactual matched task families，共 80 个公开 development instances；
-- 9 个独立注册的 paper-derived Temporal task families，共 36 个公开 development instances；
+- 9 个独立注册的 paper-derived Temporal task families，共 36 个公开 development instances；这些是旧版 paired source-condition contract 下的冻结产物；
 - 合计 29 个 task families、116 个公开 development instances；
 - private test set 仍为 0，公开 development set 的结果不得称为 contamination-resistant formal evaluation；
 - P0.1--P0.6 核心合同已实现：Identification 与 Discovery 共享最终可执行表示、evaluation procedure、held-out conditions 和 scorer；
 - prior-only baseline、fixed experimental design 和 adaptive experimental design 三种评测方法已实现，fixed 与 adaptive 对同一 family 使用相同的 \(B\)；
 - 连续 `held_out_prediction_score` 是主要结果，binary pass 与 protocol completion 分开报告；
 - P0.5 用显式 condition role 区分 curated H/C 与 Temporal source-reported conditions；P0.6 只保存 model-profile × Temporal-instance 的可核对事实与 `unknown`，不据 unknown 推断 unseen；
+- 若 pipeline LLM 的改写文本进入最终 instance，Temporal 的保守时间边界取 raw source earliest-public date 与改写模型有文档依据的 knowledge-cutoff date 中较晚者；任一时间未知时保留 `exposure_unknown`。新版最小路径不公开 LLM 生成的 prose，但仍不以此替代 evaluated model 的 exposure assessment；
 - 确定性 Oracle 是主要方案；可选 LLM presentation 只能严格呈现确定性 observation，且仍待 Oracle 准确性审计。
+- 新 Temporal authoring 实现把 LLM 输出限制为 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；实验预算、diagnostic conditions、held-out conditions、public template 和 provenance mapping 由确定性代码生成。
+- `EXP-TEMPORAL-AUTHORING-001` 已冻结既有两次 authoring run 的同一批 37 个 source packets、原顺序和逐论文调用上限。历史运行未保存不可变 authoring-model snapshot，当前也没有运行凭据，因此重新运行尚未执行，pipeline 修改的因果效应目前不可识别。
 
 每次这些数字变化时，必须同时更新来源文件或运行产物链接，不得只修改本文数字。
 
@@ -257,6 +262,28 @@ Y^T_{m,c,A}-Y^T_{m,c,F}.
 
 Phase 0 的核心退出条件 P0.1–P0.6 已满足。P0.7 在任何 formal capability claim 前必须完成，但可与 development pilot 并行实现。
 
+### Temporal authoring conversion study
+
+状态：`blocked`
+
+`EXP-TEMPORAL-AUTHORING-001` 检查较小的抽取合同和单关系 admission 是否提高 paper-to-case conversion。该研究不评测 Player 能力，也不改变 Historical/Counterfactual matched-pairs design。
+
+Scientific problem: 旧流程把 Temporal eligibility 与第二个 source-reported condition 和 paired-case construction 绑定，可能拒绝本来已有一个可靠定量关系的论文。
+
+Proposed change: Temporal admission 只要求至少一个经来源支持、可执行的定量关系；LLM 只抽取 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`，其余 case 字段由确定性代码生成；只有明确需要 counterfactual variant 时才调用独立的 counterfactual construction pipeline。
+
+Simpler alternative: 只删除旧 reviewer 的 paired-condition 要求仍会保留不必要的 LLM-authored case-design 字段，不能判断结构失败来自科学证据不足还是输出合同过大。
+
+Assumptions: 六类抽取字段足以表达目标关系；确定性生成规则不会扩大 source-supported domain；独立 source review 能核对公式、参数、controls、readouts、domain 和 anchors 的一致性。
+
+Stopping rule: 37 篇 source packets 全部按冻结顺序和逐论文调用上限处理；基础设施失败时保留当前位置，恢复时必须继续使用同一不可变 snapshot 和剩余预算。
+
+冻结协议见 [`../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/)。分析单位是论文，四个主要分母均固定为 37：首次结构合格率、bounded repair 后结构合格率、source-review retention rate 和最终 acceptance rate。17 篇论文最多各调用 2 次，另 20 篇最多各调用 4 次；论文不得替换、增删、重排或跨论文转移未用调用预算。
+
+历史描述值为首次结构合格 `3/37`、repair 后结构合格 `13/37`、source-review retention `0/37` 和最终 acceptance `0/37`。旧 review 对 13 张结构合格 cards 的结果是直接通过 `0/13`、要求修改 `6/13`、拒绝 `7/13`；要求修改必须单列，不能计为 retained，也不能追溯地改判为新版单关系 admission。
+
+该研究当前不能执行为受控比较：历史产物只记录可变 model alias `deepseek-v4-flash`，没有保存不可变 checkpoint 或 snapshot ID；运行环境也缺少 API 凭据。若以后恢复可由 provider 直接调用的历史 snapshot，必须在任何模型调用前提交一份有记录的 registration amendment：两个 snapshot 字段写入同一标识，将历史比较状态改为 `controlled`，并将实验状态改为 `ready_for_execution`；runner 会把该 snapshot 标识直接作为 provider request 的 `model` 值。只匹配同名 alias 的运行最多是描述性 replication，必须另行登记，不能把比例差异归因于 pipeline 修改。当前没有新结果，结果登记保持为空。
+
 ### Phase 1，方法学 pilot study
 
 状态：`ready`
@@ -370,6 +397,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | D-002 | 仅依据论文发表日期把 Temporal benchmark instance 称为模型未知 | `rejected` | earliest public disclosure 与模型训练暴露均不由期刊日期决定 | 对每个 model–benchmark-instance pair 完成 temporal contamination audit |
 | D-003 | 用较旧 authoring LLM 证明 Temporal benchmark instance 对较新的 evaluated language-model agent 未知 | `rejected` | authoring model 的版本不改变 evaluated model 的训练数据暴露 | 旧 LLM 只用于 prompt paraphrase sensitivity analysis |
 | D-004 | 仅使用 prior-only baseline 和 adaptive experimental design 分离证据使用与实验选择 | `rejected` | 两种方法的表现差异同时包含对观测的使用和实验选择，无法分别估计 | 增加 fixed experimental design |
+| D-005 | 要求每篇 Temporal source 同时提供两个可配对的 source-reported conditions 才能进入 case construction | `superseded` | 该要求把 source-supported quantitative relation 的 eligibility 与另一种条件是否存在混为一体，并额外扩大 LLM 输出合同 | Temporal admission 接受至少一个经来源支持、可执行的定量关系；第二个 source-reported condition 可选，counterfactual variant 由独立 pipeline 构造 |
 
 ## 8. 实验登记表
 
@@ -377,6 +405,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 | Experiment ID | 问题 | Cohort | Models | Primary estimand | Status | Protocol | Results | Decision |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| EXP-TEMPORAL-AUTHORING-001 | 最小 ScienceCard 与单关系 Temporal admission 是否提高 paper-to-case conversion | 同一批 37 个冻结 source packets；顺序和逐论文调用上限不变 | 历史 alias 为 `deepseek-v4-flash`；不可变历史 snapshot 未保存，当前凭据缺失 | 首次结构合格率、repair 后结构合格率、source-review retention rate、最终 acceptance rate；分母均为 37 | `blocked` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/registration.json)；[`frozen_sources.json`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/frozen_sources.json) | 未运行 | 不可变历史 snapshot 与凭据缺失；当前无法识别 pipeline 修改的因果效应 |
 | EXP-METHOD-PILOT-001 | 三种 evaluation methods 能否分别测量无观测、固定观测和自适应实验条件下的表现 | 6 个 H/C families（easy/hard）与 3 个独立 Temporal families；2 repeats | `deepseek-v4-flash` API alias；snapshot 与 cutoff 为 unknown；deterministic Oracle；独立 post-hoc Evaluator | `held_out_prediction_score` 的 \(\Delta_0,\Delta_F,\Delta_A\)；Temporal 独立报告 | `ready` | [`registration.json`](../experiments/registrations/EXP-METHOD-PILOT-001/registration.json) | 未运行 | development method pilot；不作 capability 或 post-checkpoint claim |
 | EXP-HC-CONFIRM-001 | 固定实验观测能否改变 Counterfactual condition 下的初始预测 | 20 matched task families；formal evaluation 需要 private benchmark instances | 待冻结 | \(\Delta_0,\Delta_F\) | `blocked` | 待补 | 待补 | 等待 pilot study |
 | EXP-TEMPORAL-001 | 独立近期来源 benchmark instances 在三种 evaluation methods 下的表现差异 | 数量待 power analysis，以 source paper 计 | 待冻结 | \(Y^T_F-Y^T_0\) 和 \(Y^T_A-Y^T_F\) | `blocked` | 待补 | 待补 | 等待 temporal contamination audit 和 private evaluation workflow |
@@ -446,6 +475,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | R-005 | 将 episodes 当作独立样本 | 低估不确定性 | task family/source paper 作为统计单位 | analysis script 实现 cluster-level inference | open |
 | R-006 | Fixed experimental design 不可辨识或偏向预先规定的数据生成关系 | 方法间表现差异无法解释 | Phase 1 执行 pilot study | reference baselines 与 competing-hypothesis tests 通过 | open |
 | R-007 | 大规模运行先于评测方法 pilot | 产生昂贵但不可解释的数据 | P0.1–P0.6 已完成；先冻结并执行 Phase 1 | pilot study 通过后才扩展 | controlled |
+| R-008 | 历史 Temporal authoring run 没有不可变 model snapshot | 即使 source packets、alias 和调用预算相同，也不能把新旧转换率差异归因于 pipeline 修改 | `EXP-TEMPORAL-AUTHORING-001` 保持 blocked；历史值仅作描述性基线 | 找到并可调用与历史运行相同的不可变 snapshot，或另行登记同一新 snapshot 下的新旧 pipeline 同期比较 | open |
 
 ## 11. 文档维护规则
 
@@ -478,6 +508,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 | Version | Date | Change | Evidence/reason | Author |
 | --- | --- | --- | --- | --- |
+| 0.6.0 | 2026-09-03 | 将 Temporal admission 改为至少一个 source-supported executable quantitative relation；第二个 source-reported condition 改为可选，counterfactual construction 独立；LLM 仅抽取六类 ScienceCard 字段，其余由确定性代码生成；登记同一批 37 篇的 conversion study | [`../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/`](../experiments/registrations/EXP-TEMPORAL-AUTHORING-001/)；历史不可变 snapshot 与运行凭据缺失，故未执行且不作因果比较 | project team |
 | 0.5.0 | 2026-09-03 | 冻结 `EXP-METHOD-PILOT-001` 的 cohort、model profile、2 repeats、主要 outcome/estimands、deterministic Oracle 与 Temporal source dates；状态改为 `ready`，结果仍为未运行 | [`../experiments/registrations/EXP-METHOD-PILOT-001/`](../experiments/registrations/EXP-METHOD-PILOT-001/)；API snapshot/cutoff 缺失保持 unknown | project team |
 | 0.4.0 | 2026-09-03 | 将 P0.1–P0.6 标为完成；记录三方法、连续主指标、condition role、事实/unknown exposure 合同、Oracle 双接口与 H/C 变体边界；`EXP-METHOD-PILOT-001` 保持待主任务冻结且未运行 | 对应核心模块与聚焦测试；不新增实验结果 | project team |
 | 0.3.1 | 2026-09-02 | 明确所有比较的评测程序统一称为 method；补充项目级术语规范与自动检查要求 | [`terminology_and_writing_conventions.md`](terminology_and_writing_conventions.md)；`../scripts/check_document_terminology.py` | project team |

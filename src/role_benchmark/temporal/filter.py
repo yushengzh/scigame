@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from itertools import product
-from typing import Any, Dict, Mapping, Optional, Set, Tuple
+from typing import Any, Dict, Mapping, Optional, Sequence, Set, Tuple
 
 from role_benchmark.expression import (
     ExpressionError,
@@ -295,6 +295,52 @@ def _expression_interval(
     raise _UnsafeDomain("unsupported expression operator")
 
 
+def validate_materialized_outputs_totality(
+    outputs: Mapping[str, Any],
+    controls: Sequence[Any],
+) -> None:
+    """Conservatively require every output to be finite on the query domain."""
+
+    if not controls or not all(
+        _is_interval_control(item) or _is_enumerated_control(item)
+        for item in controls
+    ):
+        raise ValueError("controls must define valid interval or enumerated domains")
+    variable_intervals = {
+        item.name: (
+            (item.minimum, item.maximum)
+            if _is_interval_control(item)
+            else (min(item.allowed_values), max(item.allowed_values))
+        )
+        for item in controls
+    }
+    enumerated_controls = tuple(
+        item for item in controls if _is_enumerated_control(item)
+    )
+    for readout, expression in outputs.items():
+        try:
+            _expression_interval(expression, variable_intervals)
+        except _UnsafeDomain as exc:
+            # An interval hull can include values between discrete settings.
+            # Retry with every enumerated coordinate fixed exactly.
+            if enumerated_controls:
+                try:
+                    for values in product(
+                        *(item.allowed_values for item in enumerated_controls)
+                    ):
+                        exact_intervals = dict(variable_intervals)
+                        for control, value in zip(enumerated_controls, values):
+                            exact_intervals[control.name] = (value, value)
+                        _expression_interval(expression, exact_intervals)
+                    continue
+                except _UnsafeDomain as exact_exc:
+                    exc = exact_exc
+            raise ValueError(
+                "output %s is not total on the declared control domain: %s"
+                % (readout, exc)
+            ) from exc
+
+
 def filter_candidate(candidate: TemporalCaseCandidate) -> FilterResult:
     """Apply the closed-form admission rules without an LLM judgment."""
 
@@ -508,39 +554,13 @@ def filter_candidate(candidate: TemporalCaseCandidate) -> FilterResult:
         )
     )
     if programs and ranges_are_valid:
-        variable_intervals = {
-            item.name: (
-                (item.minimum, item.maximum)
-                if _is_interval_control(item)
-                else (min(item.allowed_values), max(item.allowed_values))
-            )
-            for item in candidate.controls
-        }
-        enumerated_controls = tuple(
-            item for item in candidate.controls if _is_enumerated_control(item)
-        )
         for world, program in programs.items():
             for readout, expression in program["outputs"].items():
                 try:
-                    _expression_interval(expression, variable_intervals)
-                except _UnsafeDomain as exc:
-                    # The interval hull can contain unsupported points between
-                    # discrete settings.  The Oracle only owes answers on Q,
-                    # so retry with every enumerated coordinate fixed exactly.
-                    if enumerated_controls:
-                        try:
-                            for values in product(
-                                *(item.allowed_values for item in enumerated_controls)
-                            ):
-                                exact_intervals = dict(variable_intervals)
-                                for control, value in zip(
-                                    enumerated_controls, values
-                                ):
-                                    exact_intervals[control.name] = (value, value)
-                                _expression_interval(expression, exact_intervals)
-                            continue
-                        except _UnsafeDomain as exact_exc:
-                            exc = exact_exc
+                    validate_materialized_outputs_totality(
+                        {readout: expression}, candidate.controls
+                    )
+                except ValueError as exc:
                     reject(
                         RejectionCode.DOMAIN_UNSAFE,
                         "$.oracle.outputs.%s" % readout,
@@ -809,4 +829,5 @@ __all__ = [
     "filter_candidate",
     "materialize_expression",
     "materialize_outputs",
+    "validate_materialized_outputs_totality",
 ]
