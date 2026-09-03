@@ -373,6 +373,9 @@ def run_logged_episode(
     oracle: Optional[Oracle] = None,
     max_actions: int = 100,
     run_metadata: Optional[Mapping[str, Any]] = None,
+    observation_budget: Optional[int] = None,
+    initial_attempts_used: int = 0,
+    require_budget_exhaustion: bool = False,
 ) -> EpisodeOutcome:
     """Run one episode while recording every decoded action and transition.
 
@@ -401,6 +404,33 @@ def run_logged_episode(
         if isinstance(effective_oracle, LLMOracle)
         else None
     )
+    episode = Episode(
+        case,
+        oracle=effective_oracle,
+        observation_budget=observation_budget,
+        initial_attempts_used=initial_attempts_used,
+        require_budget_exhaustion=require_budget_exhaustion,
+    )
+    policy: Dict[str, Any] = {
+        "max_actions": max_actions,
+        "durable_log": log.durable,
+    }
+    if (
+        observation_budget is not None
+        or initial_attempts_used != 0
+        or require_budget_exhaustion
+    ):
+        policy.update(
+            {
+                "observation_budget": (
+                    case.definition.budget
+                    if observation_budget is None
+                    else observation_budget
+                ),
+                "initial_attempts_used": initial_attempts_used,
+                "require_budget_exhaustion": require_budget_exhaustion,
+            }
+        )
     log.append(
         "run.started",
         {
@@ -409,13 +439,12 @@ def run_logged_episode(
             "action_schema": PLAYER_ACTION_SCHEMA,
             "player_kind": "llm" if isinstance(player, LLMPlayerBackend) else "custom",
             "llm_config": llm_config,
-            "policy": {"max_actions": max_actions, "durable_log": log.durable},
+            "policy": policy,
             "oracle_mode": oracle_mode,
             "oracle_llm_config": oracle_llm_config,
             "run_metadata": metadata,
         },
     )
-    episode = Episode(case, oracle=effective_oracle)
     for action_index in range(1, max_actions + 1):
         view_before = episode.view()
         try:
@@ -619,6 +648,9 @@ def run_llm_episode(
     run_id: Optional[str] = None,
     run_metadata: Optional[Mapping[str, Any]] = None,
     durable_log: bool = False,
+    observation_budget: Optional[int] = None,
+    initial_attempts_used: int = 0,
+    require_budget_exhaustion: bool = False,
 ) -> LoggedEpisodeRun:
     """Run one logged development episode with an LLM on either track."""
     if isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1:
@@ -651,6 +683,13 @@ def run_llm_episode(
     if not isinstance(durable_log, bool):
         raise ValueError("durable_log must be boolean")
     canonical_json_dumps(dict(run_metadata or {}))
+    # Validate the method-specific episode policy before creating a run log.
+    Episode(
+        case,
+        observation_budget=observation_budget,
+        initial_attempts_used=initial_attempts_used,
+        require_budget_exhaustion=require_budget_exhaustion,
+    )
 
     resolved_run_id = run_id or uuid.uuid4().hex
     with JSONLRunLog(
@@ -683,6 +722,9 @@ def run_llm_episode(
             oracle=llm_oracle,
             max_actions=max_actions,
             run_metadata=run_metadata,
+            observation_budget=observation_budget,
+            initial_attempts_used=initial_attempts_used,
+            require_budget_exhaustion=require_budget_exhaustion,
         )
         stats = player.stats
         oracle_stats = llm_oracle.stats if llm_oracle is not None else None
@@ -1810,18 +1852,49 @@ def replay_run_log(
         raise RunReplayError("logged action schema is unavailable")
     oracle_mode = started.get("oracle_mode")
     if oracle_mode not in ("case", "llm_case"):
-        raise RunReplayError("only truth-grounded case Oracle logs can be replayed")
+        raise RunReplayError("only deterministic case Oracle logs can be replayed")
     player_kind = started.get("player_kind")
     if player_kind not in ("llm", "custom"):
         raise RunReplayError("logged player kind is unavailable")
     policy = started.get("policy")
-    if not isinstance(policy, dict) or set(policy) != {"max_actions", "durable_log"}:
+    base_policy_fields = {"max_actions", "durable_log"}
+    observation_policy_fields = {
+        "observation_budget",
+        "initial_attempts_used",
+        "require_budget_exhaustion",
+    }
+    if not isinstance(policy, dict) or set(policy) not in (
+        base_policy_fields,
+        base_policy_fields | observation_policy_fields,
+    ):
         raise RunReplayError("run action/log policy is invalid")
     max_actions = policy.get("max_actions")
     if isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1:
         raise RunReplayError("logged max_actions is invalid")
     if not isinstance(policy.get("durable_log"), bool):
         raise RunReplayError("logged durability policy is invalid")
+    if observation_policy_fields.issubset(policy):
+        observation_budget = policy["observation_budget"]
+        initial_attempts_used = policy["initial_attempts_used"]
+        require_budget_exhaustion = policy["require_budget_exhaustion"]
+        if (
+            isinstance(observation_budget, bool)
+            or not isinstance(observation_budget, int)
+            or not 0 <= observation_budget <= case.definition.budget
+        ):
+            raise RunReplayError("logged observation budget is invalid")
+        if (
+            isinstance(initial_attempts_used, bool)
+            or not isinstance(initial_attempts_used, int)
+            or not 0 <= initial_attempts_used <= observation_budget
+        ):
+            raise RunReplayError("logged initial observation count is invalid")
+        if not isinstance(require_budget_exhaustion, bool):
+            raise RunReplayError("logged observation stopping policy is invalid")
+    else:
+        observation_budget = None
+        initial_attempts_used = 0
+        require_budget_exhaustion = False
     if player_kind == "llm":
         config, max_action_bytes, max_repair = _llm_policy_from_started(started)
     else:
@@ -1905,7 +1978,13 @@ def replay_run_log(
     effective_oracle: Oracle = (
         replay_oracle if oracle_mode == "llm_case" else canonical_oracle
     )
-    episode = Episode(case, oracle=effective_oracle)
+    episode = Episode(
+        case,
+        oracle=effective_oracle,
+        observation_budget=observation_budget,
+        initial_attempts_used=initial_attempts_used,
+        require_budget_exhaustion=require_budget_exhaustion,
+    )
     prompt_requests_checked = 0
     oracle_turn = 0
     replayed_outcome: Optional[EpisodeOutcome] = None

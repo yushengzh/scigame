@@ -74,18 +74,23 @@ def _render_index(
             "<tr>"
             "<td>%s</td><td><a href=\"%s\">%s</a></td>"
             "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-            "<td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+            "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+            "<td>%s</td><td>%s</td><td>%s</td>"
             "</tr>"
             % (
                 _escape(row.get("schedule_index")),
                 _escape(filename),
                 _escape(episode_id),
                 _escape(row.get("player_model")),
-                _escape(row.get("oracle_model")),
+                _escape(row.get("oracle_mode")),
                 _escape(row.get("evaluator_model")),
+                _escape(row.get("dataset_kind")),
                 _escape(row.get("case_family")),
-                _escape(row.get("world")),
-                _escape(row.get("track")),
+                _escape(row.get("variant_id")),
+                _escape(row.get("condition_id")),
+                _escape(row.get("condition_role")),
+                _escape(row.get("task_setting")),
+                _escape(row.get("evaluation_method")),
                 _escape(row.get("repeat")),
                 _escape(row.get("active_pass")),
                 _escape(row.get("termination_kind")),
@@ -115,7 +120,7 @@ def _render_index(
   <h1>%s</h1>
   <p>%d evaluated episodes. Each link opens the canonical Player–Oracle transcript named by episode ID.</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>Schedule</th><th>Episode</th><th>Player</th><th>Oracle</th><th>Evaluator</th><th>Family</th><th>World</th><th>Track</th><th>Repeat</th><th>Pass</th><th>Termination</th></tr></thead>
+    <thead><tr><th>Schedule</th><th>Episode</th><th>Player</th><th>Oracle mode</th><th>Evaluator</th><th>Dataset</th><th>Family</th><th>Variant</th><th>Condition</th><th>Condition role</th><th>Task setting</th><th>Method</th><th>Repeat</th><th>Pass</th><th>Termination</th></tr></thead>
     <tbody>%s</tbody>
   </table></div>
 </main>

@@ -1,6 +1,6 @@
 # P0 evaluation policy: tracks, score semantics, and isolation
 
-Status: normative for this repository from 2026-08-24.  This document is the
+Status: normative for this repository from 2026-09-03. This document is the
 single source of truth for claims about what a case measures and when a result
 may be called a formal evaluation result.
 
@@ -80,15 +80,15 @@ The two track labels are mutually exclusive contracts, not difficulty levels.
 | --- | --- | --- |
 | Full name | fixed-family active system identification | blind-family predictive law induction |
 | Unknown before interaction | parameters of a public model family | the truth-specific functional family and its parameters |
-| Public model information | complete family, parameter meanings, admissible ranges | only a track-wide, family-neutral executable representation and complexity ceiling |
+| Public model information | complete family, parameter meanings, admissible ranges | only an executable representation and complexity ceiling shared across task families |
 | Public experimental information | controls, readouts, units, ranges, resolution/noise, budget | the same |
 | Private information | truth parameters, assignment, seed, specific held-out conditions | truth family, truth parameters, assignment, seed, specific held-out conditions |
 | Final scored object | parameters or an equivalent executable predictor | an executable predictor in the common representation |
 | Primary correctness criterion | predictive loss on held-out interventions | predictive loss on held-out interventions |
 | Optional diagnostics | identifiable parameter error, attempts, calibration | canonical family recovery when defined, attempts, calibration |
 
-`predictive_model_pass` does not require the Player to reproduce the
-author-side canonical formula, the same algebraic spelling, or exact hidden
+The continuous `held_out_prediction_score` does not require the Player to reproduce the
+benchmark reference expression, the same algebraic spelling, or exact hidden
 parameters. It tests numerical predictions on the declared evaluation domain.
 Formula-family or parameter agreement, when available, remains a separately
 named diagnostic; finitely many successful interventions do not prove global
@@ -114,65 +114,79 @@ Rules that resolve ambiguous cases:
 
 ### Current implementation status
 
-The public registry contains 20 matched case families. Every family is built
-through `make_case(name, world, track)` and exposes the same four-cell design:
-two worlds (`historical`, `counterfactual`) crossed with two tracks
+The P0.1--P0.6 core contracts are implemented. The public curated registry
+contains 20 H/C case families. Every family is built through
+`make_case(name, world, track)` and exposes the four-cell design formed by two
+condition roles (`historical`, `counterfactual`) and two task settings
 (`identification`, `discovery`). The repository therefore contains 80 public
-development cells.
+curated development instances.
 
-A separate source-reviewed temporal registry contains 9 additional families /
-36 cells, addressed through `make_temporal_case`. It comprises the registered
-KZ warm-up plus 8 families admitted from the fixed-window paper pipeline. Two
-other generated candidates remain outside the registry because their proposed
-paired axes changed the observable or evidence modality. Temporal membership
-is kept separate from the stable built-in pack, but both registries implement
-the same four-cell contract.
+A separate Temporal registry reviewed against the cited sources contains 9 additional families
+and 36 instances, addressed through `make_temporal_case`. Each family retains
+two source-reported conditions and crosses them with the two task settings.
+Both Temporal conditions have the role `source_reported` and use semantically
+neutral condition IDs. They are not H/C conditions; any legacy runtime selector
+is an implementation compatibility detail, not a scientific label.
 
 | Family group | Registered families | Cells per family |
 | --- | --- | --- |
 | Historically anchored core | `pendulum`, `young_double_slit`, `galileo_inclined_plane`, `boyle_j_tube`, `photoelectric`, `faraday_induction`, `radioactive_decay`, `rutherford_scattering` | 4 |
 | Expanded matched set | `hooke_spring`, `torricelli_efflux`, `ohm_circuit`, `rc_discharge`, `stefan_boltzmann`, `newton_cooling`, `beer_lambert`, `michaelis_menten`, `coulomb_force`, `kepler_orbit`, `brownian_diffusion`, `poiseuille_flow` | 4 |
 
-Within a family, each counterfactual changes one declared mechanism coordinate.
-Within a world, identification and discovery reuse the same truth, WorldModel,
-measurement contract, and held-out interventions. Identification exposes the
-family-specific model and parameter slots; discovery instead accepts the common
-family-neutral executable `expression` representation. This pairing holds the
-evidence environment fixed. Because the final encodings also differ (named
-parameters versus a general expression tree), the current end-to-end track
-contrast includes representation and parser difficulty; it does not yet isolate
-family disclosure as the sole causal difference.
+Within a curated family, each counterfactual changes one declared mechanism
+coordinate. Within a condition, identification and discovery reuse the same
+truth, WorldModel, measurement contract, held-out interventions, and final
+executable `expression` representation; identification only discloses the
+family-specific model and parameter slots. This holds the evidence and output
+contracts fixed while changing family disclosure.
 
-All 29 registered families remain transparent development fixtures. Their truths, world
-mapping, and evaluator conditions ship with the source. Historical labels mean
-modern idealized worlds motivated by the credited scientific relationship, not
-raw archival evidence or literal apparatus replay; authored counterfactuals are
-benchmark constructs, not historical claims. The current formal private pack
-contains 0 families and 0 cells. Consequently, results on the 116 public cells
-are not contamination-resistant formal benchmark results.
+Each curated pair has two complete H/C variants. `easy` uses the original
+counterfactual coordinate and `hard` uses the midpoint between the historical
+and original counterfactual coordinates. Units, formula form, the single changed
+mechanism coordinate, interface, fixed experimental design, budget, and scorer
+remain unchanged. Four Temporal topics also have derived H/C variants in a
+separate benchmark-authored pack: `self_similar_spreading_radius_ratio`,
+`statistical_mean_field_effective_detuning`,
+`stealthy_hyperuniform_localization_scaling`, and `uamo_lyapunov`. Their `easy`
+and `hard` strength fractions are `0.75` and `0.5`. These authored variants do
+not relabel or modify the original Temporal source conditions. NewtonBench is
+used only as a design reference for law mutation, dimensional consistency, and
+experiment budgets; its difficulty definitions are not adopted here.
 
-Twenty-nine registered public families improve implementation breadth but do not by themselves
-establish cross-domain validity, evidence-following, or scientific discovery
-ability. Such claims require private assignment and truth, the formal isolation
-boundary below, prespecified model/repeat/aggregation choices, and empirical
-validation at the case-family level.
+All 29 registered families remain public development data: 20 H/C families
+with 80 instances and 9 Temporal families with 36 source-condition instances.
+The P0.6 contamination record stores only source/model-instance facts and an
+explicit unknown state. Unknown exposure must not be inferred as unseen or
+contamination-free. The private test set contains 0 families and 0 instances;
+results on the 116 public instances are therefore not contamination-resistant
+formal benchmark results. Breadth alone does not establish cross-domain
+validity, evidence-following, or scientific discovery ability.
+
+The three implemented evaluation methods are prior-only baseline, fixed
+experimental design, and adaptive experimental design. Fixed and adaptive
+methods use the same family-specific observation budget \(B\), and all three
+methods share the final representation, held-out conditions, and scorer.
 
 ## 3. Score names state what was measured
 
-The deterministic built-in evaluators use:
+The deterministic built-in evaluators use the continuous primary outcome:
 
 ```text
-scores["predictive_model_pass"]
+scores["held_out_prediction_score"]
 ```
 
-It is `1.0` exactly when the submitted structured model meets that case's
-numeric held-out prediction criterion, and `0.0` otherwise. The former name
-`explanation_correct` was removed rather than retained as an alias because it
-asserted a construct the evaluator never measured.
+For each held-out prediction, absolute error is divided by the case tolerance
+(`absolute_tolerance + relative_tolerance * abs(target)`). The primary score is
+`1 / (1 + mean scaled error)`, lies in `[0,1]`, and is higher when held-out
+prediction is better. An invalid or missing Player submission receives 0;
+infrastructure failure is missing and is retried. Binary
+`predictive_model_pass` is a separately reported secondary outcome.
 
 For the current cases:
 
-- `EvaluationResult.success` is the case's preregistered predictive pass/fail;
+- `held_out_prediction_score` is the preregistered continuous primary outcome;
+- `EvaluationResult.success` and `predictive_model_pass` are the case's
+  predictive pass/fail diagnostics;
 - `explanation` and `scope_conditions` are required/free-form submission data
   but are not scored;
 - the dynamic hypothesis portfolio and ex-ante forecasts are observable process
@@ -186,13 +200,13 @@ For the current cases:
   stopping condition, not calibrated confidence or evidence sufficiency;
 - parameter errors are diagnostics, not a universal definition of correctness.
 
-“Held out” in a public development fixture only means not passed through the
+“Held out” in a public development instance only means not passed through the
 normal Player API. In a formal evaluation it additionally means inaccessible
 from the Player execution environment and fixed only by the trusted service.
 
 If future work scores claims or scope, it must add separately named axes such as
 claim/model consistency, claim truth, and scope validity. A language judge must
-not silently alter `predictive_model_pass`.
+not alter `held_out_prediction_score` or the secondary binary pass.
 
 The same rule applies to process evaluation. A transcript-aware Judge may score
 observable experiment choice, evidence use, hypothesis revision, and stopping
@@ -216,7 +230,8 @@ aggregate names are:
   forecast error; unchanged gaps receive 0.5.
 
 The accompanying pair counts make unscorable episodes explicit. These values
-are never fed back to the Player and are not combined with predictive success.
+are never fed back to the Player and are not combined with the continuous
+predictive score or binary pass.
 In particular, `scorable_belief_pair_count = 0` means the update diagnostic is
 unscorable; its stored aggregate default must not be interpreted as zero
 scientific quality.
@@ -274,6 +289,8 @@ Reports use the full planned denominator and keep the following quantities
 separate:
 
 - evaluated-terminal coverage over scheduled cells;
+- unconditional continuous held-out prediction score, with Player-side invalid
+  or missing submissions scored as 0;
 - protocol-completion (valid-final) rate;
 - unconditional task success, represented by `active_pass = submitted AND
   protocol_completion AND EvaluationResult.success`;
@@ -286,11 +303,11 @@ denominator instead of disappearing before evaluation.
 
 ## 4. Formal evaluation boundary
 
-The repository currently implements public development evaluation: 29 matched
-families and 116 cells are public, while the formal private pack contains 0
-families and 0 cells. A result is formal only when the active case pack is kept
-outside the Player process and the Player communicates with it through the
-serialized protocol.
+The repository currently implements public development evaluation: 20 H/C
+families (80 instances) and 9 Temporal source-condition families (36 instances)
+are public, while the private test set contains 0 families and 0 instances. A
+result is formal only when the active case pack is kept outside the Player
+process and the Player communicates with it through the serialized protocol.
 
 The minimum formal boundary has four rules:
 
@@ -304,13 +321,14 @@ The minimum formal boundary has four rules:
    predictive rule; any optional process Judge runs only after the interaction
    on the recorded observable transcript.
 
-Player and Oracle may be backed by the same provider and model ID. They remain
-separate roles with separate prompts, conversations, and information access:
-the Player receives only public case information and returned evidence, while
-the Oracle may receive the complete private case specification and WorldModel
-interface. Regardless of model choice, measurements, units, and uncertainty in
-an Oracle response must be generated or validated by the WorldModel rather than
-invented by the Oracle LLM.
+The deterministic `CaseOracle` is the primary interface. An optional LLM
+presentation layer may strictly present an observation already produced by the
+WorldModel, but it must not change response status, measurements, units, or
+uncertainty. That optional path still requires an Oracle accuracy audit and
+must not be used for primary results before the audit is complete. The Player
+receives only public case information and returned evidence; any presentation
+model remains a separate role with separate prompts, conversations, and
+information access.
 
 These rules separate development fixtures from private evaluation without
 adding mechanisms unrelated to the scientific interaction. They do not imply
@@ -334,7 +352,7 @@ Before merging a case, its author records:
 - accurate metric names and an explicit list of unscored fields.
 
 Discovery cases have two additional gates: at least several viable functional
-families behind the same public interface, and one family-neutral executable
+families behind the same public interface, and one executable
 submission representation shared across the track. Until both exist and the
 formal boundary is deployed, a case remains an identification or development
 fixture rather than a discovery benchmark.

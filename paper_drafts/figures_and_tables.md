@@ -13,7 +13,7 @@ mock-up, not silently promoted to the final empirical figure.
 `identification` and `discovery`. A shared apparatus block below each row points
 to the same `WorldModel`, controls, budget, evidence, and held-out interventions.
 The identification cells show a disclosed parameterized skeleton; the discovery
-cells show only a family-neutral expression interface. Highlight the one
+cells show only an expression interface shared across task families. Highlight the one
 mechanism coordinate changed between historical and counterfactual worlds.
 
 **Message:** prior alignment and whether the family is disclosed are distinct
@@ -41,7 +41,7 @@ keeps the post-hoc evaluator out of the Player–Oracle interaction.
 ### Figure 3 — Development outcomes by cell and terminal category (required after rerun)
 
 **Form:** two panels. Panel A is a four-cell dot-and-interval plot of
-unconditional active-pass rates, with family as the analysis unit. Panel B is a
+unconditional held-out prediction success rates, with family as the analysis unit. Panel B is a
 stacked bar for each cell showing `pass`, `scientific failure`, `action rejected`,
 and `player output invalid`. Display raw counts next to every mark.
 
@@ -54,7 +54,7 @@ and one model, so no confirmatory interval or significance marker is permitted.
 **Final source required:** a new frozen-release run with prespecified models and
 repeats. Do not mix the archived 2026-08-25 block with that run.
 
-### Figure 4 — A forecast-grounded evidence-use vignette (optional for Draft A, required for Draft B)
+### Figure 4 — Example of pre-experiment predictions and subsequent model revision (optional for Draft A, required for Draft B)
 
 **Form:** transcript timeline for
 `pendulum__counterfactual__discovery__r01`. The top panel shows mass settings and
@@ -73,7 +73,7 @@ frequency or establish a cognitive mechanism.
 ### Figure 5 — Outcome and process are different axes (Draft B only, after validation)
 
 **Form:** each episode is a point with held-out prediction outcome on one axis
-and a validated evidence-use score on the other, faceted by track and world.
+and a validated process-evaluation score on the other, faceted by task setting and experimental condition.
 Marginal bars show unscorable coverage.
 
 **Message:** successful prediction need not imply an evidence-responsive
@@ -83,7 +83,7 @@ trajectory, and a well-updated trajectory may still fail numerically.
 this as a main result until blinded human coding and inter-rater reliability are
 available.
 
-### Figure 6 — Source-grounded temporal authoring funnel (Draft C only)
+### Figure 6 — Paper-derived temporal task-construction pipeline (Draft C only)
 
 **Form:** `journal census → arXiv identity resolution → fixed TeX → ScienceCard
 proposal → independent source review → matched draft → deterministic filter →
@@ -111,7 +111,7 @@ Columns:
 3. manipulation of prior information;
 4. counterfactual/shifted laws;
 5. final executable predictor and held-out prediction;
-6. forecast-grounded process record;
+6. record of pre-experiment predictions and subsequent model revisions;
 7. matched prior-alignment x family-disclosure design.
 
 The caption must state that most individual components already exist and that
@@ -127,7 +127,7 @@ representations differ and must be unified for a pure disclosure contrast.
 
 ### Table 3 — Development-run accounting (required for any empirical draft)
 
-Rows: scheduled, evaluated terminal, valid final, active pass, generation
+Rows: scheduled, evaluated terminal, valid final, held-out prediction success, generation
 failure, protocol rejection, scientific failure. Columns: overall and four
 cells. Report counts before percentages and include the one-format-regeneration
 profile in the caption.
@@ -157,4 +157,3 @@ claim boundary easy to audit.
   scientific source rejection, deterministic filter rejection, reviewer pause,
   and infrastructure failure. These categories must never be collapsed into
   “paper was not authorable.”
-

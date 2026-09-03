@@ -1,11 +1,11 @@
-"""Small, family-neutral executable expression contract for discovery cases.
+"""Small executable expression contract shared across benchmark families.
 
 The representation is deliberately an arithmetic tree rather than Python.
 Constants are JSON numbers, variables are
 ``{"var": "public_control_name"}``, and operations are
 ``{"op": "...", "args": [...]}``.  Source templates may additionally use
 ``{"param": "source_parameter_name"}`` when the validator is explicitly
-given an allowed parameter set; ordinary executable discovery programs retain
+given an allowed parameter set; ordinary executable predictor programs retain
 the historical materialized-expression behavior by default.  A program maps
 public readout names to expressions through ``{"outputs": {...}}``.
 """
@@ -37,7 +37,7 @@ EXPRESSION_OPERATORS = tuple(EXPRESSION_OPERATOR_ARITIES)
 
 
 class ExpressionError(ValueError):
-    """A discovery expression is malformed or cannot be evaluated."""
+    """An executable expression is malformed or cannot be evaluated."""
 
 
 def _number(value: Any, path: str) -> float:
@@ -233,7 +233,7 @@ def evaluate_expression_program(
     allowed_variables: Optional[Sequence[str]] = None,
     required_outputs: Optional[Sequence[str]] = None,
 ) -> Dict[str, float]:
-    """Validate and execute a discovery expression for one intervention."""
+    """Validate and execute a predictor expression for one intervention."""
 
     validate_expression_program(
         parameters,

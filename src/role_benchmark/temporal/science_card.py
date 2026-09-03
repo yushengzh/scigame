@@ -1,4 +1,4 @@
-"""Strict, source-grounded intermediate representation for one scientific paper.
+"""Strict intermediate representation supported by evidence from one paper.
 
 The science card records what the paper says before any benchmark world is
 authored.  It deliberately contains no Player prompt, counterfactual, episode
@@ -409,7 +409,7 @@ def _domain_fields(
         if not statement:
             _error(
                 path + ".domain_statement",
-                "%s requires a source-grounded description" % kind,
+                "%s requires a description supported by source evidence" % kind,
             )
     return item, kind, minimum, maximum, allowed_values, statement
 

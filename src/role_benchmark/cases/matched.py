@@ -30,6 +30,10 @@ from role_benchmark.models import (
     ReadoutSpec,
     ResourceCatalog,
 )
+from role_benchmark.metrics import (
+    HELD_OUT_PREDICTION_SCORE,
+    held_out_prediction_score,
+)
 from role_benchmark.protocols import BenchmarkCase, FinalEvaluator, WorldModel
 
 
@@ -55,7 +59,7 @@ class SourceCredit:
 
 @dataclass(frozen=True)
 class MatchedTruth:
-    """One private world law in both supported submission representations."""
+    """One private world law with its executable predictor fixture."""
 
     parameters: Mapping[str, float]
     discovery_outputs: Mapping[str, Any]
@@ -285,6 +289,21 @@ def _scaled_error(
 
 
 def _resources(spec: MatchedFamilySpec, track: BenchmarkTrack) -> ResourceCatalog:
+    required_outputs = ", ".join(readout.name for readout in spec.readouts)
+    submission_note = (
+        "Submit an executable predictor. FinalSubmission.model must equal '%s'. "
+        "FinalSubmission.parameters must equal {'outputs': {READOUT: EXPR, ...}} "
+        "with exactly these readouts: %s. EXPR is the expression format shared "
+        "across all benchmark families: a JSON arithmetic tree over public "
+        "controls. Materialize fitted constants "
+        "as finite JSON numbers. Supported operators are: %s."
+        % (
+            EXPRESSION_MODEL,
+            required_outputs,
+            ", ".join(EXPRESSION_OPERATORS),
+        )
+    )
+    notes = spec.common_fixed_conditions + spec.common_notes + (submission_note,)
     if track is BenchmarkTrack.IDENTIFICATION:
         parameter_contract = "; ".join(
             "%s: %s (unit: %s; admissible: %s)"
@@ -296,31 +315,16 @@ def _resources(spec: MatchedFamilySpec, track: BenchmarkTrack) -> ResourceCatalo
             )
             for parameter in spec.identification_parameter_specs
         )
-        submission_note = (
-            "FinalSubmission.model must equal '%s'. "
-            "FinalSubmission.parameters must contain exactly %s. Candidate law: %s "
-            "Parameter meanings and admissible domains: %s"
+        model_specification = (
+            "Model specification: %s. Equation: %s Parameter meanings and "
+            "admissible domains: %s"
             % (
                 spec.identification_model,
-                ", ".join(spec.identification_parameters),
                 spec.identification_formula,
                 parameter_contract,
             )
         )
-    else:
-        required_outputs = ", ".join(readout.name for readout in spec.readouts)
-        submission_note = (
-            "FinalSubmission.model must equal '%s'. "
-            "FinalSubmission.parameters must equal {'outputs': {READOUT: EXPR, ...}} "
-            "with exactly these readouts: %s. EXPR is the shared family-neutral "
-            "JSON arithmetic tree over public controls. Supported operators are: %s. "
-            "No candidate law family or truth-specific parameter slots are supplied."
-            % (
-                EXPRESSION_MODEL,
-                required_outputs,
-                ", ".join(EXPRESSION_OPERATORS),
-            )
-        )
+        notes += (model_specification,)
     return ResourceCatalog(
         instruments=(
             InstrumentSpec(
@@ -333,7 +337,7 @@ def _resources(spec: MatchedFamilySpec, track: BenchmarkTrack) -> ResourceCatalo
         controls=spec.controls,
         readouts=spec.readouts,
         max_replicates=spec.max_replicates,
-        notes=spec.common_fixed_conditions + spec.common_notes + (submission_note,),
+        notes=notes,
     )
 
 
@@ -400,55 +404,30 @@ class MatchedWorldModel(WorldModel):
 
 
 class MatchedEvaluator(FinalEvaluator):
-    """Score both tracks on the same private held-out interventions."""
+    """Score both tracks through one executable-predictor evaluation path."""
 
     def __init__(
         self,
         spec: MatchedFamilySpec,
         truth: MatchedTruth,
-        track: BenchmarkTrack,
     ) -> None:
         self._spec = spec
         self._truth = truth
-        self._track = track
 
     def _failure(self, message: str) -> EvaluationResult:
         return EvaluationResult(
             success=False,
-            scores={"predictive_model_pass": 0.0},
+            scores={
+                "predictive_model_pass": 0.0,
+                HELD_OUT_PREDICTION_SCORE: 0.0,
+            },
             message=message,
         )
 
     def evaluate(self, submission: FinalSubmission) -> EvaluationResult:
-        identification_parameters: Dict[str, float] = {}
-        if self._track is BenchmarkTrack.IDENTIFICATION:
-            if submission.model != self._spec.identification_model:
-                return self._failure(
-                    "Unsupported structured model for the identification track.",
-                )
-            if set(submission.parameters) != set(
-                self._spec.identification_parameters
-            ):
-                return self._failure(
-                    "Identification parameters must match the public contract exactly.",
-                )
-            try:
-                identification_parameters = {
-                    name: _finite_number(submission.parameters[name], name)
-                    for name in self._spec.identification_parameters
-                }
-            except ValueError as exc:
-                return self._failure(str(exc))
-            for parameter in self._spec.identification_parameter_specs:
-                value = identification_parameters[parameter.name]
-                if not parameter.contains(value):
-                    return self._failure(
-                        "Identification parameter %s is outside its public admissible domain."
-                        % parameter.name
-                    )
-        elif submission.model != EXPRESSION_MODEL:
+        if submission.model != EXPRESSION_MODEL:
             return self._failure(
-                "Unsupported structured model for the discovery track.",
+                "The final model must use the public executable expression representation.",
             )
 
         scaled_errors = []
@@ -459,17 +438,12 @@ class MatchedEvaluator(FinalEvaluator):
             controls = _validated_controls(self._spec, condition)
             targets = _predictions(self._spec, self._truth.parameters, controls)
             try:
-                if self._track is BenchmarkTrack.IDENTIFICATION:
-                    predictions = _identification_predictions(
-                        self._spec, identification_parameters, controls
-                    )
-                else:
-                    predictions = evaluate_expression_program(
-                        submission.parameters,
-                        controls,
-                        allowed_variables=tuple(controls),
-                        required_outputs=tuple(per_readout),
-                    )
+                predictions = evaluate_expression_program(
+                    submission.parameters,
+                    controls,
+                    allowed_variables=tuple(controls),
+                    required_outputs=tuple(per_readout),
+                )
             except (ExpressionError, ValueError) as exc:
                 return self._failure(str(exc))
             for readout, target in targets.items():
@@ -489,18 +463,13 @@ class MatchedEvaluator(FinalEvaluator):
         success = maximum_error <= 1.0
         scores: Dict[str, float] = {
             "predictive_model_pass": float(success),
+            HELD_OUT_PREDICTION_SCORE: held_out_prediction_score(scaled_errors),
             "hidden_test_mean_scaled_error": sum(scaled_errors)
             / len(scaled_errors),
             "hidden_test_max_scaled_error": maximum_error,
         }
         for readout, errors in per_readout.items():
             scores["%s_max_scaled_error" % readout] = max(errors)
-        if self._track is BenchmarkTrack.IDENTIFICATION:
-            truth_values = _identification_values(self._truth)
-            for name, value in identification_parameters.items():
-                scores["%s_absolute_error" % name] = abs(
-                    value - truth_values[name]
-                )
         return EvaluationResult(
             success=success,
             scores=scores,
@@ -547,7 +516,7 @@ def make_matched_case(
     return BenchmarkCase(
         definition=definition,
         world_model=MatchedWorldModel(spec, truth),
-        evaluator=MatchedEvaluator(spec, truth, track),
+        evaluator=MatchedEvaluator(spec, truth),
     )
 
 
@@ -560,18 +529,14 @@ def truth_submission(
 
     if world not in MATCHED_WORLDS:
         raise ValueError("unknown world %r" % world)
+    if not isinstance(track, BenchmarkTrack):
+        raise ValueError("track must be a BenchmarkTrack")
     truth = spec.truths[world]
-    if track is BenchmarkTrack.IDENTIFICATION:
-        model = spec.identification_model
-        parameters: Mapping[str, Any] = dict(_identification_values(truth))
-    else:
-        model = EXPRESSION_MODEL
-        parameters = {"outputs": dict(truth.discovery_outputs)}
     return FinalSubmission(
         hypothesis_id="H1",
         explanation="Development truth fixture for protocol validation.",
-        model=model,
-        parameters=parameters,
+        model=EXPRESSION_MODEL,
+        parameters={"outputs": dict(truth.discovery_outputs)},
     )
 
 
@@ -602,7 +567,7 @@ def validate_matched_family_spec(spec: MatchedFamilySpec) -> None:
             not readout.statistic or not readout.uncertainty
         ):
             raise ValueError(
-                "source-grounded readouts need statistic and uncertainty semantics"
+                "readouts derived from source evidence need statistic and uncertainty semantics"
             )
     if not spec.identification_model or not spec.identification_parameter_specs:
         raise ValueError("identification contract must be explicit")

@@ -1,9 +1,9 @@
-import math
 import unittest
 from dataclasses import replace
 
 from role_benchmark import BenchmarkTrack as PublicBenchmarkTrack
-from role_benchmark.cases import make_pendulum_case
+from role_benchmark.cases import PENDULUM_SPEC, make_pendulum_case
+from role_benchmark.cases.matched import truth_submission
 from role_benchmark.models import (
     BenchmarkTrack,
     CaseDefinition,
@@ -223,14 +223,10 @@ class CaseFactoryTest(unittest.TestCase):
 
     def test_pendulum_metric_names_predictive_success_and_failures(self):
         evaluator = make_pendulum_case("historical").evaluator
-        correct = FinalSubmission(
-            explanation="A structured predictive model.",
-            model="normalized_power_law",
-            parameters={
-                "reference_period_s": 2.0 * math.pi * math.sqrt(1.0 / 9.80665),
-                "length_exponent": 0.5,
-                "mass_exponent": 0.0,
-            },
+        correct = truth_submission(
+            PENDULUM_SPEC,
+            "historical",
+            BenchmarkTrack.IDENTIFICATION,
         )
         submissions = (
             (correct, True),
@@ -239,17 +235,18 @@ class CaseFactoryTest(unittest.TestCase):
                 False,
             ),
             (
-                replace(correct, parameters={"reference_period_s": 2.0}),
+                replace(
+                    correct,
+                    parameters={
+                        "outputs": {"period_s": {"var": "unknown_control"}}
+                    },
+                ),
                 False,
             ),
             (
                 replace(
                     correct,
-                    parameters={
-                        "reference_period_s": 2.0,
-                        "length_exponent": 10000.0,
-                        "mass_exponent": 0.0,
-                    },
+                    parameters={"outputs": {"period_s": 0.0}},
                 ),
                 False,
             ),

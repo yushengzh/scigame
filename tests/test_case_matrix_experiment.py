@@ -14,6 +14,8 @@ from unittest import mock
 from role_benchmark import (
     BenchmarkTrack,
     EVALUATOR_SCORE_AXES,
+    EVALUATION_METHODS,
+    FIXED_EXPERIMENTAL_DESIGN,
     FinalSubmission,
     GenerationResponse,
     JSONLRunLog,
@@ -24,13 +26,18 @@ from role_benchmark.temporal_cases import TEMPORAL_CASE_FAMILIES
 
 from experiments.run_case_matrix import (
     CASE_FAMILIES,
+    CONDITIONS,
+    COUNTERFACTUAL_DIFFICULTIES,
     DEFAULT_SCHEDULE_SEED,
+    DETERMINISTIC_ORACLE,
     EPISODE_RESULT_SCHEMA,
     EXPERIMENT_SCHEMA,
     MATCHED_FAMILIES,
+    LLM_PRESENTATION_ORACLE,
     OPENAI_API_KEY_ENV,
     OPENAI_ENDPOINT,
     TOTAL_EPISODES,
+    TASK_SETTINGS,
     CaseMatrixDeepSeekBackend,
     _config_payload,
     _evaluated_result,
@@ -39,6 +46,7 @@ from experiments.run_case_matrix import (
     _resolve_api_key,
     _resolve_api_keys,
     _run_evaluator,
+    _run_one_episode,
     _runtime_profile,
     build_plan,
     load_backends,
@@ -55,10 +63,12 @@ from experiments.openai_responses import OpenAIResponsesBackend
 def _args(output_dir):
     return argparse.Namespace(
         output_dir=str(output_dir),
+        experiment_id="EXP-TEST-001",
         case_pack="curated",
         player_provider="deepseek",
         player_endpoint="https://player.invalid/chat/completions",
         player_model="deepseek-v4-flash",
+        player_snapshot_id="unknown",
         player_thinking="disabled",
         player_reasoning_effort=None,
         player_timeout_s=1.0,
@@ -69,6 +79,7 @@ def _args(output_dir):
         oracle_provider="deepseek",
         oracle_endpoint="https://oracle.invalid/chat/completions",
         oracle_model="deepseek-v4-flash",
+        oracle_snapshot_id="unknown",
         oracle_thinking="disabled",
         oracle_reasoning_effort=None,
         oracle_timeout_s=2.0,
@@ -79,6 +90,7 @@ def _args(output_dir):
         evaluator_provider="deepseek",
         evaluator_endpoint="https://evaluator.invalid/chat/completions",
         evaluator_model="deepseek-v4-flash",
+        evaluator_snapshot_id="unknown",
         evaluator_thinking="disabled",
         evaluator_reasoning_effort=None,
         evaluator_timeout_s=3.0,
@@ -87,10 +99,14 @@ def _args(output_dir):
         evaluator_prompt_api_key=False,
         evaluator_api_key_env="EVALUATOR_API_KEY",
         family=None,
-        world=None,
-        track=None,
+        variant=None,
+        condition=None,
+        task_setting=None,
+        evaluation_method=None,
         repeat=None,
+        repeats=5,
         schedule_seed=DEFAULT_SCHEDULE_SEED,
+        oracle_mode=DETERMINISTIC_ORACLE,
         player_max_output_tokens=8192,
         max_repair_attempts=1,
         oracle_max_output_tokens=256,
@@ -218,7 +234,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 config["design"]["case_families"],
                 list(TEMPORAL_CASE_FAMILIES),
             )
-            cells_per_repeat = len(TEMPORAL_CASE_FAMILIES) * 4
+            cells_per_repeat = len(TEMPORAL_CASE_FAMILIES) * 4 * 3
             total_episodes = cells_per_repeat * 5
             self.assertEqual(
                 config["design"]["cells_per_repeat"], cells_per_repeat
@@ -230,6 +246,69 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             self.assertEqual(
                 len(config["schedule"]["execution_order"]), total_episodes
             )
+            temporal_conditions = config["design"]["condition_semantics"][
+                TEMPORAL_CASE_FAMILIES[0]
+            ]["source_reported_v1"]
+            self.assertEqual(
+                [item["condition_role"] for item in temporal_conditions],
+                ["source_reported", "source_reported"],
+            )
+            self.assertIsNone(config["design"]["counterfactual_difficulty"])
+            self.assertNotIn("worlds", config["design"])
+            self.assertNotIn("tracks", config["design"])
+
+    def test_authored_temporal_counterfactual_pack_is_separate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = _args(root)
+            args.case_pack = "temporal_counterfactual"
+            args.repeats = 1
+            args.dry_run = True
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_matrix(args)
+
+            config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                config["design"]["counterfactual_difficulty"]["levels"],
+                ["easy", "hard"],
+            )
+            self.assertTrue(
+                config["design"]["counterfactual_difficulty"][
+                    "temporal_source_conditions_unchanged"
+                ]
+            )
+            self.assertTrue(
+                all(
+                    descriptor["dataset_kind"] == "historical_counterfactual"
+                    for variants in config["design"]["condition_semantics"].values()
+                    for descriptors in variants.values()
+                    for descriptor in descriptors
+                )
+            )
+
+    def test_cli_selectors_define_the_frozen_design(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = _args(root)
+            args.family = ["pendulum"]
+            args.variant = ["hard"]
+            args.condition = ["counterfactual"]
+            args.task_setting = ["discovery"]
+            args.evaluation_method = [FIXED_EXPERIMENTAL_DESIGN]
+            args.repeats = 2
+            args.dry_run = True
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_matrix(args)
+
+            config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["experiment_id"], "EXP-TEST-001")
+            self.assertEqual(config["design"]["case_families"], ["pendulum"])
+            self.assertEqual(config["design"]["task_settings"], ["discovery"])
+            self.assertEqual(
+                config["design"]["evaluation_methods"],
+                [FIXED_EXPERIMENTAL_DESIGN],
+            )
+            self.assertEqual(config["design"]["total_episodes"], 2)
 
     def test_plan_has_exact_family_counts_and_repeat_blocks(self):
         plan = build_plan()
@@ -241,18 +320,27 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         )
         self.assertEqual(
             [sum(spec.repeat == repeat for spec in plan) for repeat in range(1, 6)],
-            [80, 80, 80, 80, 80],
+            [480, 480, 480, 480, 480],
         )
 
         family_counts = Counter(spec.case_family for spec in plan)
         for family in MATCHED_FAMILIES:
-            self.assertEqual(family_counts[family], 20)
+            self.assertEqual(family_counts[family], 120)
 
         matched_cells = {
-            (family, world, track)
+            (
+                family,
+                variant,
+                condition,
+                condition,
+                task_setting,
+                evaluation_method,
+            )
             for family in MATCHED_FAMILIES
-            for world in ("historical", "counterfactual")
-            for track in ("identification", "discovery")
+            for variant in COUNTERFACTUAL_DIFFICULTIES
+            for condition in CONDITIONS
+            for task_setting in TASK_SETTINGS
+            for evaluation_method in EVALUATION_METHODS
         }
         for repeat in range(1, 6):
             block = [spec for spec in plan if spec.repeat == repeat]
@@ -280,7 +368,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         selected = select_plan(
             first,
             families=["young_double_slit"],
-            tracks=["discovery"],
+            task_settings=["discovery"],
         )
         self.assertEqual(
             selected,
@@ -288,21 +376,33 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 spec
                 for spec in first
                 if spec.case_family == "young_double_slit"
-                and spec.track == "discovery"
+                and spec.task_setting == "discovery"
             ],
         )
-        self.assertEqual(len(select_plan(first, repeats=[1])), 80)
-        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 240)
+        self.assertEqual(len(select_plan(first, repeats=[1])), 480)
+        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 1440)
+        self.assertEqual(
+            len(
+                select_plan(
+                    first,
+                    evaluation_methods=[EVALUATION_METHODS[0]],
+                )
+            ),
+            800,
+        )
 
     def test_every_declared_cell_instantiates_through_the_generic_factory(self):
         unique = {}
         for spec in build_plan():
             unique.setdefault(spec.cell, spec)
-        self.assertEqual(len(unique), 80)
+        self.assertEqual(len(unique), 480)
         for spec in unique.values():
             with self.subTest(cell=spec.cell):
                 case = _make_case(spec)
-                self.assertIs(case.definition.track, BenchmarkTrack(spec.track))
+                self.assertIs(
+                    case.definition.track,
+                    BenchmarkTrack(spec.task_setting),
+                )
 
     def test_backend_instances_are_independent_and_reuse_shared_transport(self):
         self.assertTrue(issubclass(CaseMatrixDeepSeekBackend, DeepSeekChatBackend))
@@ -365,6 +465,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
     def test_openai_config_records_effective_transport_without_credential(self):
         with tempfile.TemporaryDirectory() as directory:
             args = _args(directory)
+            args.oracle_mode = LLM_PRESENTATION_ORACLE
             for role in ("player", "oracle", "evaluator"):
                 setattr(args, role + "_provider", "openai")
                 setattr(args, role + "_endpoint", None)
@@ -404,8 +505,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             ):
                 self.assertNotIn(secret, serialized)
             self.assertNotIn("api_key", serialized.lower())
-            self.assertEqual(config["schedule"]["block_sizes"], [80] * 5)
-            self.assertEqual(len(config["schedule"]["execution_order"]), 400)
+            self.assertEqual(config["schedule"]["block_sizes"], [480] * 5)
+            self.assertEqual(len(config["schedule"]["execution_order"]), 2400)
             prepare_output(root, config)
             stored = (root / "config.json").read_text(encoding="utf-8")
             for secret in (
@@ -445,10 +546,83 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             )
             self.assertIsNone(player_failure["final_submission"])
 
-    def test_repeat_one_dispatches_eighty_cells_and_player_failures_continue(self):
+    def test_fixed_method_dispatches_frozen_observations_through_same_runner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "episodes").mkdir()
+            args = _args(root)
+            spec = next(
+                item
+                for item in build_plan()
+                if item.evaluation_method == FIXED_EXPERIMENTAL_DESIGN
+            )
+            with mock.patch(
+                "experiments.run_case_matrix.run_llm_episode",
+                return_value=_fake_run(spec),
+            ) as run:
+                result = _run_one_episode(
+                    args,
+                    player_backend=SimpleNamespace(generate=mock.Mock()),
+                    oracle_backend=None,
+                    output_dir=root,
+                    spec=spec,
+                    log_path=root / "episodes" / (spec.episode_id + ".jsonl"),
+                )
+
+        positional = run.call_args.args
+        keyword = run.call_args.kwargs
+        budget = keyword["observation_budget"]
+        self.assertEqual(spec.evaluation_method, result["evaluation_method"])
+        self.assertEqual(result["observation_budget"], budget)
+        self.assertEqual(keyword["initial_attempts_used"], budget)
+        self.assertIs(keyword["require_budget_exhaustion"], True)
+        self.assertEqual(
+            len(keyword["run_metadata"]["fixed_observations"]),
+            budget,
+        )
+        self.assertEqual(
+            keyword["run_metadata"]["evaluation_method"],
+            FIXED_EXPERIMENTAL_DESIGN,
+        )
+        self.assertIsNone(keyword["oracle_backend"])
+        self.assertIsNone(keyword["oracle_config"])
+        self.assertEqual(result["oracle_mode"], DETERMINISTIC_ORACLE)
+        self.assertEqual(result["oracle_provider"], "deterministic")
+        self.assertNotIn("world", keyword["run_metadata"])
+        self.assertNotIn("track", keyword["run_metadata"])
+        self.assertGreaterEqual(positional[1].definition.budget, budget)
+
+    def test_llm_presentation_oracle_is_an_explicit_optional_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "episodes").mkdir()
+            args = _args(root)
+            args.oracle_mode = LLM_PRESENTATION_ORACLE
+            spec = build_plan()[0]
+            oracle_backend = SimpleNamespace(generate=mock.Mock())
+            with mock.patch(
+                "experiments.run_case_matrix.run_llm_episode",
+                return_value=_fake_run(spec),
+            ) as run:
+                result = _run_one_episode(
+                    args,
+                    player_backend=SimpleNamespace(generate=mock.Mock()),
+                    oracle_backend=oracle_backend,
+                    output_dir=root,
+                    spec=spec,
+                    log_path=root / "episodes" / (spec.episode_id + ".jsonl"),
+                )
+
+        self.assertIs(run.call_args.kwargs["oracle_backend"], oracle_backend)
+        self.assertIsNotNone(run.call_args.kwargs["oracle_config"])
+        self.assertEqual(result["oracle_mode"], LLM_PRESENTATION_ORACLE)
+        self.assertEqual(result["oracle_provider"], "deepseek")
+
+    def test_repeat_one_dispatches_all_method_cells_and_player_failures_continue(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             args = _args(root)
+            args.family = ["pendulum"]
             args.repeat = [1]
             observed = []
 
@@ -473,9 +647,11 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             ), contextlib.redirect_stdout(io.StringIO()):
                 results = run_matrix(args, **_runtime_keys())
 
-            selected = select_plan(build_plan(), repeats=[1])
+            selected = select_plan(
+                build_plan(families=("pendulum",)), repeats=[1]
+            )
             self.assertEqual(observed, [spec.episode_id for spec in selected])
-            self.assertEqual(len(observed), 80)
+            self.assertEqual(len(observed), 24)
             first = next(
                 result for result in results if result["episode_id"] == observed[0]
             )
@@ -498,8 +674,11 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             args = _args(root)
+            args.family = ["pendulum"]
             args.repeat = [1]
-            first_spec = select_plan(build_plan(), repeats=[1])[0]
+            first_spec = select_plan(
+                build_plan(families=("pendulum",)), repeats=[1]
+            )[0]
 
             def fail(*unused_args, **kwargs):
                 kwargs["log_path"].write_text("failed\n", encoding="utf-8")

@@ -740,7 +740,7 @@ def filter_candidate(candidate: TemporalCaseCandidate) -> FilterResult:
             )
 
     # A dual-track candidate is not admissible unless the two private laws can
-    # be projected to one world-neutral Identification scaffold.  The deferred
+    # be projected to one condition-independent Identification scaffold.  The deferred
     # import avoids making the renderer part of basic candidate decoding.
     if not issues:
         from .render import (  # pylint: disable=import-outside-toplevel

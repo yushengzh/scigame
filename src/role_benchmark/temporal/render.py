@@ -23,7 +23,7 @@ from .filter import IneligibleCandidateError, filter_candidate, materialize_outp
 
 @dataclass(frozen=True)
 class TemporalIdentificationContract:
-    """A world-neutral scalar-parameter scaffold shared by both active laws.
+    """A condition-independent scalar-parameter scaffold shared by both laws.
 
     This is a representational contract for the Identification track.  It does
     not claim that every exposed scalar is statistically identifiable under a
@@ -301,7 +301,7 @@ def build_identification_contract(
                         "active identification branch references an unknown source parameter"
                     ) from exc
                 if left_value == right_value:
-                    # A scalar that is fixed in both source-grounded worlds is
+                    # A scalar that is fixed in both source-reported conditions is
                     # part of the common public model, not an unknown mechanism
                     # coordinate.  Keeping it as a free slot creates artificial
                     # non-identifiability without adding scientific signal.

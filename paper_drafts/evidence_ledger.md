@@ -16,7 +16,7 @@ variants in this directory.
 | A7 | The primary deterministic outcome is `predictive_model_pass`, based on numerical prediction at held-out interventions. Natural-language explanation and scope are currently unscored. | `docs/evaluation_policy.md`, lines 151–185 | “Primary outcome: held-out predictive pass.” Never use the removed name `explanation_correct`. |
 | A8 | Every experiment action contains at least two named hypotheses and an ex-ante numeric forecast for every requested readout under every current hypothesis. `OTHER` is disallowed. | `src/role_benchmark/models.py`; `src/role_benchmark/llm.py`; evaluation policy, lines 34–38 and 193–197 | “The protocol records explicit competing hypotheses and forecasts before evidence is returned.” |
 | A9 | Outcome, protocol completion, forecast separation, and evidence-aligned support movement are separate quantities; process diagnostics do not alter predictive pass. | `src/role_benchmark/trajectory.py`; evaluation policy, lines 187–212 and 237–271 | Do not call forecast separation expected information gain or confidences Bayesian posteriors. |
-| A10 | The current formal private pack contains zero families and zero cells. Formal use requires the active truth, evaluator, and held-out conditions to remain outside the Player process. | `docs/evaluation_policy.md`, lines 273–299 | “Public development evaluation,” never “formal/private benchmark result.” |
+| A10 | The current private test set contains zero families and zero cells. Formal use requires the active data-generating process, evaluation procedure, and held-out conditions to remain outside the Player process. | `docs/evaluation_policy.md`, lines 273–299 | “Public development evaluation,” never “formal/private benchmark result.” |
 | A11 | The provider-neutral adapter, strict action decoding, ordinary JSONL events, and replay paths are implemented. | `src/role_benchmark/llm.py`, `wire.py`, `runlog.py`, `runner.py`; `README.md` | These are implementation properties, not the paper's scientific novelty. |
 | A12 | On this snapshot, `PYTHONPATH=src python3 -m unittest discover -s tests -q` ran 226 tests successfully. | Local verification on 2026-08-26 | “The current implementation passes 226 unit tests.” This does not establish benchmark validity. |
 
@@ -34,7 +34,7 @@ Oracle LLM did not determine measurements.
 | --- | ---: | ---: |
 | Evaluated terminal outcomes | 80 / 80 completed cells | 100% of the completed block |
 | Protocol-valid submissions | 50 / 80 | 62.5% |
-| Unconditional active passes | 21 / 80 | 26.25% |
+| Unconditional held-out prediction successes | 21 / 80 | 26.25% |
 | Passes conditional on a valid submission | 21 / 50 | 42.0% |
 | Player output invalid after enabled calls | 20 / 80 | 25.0% |
 | Decoded action rejected by protocol | 10 / 80 | 12.5% |
@@ -140,4 +140,3 @@ The following claims are prohibited in the current drafts:
    report coverage/reliability rather than only aggregate scores.
 7. For formal claims, deploy a private case service and private variants whose
    truths and held-out conditions are inaccessible to the Player process.
-

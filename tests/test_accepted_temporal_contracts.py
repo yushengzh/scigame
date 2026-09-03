@@ -1,4 +1,4 @@
-"""Acceptance contracts for the source-reviewed temporal cohort."""
+"""Acceptance contracts for the temporal cohort reviewed against its sources."""
 
 from __future__ import annotations
 
@@ -127,7 +127,7 @@ class AcceptedTemporalContractTests(unittest.TestCase):
                 hidden = {condition_key(item) for item in spec.hidden_conditions}
                 self.assertFalse(diagnostic & hidden)
 
-    def test_truth_passes_false_twin_fails_and_nonfinite_input_is_rejected(self):
+    def test_truth_passes_false_twin_fails_and_nonfinite_expression_is_rejected(self):
         for family, spec in self.specs:
             for world, twin in (
                 ("historical", "counterfactual"),
@@ -143,19 +143,18 @@ class AcceptedTemporalContractTests(unittest.TestCase):
                             evaluator.evaluate(truth_submission(spec, twin, track)).success
                         )
 
-                identification = make_matched_case(
-                    spec, world, BenchmarkTrack.IDENTIFICATION
-                )
                 submission = truth_submission(
                     spec, world, BenchmarkTrack.IDENTIFICATION
                 )
-                invalid = dict(submission.parameters)
-                invalid[spec.identification_parameters[0]] = math.inf
-                result = identification.evaluator.evaluate(
-                    replace(submission, parameters=invalid)
-                )
-                self.assertFalse(result.success)
-                self.assertIn("finite", result.message)
+                with self.assertRaisesRegex(ValueError, "finite"):
+                    replace(
+                        submission,
+                        parameters={
+                            "outputs": {
+                                spec.readouts[0].name: math.inf,
+                            }
+                        },
+                    )
 
     def test_world_model_is_track_invariant_and_matches_private_predictor(self):
         for family, spec in self.specs:

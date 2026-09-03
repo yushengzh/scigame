@@ -1,4 +1,4 @@
-# From Recent Papers to Executable Experimental Worlds: A Source-Grounded Authoring Pipeline and Its Failure Modes
+# Constructing Executable Experimental Environments from Recent Papers
 
 **Working paper draft C — benchmark-authoring alternative.** This draft reports
 the current negative result. It is not ready for a main-conference submission
@@ -11,12 +11,12 @@ benchmarks, but a paper does not directly define an interactive environment.
 Turning a published result into a case requires selecting manipulable controls,
 operational readouts, fixed conditions, an executable response, and a valid
 evaluation domain without adding facts that the source does not support. We
-present a source-grounded authoring pipeline that separates record acquisition,
+present a paper-derived task-construction pipeline that separates record acquisition,
 scientific evidence extraction, case design, deterministic validation, and
 scientific review. A fixed journal record is resolved to a versioned arXiv TeX
 source. One language-model call proposes a line-anchored private `ScienceCard`;
 after independent source review, a second call sees only the reviewed card and
-may propose a matched case. Deterministic checks enforce source lineage,
+may propose a matched-pairs task family. Deterministic checks enforce source provenance,
 Player–Oracle information boundaries, executability, and distinguishability;
 an independent family review precedes template-based rendering. The language
 model proposes structured artifacts but never serves as scientific authority.
@@ -71,7 +71,7 @@ We implement a staged pipeline around this rule. Structured metadata and
 identity resolution use deterministic code. A first language-model call maps
 line-numbered TeX into a private evidence graph. A scientific reviewer decides
 whether that graph supports a compatible pair of response branches. Only then
-does a second language-model call propose a matched case from the reviewed
+does a second language-model call propose a matched-pairs task family from the reviewed
 card. Deterministic validation and a second source review precede rendering.
 The episode benchmark itself still has only Player and Oracle roles; authoring
 models operate offline.
@@ -217,7 +217,7 @@ asserted field and whether a pair of claims defines executable response branches
 over a common active domain. The model's own readiness field is a triage hint,
 not an admission decision.
 
-### 4.3 Stage 2: matched case proposal
+### 4.3 Stage 2: matched-pairs task-family proposal
 
 Only a reviewed, reviewer-selected evidence cluster enters stage 2. The second
 model does not receive the paper text and cannot cite source lines absent from
@@ -235,7 +235,7 @@ cluster.
 The hard filter checks exact lineage, identifier syntax, operator support,
 finite evaluation, parameter use, shared public interfaces, one declared branch
 difference, and budget-feasible distinguishability in both directions. Hidden
-tests must reject each world's false twin. A second independent review checks
+tests must reject the predictor from the paired condition. A second independent review checks
 that the full family remains supported by the cited source after transformation.
 
 Only an accepted draft is rendered through a fixed template into an importable
@@ -334,7 +334,7 @@ exists.
 
 ### Shared domain is an executable requirement
 
-Two reported regimes do not automatically form a matched case. Both branches
+Two reported regimes do not automatically form a matched-pairs task family. Both branches
 must answer the same allowed interventions over a common nonzero domain under
 compatible fixed conditions. Otherwise, the Oracle requires interpolation or
 extrapolation that the source never authorizes.

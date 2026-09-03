@@ -9,17 +9,26 @@ Player 是接受测评的 LLM。它根据有限背景提出多个工作假设与
 本框架承载两个不同的评测构念：
 
 - `identification`：公开完整模型族，在有限主动实验下估计未知参数；
-- `discovery`：不公开真值特有的函数族，以统一、family-neutral 的表示提交可执行 predictor，并按声明评测域内的未见干预评分。
+- `discovery`：不公开目标函数族，以所有 task families 共用的表示提交可执行 predictor，并按声明评测域内的 held-out interventions 评分。
 
-公开有限候选族内的选择归入受约束的 identification，不称为 blind-family discovery。当前有 20 个内置 historical families 和 9 个独立注册的 temporal families；每个 family 都有 historical/counterfactual 两个 worlds，每个 world 又暴露为 `IDENTIFICATION` 或 `DISCOVERY`，合计 29 个 families、116 个 public development cells。Discovery 只公开 track-wide 的 family-neutral `expression` 表示，不公开真值特有的模型族或参数槽位。这些 case 的 truth 和 evaluator 均随源码公开；它们都是 transparent development fixtures，不是私有正式评测包。当前 formal private pack 数量为 0。
+公开有限候选族内的选择归入受约束的 identification，不称为 scientific law discovery。当前有 20 个内置 Historical/Counterfactual（H/C）task families，共 80 个公开 development instances；另有 9 个独立注册的 Temporal task families，每个 family 含两个 source-reported conditions，共 36 个公开 development instances。Temporal 的两个 conditions 不是 H/C conditions。每个 condition 均有 `IDENTIFICATION` 和 `DISCOVERY` 两种 task settings，因此合计为 29 个 task families、116 个公开 development instances。Discovery 只公开所有 task families 共用的 `expression` 表示，不公开目标 model class 或 parameter slots。这些 benchmark instances 的 data-generating processes 和 evaluation procedures 均随源码公开，因此属于 public development set，不是 private test set。当前 private test set 数量为 0。
 
-当前冻结的确定性 evaluator 只判断结构化 predictor 是否通过预定义 hidden interventions；这不要求逐字恢复 author-side 完整公式，也不能由有限测试证明全域规律等价。每次实验还必须预注册各活动假设的数值 forecast；episode 结束后，框架机械计算预测分离度和 evidence-aligned support-weight movement，并分报 aligned、inert、opposed、非区分性证据后的无支持变化等 `trajectory_scores`。自然语言 hypotheses 未必互斥完备，因此归一化 `confidence` 只视为 Player 报告的支持权重，不宣称 Bayesian posterior。可选的 post-hoc LLM Evaluator 会另行报告过程/结果诊断，但绝不覆盖确定性 `predictive_model_pass`；这些 Judge 轴在完成人工校准前属于 exploratory metrics。历史发现可以提供背景、仪器与问题，但只要允许历史上没有实际执行过的新实验，case 就是一个受历史约束的理想化实验世界，而不是历史档案的逐字重放。
+当前主要结果变量是连续的 held-out prediction score：先用每个 readout 的 absolute tolerance 与 relative tolerance 缩放 held-out absolute error，再计算 `1 / (1 + mean scaled error)`；取值范围为 `[0,1]`，越高越好。二元 `predictive_model_pass`、protocol completion 和过程诊断均单独报告，不替代连续主指标。该评分不要求逐字恢复 benchmark reference 的完整公式，也不能由有限测试证明全域规律等价。每次实验还必须预注册各活动假设的数值 forecast；episode 结束后，框架机械计算预测分离度和 evidence-aligned support-weight movement。自然语言 hypotheses 未必互斥完备，因此归一化 `confidence` 只视为 Player 报告的支持权重，不宣称 Bayesian posterior。可选的 post-hoc LLM Evaluator 会另行报告过程/结果诊断，但绝不覆盖确定性科学评分；这些 Judge 轴在完成人工校准前属于 exploratory metrics。历史发现可以提供背景、仪器与问题，但只要允许历史上没有实际执行过的新实验，case 就是一个受历史约束的理想化实验条件，而不是历史档案的逐字重放。
+
+P0.1–P0.6 的核心合同及测试已经实现。三种 evaluation methods 为 prior-only baseline、fixed experimental design 和 adaptive experimental design；三者共享最终 predictor 表示、held-out conditions、评分器、生成配置和工具权限。Prior-only baseline 不接收实验观测，fixed 与 adaptive experimental design 使用相同的 family-specific observation budget \(B\)。P0.5 用显式 condition role 将 H/C conditions 与 Temporal source-reported conditions 分开。P0.6 逐 model-profile × Temporal benchmark instance 记录公开日期、model checkpoint 或 snapshot、training-data cutoff、评测时间、联网/检索权限和已知暴露；缺失证据保持 `exposure_unknown`，不得推断为 `unseen` 或 `contamination-free`。
+
+H/C difficulty variants 是完整的 H/C pairs，不是新增 condition。Curated families 的 easy variant 使用原 counterfactual condition，hard variant 使用 Historical 与原 Counterfactual 机制坐标的中点。四个具有连续机制坐标的 Temporal families 另有独立的 benchmark-authored H/C pack：`self_similar_spreading_radius_ratio`、`statistical_mean_field_effective_detuning`、`stealthy_hyperuniform_localization_scaling` 和 `uamo_lyapunov`。该 pack 的 easy 与 hard counterfactual 分别位于从其固定参考关系到 source-reported comparison relation 的 `0.75` 和 `0.5` 位置；原 Temporal registry 的两个 source-reported conditions 保持不变。Development method pilot `EXP-METHOD-PILOT-001` 的配置已经冻结但尚未运行，见 [`experiments/registrations/EXP-METHOD-PILOT-001/`](experiments/registrations/EXP-METHOD-PILOT-001/)；本文不报告实验结果。
 
 双轨判据、评分语义、第一性原理/奥卡姆约束及正式隔离威胁模型，以 [`docs/evaluation_policy.md`](docs/evaluation_policy.md) 为唯一规范来源。
+后续研究优先级、实验登记、执行状态、结果摘要、风险和方案变更统一维护在
+[`docs/research_roadmap.md`](docs/research_roadmap.md)。该路线图记录计划与决策，不覆盖评测规范或原始运行证据。
+论文、报告、研究计划和项目文档使用的规范术语见
+[`docs/terminology_and_writing_conventions.md`](docs/terminology_and_writing_conventions.md)。除可复现性所需的代码标识符外，不使用项目自定义术语替代已有的社区术语。
+提交文档变更前运行 `python3 scripts/check_document_terminology.py`；该检查覆盖 Markdown、LaTeX 和纯文本文件，并排除不可变运行产物。
 完整的 benchmark 定义、代码实例化管线、community 术语、related work 与克制的 contribution 边界见
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md)。
 20 个内置 family 的科学复核、逐项修正记录与真实 inventory 见
-[`docs/case_scientific_audit.md`](docs/case_scientific_audit.md)；从近期论文构造 rotating temporal cases 的来源、硬筛选、Oracle authoring 与验证流程见
+[`docs/case_scientific_audit.md`](docs/case_scientific_audit.md)；从近期论文构造定期更新的 temporal evaluation instances 时采用的来源选择、纳入标准、Oracle 构建与验证流程见
 [`docs/temporal_case_pipeline.md`](docs/temporal_case_pipeline.md)。当前 29 个已接纳 family 的统一质量复核、拒收项及机器验证证据见
 [`reports/case_objectivity_reaudit_2026-08-30/report.md`](reports/case_objectivity_reaudit_2026-08-30/report.md)。
 
@@ -44,9 +53,9 @@ Oracle 在一次回复中完成两件事：
 
 Oracle 不评价证据“支持”或“反驳”哪个假设。Player 只看到 Oracle 的自然语言或结构化响应；资源检查与真值计算是 Oracle 的内部过程，不构成第三个可见角色。
 
-## Truth-grounded Oracle 与后续 ablation
+## Oracle 接口
 
-“Oracle 知道真相”不能只表示 prompt 中写有目标公式。一个 case 必须先给出足以决定所有允许实验结果的私有科学真值，包括规律、边界条件、参数以及必要的测量规则。只有先固定这份真值，确定性 Oracle 与概率性 Oracle 的比较才是在改变 Oracle 实现，而不是同时改变题目。
+“Oracle 知道真相”不能只表示 prompt 中写有目标公式。一个 case 必须先给出足以决定所有允许实验结果的私有科学真值，包括规律、边界条件、参数以及必要的测量规则。
 
 当前默认实现是**确定性 Oracle**：`CaseOracle` 先按公开资源约束检查实验，再调用 `WorldModel`；相同合法询问在相同 world 下产生相同的结构化 evidence。
 
@@ -61,11 +70,9 @@ resource validation -- invalid --> neutral Oracle response
 WorldModel -----------> measurement + unit + uncertainty
 ```
 
-后续 ablation 将增加另一个、相互独立的**概率性 Oracle（God LLM）**实现：它读取所选 world 的完整私有科学真值，并自由生成 evidence。两种实现共享同一实验 proposal / evidence 接口、Player 可见信息、case truth 与评分条件，但不能互相包装或退化为同一路径。概率性 God LLM 的回答正确率和方差本身是待测因素，不能预先等同于 ground truth。
+确定性 `CaseOracle` 是主要方案。可选的 LLM Oracle presentation 接收已经生成的确定性 observation，并通过相同 proposal/evidence interface 严格呈现该 observation；它不得改变测量值、单位、不确定性或状态。Player 和 presentation model 即使使用同一 provider 与 model ID，也仍是独立会话与权限上下文。该可选路径的 Oracle 准确性审计尚未完成，因此不能把它预先视为与确定性接口等价，也不能在审计前用于主要结果。
 
-当前可选的 LLM Oracle presentation 只是对确定性 `WorldModel` evidence 的逐字转述，不是上述概率性 God LLM。Player 和该转述层即使使用同一 provider 与 model ID，也仍是独立会话与权限上下文；数值测量、单位和不确定性仍由 `WorldModel` 产生。概率性 Oracle 接口将在 case 质量冻结后单独实现和评测。
-
-由此，当前确定性 Oracle 的“客观正确”具有一个明确而有限的含义：它的响应始终符合该 case 预先定义的实验世界。它不是关于真实自然界任意实验的绝对正确性声明；未来概率性 Oracle 与该真值的一致程度则必须作为独立结果报告。
+由此，当前确定性 Oracle 的“客观正确”具有一个明确而有限的含义：它的响应始终符合该 case 预先定义的实验世界。它不是关于真实自然界任意实验的绝对正确性声明。
 
 当前实现中的“私有”只是正常 API 不把 WorldModel 放进 `EpisodeView`；同进程、公开源码并不是安全边界。正式结果要求 Player 与可信 Oracle/evaluator 分离部署，只通过序列化接口交互，并记录隔离 profile、case pack、scorer、模型、prompt 与工具权限版本。当前仓库中的公开 fixtures 不能用于抗污染排行榜。
 
@@ -188,7 +195,7 @@ PYTHONPATH=src:. python experiments/run_temporal_warmup.py \
   --model deepseek-v4-flash --prompt-api-key
 ```
 
-它在 paper eligibility review 和最终 family source-closure review 缺失时正常暂停；恢复时重放已完成 artifact，不重复调用模型。只有通过两道来源复核、strict filter、render，并能实例化 `paper-grounded/alternate-regime × identification/discovery` 四格后才算成功。开发 cohort 与最新实跑结果见 [`docs/temporal_warmup_report.md`](docs/temporal_warmup_report.md)。
+它在 paper eligibility review 和最终 family source-closure review 缺失时正常暂停；恢复时重放已完成 artifact，不重复调用模型。只有通过两道来源复核、strict filter、render，并能实例化 `two source-reported conditions × identification/discovery` 四格后才算成功。开发 cohort 与最新实跑结果见 [`docs/temporal_warmup_report.md`](docs/temporal_warmup_report.md)。
 
 单篇 cohort 可用 `--science-card-focus` 提供一个 source-section routing hint；该文本只帮助第一阶段定位候选 evidence cluster，不能提供事实、参数或 domain，多篇 cohort 禁止使用。focus 会作为非秘密配置进入可重放 artifact。
 
@@ -220,7 +227,7 @@ Coordinator 要求 `cohort.json` 同目录存在与之逐项一致的 `acquisiti
 
 两份 review request 都原样携带被审的普通 JSON 内容；reviewer 修改 verdict 时必须保留这部分，coordinator 会按 JSON 类型和值精确比较。Resume 会重新执行 metadata、lineage、两道 review、filter 和 canary，不能仅凭旧 `case_accepted` 状态跳过这些 gate。
 
-截至 2026-08-26，当前 source-only formal coordinator 的真实 accepted temporal case 数仍为 **0**；最近一次真实运行的 `accepted_case` 为 `null`。旧 `kz_vortex_scaling` 使用 benchmark-authored alternate world，只保留为历史开发 artifact，不计入当前政策的 accepted cases。
+截至 2026-09-03，独立 Temporal registry 含 9 个通过来源复核的 task families，共 36 个公开 development instances。每个 family 的两个 conditions 都由 source paper 报告；它们不构成 H/C pair，也不能仅因来源较新而称为未暴露实例。
 
 ## 最小示例
 
@@ -320,7 +327,7 @@ python examples/run_fake_llm_development.py --log /tmp/role-benchmark-demo.jsonl
 
 这仍然是 `public_development_fixture`，可以运行 identification 或 discovery 协议，但不是正式隔离评测结果。provider binding 合同、第二次生成、inference accounting、事件格式和重放方式见 [`docs/llm_development_evaluation.md`](docs/llm_development_evaluation.md)。
 
-JSONL 已保存 Judge 所需的可观测轨迹：Player 与 LLM Oracle 的逐次原始 completion（包括解析失败的输出）、结构化 action/portfolio、实验前 forecast、WorldModel 决定的 Oracle evidence、最终提交（若存在）与结构化终止 outcome。episode 结束后会独立给出 forecast separation、evidence-aligned movement 及其 per-mode counts；它们不改变 `predictive_model_pass`。Post-hoc LLM Evaluator 只在交互结束后读取该轨迹，不是第三个在线 bench 角色；三套 API 参数见 [`docs/THREE_LLM_EVALUATION.md`](docs/THREE_LLM_EVALUATION.md)。
+JSONL 已保存 Judge 所需的可观测轨迹：Player 与可选 LLM Oracle presentation 的逐次原始 completion（包括解析失败的输出）、结构化 action/portfolio、实验前 forecast、WorldModel 决定的 Oracle evidence、最终提交（若存在）与结构化终止 outcome。episode 结束后会独立给出 forecast separation、evidence-aligned movement 及其 per-mode counts；它们不改变连续 `held_out_prediction_score` 或二元 pass。Post-hoc LLM Evaluator 只在交互结束后读取该轨迹，不是第三个在线 bench 角色；可选的三套 API 参数见 [`docs/THREE_LLM_EVALUATION.md`](docs/THREE_LLM_EVALUATION.md)。
 
 对于失败 episode，可以直接定位 terminal failure 和最早可观察失误：
 
@@ -395,7 +402,7 @@ for name in CASE_FAMILIES:
             print(case.definition.case_id)
 ```
 
-每个 family 的反事实 world 只改动一个事先声明的机制坐标；同一 world 的两条 track 共用 truth、WorldModel 和 held-out interventions，只改变 Player 可见的模型信息与提交表示。20 个内置 families 加 9 个 temporal families 的实现广度不等于跨领域有效性；116 个 cells 仍是公开开发样例，当前 formal private families/cells 均为 0。
+20 个 curated families 中，每个 counterfactual condition 只改动一个事先声明的机制坐标；同一 condition 的两种 task settings 共用 truth、WorldModel 和 held-out interventions，只改变 Player 可见的模型信息。9 个 Temporal families 则各含两个 source-reported conditions，不进入 H/C estimands。29 个 families 的实现广度不等于跨领域有效性；116 个 instances 仍是公开开发样例，当前 formal private families/instances 均为 0。
 
 ## 添加一个新 case
 

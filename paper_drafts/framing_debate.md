@@ -12,7 +12,7 @@ with familiar laws and disclosure of the correct model family can be separated
 in a matched 2 x 2 design. This is the only current element that plausibly
 differentiates the project from the nearest interactive-science benchmarks.
 
-**Objection to B.** Forecast-grounded process diagnostics are useful instruments,
+**Objection to B.** Process measures based on pre-experiment predictions are useful instruments,
 but the current measures depend on model self-reports and have no human
 validation. Making them the headline would turn an implementation feature into
 an unsupported construct-validity claim.
@@ -37,7 +37,7 @@ evidence, the design only supplies four low-powered success rates.
 evaluation question. It also creates a policy conflict: strict source-only
 branches cannot generally supply the synthetic counterfactuals needed by A.
 
-## Position C — lead with source-grounded benchmark authoring
+## Position C — lead with paper-derived benchmark construction
 
 **Claim.** Public historical cases cannot support a credible formal evaluation.
 A renewable supply of source-traceable cases is therefore strategically more
@@ -82,4 +82,3 @@ if human process-label validation becomes strong enough to support it. Preserve
 Draft C as a separate future authoring paper after a representative current-policy
 cohort yields accepted cases. This decision is based on current evidence, not on
 which title sounds more ambitious.
-

@@ -16,10 +16,12 @@ from .models import (
     FinalSubmission,
     HypothesisPortfolio,
     OracleResponse,
+    OracleStatus,
     PlayerAction,
     ProtocolViolation,
     TerminationKind,
 )
+from .metrics import HELD_OUT_PREDICTION_SCORE
 from .protocols import BenchmarkCase, CaseOracle, Oracle
 from .trajectory import score_trajectory
 
@@ -47,13 +49,44 @@ class EpisodeProtocolError(ValueError):
 class Episode:
     """A single immutable-truth Player--Oracle interaction."""
 
-    def __init__(self, case: BenchmarkCase, oracle: Optional[Oracle] = None) -> None:
+    def __init__(
+        self,
+        case: BenchmarkCase,
+        oracle: Optional[Oracle] = None,
+        *,
+        observation_budget: Optional[int] = None,
+        initial_attempts_used: int = 0,
+        require_budget_exhaustion: bool = False,
+    ) -> None:
         # The public definition contains nested mappings/tuples.  Snapshot it so
         # external aliases cannot change resource or budget semantics mid-run.
         definition = copy.deepcopy(case.definition)
         self.case = BenchmarkCase(definition, case.world_model, case.evaluator)
         self.oracle = oracle or CaseOracle(definition, case.world_model)
-        self._attempts_used = 0
+        if observation_budget is None:
+            observation_budget = definition.budget
+        if (
+            isinstance(observation_budget, bool)
+            or not isinstance(observation_budget, int)
+            or not 0 <= observation_budget <= definition.budget
+        ):
+            raise ValueError(
+                "observation_budget must be an integer between zero and case budget"
+            )
+        if (
+            isinstance(initial_attempts_used, bool)
+            or not isinstance(initial_attempts_used, int)
+            or not 0 <= initial_attempts_used <= observation_budget
+        ):
+            raise ValueError(
+                "initial_attempts_used must be between zero and observation_budget"
+            )
+        if not isinstance(require_budget_exhaustion, bool):
+            raise ValueError("require_budget_exhaustion must be boolean")
+        self._observation_budget = observation_budget
+        self._require_budget_exhaustion = require_budget_exhaustion
+        self._initial_attempts_used = initial_attempts_used
+        self._attempts_used = initial_attempts_used
         self._turns: List[ExperimentTurn] = []
         self._result: Optional[EpisodeResult] = None
         self._outcome: Optional[EpisodeOutcome] = None
@@ -91,7 +124,7 @@ class Episode:
         return EpisodeView(
             case=copy.deepcopy(self.case.definition),
             attempts_used=self._attempts_used,
-            attempts_remaining=self.case.definition.budget - self._attempts_used,
+            attempts_remaining=self._observation_budget - self._attempts_used,
             turns=tuple(copy.deepcopy(self._turns)),
         )
 
@@ -153,6 +186,7 @@ class Episode:
                 "active_pass": 0.0,
                 "protocol_completion": 0.0,
                 "submission_available": 0.0,
+                HELD_OUT_PREDICTION_SCORE: 0.0,
             },
             message=(
                 "No strictly decoded final submission was available: "
@@ -190,7 +224,7 @@ class Episode:
             )
 
     def _run_experiment(self, action: PlayerAction) -> OracleResponse:
-        if self._attempts_used >= self.case.definition.budget:
+        if self._attempts_used >= self._observation_budget:
             raise EpisodeProtocolError(
                 "experiment budget is exhausted; commit a final submission",
                 code="experiment_budget_exhausted",
@@ -227,6 +261,25 @@ class Episode:
                 "final action has no submission",
                 code="missing_final_submission",
             )
+        if (
+            self._require_budget_exhaustion
+            and self._attempts_used < self._observation_budget
+        ):
+            raise EpisodeProtocolError(
+                "the evaluation method requires exactly %d observations before final submission"
+                % self._observation_budget,
+                code="observation_budget_not_exhausted",
+            )
+        if self._require_budget_exhaustion:
+            valid_observations = self._initial_attempts_used + sum(
+                turn.response.status is OracleStatus.VALID for turn in self._turns
+            )
+            if valid_observations < self._observation_budget:
+                raise EpisodeProtocolError(
+                    "the evaluation method requires exactly %d legal observations"
+                    % self._observation_budget,
+                    code="valid_observation_budget_not_met",
+                )
         violations = []
         if len(portfolio.hypotheses) > self.case.definition.max_hypotheses:
             violations.append(
@@ -301,7 +354,7 @@ class Episode:
             )
         else:
             selected_confidence = selected[0].confidence
-        budget_exhausted = self._attempts_used >= self.case.definition.budget
+        budget_exhausted = self._attempts_used >= self._observation_budget
         threshold_reached = (
             selected_confidence is not None
             and selected_confidence >= self.case.definition.confidence_threshold

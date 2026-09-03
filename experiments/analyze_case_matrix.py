@@ -1,7 +1,7 @@
 """Aggregate the cross-case run and probe qualitative discovery relations.
 
 For families with declared exploratory relationship probes, this analysis
-reports outcomes in the order that the short active protocol can support:
+reports outcomes in the order that the current protocol can support:
 
 1. Did the submitted executable expression recover dependency and direction?
 2. Did it recover a coarse response shape (invariant, sublinear, linear, or
@@ -23,13 +23,35 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from role_benchmark import EVALUATOR_SCORE_AXES
+from role_benchmark import (
+    ADAPTIVE_EXPERIMENTAL_DESIGN,
+    EVALUATOR_SCORE_AXES,
+    FIXED_EXPERIMENTAL_DESIGN,
+    HELD_OUT_PREDICTION_SCORE,
+    PRIOR_ONLY_BASELINE,
+)
 from role_benchmark.expression import ExpressionError, evaluate_expression_program
-from role_benchmark.cases import CASE_FAMILIES
 
 
-ANALYSIS_SCHEMA = "role_benchmark.case_matrix_analysis"
-MATCHED_FAMILIES = CASE_FAMILIES
+ANALYSIS_SCHEMA = "role_benchmark.case_matrix_analysis.v2"
+HISTORICAL_COUNTERFACTUAL_DATASET = "historical_counterfactual"
+TEMPORAL_DATASET = "temporal"
+HISTORICAL_ROLE = "historical"
+COUNTERFACTUAL_ROLE = "counterfactual"
+IDENTIFICATION_TASK_SETTING = "identification"
+DISCOVERY_TASK_SETTING = "discovery"
+CELL_FIELDS = (
+    "dataset_kind",
+    "case_family",
+    "variant_id",
+    "condition_id",
+    "condition_role",
+    "source_condition_id",
+    "source_paper_id",
+    "source_version_id",
+    "task_setting",
+    "evaluation_method",
+)
 
 
 def _rate(values: Iterable[bool]) -> Optional[float]:
@@ -52,6 +74,10 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
         for row in evaluated
         if row.get("llm_evaluation_status") == "evaluated"
     ]
+    prediction_scores = [
+        (row.get("scores") or {}).get(HELD_OUT_PREDICTION_SCORE)
+        for row in evaluated
+    ]
     return {
         "n": len(rows),
         "evaluated_n": len(evaluated),
@@ -65,6 +91,10 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
         ),
         "protocol_completion_rate": _rate(
             row.get("protocol_completion") is True for row in evaluated
+        ),
+        "held_out_prediction_score_mean": _mean(prediction_scores),
+        "held_out_prediction_score_n": sum(
+            value is not None for value in prediction_scores
         ),
         "terminal_categories": dict(
             sorted(Counter(row.get("active_pass_category") for row in evaluated).items())
@@ -106,69 +136,320 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
     }
 
 
-def _cell_key(row: Mapping[str, Any]) -> Tuple[str, str, str]:
-    return (str(row["case_family"]), str(row["world"]), str(row["track"]))
+def _cell_key(row: Mapping[str, Any]) -> Tuple[Any, ...]:
+    return tuple(row.get(field) for field in CELL_FIELDS)
 
 
 def _cell_summaries(rows: Sequence[Mapping[str, Any]]) -> List[Mapping[str, Any]]:
-    groups: Dict[Tuple[str, str, str], List[Mapping[str, Any]]] = defaultdict(list)
+    groups: Dict[Tuple[Any, ...], List[Mapping[str, Any]]] = defaultdict(list)
     for row in rows:
         groups[_cell_key(row)].append(row)
     output = []
-    for (family, world, track), group in sorted(groups.items()):
+    for key, group in sorted(groups.items(), key=lambda item: repr(item[0])):
         output.append(
             {
-                "case_family": family,
-                "world": world,
-                "track": track,
+                **dict(zip(CELL_FIELDS, key)),
                 **_group_summary(group),
             }
         )
     return output
 
 
-def _interactions(cell_summaries: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
-    rates = {
-        (row["case_family"], row["world"], row["track"]): row["active_pass_rate"]
-        for row in cell_summaries
-    }
-    families: Dict[str, Mapping[str, float]] = {}
-    for family in MATCHED_FAMILIES:
-        required = (
-            (family, "historical", "identification"),
-            (family, "counterfactual", "identification"),
-            (family, "historical", "discovery"),
-            (family, "counterfactual", "discovery"),
-        )
-        if any(rates.get(key) is None for key in required):
+def _estimands(cell_summaries: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    scores: Dict[Tuple[str, str, str, str, str], List[float]] = defaultdict(list)
+    strata = set()
+    for row in cell_summaries:
+        if row["dataset_kind"] != HISTORICAL_COUNTERFACTUAL_DATASET:
             continue
-        hi = float(rates[(family, "historical", "identification")])
-        ci = float(rates[(family, "counterfactual", "identification")])
-        hd = float(rates[(family, "historical", "discovery")])
-        cd = float(rates[(family, "counterfactual", "discovery")])
-        cp_d = hd - cd
-        cp_i = hi - ci
-        db_h = hi - hd
-        db_c = ci - cd
-        families[family] = {
-            "P_HI": hi,
-            "P_CI": ci,
-            "P_HD": hd,
-            "P_CD": cd,
-            "counterfactual_penalty_discovery": cp_d,
-            "counterfactual_penalty_identification": cp_i,
-            "identification_advantage_historical": db_h,
-            "identification_advantage_counterfactual": db_c,
-            "delta": cp_d - cp_i,
+        condition_role = str(row["condition_role"])
+        task_setting = str(row["task_setting"])
+        if condition_role not in (HISTORICAL_ROLE, COUNTERFACTUAL_ROLE):
+            continue
+        if task_setting not in (
+            IDENTIFICATION_TASK_SETTING,
+            DISCOVERY_TASK_SETTING,
+        ):
+            continue
+        family = str(row["case_family"])
+        variant_id = str(row["variant_id"])
+        evaluation_method = str(row["evaluation_method"])
+        if evaluation_method not in (
+            PRIOR_ONLY_BASELINE,
+            FIXED_EXPERIMENTAL_DESIGN,
+            ADAPTIVE_EXPERIMENTAL_DESIGN,
+        ):
+            continue
+        strata.add((family, variant_id, task_setting))
+        score = row["held_out_prediction_score_mean"]
+        if score is not None:
+            scores[
+                (
+                    family,
+                    variant_id,
+                    task_setting,
+                    evaluation_method,
+                    condition_role,
+                )
+            ].append(float(score))
+
+    family_estimates = []
+    for family, variant_id, task_setting in sorted(strata):
+        values = {
+            (evaluation_method, role): _mean(
+                scores.get(
+                    (
+                        family,
+                        variant_id,
+                        task_setting,
+                        evaluation_method,
+                        role,
+                    ),
+                    (),
+                )
+            )
+            for evaluation_method in (
+                PRIOR_ONLY_BASELINE,
+                FIXED_EXPERIMENTAL_DESIGN,
+                ADAPTIVE_EXPERIMENTAL_DESIGN,
+            )
+            for role in (HISTORICAL_ROLE, COUNTERFACTUAL_ROLE)
         }
+        if any(value is None for value in values.values()):
+            continue
+        y_h0 = float(values[(PRIOR_ONLY_BASELINE, HISTORICAL_ROLE)])
+        y_c0 = float(values[(PRIOR_ONLY_BASELINE, COUNTERFACTUAL_ROLE)])
+        y_hf = float(values[(FIXED_EXPERIMENTAL_DESIGN, HISTORICAL_ROLE)])
+        y_cf = float(values[(FIXED_EXPERIMENTAL_DESIGN, COUNTERFACTUAL_ROLE)])
+        y_ha = float(values[(ADAPTIVE_EXPERIMENTAL_DESIGN, HISTORICAL_ROLE)])
+        y_ca = float(values[(ADAPTIVE_EXPERIMENTAL_DESIGN, COUNTERFACTUAL_ROLE)])
+        family_estimates.append(
+            {
+                "dataset_kind": HISTORICAL_COUNTERFACTUAL_DATASET,
+                "case_family": family,
+                "variant_id": variant_id,
+                "task_setting": task_setting,
+                "Y_H0": y_h0,
+                "Y_C0": y_c0,
+                "Y_HF": y_hf,
+                "Y_CF": y_cf,
+                "Y_HA": y_ha,
+                "Y_CA": y_ca,
+                "delta_0": y_h0 - y_c0,
+                "delta_F": (y_cf - y_c0) - (y_hf - y_h0),
+                "delta_A": (y_ca - y_cf) - (y_ha - y_hf),
+            }
+        )
+
+    mean_groups: Dict[
+        Tuple[str, str], List[Mapping[str, Any]]
+    ] = defaultdict(list)
+    for item in family_estimates:
+        mean_groups[(str(item["variant_id"]), str(item["task_setting"]))].append(
+            item
+        )
+    equal_family_means = [
+        {
+            "dataset_kind": HISTORICAL_COUNTERFACTUAL_DATASET,
+            "variant_id": variant_id,
+            "task_setting": task_setting,
+            "family_n": len(group),
+            "delta_0": _mean(item["delta_0"] for item in group),
+            "delta_F": _mean(item["delta_F"] for item in group),
+            "delta_A": _mean(item["delta_A"] for item in group),
+        }
+        for (variant_id, task_setting), group in sorted(mean_groups.items())
+    ]
     return {
-        "families": families,
-        "equal_family_mean_delta": _mean(item["delta"] for item in families.values()),
+        "outcome": HELD_OUT_PREDICTION_SCORE,
+        "family_estimates": family_estimates,
+        "equal_family_means": equal_family_means,
+    }
+
+
+def _common_value(rows: Sequence[Mapping[str, Any]], field: str) -> Any:
+    values = {row.get(field) for row in rows}
+    if len(values) != 1:
+        raise ValueError("temporal estimand rows must share one %s" % field)
+    return next(iter(values))
+
+
+def _temporal_estimands(
+    cell_summaries: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    condition_groups: Dict[
+        Tuple[str, str, str, str, str], List[Mapping[str, Any]]
+    ] = defaultdict(list)
+    for row in cell_summaries:
+        if row["dataset_kind"] != TEMPORAL_DATASET:
+            continue
+        source_paper_id = row.get("source_paper_id")
+        source_version_id = row.get("source_version_id")
+        if not source_paper_id or not source_version_id:
+            raise ValueError(
+                "temporal rows require source_paper_id and source_version_id"
+            )
+        task_setting = str(row["task_setting"])
+        if task_setting not in (
+            IDENTIFICATION_TASK_SETTING,
+            DISCOVERY_TASK_SETTING,
+        ):
+            continue
+        evaluation_method = str(row["evaluation_method"])
+        if evaluation_method not in (
+            PRIOR_ONLY_BASELINE,
+            FIXED_EXPERIMENTAL_DESIGN,
+            ADAPTIVE_EXPERIMENTAL_DESIGN,
+        ):
+            continue
+        condition_groups[
+            (
+                str(source_paper_id),
+                str(row["case_family"]),
+                str(row["variant_id"]),
+                str(row["condition_id"]),
+                task_setting,
+            )
+        ].append(row)
+
+    condition_estimates = []
+    for (
+        source_paper_id,
+        family,
+        variant_id,
+        condition_id,
+        task_setting,
+    ), group in sorted(condition_groups.items()):
+        values = {
+            method: _mean(
+                row["held_out_prediction_score_mean"]
+                for row in group
+                if row["evaluation_method"] == method
+            )
+            for method in (
+                PRIOR_ONLY_BASELINE,
+                FIXED_EXPERIMENTAL_DESIGN,
+                ADAPTIVE_EXPERIMENTAL_DESIGN,
+            )
+        }
+        if any(value is None for value in values.values()):
+            continue
+        y_0 = float(values[PRIOR_ONLY_BASELINE])
+        y_f = float(values[FIXED_EXPERIMENTAL_DESIGN])
+        y_a = float(values[ADAPTIVE_EXPERIMENTAL_DESIGN])
+        condition_estimates.append(
+            {
+                "dataset_kind": TEMPORAL_DATASET,
+                "source_paper_id": source_paper_id,
+                "source_version_id": _common_value(group, "source_version_id"),
+                "case_family": family,
+                "variant_id": variant_id,
+                "condition_id": condition_id,
+                "condition_role": _common_value(group, "condition_role"),
+                "source_condition_id": _common_value(
+                    group, "source_condition_id"
+                ),
+                "task_setting": task_setting,
+                "Y_0": y_0,
+                "Y_F": y_f,
+                "Y_A": y_a,
+                "fixed_gain": y_f - y_0,
+                "adaptive_gain": y_a - y_f,
+            }
+        )
+
+    family_groups: Dict[
+        Tuple[str, str, str, str], List[Mapping[str, Any]]
+    ] = defaultdict(list)
+    for item in condition_estimates:
+        family_groups[
+            (
+                str(item["source_paper_id"]),
+                str(item["case_family"]),
+                str(item["variant_id"]),
+                str(item["task_setting"]),
+            )
+        ].append(item)
+    family_estimates = [
+        {
+            "dataset_kind": TEMPORAL_DATASET,
+            "source_paper_id": source_paper_id,
+            "source_version_id": _common_value(group, "source_version_id"),
+            "case_family": family,
+            "variant_id": variant_id,
+            "task_setting": task_setting,
+            "condition_n": len(group),
+            "Y_0": _mean(item["Y_0"] for item in group),
+            "Y_F": _mean(item["Y_F"] for item in group),
+            "Y_A": _mean(item["Y_A"] for item in group),
+            "fixed_gain": _mean(item["fixed_gain"] for item in group),
+            "adaptive_gain": _mean(item["adaptive_gain"] for item in group),
+        }
+        for (
+            source_paper_id,
+            family,
+            variant_id,
+            task_setting,
+        ), group in sorted(family_groups.items())
+    ]
+
+    paper_groups: Dict[
+        Tuple[str, str, str], List[Mapping[str, Any]]
+    ] = defaultdict(list)
+    for item in family_estimates:
+        paper_groups[
+            (
+                str(item["source_paper_id"]),
+                str(item["variant_id"]),
+                str(item["task_setting"]),
+            )
+        ].append(item)
+    source_paper_estimates = [
+        {
+            "dataset_kind": TEMPORAL_DATASET,
+            "source_paper_id": source_paper_id,
+            "source_version_id": _common_value(group, "source_version_id"),
+            "variant_id": variant_id,
+            "task_setting": task_setting,
+            "family_n": len(group),
+            "fixed_gain": _mean(item["fixed_gain"] for item in group),
+            "adaptive_gain": _mean(item["adaptive_gain"] for item in group),
+        }
+        for (
+            source_paper_id,
+            variant_id,
+            task_setting,
+        ), group in sorted(paper_groups.items())
+    ]
+
+    mean_groups: Dict[
+        Tuple[str, str], List[Mapping[str, Any]]
+    ] = defaultdict(list)
+    for item in source_paper_estimates:
+        mean_groups[(str(item["variant_id"]), str(item["task_setting"]))].append(
+            item
+        )
+    equal_source_paper_means = [
+        {
+            "dataset_kind": TEMPORAL_DATASET,
+            "variant_id": variant_id,
+            "task_setting": task_setting,
+            "source_paper_n": len(group),
+            "fixed_gain": _mean(item["fixed_gain"] for item in group),
+            "adaptive_gain": _mean(item["adaptive_gain"] for item in group),
+        }
+        for (variant_id, task_setting), group in sorted(mean_groups.items())
+    ]
+    return {
+        "outcome": HELD_OUT_PREDICTION_SCORE,
+        "condition_estimates": condition_estimates,
+        "family_estimates": family_estimates,
+        "source_paper_estimates": source_paper_estimates,
+        "equal_source_paper_means": equal_source_paper_means,
     }
 
 
 # Each probe compares a low and high value of one control while holding the
-# remaining controls fixed.  The expected shape is author-side truth.
+# remaining controls fixed. The expected shape comes from the benchmark reference.
 _PROBES: Mapping[str, Tuple[Mapping[str, Any], ...]] = {
     "pendulum": (
         {
@@ -286,7 +567,7 @@ def _probe_submission(
                 raise ExpressionError("relationship probe requires positive predictions")
             elasticity = math.log(high_y / low_y) / math.log(high_x / low_x)
             predicted = _shape_from_elasticity(elasticity)
-            expected = str(probe[str(row["world"])])
+            expected = str(probe[str(row["condition_role"])])
             output.append(
                 {
                     "relation": probe["relation"],
@@ -305,7 +586,13 @@ def _probe_submission(
 def _relationship_rows(rows: Sequence[Mapping[str, Any]]) -> List[Mapping[str, Any]]:
     output: List[Mapping[str, Any]] = []
     for row in rows:
-        if row.get("case_family") not in _PROBES or row.get("track") != "discovery":
+        if (
+            row.get("dataset_kind") != HISTORICAL_COUNTERFACTUAL_DATASET
+            or row.get("case_family") not in _PROBES
+            or row.get("task_setting") != DISCOVERY_TASK_SETTING
+            or row.get("condition_role")
+            not in (HISTORICAL_ROLE, COUNTERFACTUAL_ROLE)
+        ):
             continue
         probes, error = _probe_submission(row)
         scorable = bool(probes) and error is None
@@ -314,8 +601,7 @@ def _relationship_rows(rows: Sequence[Mapping[str, Any]]) -> List[Mapping[str, A
         output.append(
             {
                 "episode_id": row["episode_id"],
-                "case_family": row["case_family"],
-                "world": row["world"],
+                **{field: row.get(field) for field in CELL_FIELDS},
                 "repeat": row["repeat"],
                 "held_out_predictive_pass": row.get("active_pass") is True,
                 "scorable": scorable,
@@ -330,9 +616,10 @@ def _relationship_rows(rows: Sequence[Mapping[str, Any]]) -> List[Mapping[str, A
 
 def _relationship_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
     episode_rows = _relationship_rows(rows)
-    groups: Dict[Tuple[str, str], List[Mapping[str, Any]]] = defaultdict(list)
+    groups: Dict[Tuple[Any, ...], List[Mapping[str, Any]]] = defaultdict(list)
     for row in episode_rows:
-        groups[(str(row["case_family"]), str(row["world"]))].append(row)
+        groups[_cell_key(row)].append(row)
+
     def summarize(group: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
         return {
             "n": len(group),
@@ -353,11 +640,10 @@ def _relationship_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any
         }
 
     cells = []
-    for (family, world), group in sorted(groups.items()):
+    for key, group in sorted(groups.items(), key=lambda item: repr(item[0])):
         cells.append(
             {
-                "case_family": family,
-                "world": world,
+                **dict(zip(CELL_FIELDS, key)),
                 **summarize(group),
             }
         )
@@ -367,8 +653,10 @@ def _relationship_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any
             "Relationship recovery is reported before held-out numerical prediction. "
             "Relations are probed from submitted expressions, so this run remains "
             "exploratory; future evaluations should collect a structured functional-"
-            "relationship submission directly. Identification is excluded because "
-            "its public skeleton already discloses these relations."
+            "relationship submission directly. Only historical/counterfactual "
+            "Discovery conditions are included; Identification is excluded because "
+            "its public skeleton already discloses these relations, and Temporal "
+            "source-reported conditions are not H/C estimands."
         ),
         "overall": summarize(episode_rows),
         "cells": cells,
@@ -377,20 +665,56 @@ def _relationship_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any
 
 
 def analyze(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    experiment_ids = {
+        str(row["experiment_id"])
+        for row in rows
+        if row.get("experiment_id") is not None
+    }
+    if len(experiment_ids) > 1:
+        raise ValueError("analysis rows must share one experiment_id")
     cells = _cell_summaries(rows)
-    family_groups: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
+    family_groups: Dict[
+        Tuple[str, str, str, Optional[str], Optional[str], str],
+        List[Mapping[str, Any]],
+    ] = defaultdict(list)
     for row in rows:
-        family_groups[str(row["case_family"])].append(row)
+        family_groups[
+            (
+                str(row["dataset_kind"]),
+                str(row["case_family"]),
+                str(row["variant_id"]),
+                row.get("source_paper_id"),
+                row.get("source_version_id"),
+                str(row["evaluation_method"]),
+            )
+        ].append(row)
     families = [
-        {"case_family": family, **_group_summary(group)}
-        for family, group in sorted(family_groups.items())
+        {
+            "dataset_kind": dataset_kind,
+            "case_family": family,
+            "variant_id": variant_id,
+            "source_paper_id": source_paper_id,
+            "source_version_id": source_version_id,
+            "evaluation_method": evaluation_method,
+            **_group_summary(group),
+        }
+        for (
+            dataset_kind,
+            family,
+            variant_id,
+            source_paper_id,
+            source_version_id,
+            evaluation_method,
+        ), group in sorted(family_groups.items(), key=lambda item: repr(item[0]))
     ]
     return {
         "schema": ANALYSIS_SCHEMA,
+        "experiment_id": next(iter(experiment_ids), None),
         "overall": _group_summary(rows),
         "families": families,
         "cells": cells,
-        "interactions": _interactions(cells),
+        "estimands": _estimands(cells),
+        "temporal_estimands": _temporal_estimands(cells),
         "relationships": _relationship_summary(rows),
     }
 
@@ -402,16 +726,15 @@ def _write_json(path: Path, payload: Any) -> None:
 
 
 def _write_cell_csv(path: Path, cells: Sequence[Mapping[str, Any]]) -> None:
-    fields = (
-        "case_family",
-        "world",
-        "track",
+    fields = CELL_FIELDS + (
         "n",
         "active_pass_n",
         "active_pass_rate",
         "scientifically_evaluable_n",
         "scientifically_evaluable_rate",
         "protocol_completion_rate",
+        "held_out_prediction_score_mean",
+        "held_out_prediction_score_n",
         "mean_attempts",
         "terminal_categories",
     )
@@ -429,8 +752,7 @@ def _write_cell_csv(path: Path, cells: Sequence[Mapping[str, Any]]) -> None:
 def _write_relationship_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     fields = (
         "episode_id",
-        "case_family",
-        "world",
+        *CELL_FIELDS,
         "repeat",
         "held_out_predictive_pass",
         "scorable",

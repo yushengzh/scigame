@@ -37,19 +37,6 @@ def young_proposal(
     )
 
 
-def identification_submission(slit_separation_exponent):
-    return FinalSubmission(
-        explanation="A normalized power law predicts held-out fringe spacing.",
-        model="double_slit_power_law",
-        parameters={
-            "reference_spacing_mm": 1.10,
-            "wavelength_exponent": 1.0,
-            "screen_distance_exponent": 1.0,
-            "slit_separation_exponent": slit_separation_exponent,
-        },
-    )
-
-
 def expression_submission(slit_separation_exponent):
     expression = {
         "op": "multiply",
@@ -206,36 +193,42 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
                 with self.subTest(world=world, token=token):
                     self.assertNotIn(token, public_text)
 
-    def test_correct_identification_and_expression_models_pass(self):
+    def test_one_expression_predictor_and_score_path_serves_both_tracks(self):
         exponents = {"historical": -1.0, "counterfactual": -0.5}
         for world, exponent in exponents.items():
-            with self.subTest(world=world, track="identification"):
-                case = make_young_double_slit_case(
-                    world=world,
-                    track=BenchmarkTrack.IDENTIFICATION,
-                )
-                result = case.evaluator.evaluate(
-                    identification_submission(exponent)
-                )
-                self.assertTrue(result.success)
-                self.assertEqual(result.scores["predictive_model_pass"], 1.0)
-                self.assertEqual(
-                    result.scores["slit_separation_exponent_absolute_error"],
-                    0.0,
-                )
+            submission = expression_submission(exponent)
+            results = []
+            for track in TRACKS:
+                with self.subTest(world=world, track=track.value):
+                    case = make_young_double_slit_case(world=world, track=track)
+                    result = case.evaluator.evaluate(submission)
+                    results.append(result)
+                    self.assertTrue(result.success)
+                    self.assertEqual(result.scores["predictive_model_pass"], 1.0)
+                    self.assertNotIn(
+                        "slit_separation_exponent_absolute_error",
+                        result.scores,
+                    )
+            self.assertEqual(results[0], results[1])
 
-            with self.subTest(world=world, track="discovery"):
-                case = make_young_double_slit_case(
-                    world=world,
-                    track=BenchmarkTrack.DISCOVERY,
+    def test_legacy_identification_representation_is_rejected(self):
+        for track in TRACKS:
+            with self.subTest(track=track.value):
+                case = make_young_double_slit_case(track=track)
+                result = case.evaluator.evaluate(
+                    FinalSubmission(
+                        explanation="A legacy named-parameter predictor.",
+                        model="double_slit_power_law",
+                        parameters={
+                            "reference_spacing_mm": 1.10,
+                            "wavelength_exponent": 1.0,
+                            "screen_distance_exponent": 1.0,
+                            "slit_separation_exponent": -1.0,
+                        },
+                    )
                 )
-                result = case.evaluator.evaluate(expression_submission(exponent))
-                self.assertTrue(result.success)
-                self.assertEqual(result.scores["predictive_model_pass"], 1.0)
-                self.assertNotIn(
-                    "slit_separation_exponent_absolute_error",
-                    result.scores,
-                )
+                self.assertFalse(result.success)
+                self.assertIn("executable expression representation", result.message)
 
     def test_each_world_rejects_the_other_worlds_law(self):
         pairs = (
@@ -243,16 +236,8 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
             ("counterfactual", -1.0),
         )
         for world, false_exponent in pairs:
-            for track, submission in (
-                (
-                    BenchmarkTrack.IDENTIFICATION,
-                    identification_submission(false_exponent),
-                ),
-                (
-                    BenchmarkTrack.DISCOVERY,
-                    expression_submission(false_exponent),
-                ),
-            ):
+            submission = expression_submission(false_exponent)
+            for track in TRACKS:
                 with self.subTest(world=world, track=track.value):
                     case = make_young_double_slit_case(world=world, track=track)
                     result = case.evaluator.evaluate(submission)
@@ -270,7 +255,7 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
         )
         invalid_identification = identification.evaluator.evaluate(
             FinalSubmission(
-                explanation="A required parameter is missing.",
+                explanation="A legacy named-parameter submission.",
                 model="double_slit_power_law",
                 parameters={
                     "reference_spacing_mm": 1.10,

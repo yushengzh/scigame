@@ -23,7 +23,7 @@ For every admitted family, the review instantiated historical/counterfactual × 
 | Check | Result |
 | --- | ---: |
 | Known-truth submissions accepted | 116 / 116 |
-| Opposite-world false twins rejected | 116 / 116 |
+| Predictors from the paired condition rejected | 116 / 116 |
 | Sampled valid Oracle queries finite and unit-consistent | 1242 / 1242 |
 | Repeated deterministic responses identical | 1242 / 1242 |
 | Runtime-registered admitted families | 29 / 29 |
@@ -33,7 +33,7 @@ These machine checks establish implementation consistency. Source fidelity was r
 
 ## The repairs address scientific meaning, not cosmetic engineering
 
-- The 13 previously revisable built-in families received the missing applicability, fixed-condition, wording, quantity, and unit corrections. `poiseuille_flow` now declares a conditioned inlet distance and fully developed laminar scope; `torricelli_efflux` no longer contradicts its legal orifice-area control. The remaining six built-ins received explicit selected-world applicability/fixed conditions for future God-Oracle context.
+- The 13 previously revisable hand-authored task families received the missing applicability, fixed-condition, wording, quantity, and unit corrections. `poiseuille_flow` now declares a conditioned inlet distance and fully developed laminar scope; `torricelli_efflux` no longer contradicts its legal orifice-area control. The remaining six hand-authored task families received explicit selected-world applicability and fixed conditions for a future LLM-based Oracle.
 - Identification now has one shared structured parameter contract: name, meaning, unit, and admissible finite-real domain. Non-finite and out-of-domain submissions are rejected.
 - Temporal anti-unification now publishes constants common to both worlds as fixed constants and exposes only world-varying scientific coordinates. It no longer turns values such as π, 1, or 2 into artificial unknowns.
 - The temporal filter rejects a case when its free parameters exceed the number of available scalar observations. For an all-discrete control domain, the budget must also be smaller than the number of possible control settings, so Discovery cannot degenerate into complete lookup.
@@ -95,13 +95,12 @@ Every admitted family satisfies the necessary observation-capacity check. A nume
 The scientific case is defined independently of how evidence is rendered. The later ablation must compare two separate implementations behind the same proposal/response contract:
 
 1. `deterministic`: `CaseOracle + WorldModel` computes the declared evidence exactly.
-2. `probabilistic`: a God LLM reads the complete selected-world private scientific truth and generates the evidence response.
+2. `probabilistic`: an LLM-based Oracle reads the complete selected-condition data-generating specification and generates the evidence response.
 
-This review did not implement or compare those modes. In particular, the existing exact-copy LLM presentation layer must not be mislabeled as the probabilistic God Oracle. Keeping the case truth fixed first prevents Oracle behavior from being confused with case error.
+This review did not implement or compare those modes. In particular, the existing LLM presentation layer that copies deterministic simulator outputs exactly must not be mislabeled as a stochastic LLM-based Oracle. Keeping the task truth fixed first prevents Oracle behavior from being confused with task-definition errors.
 
 ## Evidence boundary and remaining limitation
 
 PASS means source-faithful or explicitly authored within the stated idealization; it is not an independent experimental replication. Temporal parameter descriptions generated from the AST are executable and non-ambiguous at the formula-position level, but some units remain stated as `expression-defined` rather than source-level physical parameter names. If parameter interpretability becomes a scored construct, the abstractor and reviewer should emit those meanings and units explicitly; AST guessing should not be used.
 
 The benchmark is now ready for development runs on these 29 registered families with the deterministic Oracle. The deterministic-versus-probabilistic Oracle ablation should start only after the probabilistic interface is implemented as a genuinely separate path.
-

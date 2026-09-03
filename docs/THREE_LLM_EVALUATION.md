@@ -1,10 +1,11 @@
-# Player、Oracle、Evaluator 三套独立 LLM 的运行指南
+# Player、Oracle presentation 与 Evaluator 的运行指南
 
-当前 cross-case runner 在正常执行 active episode 时初始化三个相互独立的 LLM
+确定性 `CaseOracle` 是主要实验裁定接口。若启用可选的 LLM presentation，runner
+可以再为 Player、Oracle presentation 和 post-hoc Evaluator 配置相互独立的 LLM
 backend：
 
 ```text
-Player LLM ──实验请求──> deterministic WorldModel ──客观 evidence──> Oracle LLM
+Player LLM ──实验请求──> deterministic WorldModel ──确定性 observation──> 可选 LLM presentation
      │                                                        │
      └──────────── sealed observable transcript ──────────────┘
                                   │
@@ -13,13 +14,19 @@ Player LLM ──实验请求──> deterministic WorldModel ──客观 evide
 ```
 
 - **Player** 只读取公开 case、提出实验、更新假设并提交最终 predictor；
-- **Oracle** 只表述 WorldModel 已经生成的权威 evidence，不能创造测量值；
+- **Oracle presentation** 只能严格呈现 WorldModel 已经生成的确定性 observation，不能改变状态、测量值、单位或不确定性；
 - **Evaluator** 在 episode 结束且 JSONL 封闭后读取可观察 transcript，输出独立的过程/结果诊断。
 
-在线 bench 仍只有 Player 与 Oracle 两个交互角色。Evaluator 是第三个 API
-client，但不是能影响轨迹的第三个角色。
+在线 bench 仍只有 Player 与实验裁定接口两个交互角色。确定性接口是主要方案，
+不需要 Oracle LLM；LLM presentation 是可选的语言呈现层，其 Oracle 准确性审计尚未
+完成，不能在审计前用于主要结果。Evaluator 是 episode 结束后的 API client，不能
+影响轨迹。
 
-## 1. 三套完全独立的运行参数
+P0.1--P0.6 核心合同已实现，包括共享最终表示、三种 evaluation methods、相同
+observation budget \(B\)、连续主指标、显式 condition role，以及只记录事实与
+unknown 的 Temporal exposure record。
+
+## 1. 可选三套独立运行参数
 
 每个角色分别拥有：
 
@@ -35,7 +42,8 @@ client，但不是能影响轨迹的第三个角色。
 | DeepSeek thinking | `--player-thinking` | `--oracle-thinking` | `--evaluator-thinking` |
 | timeout | `--player-timeout-s` | `--oracle-timeout-s` | `--evaluator-timeout-s` |
 
-三个 backend 即使指向同一 provider/model，也会分别实例化。endpoint 参数表示
+启用可选 presentation 与 Evaluator 时，三个 backend 即使指向同一 provider/model，
+也会分别实例化。确定性 Oracle 路径不读取 Oracle LLM credential。endpoint 参数表示
 完整 HTTP route，例如：
 
 - DeepSeek Chat Completions：`https://api.deepseek.com/chat/completions`；
@@ -58,6 +66,7 @@ PYTHONPATH=src python -m experiments.run_case_matrix \
   --player-api-key-env BENCH_PLAYER_API_KEY \
   --oracle-provider openai \
   --oracle-model gpt-5.6 \
+  --oracle-mode llm_presentation \
   --oracle-reasoning-effort none \
   --oracle-api-key-env BENCH_ORACLE_API_KEY \
   --evaluator-provider openai \
@@ -78,6 +87,7 @@ PYTHONPATH=src python -m experiments.run_case_matrix \
 
 ```bash
 PYTHONPATH=src python -m experiments.run_case_matrix \
+  --oracle-mode llm_presentation \
   --player-prompt-api-key \
   --oracle-prompt-api-key \
   --evaluator-prompt-api-key \
@@ -90,9 +100,11 @@ CLI 仍支持 `--player-api-key`、`--oracle-api-key` 和
 
 ## 3. Evaluator 的评分边界
 
-case-specific `FinalEvaluator` 仍是确定性科学 scorer，拥有冻结的
-`predictive_model_pass`；`active_pass` 仍由提交、协议完成和该科学分数组合得到。
-LLM Evaluator 不得覆盖或平均这些字段。
+case-specific `FinalEvaluator` 仍是确定性科学 scorer。主要结果是连续的
+`held_out_prediction_score`：各 held-out error 先按相应容差缩放，再以
+`1 / (1 + mean scaled error)` 聚合，范围为 `[0,1]`。二元
+`predictive_model_pass`、protocol completion 和 `active_pass` 分开报告。
+LLM Evaluator 不得覆盖这些字段，也不得与连续主指标求平均。
 
 LLM Evaluator 只报告六个分别命名的、允许为 `null` 的探索性轴：
 
@@ -151,7 +163,8 @@ schedule index 停止。Evaluator failure 发生在 sealed episode 之后：acti
 重试缺失/失败的 Evaluator；不会读取或初始化 Player/Oracle，更不会重跑 episode。
 
 `episodes.json` 将 deterministic outcome 和 LLM evaluation 并列；`scores` 始终
-只保存确定性 case evaluator 分数，LLM 轴位于独立的 `llm_evaluation.scores`。
+只保存确定性 case evaluator 分数，包括连续主指标，LLM 轴位于独立的
+`llm_evaluation.scores`。
 
 ## 6. Dry run、smoke 与分析
 
@@ -166,39 +179,59 @@ PYTHONPATH=src python -m experiments.run_case_matrix \
   --dry-run
 ```
 
-完整设计仍是：
+curated pack 的完整三方法设计是：
 
 ```text
-20 families × 2 worlds × 2 tracks × 5 repeats = 400 active episodes
+20 families × 2 H/C conditions × 2 task settings × 3 methods × 5 repeats
+× 2 easy/hard variants = 2,400 episodes
 ```
 
-这里的 400 episodes 专指稳定的 `curated` pack。通过 source review 的实时
-case 注册在独立的 `role_benchmark.temporal_cases` registry 中，以
-`--case-pack temporal` 显式选择；不会改变 curated pack 的 family 数量或冻结
-schedule。当前 temporal pack 含 1 个 family，因此它自己的完整计划是：
+三种方法是 prior-only baseline、固定实验设计和自适应实验设计。固定与自适应方法
+对同一 family 使用相同的实验预算 \(B\)，并共享最终可执行表示、held-out conditions
+和 scorer；prior-only baseline 不请求 observation。
+
+通过 source review 的 case 注册在独立的 `role_benchmark.temporal_cases` registry
+中，以 `--case-pack temporal` 显式选择；不会改变 curated pack 的 family 数量或
+冻结 schedule。当前 Temporal pack 含 9 个 family，每个 family 有两个语义中性的
+source-reported conditions，而不是 historical/counterfactual。其完整三方法设计是：
 
 ```text
-1 family × 2 worlds × 2 tracks × 5 repeats = 20 active episodes
+9 families × 2 source-reported conditions × 2 task settings × 3 methods × 5 repeats
+= 540 episodes
 ```
 
-先验证一个完整四格 block：
+四个 Temporal 主题另有独立的 benchmark-authored H/C pack；其 `easy`/`hard`
+变更强度分别为 `0.75`/`0.5`，不改写上述 source-reported conditions。curated H/C
+变体的 `easy` 保留原 counterfactual，`hard` 使用 historical 与原 counterfactual
+之间的中点。两类变体都保持单位、唯一机制坐标、固定实验设计、预算和 scorer。
+
+派生 H/C pack 的 runner 名称是 `temporal_counterfactual`。例如只验证其中一个
+family 的 hard variant：
 
 ```bash
-PYTHONPATH=src python -m experiments.run_case_matrix \
-  --case-pack temporal \
-  --repeat 1 \
-  --player-prompt-api-key \
-  --oracle-prompt-api-key \
-  --evaluator-prompt-api-key \
-  --output-dir runs/temporal-smoke
+PYTHONPATH=src:. python3 experiments/run_case_matrix.py \
+  --output-dir /tmp/temporal-counterfactual-smoke \
+  --case-pack temporal_counterfactual \
+  --family self_similar_spreading_radius_ratio \
+  --variant hard \
+  --repeats 1 \
+  --oracle-mode deterministic \
+  --dry-run
 ```
+
+`EXP-METHOD-PILOT-001` 的 development 配置已经冻结于 [`../experiments/registrations/EXP-METHOD-PILOT-001/`](../experiments/registrations/EXP-METHOD-PILOT-001/)；当前文档不报告
+尚未产生的结果。
+
+实际执行应直接使用冻结登记 README 中的命令，避免临时改动 family、
+variant、method、repeat 或 schedule seed。执行前可在命令末尾加
+`--dry-run` 检查计划与配置，但 dry-run 不产生评测结果。
 
 `--family` 只能选择当前 `--case-pack` 内的 family，不能跨 pack 混跑。pack
 分离只是避免 schedule 和统计单位被动态 membership 悄然改变的运行约束，不作为
 科研 contribution。
 
-对于 curated pack，可先加 `--repeat 1` 运行冻结顺序的第一个 80-cell block。之后使用完全相同的
-三角色参数和 output directory、去掉 `--repeat 1`，runner 会补齐剩余 cells。
+对于 curated pack，可先加 `--repeat 1` 运行冻结顺序的首个重复。之后使用完全相同的
+角色参数和 output directory、去掉 `--repeat 1`，runner 会补齐剩余计划。
 
 分析与可视化：
 
@@ -215,5 +248,5 @@ PYTHONPATH=src python -m experiments.render_case_matrix \
   ../role_benchmark_visualizations/three-role-matrix
 ```
 
-聚合报告会分别给出 deterministic active pass、trajectory metrics 和六个 LLM
-Evaluator axes；不得把三者平均为一个没有明确定义的 composite score。
+聚合报告会分别给出连续 held-out prediction score、二元 pass、trajectory metrics 和
+六个 LLM Evaluator axes；不得把这些量平均为一个没有明确定义的 composite score。

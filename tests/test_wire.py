@@ -63,11 +63,20 @@ def final_action():
         FinalSubmission(
             explanation="A normalized power response predicts the observations.",
             hypothesis_id="H1",
-            model="normalized_power_law",
+            model=EXPRESSION_MODEL,
             parameters={
-                "reference_period_s": 2.0 * math.pi * math.sqrt(1.0 / 9.80665),
-                "length_exponent": 0.5,
-                "mass_exponent": 0.0,
+                "outputs": {
+                    "period_s": {
+                        "op": "multiply",
+                        "args": [
+                            2.0 * math.pi * math.sqrt(1.0 / 9.80665),
+                            {
+                                "op": "power",
+                                "args": [{"var": "length_m"}, 0.5],
+                            },
+                        ],
+                    }
+                }
             },
             scope_conditions=("public control ranges",),
         ),
@@ -244,12 +253,22 @@ class WireDecodingTest(unittest.TestCase):
         self.assertEqual(context.exception.code, "invalid_unicode")
 
         payload = player_action_to_payload(final_action())
-        nested = {"values": [{"coefficient": 1.0}]}
+        nested = {
+            "outputs": {
+                "period_s": {
+                    "op": "multiply",
+                    "args": [1.0, {"var": "length_m"}],
+                }
+            }
+        }
         payload["final"]["parameters"] = nested
         decoded = player_action_from_payload(payload)
-        nested["values"][0]["coefficient"] = 99.0
-        nested["values"].append({"coefficient": 2.0})
-        self.assertEqual(decoded.final.parameters["values"], [{"coefficient": 1.0}])
+        nested["outputs"]["period_s"]["args"][0] = 99.0
+        nested["outputs"]["period_s"]["args"].append(2.0)
+        self.assertEqual(
+            decoded.final.parameters["outputs"]["period_s"]["args"],
+            [1.0, {"var": "length_m"}],
+        )
 
     def test_parser_rejects_portfolio_invariants_without_leaking_raw_exceptions(self):
         payload = player_action_to_payload(experiment_action())
@@ -282,7 +301,7 @@ class WireDecodingTest(unittest.TestCase):
             player_action_from_payload(payload)
         self.assertEqual(context.exception.code, "model_invariant")
 
-    def test_parser_rejects_malformed_discovery_expression(self):
+    def test_parser_rejects_malformed_predictor_expression(self):
         payload = player_action_to_payload(final_action())
         payload["final"]["model"] = EXPRESSION_MODEL
         payload["final"]["parameters"] = {

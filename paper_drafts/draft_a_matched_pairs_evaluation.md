@@ -61,7 +61,7 @@ can be separated in a matched experiment: **alignment with a model's familiar
 scientific priors** and **disclosure of the correct functional family**. A
 historical versus counterfactual comparison manipulates the first factor only
 if the worlds are otherwise matched. A family-disclosed versus family-withheld
-comparison manipulates the second factor only if both arms query the same
+comparison manipulates the second factor only if both methods query the same
 world. Crossing the factors yields a direct diagnostic: does the historical
 advantage grow specifically when the agent must infer the functional form, or
 does it persist even when the correct family is supplied?
@@ -91,7 +91,7 @@ Our contributions are deliberately scoped:
    model produces evidence, the Player records competing hypotheses and
    forecasts before observing that evidence, and evaluation is post hoc.
 3. We separate unconditional held-out predictive success, protocol completion,
-   and narrow forecast-grounded trajectory diagnostics, with explicit full
+   and narrow process metrics based on pre-experiment predictions, with explicit full
    denominators for invalid or rejected Player actions.
 4. We implement 20 public development families and use one archived 80-episode
    block to expose practical failure surfaces. We do not treat that block as a
@@ -193,7 +193,7 @@ The tracks differ in what is unknown before interaction.
 | Contract | Identification | Predictive law induction |
 | --- | --- | --- |
 | Unknown object | Parameters of a disclosed family | Functional family and parameters |
-| Public model information | Formula skeleton, parameter meanings, admissible ranges | Family-neutral executable representation and complexity bound |
+| Public model information | Formula skeleton, parameter meanings, admissible ranges | Executable representation shared across task families and a complexity bound |
 | Experimental information | Controls, readouts, ranges, resolution, budget | The same |
 | Final object | Parameters or equivalent executable predictor | Executable predictor |
 | Primary criterion | Held-out predictive loss | Held-out predictive loss |
@@ -244,7 +244,7 @@ This construction supports four comparisons:
 - identification minus induction within each world; and
 - their interaction.
 
-Let \(P_{wt}\) be unconditional active-pass probability. We prespecify the
+Let \(P_{wt}\) be the probability of unconditional held-out prediction success. We prespecify the
 paired factorial contrast
 
 \[
@@ -278,10 +278,10 @@ leaderboard.
 The present implementation violates one requirement for a pure
 family-disclosure contrast. Identification returns named parameters in a
 family-specific model; induction returns a recursive expression tree. The
-induction arm therefore has additional representation and parsing burden. Any
+induction method therefore has additional representation and parsing burden. Any
 observed track effect is an end-to-end contract effect, not solely the effect of
 withholding the family. A confirmatory version must use one final executable
-representation in both arms, with identification differing only by disclosure
+representation in both methods, with identification differing only by disclosure
 of an instantiable skeleton. `[REQUIRES NEW EVIDENCE]`
 
 ## 5. Evaluation
@@ -302,11 +302,11 @@ Every Player-side terminal event remains in the active denominator:
 - `action_limit`: no final submission was produced within the action horizon.
 
 We report evaluated-terminal coverage, protocol completion, unconditional
-active pass, and—only as a diagnostic—success conditional on a valid
+unconditional held-out prediction success, and—only as a diagnostic—success conditional on a valid
 submission. Provider, storage, or evaluator-runtime failures are infrastructure
 failures and retry the same prespecified schedule position.
 
-### 5.2 Forecast-grounded trajectory diagnostics
+### 5.2 Process measures based on pre-experiment predictions
 
 For valid evidence, forecast separation is the mean pairwise relative
 difference among hypotheses' numerical predictions. This is a property of the
@@ -353,7 +353,7 @@ was 50/80 (62.5%), and conditional success was 21/50 (42.0%). Twenty episodes
 ended after invalid Player output, ten after a decoded action was rejected, and
 29 after a valid submission failed scientific evaluation.
 
-| World | Track | Active pass | Valid final |
+| Condition | Task setting | Held-out prediction success | Valid final |
 | --- | --- | ---: | ---: |
 | Historical | Identification | 12/20 | 17/20 |
 | Historical | Induction | 4/20 | 12/20 |

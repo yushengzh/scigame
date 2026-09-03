@@ -55,7 +55,7 @@ experimental evidence.
 2. No experiment shows that the proposed 2 x 2 combination yields diagnostic
    information unavailable from PhysGym- or NewtonBench-style analyses. A design
    diagram alone is not an empirical contribution at the target venues.
-3. Draft B's forecast-grounded trace is useful but insufficiently differentiated
+3. Draft B's record of pre-experiment predictions is useful but insufficiently differentiated
    from prior process analyses, especially FALSIFYBENCH and Corral, until it is
    validated and shown to predict or explain failures beyond simpler transcript
    features.
@@ -191,4 +191,3 @@ After those data exist, revise Draft A first and submit the same version to all
 three review lenses again. Draft B should be reconsidered only if process-label
 validation is strong; Draft C only after the current source-only pipeline yields
 a representative accepted cohort.
-

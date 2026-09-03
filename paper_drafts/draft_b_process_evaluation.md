@@ -1,4 +1,4 @@
-# Forecast Before You Experiment: Auditing Observable Evidence Use in LLM Scientific Agents
+# Process Evaluation of LLM-Based Scientific Agents Using Pre-Experiment Predictions
 
 **Working paper draft B — process-evaluation alternative.** This framing should
 not be submitted until the proposed diagnostics have been validated against
@@ -24,7 +24,7 @@ one model, 681 persistent-hypothesis pairs were scorable: 124 moved toward the
 lower-error hypothesis, 516 were unchanged, and 41 moved away. A detailed
 pendulum episode shows an agent performing repeated mass interventions yet
 submitting a mass-invariant law contradicted by its own measurements. These
-observations demonstrate the value of forecast-grounded logs for failure
+observations demonstrate the value of logs containing pre-experiment predictions for failure
 localization, but not a validated measure of scientific reasoning: support
 weights are self-reports, pairs are nested within episodes, and the run has one
 model and one repeat. We specify the human-validation and experimental design
@@ -227,14 +227,14 @@ cause.
 
 The primary score is binary held-out predictive pass. Protocol completion is a
 separate binary variable. Invalid JSON, rejected actions, and action-limit
-termination remain zeros in the unconditional active-pass denominator. The
+termination remain zeros in the denominator of unconditional held-out prediction success. The
 process diagnostics neither add to nor subtract from predictive success.
 
 This produces a multi-axis report rather than a composite score:
 
 | Axis | Question | Authority |
 | --- | --- | --- |
-| Active pass | Did the final executable model predict held-out interventions within tolerance? | Deterministic evaluator |
+| Held-out prediction success | Did the final executable model predict held-out interventions within tolerance? | Deterministic evaluator |
 | Protocol completion | Did the Player produce a valid committed final object? | Episode state machine |
 | Forecast separation | Did stated hypotheses predict different values at the chosen experiment? | Deterministic transcript function |
 | Support movement | Did the next stated support gap move toward the lower-error forecast? | Deterministic transcript function |
@@ -247,7 +247,7 @@ This produces a multi-axis report rather than a composite score:
 The public suite contains 20 idealized families. Each is instantiated in a
 historical and minimally modified counterfactual world, and in a family-disclosed
 identification track and a family-withheld induction track. The resulting 80
-cells are public development fixtures; truth and held-out conditions are
+cells are part of a public development set; the data-generating process and held-out conditions are
 available in source.
 
 The archived run planned five repeats but completed only its first 80-cell
@@ -319,12 +319,12 @@ and the fraction of turns that both human and deterministic methods can score.
 High agreement on a selected easy subset is insufficient.
 
 **Convergent and discriminant validity.** Test whether deterministic labels
-agree with human evidence-use labels while remaining distinct from JSON
+agree with human process-evaluation labels while remaining distinct from JSON
 validity, token count, experiment count, and terminal success. Compare against
 simpler baselines such as “support changed at all” and textual overlap.
 
 **Predictive utility across models.** With model, family, and repeat treated as
-separate levels, ask whether forecast-grounded measures explain held-out failure
+separate levels, ask whether process measures based on pre-experiment predictions explain held-out failure
 or expert process ratings beyond protocol completion. The analysis must use
 episode- or family-level resampling rather than treating hypothesis pairs as
 independent observations.
@@ -362,4 +362,3 @@ runs—not a more elaborate composite score.
 | Case study | 0.75 |
 | Validation, limitations, conclusion | 1.25 |
 | **Total** | **8.00** |
-

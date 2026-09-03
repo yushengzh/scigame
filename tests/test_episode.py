@@ -7,6 +7,7 @@ from role_benchmark import (
     Episode,
     EpisodeProtocolError,
     EvaluationResult,
+    EXPRESSION_MODEL,
     ExperimentProposal,
     OracleStatus,
     FinalSubmission,
@@ -619,13 +620,20 @@ class ScriptedIdentificationPlayer:
                     "proportional to the square root of length and independent "
                     "of bob mass."
                 ),
-                model="normalized_power_law",
+                model=EXPRESSION_MODEL,
                 parameters={
-                    "reference_period_s": (
-                        2.0 * math.pi * math.sqrt(1.0 / 9.80665)
-                    ),
-                    "length_exponent": 0.5,
-                    "mass_exponent": 0.0,
+                    "outputs": {
+                        "period_s": {
+                            "op": "multiply",
+                            "args": [
+                                2.0 * math.pi * math.sqrt(1.0 / 9.80665),
+                                {
+                                    "op": "power",
+                                    "args": [{"var": "length_m"}, 0.5],
+                                },
+                            ],
+                        }
+                    }
                 },
                 scope_conditions=(
                     "0.20 <= length_m <= 2.00",

@@ -60,7 +60,7 @@ Include only fixed conditions needed to interpret the selected discovery formula
 Preserve operational definitions separately from captions and fitted relations. A readout anchor must cover how the observable is defined; claim anchors must additionally cover the equation, domain, aggregation, and uncertainty convention they assert. For each claim, control_domains must give one separately anchored source-applicability domain for every cited control, preserving whether it is an interval, discrete values, fixed value, symbolic statement, or unreported; never substitute the broader paper-level control domain. For each readout, resolution is either a separately anchored measurement_resolution/reporting_increment object or null when the source supports neither. Do not infer resolution from uncertainty or silently treat decimal formatting as instrument resolution.
 When the paper overloads notation or distinguishes a crossing-relative quantity from an absolute one, create separate readouts or claims and record the ambiguity. Never combine their equations or speculate why one presentation differs.
 When main text, caption, appendix, or supplement uses materially different definitions or formulas, record the issue in source_ambiguities and do not silently reconcile it. Link every ambiguity to all affected claims, mechanisms, controls, readouts, and fixed conditions; leave all reference arrays empty only when the ambiguity affects the paper globally.
-Set case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective source-grounded response within an explicit domain.
+Set case_authoring_ready true only when the extracted evidence can support at least one numeric control, one numeric readout, one quantitative mechanism, and an objective response supported by source evidence within an explicit domain.
 Do not generate Player background, initial observations, episode budgets, diagnostic or hidden conditions, counterfactuals, or code. The claim.oracle_outputs source relation is the only expression tree requested at this extraction stage.
 """
 
@@ -285,7 +285,7 @@ def build_science_card_repair_request(
                 "schema/locator diagnostic below. Preserve every other scientific "
                 "statement, equation, numeric value, uncertainty, domain, claim, "
                 "source ID, dependency, and locator from the rejected response. "
-                "Reconcile an unknown reference only with a source-grounded entity "
+                "Reconcile an unknown reference only with an entity supported by source evidence "
                 "already represented in the response and source; do not invent a "
                 "new scientific entity or fact. For a locator error, use only an "
                 "exact supporting range in the unchanged numbered source. Return "

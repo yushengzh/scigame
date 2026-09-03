@@ -106,7 +106,7 @@ authoritative response, then gives the Oracle LLM only the public case,
 proposal, and that response; its strict output contains only `message`.
 Evidence values, units, uncertainty, status, and budget behavior never come
 from the language model. The model name alone therefore never makes an Oracle
-response truth-grounded.
+response based on the benchmark simulator.
 
 The baseline transport is text in/text out with
 `structured_output_transport=False` and no format-regeneration call. Function
@@ -272,7 +272,7 @@ print(run.oracle_llm_stats)
 The log uses exclusive creation and never overwrites an existing path. It stores
 the exact public case snapshot, logical Player and optional Oracle model
 requests, each in-limit raw response, parse/second-generation events, accepted
-actions, truth-grounded Oracle responses, final evaluation, usage, and
+actions, simulator-based Oracle responses, final evaluation, usage, and
 termination reason. Cumulative episode states are bound by the ordered
 action/outcome stream and are reconstructed during replay.
 

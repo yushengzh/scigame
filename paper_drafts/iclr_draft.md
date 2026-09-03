@@ -3,7 +3,7 @@
 > **Working ICLR draft — Sections 2 and 3.** Repository snapshot: 31 August
 > 2026. This editorial note is not part of the manuscript. The current public
 > development release contains 20 historically anchored matched families and 9
-> source-grounded temporal families. It does not yet contain a formal private
+> paper-derived temporal task families. It does not yet contain a private
 > evaluation pack. Statements below distinguish the implemented protocol from
 > preregistered extensions.
 
@@ -176,7 +176,7 @@ component of the cited benchmark, not identical implementation.
 | --- | :---: | :---: | :---: | :---: | --- |
 | DiscoveryWorld | yes | partial | difficulty levels | no | Rich end-to-end laboratory; no paired ID/Discovery predictor contract |
 | PhysGym | yes | partial | yes | partial | Strong prior-control precedent; uses graded context rather than a matched structural/parametric split |
-| NewtonBench | yes | yes | system complexity | yes | Counterfactual law discovery; no same-world identification arm |
+| NewtonBench | yes | yes | system complexity | yes | Counterfactual law discovery; no same-world identification method |
 | DiscoverPhysics | yes | yes | fixed blind setting | yes | Closest blind executable discovery setting; no historical/identification pairing |
 | FALSIFYBENCH | yes | semantic rules | fixed | no | Player--Oracle falsification and trajectory analysis, not numerical extrapolation |
 | ScienceAgentBench / EXP-Bench | tool use | no | knowledge/task conditions | executable task artifacts | Paper-derived analysis or reproduction, not an intervenable hidden law |
@@ -248,9 +248,9 @@ The family constructor enforces five matching conditions.
 4. At least one allowed set of interventions within budget separates the worlds
    beyond the declared scoring tolerance.
 5. The executable truth from either world fails the other world's hidden test
-   in at least one condition. Thus, a canonical false twin cannot pass both.
+   in at least one condition. Thus, a predictor from one condition cannot pass both.
 
-For Player model \(m\), let \(Y_{f,w,d,m,k}\) be unconditional active pass on
+For Player model \(m\), let \(Y_{f,w,d,m,k}\) be unconditional held-out prediction success on
 repeat \(k\), including protocol-invalid terminations as failures. Repeats are
 first averaged within a cell. The prespecified family-level interaction is
 
@@ -274,7 +274,7 @@ The tracks differ in the object left unknown before interaction.
 
 | Component | Identification \(I\) | Discovery \(D\) |
 | --- | --- | --- |
-| Public model information | Formula scaffold; parameter names, meanings, units, and finite domains | A family-neutral executable expression grammar; no truth-specific model or parameter slots |
+| Public model information | Formula specification; parameter names, meanings, units, and finite domains | An executable expression grammar shared across task families; no target model or parameter slots |
 | Unknown object | \(\theta\) in \(g_f(x;\theta)\) | Functional structure and constants of \(\hat g(x)\) |
 | Experimental interface | Controls, readouts, resolution, and budget | Identical within the same world |
 | Final structured object | Family-specific named parameters | One expression program for each readout |
@@ -416,12 +416,12 @@ Every scheduled Player episode remains in the denominator. Terminal outcomes
 are: a submitted model, invalid Player output after the allowed generations, a
 decoded action rejected by the episode protocol, or reaching the action horizon
 without submission. We report submission availability, protocol completion,
-unconditional active pass, and—only as a diagnostic—scientific pass conditional
+unconditional held-out prediction success, and—only as a diagnostic—held-out prediction success conditional
 on submission. Provider transport or storage failures are infrastructure
 events; they do not become Player failures and must rerun the same prespecified
 schedule position.
 
-### 3.7 Forecast-grounded process diagnostics and failure modes
+### 3.7 Process measures based on pre-experiment predictions and failure modes
 
 For each valid turn, the experiment-discriminativeness diagnostic averages the
 pairwise normalized separation of the Player's ex-ante forecasts:
@@ -473,7 +473,7 @@ and judge sensitivity is reported, these scores are exploratory.
 
 ### 3.8 Family construction and executable quality gates
 
-A built-in family starts from a sourced scientific relation and an explicit
+A hand-authored task family starts from a scientific relation supported by a cited source and an explicit
 modern idealization. Authors specify the public apparatus, controls, readouts,
 fixed conditions, diagnostic interventions, hidden interventions, a
 family-specific identification scaffold, and two private executable truths.
@@ -502,15 +502,15 @@ Admission applies the following deterministic gates:
 The current public development suite contains 20 historically anchored
 families (80 cells) across mechanics, waves, gases, electromagnetism,
 radiation, circuits, heat transfer, optics, kinetics, diffusion, and fluid
-transport. A separate source-grounded registry contains 9 temporal families
+transport. A separate registry contains 9 temporal task families derived from recent papers
 (36 cells), for 29 admitted families and 116 cells in total. Contract canaries
-accept the known truth and reject the opposite-world false twin in all 116
+accept the known truth and reject the predictor from the paired condition in all 116
 cells; 1,242 sampled legal deterministic queries return finite, unit-consistent,
 repeat-identical evidence, and the current repository test suite passes 410
 tests. These checks establish executable consistency. They do not substitute
 for source review, experimental replication, or a model evaluation.
 
-### 3.9 Source-grounded temporal authoring
+### 3.9 Construction of temporal evaluation instances from recent papers
 
 The temporal path is designed to enlarge scientific provenance without letting
 an LLM invent the case truth. A release begins with a fixed date interval and a
@@ -552,7 +552,7 @@ cannot transcribe or rewrite the executable formulas. A deterministic binder
 compiles the selected reviewed claims into both private response functions and
 inserts source-supported parameter values. Subsequent filters check source
 lineage, public/private information boundaries, expression totality,
-observation capacity, diagnostic separability, hidden-test false twins, and
+observation capacity, diagnostic separability, predictors drawn from paired conditions, and
 matched controls, readouts, and evidence modality. A final reviewer verifies
 that the family closes against the original source.
 
@@ -562,7 +562,7 @@ even though the current storage interface reuses the two-world field. They do
 not automatically manipulate historical familiarity and therefore must not be
 pooled into the primary \(H/C\) interaction defined in Section 3.2. They
 support a separate
-source-grounded transfer analysis of the Identification--Discovery contrast.
+separate analysis of the Identification--Discovery contrast on paper-derived temporal tasks.
 Two additional candidates are retained as rejected provenance because their
 proposed branches did not define mutually exclusive worlds under a shared
 observable. Source-reported uncertainty is preserved as provenance, while the
@@ -599,7 +599,7 @@ not a change to the benchmark truth.
 
 The present draft therefore supports a precise methodological claim: the
 repository implements a matched evaluation surface for active identification
-and predictive law induction, plus a source-grounded route for adding recent
+and predictive law induction, plus a documented procedure for constructing tasks from recent
 relations. Claims about model rankings, the magnitude of the factorial
 interaction, calibrated scientific process, or formal private performance
 require the preregistered multi-model study rather than the public development

@@ -1,6 +1,7 @@
 import unittest
 
 from role_benchmark import (
+    BenchmarkTrack,
     CaseOracle,
     Episode,
     ExperimentProposal,
@@ -20,6 +21,7 @@ from role_benchmark.cases import (
     make_rutherford_scattering_case,
     make_young_double_slit_case,
 )
+from role_benchmark.cases.matched import truth_submission
 
 
 def confident_portfolio():
@@ -104,60 +106,34 @@ def scattering_proposal(
 
 
 def correct_young_submission():
-    return FinalSubmission(
-        hypothesis_id="H1",
-        explanation="Fringe spacing follows the fitted geometric scaling.",
-        model="double_slit_power_law",
-        parameters={
-            "reference_spacing_mm": 1.10,
-            "wavelength_exponent": 1.0,
-            "screen_distance_exponent": 1.0,
-            "slit_separation_exponent": -1.0,
-        },
+    return truth_submission(
+        YOUNG_DOUBLE_SLIT_SPEC,
+        "historical",
+        BenchmarkTrack.IDENTIFICATION,
     )
 
 
 def correct_faraday_submission():
-    return FinalSubmission(
-        hypothesis_id="H1",
-        explanation="Peak voltage follows the rate of magnetic-flux change.",
-        model="faraday_flux_change_power_law",
-        parameters={
-            "reference_emf_mv": 20.0,
-            "turn_exponent": 1.0,
-            "area_exponent": 1.0,
-            "field_change_exponent": 1.0,
-            "change_time_exponent": -1.0,
-        },
+    return truth_submission(
+        FARADAY_INDUCTION_SPEC,
+        "historical",
+        BenchmarkTrack.IDENTIFICATION,
     )
 
 
 def correct_decay_submission():
-    return FinalSubmission(
-        hypothesis_id="H1",
-        explanation="Net activity halves after a fixed elapsed time.",
-        model="single_exponential_decay",
-        parameters={
-            "background_cpm": 20.0,
-            "reference_activity_cpm": 800.0,
-            "half_life_min": 60.0,
-            "mass_exponent": 1.0,
-        },
+    return truth_submission(
+        RADIOACTIVE_DECAY_SPEC,
+        "historical",
+        BenchmarkTrack.IDENTIFICATION,
     )
 
 
 def correct_scattering_submission():
-    return FinalSubmission(
-        hypothesis_id="H1",
-        explanation="The angular and foil dependences fit a central-scattering law.",
-        model="rutherford_scattering_law",
-        parameters={
-            "reference_count_rate_cpm": 120.0,
-            "atomic_number_exponent": 2.0,
-            "areal_number_density_exponent": 1.0,
-            "exposure_exponent": 1.0,
-            "sine_half_angle_exponent": -4.0,
-        },
+    return truth_submission(
+        RUTHERFORD_SCATTERING_SPEC,
+        "historical",
+        BenchmarkTrack.IDENTIFICATION,
     )
 
 
@@ -331,18 +307,20 @@ class AdditionalHistoricalEvaluatorTest(unittest.TestCase):
                 self.assertTrue(episode.result.evaluation.success)
                 self.assertEqual(episode.result.attempts_used, 1)
 
-    def test_extra_parameters_and_unsupported_models_fail_cleanly(self):
+    def test_unknown_control_references_and_unsupported_models_fail_cleanly(self):
         young = correct_young_submission()
-        extra_parameters = dict(young.parameters)
-        extra_parameters["unused"] = 1.0
         cases = (
             (
                 make_young_double_slit_case(),
                 FinalSubmission(
                     hypothesis_id="H1",
-                    explanation="Includes an undeclared parameter.",
+                    explanation="References an undeclared control.",
                     model=young.model,
-                    parameters=extra_parameters,
+                    parameters={
+                        "outputs": {
+                            "fringe_spacing_mm": {"var": "unused"},
+                        }
+                    },
                 ),
             ),
             (

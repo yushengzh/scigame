@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from role_benchmark import (
     BenchmarkTrack,
@@ -21,6 +22,8 @@ from role_benchmark.cases import (
     make_galileo_inclined_plane_case,
     make_photoelectric_case,
 )
+from role_benchmark.cases.matched import truth_submission
+from role_benchmark.expression import EXPRESSION_MODEL
 
 
 def confident_portfolio():
@@ -89,44 +92,37 @@ def photoelectric_proposal(
 
 
 def correct_galileo_submission(explanation="Uniform acceleration fits the data."):
-    return FinalSubmission(
-        hypothesis_id="H1",
+    return replace(
+        truth_submission(
+            GALILEO_INCLINED_PLANE_SPEC,
+            "historical",
+            BenchmarkTrack.IDENTIFICATION,
+        ),
         explanation=explanation,
-        model="inclined_plane_power_law",
-        parameters={
-            "reference_water_mass_g": 24.0,
-            "distance_exponent": 0.5,
-            "sine_angle_exponent": -0.5,
-            "mass_exponent": 0.0,
-        },
     )
 
 
 def correct_boyle_submission(explanation="Pressure and volume vary inversely."):
-    return FinalSubmission(
-        hypothesis_id="H1",
+    return replace(
+        truth_submission(
+            BOYLE_J_TUBE_SPEC,
+            "historical",
+            BenchmarkTrack.IDENTIFICATION,
+        ),
         explanation=explanation,
-        model="boyle_inverse_law",
-        parameters={
-            "reference_volume_ml": 48.0,
-            "ambient_pressure_kpa": 101.3,
-            "pressure_exponent": -1.0,
-        },
     )
 
 
 def correct_photoelectric_submission(
     explanation="Frequency sets electron energy; absorbed photon flux sets their number.",
 ):
-    return FinalSubmission(
-        hypothesis_id="H1",
+    return replace(
+        truth_submission(
+            PHOTOELECTRIC_SPEC,
+            "historical",
+            BenchmarkTrack.IDENTIFICATION,
+        ),
         explanation=explanation,
-        model="einstein_photoelectric_law",
-        parameters={
-            "h_over_e_v_s": 4.135667696e-15,
-            "work_function_equivalent_v": 2.28,
-            "reference_saturation_current_ua": 3.0,
-        },
     )
 
 
@@ -302,7 +298,7 @@ class HistoricalEvaluatorTest(unittest.TestCase):
                 self.assertEqual(result.scores["predictive_model_pass"], 0.0)
                 self.assertNotIn("explanation_correct", result.scores)
 
-    def test_existing_protocol_scores_parameters_not_explanatory_prose(self):
+    def test_existing_protocol_scores_predictor_not_explanatory_prose(self):
         case = make_photoelectric_case()
         submission = correct_photoelectric_submission(
             explanation=(
@@ -314,16 +310,18 @@ class HistoricalEvaluatorTest(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.scores["predictive_model_pass"], 1.0)
 
-    def test_new_case_evaluators_turn_huge_parameters_into_failures(self):
+    def test_new_case_evaluators_turn_nonfinite_predictions_into_failures(self):
         case = make_galileo_inclined_plane_case()
         submission = FinalSubmission(
             explanation="An invalid numeric model.",
-            model="inclined_plane_power_law",
+            model=EXPRESSION_MODEL,
             parameters={
-                "reference_water_mass_g": 10**10000,
-                "distance_exponent": 0.5,
-                "sine_angle_exponent": -0.5,
-                "mass_exponent": 0.0,
+                "outputs": {
+                    "collected_water_g": {
+                        "op": "multiply",
+                        "args": [1.0e308, 1.0e308],
+                    }
+                }
             },
         )
         result = case.evaluator.evaluate(submission)

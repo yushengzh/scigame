@@ -1,6 +1,6 @@
 # Role Benchmark：评测构念、代码管线与相关工作
 
-> 状态：截至 2026-08-25 的研究定位与实现说明。关于轨道、评分语义和正式评测边界，唯一规范来源仍是 [`evaluation_policy.md`](evaluation_policy.md)；本文用于解释，而不覆盖该规范。
+> 状态：截至 2026-09-03 的研究定位与实现说明。关于任务设置、评分语义和正式评测边界，唯一规范来源仍是 [`evaluation_policy.md`](evaluation_policy.md)；本文用于解释，而不覆盖该规范。
 
 ## 1. 一句话定义与结论边界
 
@@ -79,10 +79,10 @@ CaseOracle 资源检查 -- 非法 --> 中性状态与说明
 WorldModel.run() -------> measurement + unit + uncertainty
         |
         v
-可选 LLM Oracle 只改写中性 message，不生成数值事实
+可选 LLM presentation 严格呈现确定性 observation
 ```
 
-这一拆分很重要。即使 Player 和 Oracle 使用同一 provider 和 model ID，它们也是两个独立请求上下文；更重要的是，模型权重不决定证据。所谓“Oracle 客观正确”只表示返回值符合预定义 case 世界，不表示它能对真实自然界任意问题给出绝对真理。
+这一拆分很重要。确定性 `CaseOracle` 是主要方案。可选的 LLM presentation 只能呈现已经由 `WorldModel` 生成的 observation，不得改变状态、测量值、单位或不确定性。该可选路径的 Oracle 准确性审计尚未完成，因此不能预先视为与确定性接口等价，也不能在审计前用于主要结果。所谓“Oracle 客观正确”只表示返回值符合预定义 case 世界，不表示它能对真实自然界任意问题给出绝对真理。
 
 ### 2.5 过程/轨迹评测与 outcome 评测
 
@@ -93,13 +93,13 @@ WorldModel.run() -------> measurement + unit + uncertainty
 - `experiment_discriminativeness_mean`：有效实验上，各活动假设事前预测的平均成对相对分离度；
 - `evidence_aligned_belief_update_rate`：持续存在的假设对中，置信差是否向预测误差更小者移动。
 
-二者都附带可评分 pair count，不合并进最终 `predictive_model_pass`，也不等价于贝叶斯更新、置信校准或一般科学方法质量。
+二者都附带可评分 pair count，不合并进连续 `held_out_prediction_score`，也不等价于贝叶斯更新、置信校准或一般科学方法质量。
 
 ### 2.6 LLM-as-a-Judge
 
 **以大模型为裁判（LLM-as-a-judge）**适合评价难以完全机械化的维度，例如 explanation 是否忠实于实验、是否忽略反证、scope 是否过度延伸。它不是客观真值的替代物。MT-Bench/Chatbot Arena 的研究记录了位置、冗长和自我偏好等偏差（[论文](https://arxiv.org/abs/2306.05685)，[代码](https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge)）；[G-Eval](https://arxiv.org/abs/2303.16634) 也报告了对 LLM 生成文本的潜在偏好；[JudgeBench](https://arxiv.org/abs/2410.12784) 则表明，当标签来自客观正确性而非一般人类偏好时，强 judge 也可能表现很差。
 
-因此当前协议的次序是：先由 executable predictor 的私有测试决定科学 outcome，再由 post-hoc Judge 对完整的**可观察** transcript 输出独立维度。Judge 不得覆盖或平均进 `predictive_model_pass`。当前实现提供六个严格解码但仍属 exploratory 的 Judge 轴；在人工校准和跨 Judge reliability 验证前，它们不是正式主指标。
+因此当前协议的次序是：先由 executable predictor 的私有测试决定连续科学 outcome，再由 post-hoc Judge 对完整的**可观察** transcript 输出独立维度。Judge 不得覆盖或平均进 `held_out_prediction_score`。当前实现提供六个严格解码但仍属 exploratory 的 Judge 轴；在人工校准和跨 Judge reliability 验证前，它们不是正式主指标。
 
 ### 2.7 合成、虚构与反事实世界
 
@@ -192,12 +192,7 @@ FinalEvaluator on held-out interventions
 
 ### 3.3 评分对象
 
-当前主分数名为 `predictive_model_pass`。它只表示结构化 predictor 在该 family
-预定义的 matched hidden interventions 上达到公开 tolerance，不表示 explanation 正确。
-误差按各 readout 的测量分辨率与 family 的相对 tolerance 缩放；四格使用相同条件与
-阈值。identification 另报告 named parameter 误差；discovery 不比较表达式字符串或
-canonical 公式，只要求合法 `expression` 在 evaluation domain 达标。该结果只支持域内
-预测充分性，不证明全域行为等价或完整规律恢复。
+当前主要结果变量是连续的 `held_out_prediction_score`。每个 held-out absolute error 先除以该 readout 的 absolute tolerance 加 relative tolerance 乘目标值绝对值，再计算 `1 / (1 + mean scaled error)`。该分数位于 `[0,1]`，越高越好；无效或缺失的 Player submission 记为 0，基础设施失败视为缺失并重跑。二元 `predictive_model_pass`、protocol completion 和参数误差均单独报告，不替代连续主指标。Identification 与 Discovery 使用相同的 executable predictor 表示、evaluation procedure、held-out conditions 和 scorer。Discovery 不比较表达式字符串或 canonical 公式，只要求合法 `expression` 在 evaluation domain 上给出充分预测。有限 held-out evaluation 不证明全域行为等价或完整规律恢复。
 
 这种“先定义可执行对象，再定义外推误差”的方式避免让自然语言字符串相似度决定科学正确性。Rationale、scope 和置信度仍被记录，但目前不进入主科学 outcome。
 
@@ -281,7 +276,7 @@ measurement 数计数，而不只报对话轮次，因为不同 benchmark 的单
 
 因此，`player_output_invalid`、`action_rejected` 和 `action_limit` 必须保留为被评测系统的失败结果，不能通过事后解析、补全提交或改写标签“修复”为科学成功。报告至少应同时给出：
 
-- **全分母 active pass**：`pass / 所有 evaluated outcomes`，作为主指标；
+- **无条件 held-out prediction success**：`pass / 所有 evaluated outcomes`，作为主指标；
 - **科学可评率**：`scientifically_evaluable / 所有 evaluated outcomes`，显示有多少 final 可进入科学评分；
 - **协议完成率**：`protocol_completed / 所有 evaluated outcomes`，与科学可评率分开；
 - **条件预测通过率**：`evaluation_success / scientifically_evaluable`，只作为次要科学诊断，不能替代全分母结果；
@@ -401,16 +396,17 @@ Provider-neutral adapter 只规定 `GenerationRequest -> GenerationResponse`，�
 - 每个 family 的两条 track 共享同一 WorldModel、装置、控制量、readout、预算和
   hidden interventions；两个 world 只改变 spec 中明确记录的一项私有机制；
 - 每个 family 的来源 credit、反事实动机与具体合同见 [`case_catalog.md`](case_catalog.md)；
-- provider-neutral Player adapter、独立的可选 LLM Oracle presentation layer、严格 action schema、JSONL 记录与行为 replay；
+- prior-only baseline、fixed experimental design 和 adaptive experimental design；fixed 与 adaptive methods 使用相同的 family-specific observation budget \(B\)，三种 methods 共享最终表示、held-out conditions、scorer、生成配置和工具权限；
+- 连续 held-out prediction score 作为 primary outcome，二元 pass、protocol completion 和过程指标分开报告；
+- H/C 与 Temporal source-reported conditions 的显式 condition-role contract，以及逐 model-profile × Temporal benchmark instance 保存公开日期、model snapshot、training-data cutoff、权限和暴露事实的记录合同；未知信息保持 `exposure_unknown`；
+- provider-neutral Player adapter、确定性 Oracle 主方案、独立的可选 LLM Oracle presentation、严格 action schema、JSONL 记录与行为 replay；
 - executable final evaluator、确定性 trajectory breakdown 与 post-hoc failure-mode analyzer。
 
-尚未实现：正式隔离服务、私有 case pack、每个 family 的多个私有 variants、publisher feeds 自动采集与 completeness 证明、批量多-cluster authoring、通用 fictional-world generator、人工 Judge 校准集和抗污染 leaderboard。近期论文方向采用 journal-first 路径：先对固定 `[start,end]` 的 Nature、Science 和 PRL 期刊记录做 census，再要求调用方提供 DOI-keyed publisher reconciliation，并用 DOI 与标题/第一作者合成一次 arXiv recall。唯一 DOI 相等优先；只对未声明 DOI 的 candidate 使用唯一 exact-title+first-author-family fallback，明示冲突 DOI 不能被题名/作者覆盖。随后固定 `/src` 版本并显式检查 `.tex`。两个 LLM proposal stage 分别产生 locator-linked private `ScienceCard` 与至多一个 matched draft；中间和末端各有独立 source review，确定性 lineage/filter/canary 决定能否渲染。找到 arXiv 记录不保证存在 TeX，这个 gate 不能省略。同一 source paper 未来产生的 sibling families 不视为统计独立，推断至少按期刊 DOI/source paper 聚类。详见 [`temporal_case_pipeline.md`](temporal_case_pipeline.md)。当前 source-only accepted temporal case 数为 0，该路径尚未形成 rotating private cohort。这里的 live census 是可重复运行的时间窗快照，不是常驻监听服务。当前 20 个 family 都是透明 public development fixtures；数量增加不改变这一威胁模型边界。
+尚未实现：正式隔离服务、private test set、每个 task family 的多个 private benchmark instances、publisher feeds 自动采集与 completeness 证明、批量多-cluster authoring、通用 fictional-world generator、人工 LLM-as-a-Judge 校准集和抗污染 leaderboard。近期论文方向采用 journal-first 路径：先对固定 `[start,end]` 的 Nature、Science 和 PRL 期刊记录做 census，再要求调用方提供 DOI-keyed publisher reconciliation，并用 DOI 与标题/第一作者合成一次 arXiv recall。唯一 DOI 相等优先；只对未声明 DOI 的 candidate 使用唯一 exact-title+first-author-family fallback，明示冲突 DOI 不能被题名/作者覆盖。随后固定 `/src` 版本并显式检查 `.tex`。两个 LLM proposal stages 分别产生 locator-linked private `ScienceCard` 与至多一个 case draft；中间和末端各有独立 source review，确定性 source provenance、filter 和 test 决定能否渲染。找到 arXiv 记录不保证存在 TeX，这个 filter 不能省略。同一 source paper 产生的多个 task families 不视为统计独立，推断至少按期刊 DOI/source paper 聚类。详见 [`temporal_case_pipeline.md`](temporal_case_pipeline.md)。当前 Temporal registry 含 9 个经过来源核对的 families、36 个公开 development instances；每个 family 的两个 source-reported conditions 都不是 H/C conditions。该流程尚未形成 rotating private test set。这里的 live census 是可重复运行的时间窗快照，不是常驻监听服务。全部 116 个公开 development instances 都不能支持 contamination-resistant formal claim。
 
 当前 `experiments/` 的 60-episode 最小验证虽然有三个 Player profile 槽位，但截至本文日期三个槽位都绑定 `deepseek-v4-flash`、关闭 thinking、使用相同推理设置。它们创建独立 backend 对象并形成三个重复组，**不是三个不同模型 treatment**；托管 API 也不能保证三份不同服务器权重实例。五次 repeat 主要观测 provider-side 变异。该实验适合检验管线和形成初步 effect-size 假设，不足以支持模型间排名或一般化的科学发现结论。
 
-跨 case runner 现在生成 `20 families × 2 worlds × 2 tracks × 5 repeats = 400`
-个 episode 的五个 80-cell randomized complete blocks。这个数字描述已冻结的开发运行
-计划，不表示 400 个 episode 已经实际执行，也不增加 family-level 独立样本量。
+跨 case runner 已实现三种 evaluation methods。对同时包含 easy/hard variants 的 curated pack，完整开发计划为 `20 families × 2 variants × 2 H/C conditions × 2 task settings × 3 methods × 5 repeats = 2,400` 个 sessions；source-reported Temporal pack 的对应计划为 `9 families × 2 conditions × 2 task settings × 3 methods × 5 repeats = 540` 个 sessions。Fixed 与 adaptive experimental design 对同一 family 使用相同的 \(B\)。这些数字只描述可生成的计划，不表示 sessions 已经实际执行，也不增加 family-level 独立样本量。已冻结但尚未运行的 `EXP-METHOD-PILOT-001` 共有 360 个 sessions，配置见 [`../experiments/registrations/EXP-METHOD-PILOT-001/`](../experiments/registrations/EXP-METHOD-PILOT-001/)；本文不登记结果。
 
 ## 4. 相关工作：最相近的已有路线
 
@@ -457,20 +453,20 @@ FALSIFYBENCH 从 17,905 个 WordNet 组合中人工筛选 100 个 game，目标�
 | [DiscoveryWorld](https://arxiv.org/abs/2406.06769)（[GitHub](https://github.com/allenai/discoveryworld)） | 120 个任务、8 个主题、3 个难度，含参数变体；完整假设—实验—分析—行动循环，并评分 task completion、relevant actions、explanatory knowledge | 已经是成熟的端到端虚拟科学发现环境；本项目的差异只能是更小的变量控制、双轨信息合同和 executable held-out prediction |
 | [Auto-Discovery-Bench](https://arxiv.org/abs/2502.15224)（2026 年改名为 Auto-Bench） | 确定性 Oracle 引导的图、无向关系与符号方程发现；隔离长程结构化状态维护 | 已有 deterministic oracle-guided discovery 诊断；本项目额外要求显式竞争假设 forecasts，并操纵是否公开模型族 |
 | [PhysGym](https://arxiv.org/abs/2507.15550)（NeurIPS 2025 Datasets & Benchmarks，[GitHub](https://github.com/principia-ai/PhysGym)） | 97 个交互式物理问题；同一任务设置四级先验知识，从完整描述逐步降到匿名变量，并在预算内追踪实验历史、方程和模型 fidelity | 已经系统操纵“Player 事前知道多少”，因此本项目不能声称首次控制科学先验；潜在差异是把 truth 是否符合现实先验与 truth-family 是否公开拆成两个正交轴 |
-| [NewtonBench](https://arxiv.org/abs/2510.07172)（ICLR 2026，[GitHub](https://github.com/HKUST-KnowComp/NewtonBench)） | 12 个物理域、324 个任务；系统改变 canonical laws，要求 agent 交互探索模拟系统；研究复杂度、噪声和代码工具 | 已经覆盖反事实规律与主动科学 law discovery，是最强直接近邻之一；其主设计没有把同一世界的“公开族估参 vs 盲族归纳”作为配对轴 |
+| [NewtonBench](https://arxiv.org/abs/2510.07172)（ICLR 2026，[GitHub](https://github.com/HKUST-KnowComp/NewtonBench)） | 12 个物理域、324 个任务；系统改变 canonical laws，要求 agent 交互探索模拟系统；研究复杂度、噪声和代码工具 | 已经覆盖反事实规律与主动科学 law discovery，是最强直接近邻之一；本项目只把它作为规律变更、量纲一致性和实验预算的设计参照，不沿用其难度定义 |
 | [LLM-AutoSciLab / ActiveSciBench](https://arxiv.org/abs/2605.24043)（[GitHub](https://github.com/scientific-discovery/LLM-AutoSciLab)） | 闭环生成假设、按假设选择实验并据结果细化机制；ActiveSciBench-Chem 含 57 个酶动力学任务，ActiveSciBench-GRN 含 45 个基因调控网络任务，并在预算约束下评价机制恢复 | 已直接实现 hypothesis-conditioned active experimentation，故本项目不能声称首次以显式假设驱动实验；本项目待验证的是 matched historical/counterfactual × identification/discovery 合同及逐假设事前数值 forecast 的诊断增益 |
 | [DiscoverPhysics](https://arxiv.org/abs/2605.26087)（[GitHub](https://github.com/SampsonML/DiscoverPhysics)） | 22 个偏离现实的 N-body 世界；agent 设计初值实验、看 noisy trajectories，提交 Python law 与解释；用 held-out trajectory MSE 和 rubric-based LLM Judge | 与本项目的 synthetic physics discovery、主动实验、executable predictor 和 Judge 设想高度重叠；本项目仅在 matched historical/counterfactual × identification/discovery 诊断上有潜在差异 |
 | [Testing Frontier LLMs’ Physics Literacy in Parallel Physical Worlds](https://arxiv.org/abs/2607.00276)（[GitHub](https://github.com/dongzhang84/physlit)） | 比较单方程反事实、Aristotelian historical framework 和多域反事实世界，分 induction/formulation/prediction/review | 已经把 historical 与 counterfactual frameworks 放在同一诊断中；其公开设计不是本项目这种预算内 Player-selected experiment/WorldModel 循环 |
 | [petri-bench](https://www.petri-labs.org/bench/report)（工作稿，[Zenodo DOI](https://doi.org/10.5281/zenodo.20618024)） | 程序生成的多域因果 mystery worlds，预算内盲实验，客观评分 correctness、controlled-method rigor 和 efficiency，并单列过程审计 | 已覆盖 fresh ground truth、过程方法评分和无 LLM Judge 主指标；当前尚是技术工作稿，但足以排除相关“首次”声明 |
 
-这里对 NewtonBench 的区别需要说得更精确。它把 108 条 shifted laws 各自实例化到 Vanilla Equation、Simple System 和 Complex System，得到 324 个任务；所以它确实有**同一规律跨系统嵌入复杂度的匹配比较**。在所有这些任务中，目标方程都隐藏，辅助方程和计算图公开，agent 通过黑盒实验恢复目标结构；主设计轴是 target-law mutation 难度与 surrounding-system complexity，而不是 family disclosure。
+这里对 NewtonBench 的借鉴边界需要说得更精确。它把 108 条 shifted laws 各自实例化到 Vanilla Equation、Simple System 和 Complex System，得到 324 个任务；所以它确实有**同一规律跨系统嵌入复杂度的匹配比较**。在所有这些任务中，目标方程都隐藏，辅助方程和计算图公开，agent 通过黑盒实验恢复目标结构；主设计轴是 target-law mutation 难度与 surrounding-system complexity，而不是 family disclosure。本项目借鉴的是最小规律变更、量纲一致性检查和预算内可辨识性等设计原则；本文中的 `easy`/`hard` 是项目内预先定义的变更强度，不对应 NewtonBench 的 Vanilla/Simple/Complex 或其他难度标签。
 
 所谓缺少“公开族估参 vs 盲族归纳”的配对轴，具体指它没有对同一个 `f_target`、同一个模拟器和同一组评分条件同时提供下面两个 twin：
 
 1. **Identification twin**：公开目标方程的结构骨架、参数槽和含义，只隐藏参数值；
 2. **Discovery twin**：不公开该真值特有的结构，只给所有 case 共用的通用表达式合同。
 
-两者若只相差这一项，分数差才可解释为“公开正确模型族带来的收益”。NewtonBench 的附录为了证明 noiseless solvability，假设目标来自有限、grammar-bounded candidate family；这说明它并非数学上无限制的开放发现，但该候选族假设不等于在一个对照 arm 中把正确结构骨架直接告诉 agent。相反，NewtonBench 当前的 Vanilla/Simple/Complex 配对测的是隐藏规律被多少已知辅助方程包围。
+两者若只相差这一项，分数差才可解释为“公开正确模型族带来的收益”。NewtonBench 的附录为了证明 noiseless solvability，假设目标来自有限、grammar-bounded candidate family；这说明它并非数学上无限制的开放发现，但该候选族假设不等于在一种对照方法中把正确结构骨架直接告诉 agent。相反，NewtonBench 当前的 Vanilla/Simple/Complex 配对测的是隐藏规律被多少已知辅助方程包围。
 
 本项目 20 个 public matched families 尝试实现的正是这个窄 contrast。每个
 world 的两条 track 共用同一个 `WorldModel`、装置、预算、evidence 和 held-out
@@ -530,7 +526,7 @@ NewtonBench 更全面或更可靠的 law-discovery benchmark。
 - 每个 track 内的 counterfactual penalty；
 - 每个 world 内的 discovery penalty；
 - 二者的 interaction，即 difference-in-differences；
-- 全分母 active pass 与 protocol completion，避免只在成功提交上条件化后掩盖 schema/protocol 失败。
+- 连续 held-out prediction score 与 protocol completion；二元 prediction pass 另行报告，避免只在成功提交上条件化后掩盖 schema/protocol 失败。
 
 如果 counterfactual penalty 只在 discovery 显著放大，才初步支持“模型在未知族、先验冲突时更难从 evidence 归纳”的差异化命题。若 identification 同样下降，可能只是数值估计或一般执行问题；若 historical 与 counterfactual 都一样，则该 matched pair 没有诊断力。
 
@@ -552,20 +548,24 @@ pendulum 的弱质量依赖和 Young 双缝的缝间距指数 `-1 -> -0.5` 属�
 
 另一类是 **structural counterfactual**，包括加法与乘法替换、耦合项增删、指数衰减与 stretched/multi-component 动力学、延迟或记忆、对称性破缺、阈值和 regime change，以及干预下可区分的替代因果图。这些 case 能覆盖更丰富的科学机制，但往往同时改变表达长度、参数数目或最优实验策略。它们应按机制预先分层并做复杂度匹配，作为扩展分析；在完成匹配前，不与最小 prior-conflict twins 混成一个主 DiD。
 
-因此，现有历史 family 不能只增加 `world` 和 `track` 字段就自动变成有效四格。每个 family 仍需逐项通过量纲/定义域检查、预算内可辨识性检查、双向 false-twin hidden-test 检查，并为 discovery 提供不泄露真值族的公共表示。若需要三角函数、阈值或条件分支，应扩展所有 discovery case 共用的 grammar，而不是加入只为某个答案服务的 case-specific operator。
+因此，现有历史 family 不能只增加 `world` 和 `track` 字段就自动变成有效四格。每个 family 仍需逐项通过量纲/定义域检查、预算内可辨识性检查，并确认每个条件的真实预测器不能通过配对条件的 hidden tests；同时还需为 discovery 提供不泄露真值族的公共表示。若需要三角函数、阈值或条件分支，应扩展所有 discovery case 共用的 grammar，而不是加入只为某个答案服务的 case-specific operator。
 
-若主张要进一步收窄为“只操纵 family disclosure”，identification 与 discovery 还应使用同一个最终 predictor encoding；identification 只额外公开可实例化的正确骨架。当前实现中 identification 提交 named parameters，discovery 提交通用 expression AST，因此当前 interaction 是两个完整 track contract 的端到端对比，也包含输出表示和解析难度。正式验证前应统一最终 encoding；若暂时保留现状，则必须分报 invalid action、protocol completion 和 scientifically evaluable submission，不能把全部差异归因于模型族是否公开。
+公开 curated pack 的每个 H/C pair 还提供两种完整变体。`easy` 保留原始 counterfactual 规律；`hard` 把唯一改变的规律坐标移到 historical 与原始 counterfactual 的中点。两个变体都保留公式形式、单位、控制量、readout、接口、固定实验设计、预算 (B) 和 scorer，因此 `easy`/`hard` 表示变更强度，而不是增加新机制或改变量纲。
+
+另有四个由 Temporal 主题派生的 H/C family，存放在独立的 benchmark-authored pack：`self_similar_spreading_radius_ratio`、`statistical_mean_field_effective_detuning`、`stealthy_hyperuniform_localization_scaling` 和 `uamo_lyapunov`。其 `easy` 与 `hard` 强度系数分别为 `0.75` 和 `0.5`。这些是 benchmark 作者构造的 H/C 变体，不是论文报告的两种条件；原 Temporal registry 中的两个 source-reported conditions 保持不变。
+
+Identification 与 Discovery 现在使用相同的最终可执行 `expression` 表示、相同的 evaluator 和相同的 held-out conditions；identification 只额外公开可实例化的正确骨架。因此 P0.1 的表示混杂已在核心合同中消除，invalid action、protocol completion 和 scientifically evaluable submission 仍需分报。
 
 ### 5.4 正式验证的预注册量与规模
 
-令 `P_{w,t}` 表示某一 model profile 在 world `w` 和 track `t` 上的**全分母 active-pass 概率**，其中 `H/C` 分别表示 historical/counterfactual，`I/D` 分别表示 identification/discovery。主预注册量为：
+令 `Y_{w,t}` 表示某一 model profile 在 world `w` 和 track `t` 上的**连续 held-out prediction score 期望值**，其中 `H/C` 分别表示 historical/counterfactual，`I/D` 分别表示 identification/discovery。主预注册量为：
 
 ```text
-Delta = (P_H,D - P_C,D) - (P_H,I - P_C,I)
-      = (P_H,D - P_H,I) - (P_C,D - P_C,I)
+Delta = (Y_H,D - Y_C,D) - (Y_H,I - Y_C,I)
+      = (Y_H,D - Y_H,I) - (Y_C,D - Y_C,I)
 ```
 
-当越高越好时，`Delta > 0` 表示 historical 相对 counterfactual 的优势在盲 discovery 中更大，而 identification 暴露正确 super-family 后该优势缩小。这才与“既有先验主要影响未知族归纳”一致。若主结果使用 loss，则必须在预注册中反转或重新定义符号；不能把概率差的 `Delta` 与 logistic interaction 当作同一个 estimand。
+当越高越好时，`Delta > 0` 表示 historical 相对 counterfactual 的优势在盲 discovery 中更大，而 identification 暴露正确 super-family 后该优势缩小。这才与“既有先验主要影响未知族归纳”一致。二元 `predictive_model_pass` 是次要结果；不能把连续分数差的 `Delta`、通过概率差和 logistic interaction 当作同一个 estimand。
 
 episode 不是统计独立单位。令 `Y[f,v,m,r,w,t]` 为一次预定运行；其中 variant `v` 必须定义一套完整的 matched quadruplet，在相同 nuisance calibration、接口和 hidden coordinates 下实例化 `H/C x I/D`，不能让四个 cell 独立抽取不同 variant。先在最小 cell 内对 provider repeats `r` 取平均，再计算 variant-level contrast：
 
@@ -586,9 +586,9 @@ delta[f,v,m] = (mean_Y_H,D - mean_Y_C,D) - (mean_Y_H,I - mean_Y_C,I)
 - 使用 `6--8` 个真正不同的 model profiles，覆盖 reasoning/non-reasoning 与闭源/开源；profile 应固定 weights/model、provider、reasoning mode、system prompt、action parser 和 generation settings，而不是只记录一个营销模型名；
 - 每个实例重复 `3--5` 次，用于估计生成随机性，不把重复当成新 case；
 - public development pack 用于协议和 agent 调试，private rotating evaluation pack 用于正式测量；active pack 不参与 prompt 调优，轮换后可退役或公开；
-- 随机交错各 cell，并预注册 aggregation order、重试规则和缺失处理。Player/schema/protocol 失败保留在 active-pass 分母；可归因于评测基础设施的失败只重跑同一预定 cell。
+- 随机交错各 cell，并预注册 aggregation order、重试规则和缺失处理。Player/schema/protocol 失败保留在无条件 held-out prediction success 的分母；可归因于评测基础设施的失败只重跑同一预定 cell。
 
-例如，`15 families x 2 private variants x 4 cells x 6 models x 3 repeats = 2,160 episodes`；`20 x 3 x 4 x 7 x 4 = 6,720 episodes`。这些数量足以形成数千次运行，但有效独立信息仍主要来自 15 或 20 个 matched families。当前已经完成 20-family public authoring 闭环；下一步应先做预算内可辨识性和多模型 warm-up，再为每个 family 建设多个私有 variants 与 rotating formal pack。不能把 80 个公开 cells 当作 80 个统计独立 case。
+例如，`15 families x 2 private variants x 4 cells x 6 models x 3 repeats = 2,160 episodes`；`20 x 3 x 4 x 7 x 4 = 6,720 episodes`。这些数量足以形成数千次运行，但有效独立信息仍主要来自 15 或 20 个 matched families。当前已经完成 P0.1--P0.6 的核心合同、20-family public authoring 闭环、三种评测方法和公开变体构造，并冻结 `EXP-METHOD-PILOT-001` 的 development 配置。下一步是执行该 method pilot；本文不写入尚未产生的结果。后续仍需为每个 family 建设多个私有 variants 与 rotating formal pack。不能把公开 cells 当作统计独立 case。
 
 ### 5.5 当前证据还不能支持什么
 
@@ -614,14 +614,14 @@ delta[f,v,m] = (mean_Y_H,D - mean_Y_C,D) - (mean_Y_H,I - mean_Y_C,I)
 
 这一步不能机械批量化。当前 20 个 family 均由 case author 逐项给出来源、最小
 counterfactual、量纲/适用域、diagnostic conditions 和 matched hidden interventions，
-并通过预算内区分、测量分辨率、truth-pass 与 false-twin-fail 的通用 contract tests。
+并通过预算内区分、测量分辨率、真实预测器通过本条件测试以及无法通过配对条件测试等通用 contract tests。
 这些是必要的内部验收，不等于外部领域专家复核，也不等于正式评测有效性。
 
 ### 6.2 近期论文提取 case
 
 近期论文可提供复杂、较少被预训练吸收的发现，但“论文发布时间晚”不等于无污染。构建时至少要把论文中的公开发现与 private evaluation instance 分开：公开的是最小背景、变量和允许实验；私有的是重新参数化的 truth、assignment、seeds 和 held-out interventions。直接把论文结论当答案，更接近论文理解或复现 benchmark。
 
-当前仓库还没有自动或人工验证完备的论文抽取 case pack，不应在项目介绍中写成已实现贡献。
+当前 Temporal registry 已包含 9 个通过来源审查的 family，每个 family 保留论文报告的两个 source-reported conditions，并分别实例化 identification/discovery，共 36 个公开实例。这些条件不是 historical/counterfactual，也不能据来源日期推断为 unseen。四个由这些主题派生的 H/C family 位于独立的 benchmark-authored pack，不改变原 source conditions。仓库仍没有可据此宣称抗污染的私有论文抽取 pack。
 
 ### 6.3 虚构/合成/反事实 case
 
@@ -646,6 +646,6 @@ counterfactual、量纲/适用域、diagnostic conditions 和 matched hidden int
 
 在尚未完成多 case、私有部署和跨模型验证前，推荐使用以下克制表述：
 
-> Role Benchmark 是一个用于诊断 LLM 主动科学建模的最小框架。它把已知族参数辨识与盲族预测规律归纳定义为两个明确的信息合同，并用 matched historical/counterfactual worlds 检验熟悉科学先验与实验 evidence 的交互。每次实验绑定竞争假设的事前数值预测，Oracle evidence 由可执行 WorldModel 决定，最终 correctness 由未见干预上的 predictor performance 决定。当前公开仓库包含 20 个完整四格 family（80 个透明开发 cells）；它们提供多域 authoring 与协议 warm-up，而私有正式 case pack、每-family 多 variants 和跨模型有效性仍是后续工作。
+> Role Benchmark 是一个用于诊断 LLM 主动科学建模的最小框架。它把 prior-only baseline、固定实验设计和自适应实验设计定义为三种方法；固定与自适应方法在每个 family 使用相同实验预算 \(B\)。Identification 与 discovery 使用同一个可执行 predictor 合同，连续 held-out prediction score 是主要结果。确定性 Oracle 是主要方案；可选 LLM presentation 只能严格呈现确定性 observation，且仍待 Oracle 准确性审计。当前公开仓库包含 20 个 H/C family（80 个实例）和 9 个采用 source-reported conditions 的 Temporal family（36 个实例）。它们提供多域开发与协议 warm-up，而私有正式 case pack、每-family 多私有 variants 和跨模型有效性仍是后续工作。
 
-这一定位承认 FALSIFYBENCH、NewtonBench、DiscoverPhysics、DiscoveryWorld 等工作的直接先例，同时留下一个可被实验推翻的具体贡献空间：**正交分离 prior alignment 与 family disclosure，并用 forecast-grounded trajectory 解释模型的主动证据使用。**
+这一定位承认 FALSIFYBENCH、NewtonBench、DiscoverPhysics、DiscoveryWorld 等工作的直接先例，同时保留一个可检验的研究问题：在 matched-pairs design 中分别操纵 prior alignment 和 model-class disclosure，并分析模型的 pre-experiment predictions、subsequent observations 与 final predictions。

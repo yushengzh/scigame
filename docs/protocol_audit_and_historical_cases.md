@@ -58,10 +58,10 @@ visible.
 
 ### Brainstormed options
 
-1. Keep the current cases as explicitly public development fixtures.
+1. Keep the current benchmark instances in an explicitly labeled public development set.
 2. Run Oracle and evaluator in a separate trusted service; give the Player only
    serialized public views and opaque per-run handles.
-3. Give matched worlds the same public family metadata and use per-family
+3. Give paired conditions the same public family metadata and use per-family
    counterbalanced opaque instance tokens; the current development pack now does
    this deterministically, while a private service may use per-run tokens.
 4. Sample private worlds from a parameterized family on the evaluation service.
@@ -117,7 +117,7 @@ track-wide `expression` representation instead.
 All 20 current families implement the full historical/counterfactual ×
 identification/discovery matrix. Their generic acceptance tests require matched
 public payloads, identical same-world evidence across tracks, budget-feasible
-diagnostics, truth-pass and bidirectional false-twin failure. This exercises the
+diagnostics, acceptance of the true predictor and rejection of each predictor under the paired condition. This exercises the
 public protocol but does not satisfy the formal private-pack gate or establish
 broad cross-domain validity. A formal discovery pack still needs private
 variants and an experiment-using baseline that succeeds across private seeds.
@@ -440,7 +440,7 @@ Implemented public experiment:
 - readout: adjacent bright-fringe spacing;
 - budget: 8; maximum replicates: 12;
 - identification submission: normalized three-variable power law;
-- discovery submission: the track-wide family-neutral `expression` grammar.
+- discovery submission: the `expression` grammar shared across task families.
 
 The historical-law private truth is:
 
@@ -632,7 +632,7 @@ readouts; Pasteur is the clearest driver for stateful multi-stage experiments.
 ## Suggested implementation order
 
 1. **Completed in P0:** clarify task names, metric names, and formal boundary;
-   mark current cases as public development fixtures with explicit tracks.
+   mark current benchmark instances as a public development set with explicit task settings.
 2. **Completed for the development boundary:** add negative characterization
    tests, recursive detached codecs, strict decoding, and explicit error classes.
 3. Correct action/clarification limits; plain transcript persistence is complete,

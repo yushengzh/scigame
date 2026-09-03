@@ -227,7 +227,7 @@ _CANDIDATE = {
             "514-517, and 1110-1112"
         ),
         "role": (
-            "The two source-reported temperature-regime fits define the matched worlds."
+            "The two source-reported temperature-regime fits define the two conditions."
         ),
     },
     "title": "Incompressible kinetic energy after a condensate quench",

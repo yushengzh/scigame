@@ -20,8 +20,13 @@ def episode_row(**updates):
         "oracle_model": "gpt-5.6 & oracle",
         "evaluator_model": "gpt-5.6 judge",
         "case_family": "pendulum",
-        "world": "historical",
-        "track": "discovery",
+        "dataset_kind": "historical_counterfactual",
+        "variant_id": "easy",
+        "condition_id": "historical",
+        "condition_role": "historical",
+        "task_setting": "discovery",
+        "evaluation_method": "adaptive experimental design",
+        "oracle_mode": "deterministic",
         "repeat": 5,
         "active_pass": False,
         "termination_kind": "submitted",
@@ -77,8 +82,10 @@ class CaseMatrixRendererTest(unittest.TestCase):
         self.assertNotIn("resume-1.html", index_text)
         self.assertNotIn("abandoned attempt", index_text)
         self.assertIn("gpt-5.6 &lt;player&gt;", index_text)
-        self.assertIn("gpt-5.6 &amp; oracle", index_text)
+        self.assertIn("deterministic", index_text)
         self.assertIn("gpt-5.6 judge", index_text)
+        self.assertIn("historical_counterfactual", index_text)
+        self.assertIn("adaptive experimental design", index_text)
 
     def test_refuses_existing_output_directory(self):
         with tempfile.TemporaryDirectory() as directory:
