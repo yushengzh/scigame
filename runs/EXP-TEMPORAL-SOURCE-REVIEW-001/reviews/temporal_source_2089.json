@@ -1,0 +1,177 @@
+{
+  "schema": "role_benchmark.temporal_model_source_review.v1",
+  "experiment_id": "EXP-TEMPORAL-SOURCE-REVIEW-001",
+  "family": "temporal_source_2089",
+  "paper_id": "paper_2606_12204v1",
+  "reviewer": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "ultra",
+    "reviewer_type": "language_model",
+    "human_domain_expert": false,
+    "immutable_model_snapshot": null
+  },
+  "primary_analytical_lens": "discovery",
+  "locator_mode": "structure-grounded",
+  "source_coverage": {
+    "status": "adequate",
+    "notes": "The frozen packet contains the main text, Hamiltonian and energy-unit definition, the integer reversed-spin-sector definition, the ground-state-energy figure caption, the explicit large-n fit with parameter uncertainties and fit interval, and the ED/DMRG methods and finite-geometry context. Although the referenced plot is not rendered in the text packet, the quantitative relation and the context needed to assess it are stated explicitly, so external sources are unnecessary."
+  },
+  "checks": {
+    "source_coverage": "pass",
+    "quantitative_relation_support": "pass",
+    "formula_fidelity": "pass",
+    "parameter_support": "pass",
+    "control_support": "pass",
+    "readout_support": "pass",
+    "domain_support": "fail",
+    "anchor_accuracy": "pass",
+    "constructed_case_fidelity": "pass"
+  },
+  "evidence": [
+    {
+      "target_fields": ["source_coverage"],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 90, "line_end": 118},
+        {"line_start": 123, "line_end": 130},
+        {"line_start": 168, "line_end": 174},
+        {"line_start": 248, "line_end": 252},
+        {"line_start": 313, "line_end": 320}
+      ],
+      "source_paraphrase": "The packet defines the infinite-U nearest-neighbor kagome Hubbard Hamiltonian and t=1 energy unit, defines n as the integer number of reversed spins in the one-hole sector, identifies the plotted readout as the ground-state energy, states the approximate E0+A/(n+B) fit and its parameters over n=5 through 24, and describes the finite ED/DMRG calculations.",
+      "reasoning": "These statements provide enough source context to judge the mapping, approximation, values, units, discrete domain, and numerical scope even without inspecting the underlying figure asset."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].formula",
+        "provenance.oracle.formula",
+        "provenance.public.identification_formula"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 248, "line_end": 252}
+      ],
+      "source_paraphrase": "The source states that the ground-state energy shows large-n scaling approximately equal to E0+A/(n+B), based on a fit over 5 <= n <= 24.",
+      "reasoning": "The expression tree implements the reported central fit exactly. The ScienceCard expressly labels it an approximate large-n fit and labels E0, A, and B fitted central values with uncertainties, so the executable central predictor is not presented as an exact physical equality."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].parameters[0]",
+        "science_card.relations[0].parameters[1]",
+        "science_card.relations[0].parameters[2]",
+        "provenance.oracle.parameters.e0",
+        "provenance.oracle.parameters.a",
+        "provenance.oracle.parameters.b"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 97, "line_end": 97},
+        {"line_start": 126, "line_end": 126},
+        {"line_start": 252, "line_end": 252}
+      ],
+      "source_paraphrase": "The fit reports E0=-3.68 +/- 0.01, A=2.26 +/- 0.13, and B=0.84 +/- 0.23; t is set to one as the energy unit, while n is an integer count.",
+      "reasoning": "The retained values are the reported fitted central values. E0 and A carry the energy unit t, while B is a dimensionless count offset required for addition to n. The E0 notation at line 97 refers to separate illustrative triangle energies and is used by the declared anchor only for the t-unit statement; the fitted E0 value itself is unambiguously supplied at line 252."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].controls[0]",
+        "science_card.relations[0].domain.controls[0]",
+        "provenance.public.controls.reversed_spin_count",
+        "provenance.public.domain.reversed_spin_count"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 51, "line_end": 55},
+        {"line_start": 123, "line_end": 130},
+        {"line_start": 248, "line_end": 252}
+      ],
+      "source_paraphrase": "The paper uses magnetization as a tuning parameter and defines n=1,2,3,... as the number of reversed spins in the one-hole system; the reported energy fit was performed over 5 <= n <= 24.",
+      "reasoning": "reversed_spin_count is a dimensionless integer sector count. Enumerating every integer from 5 through 24 preserves the reported fit interval and does not introduce interpolation at non-integer n."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].readouts[0]",
+        "provenance.public.readouts.ground_state_energy"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 90, "line_end": 97},
+        {"line_start": 168, "line_end": 174},
+        {"line_start": 248, "line_end": 252}
+      ],
+      "source_paraphrase": "The source defines the Hamiltonian and t energy unit, identifies panel 2e as the dependence of the one-hole system's ground-state energy on n, and states the fitted dependence.",
+      "reasoning": "The readout is correctly identified as ground-state energy, has energy unit t, and depends on reversed-spin count through the stated fitted relation. The omitted model and finite-calculation scope is treated separately as an applicability defect."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].domain.applicability",
+        "construction.truth.fixed_conditions"
+      ],
+      "assessment": "unsupported",
+      "source_line_ranges": [
+        {"line_start": 90, "line_end": 118},
+        {"line_start": 248, "line_end": 252},
+        {"line_start": 313, "line_end": 320}
+      ],
+      "source_paraphrase": "The fitted energies belong to the singly doped, infinite-U nearest-neighbor Hubbard Hamiltonian on the kagome lattice with positive hopping, evaluated numerically in the reported finite ED and YC-cylinder DMRG settings; the source presents the relation as a fit to those computed energies.",
+      "reasoning": "The applicability entries retain the approximation, fit interval, central-value interpretation, and t=1 convention, but describe only a generic one-hole kagome-lattice system. They omit the defining infinite-U Hubbard Hamiltonian and the finite numerical setting, thereby allowing the fit to be read as applying to materially broader kagome one-hole systems or as a universal thermodynamic relation."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].anchors",
+        "science_card.relations[0].controls[0].anchors",
+        "science_card.relations[0].domain.applicability",
+        "science_card.relations[0].domain.controls[0].anchors",
+        "science_card.relations[0].parameters",
+        "science_card.relations[0].readouts[0].anchors",
+        "provenance.mappings"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 97, "line_end": 97},
+        {"line_start": 126, "line_end": 128},
+        {"line_start": 248, "line_end": 252}
+      ],
+      "source_paraphrase": "The three declared source regions respectively establish t=1 as the energy unit, define integer n as reversed-spin count and its qualitative role, and state the ground-state-energy scaling, fit values, approximation, and fitted n interval.",
+      "reasoning": "Every declared anchor is in bounds and relevant to at least the mapped field's unit, variable meaning, formula, parameter value, readout, or domain. Line 97 is unit evidence rather than evidence for the fitted E0 value; line 252 supplies that value. The domain defect arises from omitted model/method anchors and conditions, not from displacement of the anchors that are declared."
+    },
+    {
+      "target_fields": [
+        "construction.oracle.formula",
+        "construction.oracle.parameters.e0",
+        "construction.oracle.parameters.a",
+        "construction.oracle.parameters.b",
+        "construction.public.controls.reversed_spin_count",
+        "construction.public.readouts.ground_state_energy",
+        "construction.public.domain.reversed_spin_count"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 97, "line_end": 97},
+        {"line_start": 126, "line_end": 126},
+        {"line_start": 252, "line_end": 252}
+      ],
+      "source_paraphrase": "The source-supported central mapping is E(n)=E0+A/(n+B), with E0=-3.68, A=2.26, B=0.84, t as the energy unit, and integer n from 5 through 24 within the stated approximate-fit scope.",
+      "reasoning": "The generated case embeds the same parsed ScienceCard, the same expression tree and central parameter values, and the same enumerated domain before deterministic compilation. No alternative formula, unit conversion, parameter value, or expanded n domain is introduced in the case wrapper; construction therefore adds no mismatch beyond propagating the upstream applicability omission."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "blocking",
+      "code": "applicability_model_and_numerical_scope_omitted",
+      "affected_fields": [
+        "science_card.relations[0].domain.applicability",
+        "construction.truth.fixed_conditions"
+      ],
+      "detail": "The card qualifies the expression as an approximate central fit over n=5 through 24 and records t=1, but it does not identify the fitted system as the source's singly doped, infinite-U nearest-neighbor kagome Hubbard Hamiltonian or clarify that the fit summarizes the reported finite ED/DMRG ground-state calculations. As written, 'one-hole kagome-lattice system' is materially broader than the source-supported scope.",
+      "source_line_ranges": [
+        {"line_start": 90, "line_end": 118},
+        {"line_start": 248, "line_end": 252},
+        {"line_start": 313, "line_end": 320}
+      ],
+      "correction": "Add applicability/fixed-condition text limiting the central fit to the paper's singly doped infinite-U nearest-neighbor Hubbard model on the kagome lattice with t>0 (t=1 as the energy unit), and state that it is an approximate fit to the authors' reported finite-system ED/DMRG ground-state energies rather than an exact universal or thermodynamic-limit law."
+    }
+  ],
+  "decision": "revision_required",
+  "decision_basis": "The frozen source directly supports an executable central fit E(n)=E0+A/(n+B), the three fitted central values and units, integer reversed-spin count, and the discrete n=5 through 24 fit domain, and the generated wrapper preserves those numerical semantics. Release nevertheless requires an applicability correction based on the source because the card omits the defining infinite-U kagome Hubbard Hamiltonian and finite numerical scope of the reported fit."
+}

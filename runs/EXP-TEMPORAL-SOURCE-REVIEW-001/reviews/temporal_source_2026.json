@@ -1,0 +1,170 @@
+{
+  "schema": "role_benchmark.temporal_model_source_review.v1",
+  "experiment_id": "EXP-TEMPORAL-SOURCE-REVIEW-001",
+  "family": "temporal_source_2026",
+  "paper_id": "paper_2601_19212v1",
+  "reviewer": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "ultra",
+    "reviewer_type": "language_model",
+    "human_domain_expert": false,
+    "immutable_model_snapshot": null
+  },
+  "primary_analytical_lens": "methods",
+  "locator_mode": "structure-grounded",
+  "source_coverage": {
+    "status": "adequate",
+    "notes": "The frozen packet contains the full main text and Supplementary Material, including the simulation setup and initial volume fractions, the definition and fitted motion of the mixing-layer center, the bulk-settling relation, the velocity normalization, the volume-fraction comparison, and the relevant figure captions. The reported fit is stated explicitly in text, so the absent plotted image data do not prevent assessment of the proposed executable relation."
+  },
+  "checks": {
+    "source_coverage": "pass",
+    "quantitative_relation_support": "pass",
+    "formula_fidelity": "pass",
+    "parameter_support": "pass",
+    "control_support": "pass",
+    "readout_support": "fail",
+    "domain_support": "pass",
+    "anchor_accuracy": "pass",
+    "constructed_case_fidelity": "pass"
+  },
+  "evidence": [
+    {
+      "target_fields": ["source_coverage"],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 119, "line_end": 158},
+        {"line_start": 184, "line_end": 238},
+        {"line_start": 288, "line_end": 318},
+        {"line_start": 969, "line_end": 1029}
+      ],
+      "source_paraphrase": "The packet supplies the particle and initial-condition definitions, the extraction and motion of the mixing-layer center, the bulk hindered-settling fit, the sign convention in the center-motion equations, the velocity normalization, the three-volume-fraction comparison, and concentration-profile fitting details.",
+      "reasoning": "This is enough source context to judge the quantitative mapping, its fitted status, every encoded value and unit, its restricted domain, and the readout-sign semantics without external evidence."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].formula",
+        "provenance.oracle.formula",
+        "provenance.public.identification_formula"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 231, "line_end": 238},
+        {"line_start": 969, "line_end": 976}
+      ],
+      "source_paraphrase": "The source reports the fitted bulk descent-speed relation v_b approximately equal to v_t(a-d phi_b), and the supplement restates v_b = v_t(a-d phi_b) with approximate fitted coefficients.",
+      "reasoning": "After division by v_t, the expression a-d*initial_volume_fraction is algebraically the reported central fit for the positive descent speed. The card preserves rather than suppresses its epistemic status by explicitly calling the relation fitted and both coefficients approximate. The expression is not supported for the signed derivative as presently defined in the readout; that separate semantic defect is recorded under readout support."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].parameters[0]",
+        "science_card.relations[0].parameters[1]",
+        "provenance.oracle.parameters.a",
+        "provenance.oracle.parameters.d"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 235, "line_end": 238},
+        {"line_start": 974, "line_end": 976}
+      ],
+      "source_paraphrase": "The source identifies a and d as order-one fit constants and gives a approximately 0.8 and d approximately 3 for the volume-fraction comparison.",
+      "reasoning": "The encoded central values are exact transcriptions of the reported approximations, their fixed fitted-parameter role is preserved, and both are dimensionless because they relate the dimensionless ratio v_b/v_t to dimensionless phi_b."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].controls[0]",
+        "science_card.relations[0].domain.controls[0]",
+        "provenance.public.controls.initial_volume_fraction",
+        "provenance.public.domain.initial_volume_fraction"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 124, "line_end": 125},
+        {"line_start": 153, "line_end": 158},
+        {"line_start": 974, "line_end": 976},
+        {"line_start": 1001, "line_end": 1002}
+      ],
+      "source_paraphrase": "phi_b is the initial particle volume fraction in the particle-laden top half. The main run uses the nominal approximately 0.10 setting, and the gamma = 2 comparison adds settings 0.05 and 0.15, yielding the three investigated nominal values.",
+      "reasoning": "The control meaning and dimensionless unit are correct. Restricting queries to the explicitly reported nominal settings 0.05, 0.10, and 0.15 introduces neither interpolation nor an unsupported Cartesian product."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].readouts[0].definition",
+        "science_card.relations[0].readouts[0].anchors",
+        "construction.public.readouts.normalized_descent_rate"
+      ],
+      "assessment": "unsupported",
+      "source_line_ranges": [
+        {"line_start": 221, "line_end": 226},
+        {"line_start": 299, "line_end": 315},
+        {"line_start": 969, "line_end": 976}
+      ],
+      "source_paraphrase": "The main text treats v_b as a positive descent-speed magnitude and explicitly writes dz_c/dt = -v_b and a negative normalized displacement, whereas the supplement later calls v_b = dz_c/dt while reporting the positive fit v_b/v_t = a-d phi_b.",
+      "reasoning": "The source contains an internal shorthand/sign inconsistency, but its equations and downward coordinate convention resolve the intended executable quantity: a-d phi_b is v_b/v_t, equivalently -(dz_c/dt)/v_t or the magnitude of the center velocity. The card instead defines the positive output as the signed derivative dz_c/dt/v_t, so its operational definition has the wrong sign."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].domain.applicability",
+        "construction.truth.fixed_conditions"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 153, "line_end": 158},
+        {"line_start": 231, "line_end": 238},
+        {"line_start": 974, "line_end": 995}
+      ],
+      "source_paraphrase": "The source reports a linear fitted dependence within the explored simulations and presents the three-volume-fraction comparison specifically for gamma = 2; it labels a and d as approximate fit values.",
+      "reasoning": "The card limits the executable domain to the three jointly reported gamma = 2 settings and records both fitted and approximate status. With only one varying control, the enumerated domain is source-supported and does not add unstated continuous interpolation."
+    },
+    {
+      "target_fields": [
+        "science_card.relations[0].anchors",
+        "provenance.mappings"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 155, "line_end": 158},
+        {"line_start": 969, "line_end": 976}
+      ],
+      "source_paraphrase": "The declared ranges identify the nominal baseline and additional volume fractions, the terminal-velocity normalization, the gamma = 2 restriction, the linear fit, and its approximate coefficients.",
+      "reasoning": "Every declared anchor is in bounds and relevant to its mapped field. The readout defect arises because the locally supporting supplemental shorthand conflicts with the main-text sign convention, not because a declared range is displaced or unrelated; the correction should add the main-text equations that resolve the convention."
+    },
+    {
+      "target_fields": [
+        "construction.oracle.formula",
+        "construction.oracle.parameters.a",
+        "construction.oracle.parameters.d",
+        "construction.public.controls.initial_volume_fraction",
+        "construction.public.domain.initial_volume_fraction",
+        "construction.design.diagnostic_conditions",
+        "construction.design.hidden_conditions"
+      ],
+      "assessment": "supported",
+      "source_line_ranges": [
+        {"line_start": 153, "line_end": 158},
+        {"line_start": 231, "line_end": 238},
+        {"line_start": 969, "line_end": 976}
+      ],
+      "source_paraphrase": "The source-supported central fit uses a approximately 0.8 and d approximately 3 at the three nominal gamma = 2 volume fractions 0.05, 0.10, and 0.15.",
+      "reasoning": "The generated case visibly embeds the reviewed card unchanged and passes it to deterministic compilation. No construction-specific unit, coefficient, expression, or domain change is present; construction propagates the upstream readout-sign defect but does not introduce an additional mismatch."
+    }
+  ],
+  "issues": [
+    {
+      "severity": "blocking",
+      "code": "readout_signed_velocity_convention_incorrect",
+      "affected_fields": [
+        "science_card.relations[0].readouts[0].definition",
+        "science_card.relations[0].readouts[0].anchors",
+        "construction.public.readouts.normalized_descent_rate"
+      ],
+      "detail": "The card defines the output as v_b = dz_c/dt normalized by v_t, yet its expression returns the positive quantity a-d phi_b. In the main text, downward center motion is written explicitly as dz_c/dt = -v_b and (z_c(t)-z_c(0))/L_z = -r t/tau_t with r = v_b/v_t. The supplemental sentence v_b = dz_c/dt is therefore inconsistent with the source's governing sign convention and cannot support the card's signed-derivative definition.",
+      "source_line_ranges": [
+        {"line_start": 299, "line_end": 315},
+        {"line_start": 969, "line_end": 976}
+      ],
+      "correction": "Define normalized_descent_rate as the positive descent-speed ratio v_b/v_t = -(dz_c/dt)/v_t (equivalently |dz_c/dt|/v_t under the reported downward motion), retain the central fitted expression a-d phi_b, and add lines 299-315 to the readout anchors so the sign convention is explicit."
+    }
+  ],
+  "decision": "revision_required",
+  "decision_basis": "The frozen source supports an executable central fit v_b/v_t approximately equal to 0.8-3 phi_b for the three nominal gamma = 2 volume-fraction settings, and the deterministic construction preserves its coefficients, units, and enumerated domain. Release requires a readout correction based on the source because the card equates the positive descent speed with dz_c/dt even though the main-text equations define dz_c/dt = -v_b."
+}

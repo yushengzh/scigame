@@ -1,7 +1,7 @@
 ---
 title: Role Benchmark 研究计划与实验记录
 status: active
-version: 0.7.2
+version: 0.8.0
 created: 2026-09-02
 last_updated: 2026-09-03
 target: ICLR-level submission
@@ -82,6 +82,8 @@ language: zh
 - 新 Temporal authoring 实现把 LLM 输出限制为 `formula`、`parameters`、`controls`、`readouts`、`domain` 和 `anchors`；实验预算、diagnostic conditions、held-out conditions、public template 和 provenance mapping 由确定性代码生成。
 - `EXP-TEMPORAL-AUTHORING-001` 已冻结既有两次 authoring run 的同一批 37 个 source packets、原顺序和逐论文调用上限。历史运行未保存不可变 authoring-model snapshot，当前也没有运行凭据，因此重新运行尚未执行，pipeline 修改的因果效应目前不可识别。
 - 四次独立登记的 operational Temporal production runs 已在 2026-01-01 至 2026-09-03 的来源窗口内构造出 22 个不同 source papers 对应的 candidate families，超过预定的至少 20 个目标。这 22 个 families 仍是运行产物，不属于上述 9 个公开 Temporal families；在独立人工或领域专家 source review、去重和 release review 完成前，不计入公开 benchmark 规模。
+- `EXP-TEMPORAL-SOURCE-REVIEW-001` 已用 `gpt-5.6-sol`、`ultra` 在逐 family 独立上下文中完成 22/22 项模型 source review：11 项 `retain`、10 项 `revision_required`、1 项 `not_assessable`、0 项 `reject`。这是模型评审，不满足独立人工领域专家 review；11 项通过者仍只是 provisional candidates。
+- 4 项待补 journal–arXiv linkage 已冻结当前官方字段：3 项 Crossref `has-preprint` relation 明确给出 `id-type=doi` 并通过官方 arXiv exact-version resolution；1 项只有官方 title、完整有序 author list 和 publication statement 一致性，保持非自动裁定。
 
 每次这些数字变化时，必须同时更新来源文件或运行产物链接，不得只修改本文数字。
 
@@ -302,7 +304,9 @@ Stopping rule: 37 篇 source packets 全部按冻结顺序和逐论文调用上�
 
 四次运行共得到 22 个不同 source papers 对应的 candidate families。这个数字只说明构造目标已经达到，不说明 benchmark coverage、代表性、难度或模型能力。每个通过项均满足非空 minimal ScienceCard、separate-context source review retention、确定性构造以及 Identification/Discovery known-truth validation；Code Agent contexts 只提供 process separation，不等同于独立人工或领域专家 source review。authoring runtime 的 immutable snapshot 和 documented knowledge cutoff 均未知，因此不得称这些 families 为 post-cutoff、unseen 或 contamination-free。逐次 protocol、完整分母和结果见实验登记与 [`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json)。
 
-Post-hoc record-linkage conformance review 将 22 项按最强已记录依据分类为：18 项 exact journal DOI、3 项保存了 Crossref `has-preprint` relation、规范化 arXiv target 和 official `id_list` resolution 但未冻结原始 identifier type、1 项人工核对官方记录。没有通过项仅依赖标题或数字；但现有本地材料不足以证明前述 3 项 relation-only records 满足当前 automatic resolution rule，它们须在 release 前重新冻结官方 Crossref relation tuple 或完成独立人工复核。该结果不消除原始 HTTP payload 未全部冻结、个别早晚记录不一致及人工项不能离线重放的限制；见 [`accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md)。
+随后登记的 `EXP-TEMPORAL-SOURCE-REVIEW-001` 对 22 项固定候选逐项执行 `gpt-5.6-sol`、`ultra` 模型 source review，结果为 11/22 `retain`、10/22 `revision_required`、1/22 `not_assessable` 和 0/22 `reject`。22 项的 quantitative-relation、parameter、anchor 与 constructed-case-fidelity checks 均通过；主要缺口是 domain support（9 fail、1 not assessable）和 readout support（5 fail）。这说明 deterministic compilation 没有新增可见的科学语义变化，但也会忠实传递上游 ScienceCard 的适用条件与读出量定义遗漏。完整逐项记录和行号证据见 [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/)。该结果只支持来源忠实性筛查，不评价 novelty、representativeness、difficulty 或 temporal contamination，也不替代独立人工领域专家 review。
+
+Post-hoc record-linkage conformance review 将 22 项按最强已记录依据分类为：18 项 exact journal DOI、3 项 Crossref `has-preprint` relation、1 项基于官方 metadata 的非自动裁定。`EXP-TEMPORAL-SOURCE-REVIEW-001` 已重新取得后四项的官方字段：前三项的 relation 均明确给出 `id-type=doi`、arXiv DOI target 和 `asserted-by=subject`，并由官方 arXiv `id_list` 返回对应带版本记录，因而满足当前 automatic resolution rule；最后一项没有 identifier relationship，仍只按官方 arXiv、Crossref 与 Nature metadata 的题名、完整有序作者列表和出版声明一致性裁定，不进入 automatic matching。新记录是带 retrieval time 的官方字段投影，不是完整原始 HTTP response；它补齐了 identity decision 所需字段，但不支持重放服务端完整响应。见 [`accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md) 与 [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/linkage/`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/linkage/)。
 
 对 14 个具有完整 journal/arXiv metadata 的 pairs 所做的描述性 record-linkage 审查发现：8 对标题完全一致，1 对只有数学或数字排版差异，5 对发生实质性改题；7 对由唯一 exact DOI 确认，5 对由官方 metadata 人工确认，1 对拒绝，1 对 unresolved。该 complete-case sample 非随机且不含所有漏检记录，不能用于估计 linkage precision 或 recall；其中未见实质性数字冲突，也不能据此假设标题数字匹配是可靠的身份判据。
 
@@ -407,7 +411,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 按依赖关系排序，下一步只做以下三件事：
 
-1. 对 22 个 production candidate families 完成独立人工或领域专家 source review、跨 cohort 去重和 release review；在此之前不扩大公开 Temporal registry；
+1. 先修订 10 个 `revision_required` candidates，并为 `temporal_source_1005` 补充可判定半径坐标的固定来源材料或将其排除；之后对拟发布集合完成新的 source review、独立人工领域专家 review、跨 cohort 去重和 release review；在此之前不扩大公开 Temporal registry；
 2. 按冻结配置执行 `EXP-METHOD-PILOT-001`，并按预先定义的 failure criteria 决定停止、修订协议或进入正式规模；
 3. 在任何 capability claim 前补充不可变 model checkpoints 并完成 P0.7。
 
@@ -435,6 +439,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | EXP-TEMPORAL-PRODUCTION-002 | 扩大独立 frozen source cohort，继续构造 candidate families | 59 个 frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-002/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-002/summary.json) | 5 个 candidate families；与前序 cohort 分开报告 |
 | EXP-TEMPORAL-PRODUCTION-003 | 在冻结 PRL relation cohort 上继续构造 candidate families | 91 个 frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-003/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-003/summary.json) | 6 个 candidate families；与前序 cohort 分开报告 |
 | EXP-TEMPORAL-PRODUCTION-004 | Nature 优先并处理完整 frozen cohort，使累计 candidate families 达到至少 20 | 2 个 Nature 与 49 个 Physical Review Letters frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-004/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/summary.json)；[`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json) | 本批 4 个、累计 22 个 candidate families；数量目标完成，release review 未完成 |
+| EXP-TEMPORAL-SOURCE-REVIEW-001 | 22 个 candidate families 是否忠实表达至少一个由固定来源支持的可执行定量关系 | 四次 production runs 的全部 22 个 candidate families；逐 family 独立上下文 | `gpt-5.6-sol`；reasoning effort `ultra`；immutable snapshot/cutoff unknown | 四种固定 disposition 的计数；九项 source-review checks | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-SOURCE-REVIEW-001/registration.json)；[`review_rubric.md`](../experiments/registrations/EXP-TEMPORAL-SOURCE-REVIEW-001/review_rubric.md) | [`summary.json`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/summary.json)；[`report_zh.md`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/report_zh.md) | 11 retain；10 revision required；1 not assessable；模型评审不等于人工领域专家 review |
 | EXP-METHOD-PILOT-001 | 三种 evaluation methods 能否分别测量无观测、固定观测和自适应实验条件下的表现 | 6 个 H/C families（easy/hard）与 3 个独立 Temporal families；2 repeats | `deepseek-v4-flash` API alias；snapshot 与 cutoff 为 unknown；deterministic Oracle；独立 post-hoc Evaluator | `held_out_prediction_score` 的 \(\Delta_0,\Delta_F,\Delta_A\)；Temporal 独立报告 | `ready` | [`registration.json`](../experiments/registrations/EXP-METHOD-PILOT-001/registration.json) | 未运行 | development method pilot；不作 capability 或 post-checkpoint claim |
 | EXP-HC-CONFIRM-001 | 固定实验观测能否改变 Counterfactual condition 下的初始预测 | 20 matched task families；formal evaluation 需要 private benchmark instances | 待冻结 | \(\Delta_0,\Delta_F\) | `blocked` | 待补 | 待补 | 等待 pilot study |
 | EXP-TEMPORAL-001 | 独立近期来源 benchmark instances 在三种 evaluation methods 下的表现差异 | 数量待 power analysis，以 source paper 计 | 待冻结 | \(Y^T_F-Y^T_0\) 和 \(Y^T_A-Y^T_F\) | `blocked` | 待补 | 待补 | 等待 temporal contamination audit 和 private evaluation workflow |
@@ -485,6 +490,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | R-TEMPORAL-PRODUCTION-002 | EXP-TEMPORAL-PRODUCTION-002 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 59/59 source papers processed | 18 nonempty relations；15 retained；5 constructed candidate families | Operational count；cohort 在前序结果后选择 | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-002/summary.json) |
 | R-TEMPORAL-PRODUCTION-003 | EXP-TEMPORAL-PRODUCTION-003 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 91/91 source papers processed | 12 nonempty relations；10 retained；6 constructed candidate families | Operational count；cohort 在前序结果后选择 | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-003/summary.json) |
 | R-TEMPORAL-PRODUCTION-004 | EXP-TEMPORAL-PRODUCTION-004 | 2026-09-03 | Frozen registration, source manifest, requests, responses, reviews and construction artifacts | 51/51 source papers processed | 11 nonempty relations；10 retained；4 constructed candidate families；累计 22 | Operational count；Nature 优先但不是 venue comparison | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/summary.json)；[`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json) |
+| R-TEMPORAL-SOURCE-REVIEW-001 | EXP-TEMPORAL-SOURCE-REVIEW-001 | 2026-09-03 | Frozen 22-family manifest and rubric；input commit `fe15a4bdf3627c5f1f11a5a17c14e6966f377863` | 22/22 candidate families reviewed once | 11 retain；10 revision required；1 not assessable；0 reject | Complete fixed cohort；model-based review；immutable reviewer snapshot unknown；不作 sampling inference | `exploratory` | [`summary.json`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/summary.json)；[`report_zh.md`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/report_zh.md) |
 
 解释状态只能使用：
 
@@ -509,7 +515,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | R-007 | 大规模运行先于评测方法 pilot | 产生昂贵但不可解释的数据 | P0.1–P0.6 已完成；先冻结并执行 Phase 1 | pilot study 通过后才扩展 | controlled |
 | R-008 | 历史 Temporal authoring run 没有不可变 model snapshot | 即使 source packets、alias 和调用预算相同，也不能把新旧转换率差异归因于 pipeline 修改 | `EXP-TEMPORAL-AUTHORING-001` 保持 blocked；历史值仅作描述性基线 | 找到并可调用与历史运行相同的不可变 snapshot，或另行登记同一新 snapshot 下的新旧 pipeline 同期比较 | open |
 | R-009 | Journal–arXiv record linkage 出现 false match 或漏召回 | False match 会污染 source truth；漏召回会降低并改变可构造 cohort | Candidate retrieval 与 identity resolution 分离；自动确认只用 Crossref arXiv DOI relation 或唯一 exact journal DOI；non-DOI relation 与标题/搜索候选人工复核；relation provenance 与明确版本不得丢弃；非命中记 unresolved | 在独立标注样本上报告 record-linkage precision/recall，并复核全部 release candidates | open |
-| R-010 | Code Agent source review 被误写为 independent expert review | 高估来源核验强度并使 benchmark release 缺少领域判断 | 运行记录只声明 separate-context process review；22 个 candidates 不进入公开 registry | 独立人工或领域专家完成 source review、去重与 release review | open |
+| R-010 | Code Agent source review 被误写为 independent expert review | 高估来源核验强度并使 benchmark release 缺少领域判断 | `EXP-TEMPORAL-SOURCE-REVIEW-001` 明确记录 reviewer 为 language model、`human_domain_expert=false` 和 immutable snapshot unknown；22 个 candidates 不进入公开 registry | 独立人工领域专家完成 source review、去重与 release review | open |
 
 ## 11. 文档维护规则
 
@@ -542,6 +548,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 | Version | Date | Change | Evidence/reason | Author |
 | --- | --- | --- | --- | --- |
+| 0.8.0 | 2026-09-03 | 登记 22/22 项 `gpt-5.6-sol`、`ultra` 模型 source review 结果；将 11 项保留为 provisional candidates、10 项标为需要修改、1 项标为不可判定；补齐 3 项 identifier-level Crossref linkage 与 1 项非自动 official-metadata linkage，同时保持人工领域专家 release review 要求 | [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/)；固定 input commit 与 preregistered rubric | project team |
 | 0.7.2 | 2026-09-03 | 收紧 22 个 accepted candidates 的 linkage 证据表述：EXP-003 的 3 项 relation-only records 未冻结原始 identifier type，不能据现有本地材料认定符合当前 automatic resolution rule；将重新冻结官方 relation tuple 或独立人工复核列为 release 前条件 | [`../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md)；最终只读代码与证据复核 | project team |
 | 0.7.1 | 2026-09-03 | 更正 arXiv API 没有 DOI search field，明确 `all:"<DOI>"` 只是 DOI-string candidate retrieval；修复 relation provenance tuple、请求节流和同一 arXiv work 的固定 source-version selection；逐项复核 22 个 accepted candidates 的 linkage evidence | [`temporal_case_pipeline.md`](temporal_case_pipeline.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md) | project team |
 | 0.7.0 | 2026-09-03 | 记录四次 operational Temporal production runs、累计 22 个 candidate families 及其非确认性解释边界；冻结 journal–arXiv candidate retrieval/identity resolution 分离规则，否决搜索命中、non-DOI relation、标题数字或 title/author agreement 直接自动匹配；增加冻结人工 match 的正式回流与 exact-version/DOI-conflict validation；把独立人工或领域专家 release review 列为下一步 | [`../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json)；[`temporal_case_pipeline.md`](temporal_case_pipeline.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md`](../runs/EXP-TEMPORAL-PRODUCTION-001/title_numeric_linkage_audit.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-005/nature_science_reciprocal_relation_candidate_audit.json`](../runs/EXP-TEMPORAL-PRODUCTION-005/nature_science_reciprocal_relation_candidate_audit.json) | project team |
