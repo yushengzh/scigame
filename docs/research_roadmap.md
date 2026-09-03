@@ -1,7 +1,7 @@
 ---
 title: Role Benchmark 研究计划与实验记录
 status: active
-version: 0.8.0
+version: 0.8.1
 created: 2026-09-02
 last_updated: 2026-09-03
 target: ICLR-level submission
@@ -306,6 +306,49 @@ Stopping rule: 37 篇 source packets 全部按冻结顺序和逐论文调用上�
 
 随后登记的 `EXP-TEMPORAL-SOURCE-REVIEW-001` 对 22 项固定候选逐项执行 `gpt-5.6-sol`、`ultra` 模型 source review，结果为 11/22 `retain`、10/22 `revision_required`、1/22 `not_assessable` 和 0/22 `reject`。22 项的 quantitative-relation、parameter、anchor 与 constructed-case-fidelity checks 均通过；主要缺口是 domain support（9 fail、1 not assessable）和 readout support（5 fail）。这说明 deterministic compilation 没有新增可见的科学语义变化，但也会忠实传递上游 ScienceCard 的适用条件与读出量定义遗漏。完整逐项记录和行号证据见 [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/)。该结果只支持来源忠实性筛查，不评价 novelty、representativeness、difficulty 或 temporal contamination，也不替代独立人工领域专家 review。
 
+### Temporal candidate revision and validation
+
+状态：`proposed`
+
+一个可执行关系的最小科学合同是
+
+\[
+y=f(x;\theta),\qquad x\in D,\qquad \text{under fixed conditions } C.
+\]
+
+来源必须足以判断 \(f\)、参数 \(\theta\)、controls \(x\)、readouts \(y\)、query domain \(D\) 和 fixed conditions \(C\)。结构合法、数值可执行和 source line range 未越界都不能替代这一判断。
+
+22 项模型 source review 的 16 个 blocking issues 可压缩为三个直接原因：1 项来源材料不足；6 项 formula、control 或 readout 的定义不完整或错误；9 项 applicability conditions 遗漏。基于这一结果，第一轮只执行以下最小修改：
+
+1. 冻结 11 个 `retain` candidates，不修改、不重新 author；
+2. 对 `015`、`026`、`031`、`032`、`2001`、`2025`、`2026`、`2089` 和 `3015` 各执行一次只针对已记录 blocking issues 的 ScienceCard revision；这些修改不改变 formula expression tree；
+3. 排除 `1005`；只有新的固定来源材料明确拟合所用 \(r\) 是 bow-apex distance 还是 parabola-focus distance 时，才能使用新 Experiment ID 重新进入 source review；
+4. `3045` 不进入第一轮。只有前述 9 项未能使 candidate 数达到 20 时，才按来源方程 \(K_{yy}(s)=18J^{(6)}|sB_6^6|/J^2\) 重新构造；不得把表中四舍五入的 `0.1059` 当作精确斜率，也不增加插值或新的 expression grammar。
+
+逐项最小修改如下：
+
+| Family | Required revision |
+| --- | --- |
+| `015` | 补充 OMR 的 resistance-ratio、Néel-state 和 zero-field before/after field-sweep operational definition；补充 progressive Ar-ion milling、每次 etch 后 12 h air exposure、sheet-resistance thickness calibration 和 150 K fixed conditions |
+| `026` | control 使用 \(\Omega/(2\pi)\)，readout 使用 \([\omega_{-1}^{(0)}-\omega_1^{(0)}]/(2\pi)\)，二者均用 Hz；补充 narrow toroid、tight confinement、radial-angular decoupling、\(q=0\)、\(\mathcal M=1\) 和固定数值设置 |
+| `031` | 定义 \(\theta(\lambda)=\rho(\lambda)/\rho^t(\lambda)\) 以及 `maximum_occupancy` 为 \(\max_\lambda\theta(\lambda)\)；补充 homogeneous Lieb–Liniger GHD、slow forward interaction cycle、repulsive ground state 和 no-bound-state branch |
+| `032` | 补充 small-amplitude condition、weakly nonlinear setting、simulation geometry、simulation-derived impulses，以及 asymmetric jetting 和 divergent shocks 对 simplified linear RMI estimate 的限制 |
+| `2001` | 明确输出为 raw polynomial \(P(w)\)，不是 \(M_N(w)=\max\{P(w),0\}\)；补充 squared-\(\ell_2\)-coherence、fixed reference basis/projectors 和 overlap conditions |
+| `2025` | 明确 \(\epsilon_{xy}\) 是 `[110]` uniaxial-loading path 上的 derived coordinate，且该 loading path 同时产生 symmetry-preserving strain；不得表述为 independently applied pure shear |
+| `2026` | 将正的 descent speed 定义为 \(v_b/v_t=-(dz_c/dt)/v_t\)，并保留 source-reported positive fitted relation |
+| `2089` | 补充 singly doped infinite-\(U\) nearest-neighbor kagome Hubbard model、\(t>0\)、\(t=1\) energy unit，以及 finite-system ED/DMRG ground-state fit scope |
+| `3015` | 补充 bulk orthorhombic SnS、AC strain scaling、relaxed-ion protocol、VASP/SCAN Independent Particle Approximation 和 1.55 eV setting |
+
+为防止同类错误再次进入 case construction，只做三项 pipeline 修改：
+
+1. 保持 [`minimal_science_card.py`](../src/role_benchmark/temporal/minimal_science_card.py) 的六类字段和 expression grammar 不变；在 [`minimal_card_extract.py`](../src/role_benchmark/temporal/minimal_card_extract.py) 的 authoring prompt 中明确要求 control/readout 的 reference point、normalization、sign convention 和 aggregation，要求记录关系成立所需的 material/system、geometry/loading path、model/protocol、approximation/regime 与 fixed settings；derived coordinate 不得写成 independently manipulated control，rounded table value 不得无说明地用作 exact coefficient；无法给出来源 anchor 时返回空 relation；
+2. 在 [`admission.py`](../src/role_benchmark/temporal/admission.py) 新建 `temporal_admission_review.v2`，在 compile 前强制逐项记录 `source_coverage`、`quantitative_relation_support`、`formula_fidelity`、`parameter_support`、`control_support`、`readout_support`、`domain_support` 和 `anchor_accuracy` 的 `pass`、`fail` 或 `not_assessable`；只有八项全部 `pass` 且没有 blocking issue 才可 admission。`constructed_case_fidelity` 保留为 compile 后检查；
+3. 旧 `temporal_admission_review.v1` 只用于重放冻结产物；新的 production 或 revision run 不得把旧版三个 boolean 自动解释为新版通过。不得增加关键词规则、单位字符串解析、OCR 或自动语义判断，因为这些方法不能可靠判断 source support。
+
+第一轮 stopping rule 在运行前固定：9 个 revised candidates 各只有一次 revision 和一次新上下文 source review；任一项仍有 blocking issue 即排除，不继续修改到通过。若 9/9 通过，与原 11 个 `retain` candidates 合计 20 项，立即停止 candidate revision。若不足 20，只允许按上述来源方程处理 `3045` 一次；此后仍不足 20，则记录未达到目标，不增加论文、不放宽 source-review checks。该结果只证明这些 artifacts 通过固定检查；由于修改规则来自同一批 22 项，它不能证明更新后的 authoring pipeline 对新论文具有更高 conversion 或 retention。pipeline 的泛化只能在未来未参与规则制定的冻结 cohort 上前瞻验证。
+
+当前 [`source_case.py`](../src/role_benchmark/temporal/source_case.py) 不公开经 source review 的 control/readout definitions，Player 只看到通用 descriptions；因此修正 ScienceCard 只能保证 Oracle 与 provenance 正确，不能自动支持“完整科学语义对 Player 可见”的主张。第一轮用无歧义的标准变量名表达必要的 sign、normalization 和 raw-versus-clipped distinction，不直接公开任意 LLM prose。若论文主张评测科学语义而非 black-box quantitative relation identification，则在正式评测前必须另行冻结 public information boundary，并由人工领域专家确认公开文本既充分定义 variables 和 fixed conditions，又不泄露 formula 或 parameter values。
+
 Post-hoc record-linkage conformance review 将 22 项按最强已记录依据分类为：18 项 exact journal DOI、3 项 Crossref `has-preprint` relation、1 项基于官方 metadata 的非自动裁定。`EXP-TEMPORAL-SOURCE-REVIEW-001` 已重新取得后四项的官方字段：前三项的 relation 均明确给出 `id-type=doi`、arXiv DOI target 和 `asserted-by=subject`，并由官方 arXiv `id_list` 返回对应带版本记录，因而满足当前 automatic resolution rule；最后一项没有 identifier relationship，仍只按官方 arXiv、Crossref 与 Nature metadata 的题名、完整有序作者列表和出版声明一致性裁定，不进入 automatic matching。新记录是带 retrieval time 的官方字段投影，不是完整原始 HTTP response；它补齐了 identity decision 所需字段，但不支持重放服务端完整响应。见 [`accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md) 与 [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/linkage/`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/linkage/)。
 
 对 14 个具有完整 journal/arXiv metadata 的 pairs 所做的描述性 record-linkage 审查发现：8 对标题完全一致，1 对只有数学或数字排版差异，5 对发生实质性改题；7 对由唯一 exact DOI 确认，5 对由官方 metadata 人工确认，1 对拒绝，1 对 unresolved。该 complete-case sample 非随机且不含所有漏检记录，不能用于估计 linkage precision 或 recall；其中未见实质性数字冲突，也不能据此假设标题数字匹配是可靠的身份判据。
@@ -411,7 +454,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 按依赖关系排序，下一步只做以下三件事：
 
-1. 先修订 10 个 `revision_required` candidates，并为 `temporal_source_1005` 补充可判定半径坐标的固定来源材料或将其排除；之后对拟发布集合完成新的 source review、独立人工领域专家 review、跨 cohort 去重和 release review；在此之前不扩大公开 Temporal registry；
+1. 按 “Temporal candidate revision and validation” 的 stopping rule 冻结 11 个 `retain` candidates，只修订 9 个不改变 formula expression tree 的 candidates，排除 `1005`，并把 `3045` 保留为不足 20 时的唯一 contingency；之后对拟发布集合完成新的 source review、独立人工领域专家 review、跨 cohort 去重和 release review；在此之前不扩大公开 Temporal registry；
 2. 按冻结配置执行 `EXP-METHOD-PILOT-001`，并按预先定义的 failure criteria 决定停止、修订协议或进入正式规模；
 3. 在任何 capability claim 前补充不可变 model checkpoints 并完成 P0.7。
 
@@ -440,6 +483,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | EXP-TEMPORAL-PRODUCTION-003 | 在冻结 PRL relation cohort 上继续构造 candidate families | 91 个 frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-003/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-003/summary.json) | 6 个 candidate families；与前序 cohort 分开报告 |
 | EXP-TEMPORAL-PRODUCTION-004 | Nature 优先并处理完整 frozen cohort，使累计 candidate families 达到至少 20 | 2 个 Nature 与 49 个 Physical Review Letters frozen source papers | Interactive Code Agent；请求标签 `gpt-5.6-fast`，runtime snapshot/cutoff unknown | Operational funnel counts；不定义因果 estimand | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-PRODUCTION-004/registration.json) | [`summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/summary.json)；[`cumulative_summary.json`](../runs/EXP-TEMPORAL-PRODUCTION-004/cumulative_summary.json) | 本批 4 个、累计 22 个 candidate families；数量目标完成，release review 未完成 |
 | EXP-TEMPORAL-SOURCE-REVIEW-001 | 22 个 candidate families 是否忠实表达至少一个由固定来源支持的可执行定量关系 | 四次 production runs 的全部 22 个 candidate families；逐 family 独立上下文 | `gpt-5.6-sol`；reasoning effort `ultra`；immutable snapshot/cutoff unknown | 四种固定 disposition 的计数；九项 source-review checks | `completed` | [`registration.json`](../experiments/registrations/EXP-TEMPORAL-SOURCE-REVIEW-001/registration.json)；[`review_rubric.md`](../experiments/registrations/EXP-TEMPORAL-SOURCE-REVIEW-001/review_rubric.md) | [`summary.json`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/summary.json)；[`report_zh.md`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/report_zh.md) | 11 retain；10 revision required；1 not assessable；模型评审不等于人工领域专家 review |
+| EXP-TEMPORAL-CARD-REVISION-001 | 一次 targeted ScienceCard revision 是否足以使固定 candidate set 中至少 20 项通过全部 source-review checks | 11 个冻结 `retain` candidates；9 个预先指定 revision candidates；`1005` 排除；`3045` 仅作预先指定 contingency | Revision 与 review 必须使用独立上下文；具体 runtime identity 在 registration 中冻结 | 通过全部八项 admission checks 并在 compile 后通过 `constructed_case_fidelity` 的 candidate 数；不估计 pipeline 泛化 | `proposed` | 待登记 | 未运行 | 每项最多一次 revision；达到 20 即停止；未通过项排除 |
 | EXP-METHOD-PILOT-001 | 三种 evaluation methods 能否分别测量无观测、固定观测和自适应实验条件下的表现 | 6 个 H/C families（easy/hard）与 3 个独立 Temporal families；2 repeats | `deepseek-v4-flash` API alias；snapshot 与 cutoff 为 unknown；deterministic Oracle；独立 post-hoc Evaluator | `held_out_prediction_score` 的 \(\Delta_0,\Delta_F,\Delta_A\)；Temporal 独立报告 | `ready` | [`registration.json`](../experiments/registrations/EXP-METHOD-PILOT-001/registration.json) | 未运行 | development method pilot；不作 capability 或 post-checkpoint claim |
 | EXP-HC-CONFIRM-001 | 固定实验观测能否改变 Counterfactual condition 下的初始预测 | 20 matched task families；formal evaluation 需要 private benchmark instances | 待冻结 | \(\Delta_0,\Delta_F\) | `blocked` | 待补 | 待补 | 等待 pilot study |
 | EXP-TEMPORAL-001 | 独立近期来源 benchmark instances 在三种 evaluation methods 下的表现差异 | 数量待 power analysis，以 source paper 计 | 待冻结 | \(Y^T_F-Y^T_0\) 和 \(Y^T_A-Y^T_F\) | `blocked` | 待补 | 待补 | 等待 temporal contamination audit 和 private evaluation workflow |
@@ -516,6 +560,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 | R-008 | 历史 Temporal authoring run 没有不可变 model snapshot | 即使 source packets、alias 和调用预算相同，也不能把新旧转换率差异归因于 pipeline 修改 | `EXP-TEMPORAL-AUTHORING-001` 保持 blocked；历史值仅作描述性基线 | 找到并可调用与历史运行相同的不可变 snapshot，或另行登记同一新 snapshot 下的新旧 pipeline 同期比较 | open |
 | R-009 | Journal–arXiv record linkage 出现 false match 或漏召回 | False match 会污染 source truth；漏召回会降低并改变可构造 cohort | Candidate retrieval 与 identity resolution 分离；自动确认只用 Crossref arXiv DOI relation 或唯一 exact journal DOI；non-DOI relation 与标题/搜索候选人工复核；relation provenance 与明确版本不得丢弃；非命中记 unresolved | 在独立标注样本上报告 record-linkage precision/recall，并复核全部 release candidates | open |
 | R-010 | Code Agent source review 被误写为 independent expert review | 高估来源核验强度并使 benchmark release 缺少领域判断 | `EXP-TEMPORAL-SOURCE-REVIEW-001` 明确记录 reviewer 为 language model、`human_domain_expert=false` 和 immutable snapshot unknown；22 个 candidates 不进入公开 registry | 独立人工领域专家完成 source review、去重与 release review | open |
+| R-011 | Temporal public case 丢弃经复核的 control/readout definitions 和 source-specific fixed conditions | 若仍声称评测科学语义，Player-facing information 可能不足；当前结果至多支持 black-box quantitative relation identification | 第一轮只用无歧义变量名修复 sign、normalization 和 raw-versus-clipped distinctions，不公开任意 LLM prose | 在 capability experiment 前冻结 public information boundary；人工领域专家确认信息充分且不泄露 formula 或 parameter values，或将论文主张明确限制为 black-box quantitative relation identification | open |
 
 ## 11. 文档维护规则
 
@@ -548,6 +593,7 @@ N_{episodes}=F\times 2_{condition}\times 2_{task\ setting}\times 3_{method}\time
 
 | Version | Date | Change | Evidence/reason | Author |
 | --- | --- | --- | --- | --- |
+| 0.8.1 | 2026-09-03 | 基于 22 项 source review 将 16 个 blocking issues 压缩为来源材料、relation/variable definition 和 applicability 三类；制定冻结 11 项、一次修订 9 项、排除 `1005`、仅在不足 20 时处理 `3045` 的最小方案；登记 admission v2 和 public information boundary 的必要修改 | [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/report_zh.md`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/report_zh.md)；现有 minimal ScienceCard、admission 与 deterministic compiler 实现 | project team |
 | 0.8.0 | 2026-09-03 | 登记 22/22 项 `gpt-5.6-sol`、`ultra` 模型 source review 结果；将 11 项保留为 provisional candidates、10 项标为需要修改、1 项标为不可判定；补齐 3 项 identifier-level Crossref linkage 与 1 项非自动 official-metadata linkage，同时保持人工领域专家 release review 要求 | [`../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/`](../runs/EXP-TEMPORAL-SOURCE-REVIEW-001/)；固定 input commit 与 preregistered rubric | project team |
 | 0.7.2 | 2026-09-03 | 收紧 22 个 accepted candidates 的 linkage 证据表述：EXP-003 的 3 项 relation-only records 未冻结原始 identifier type，不能据现有本地材料认定符合当前 automatic resolution rule；将重新冻结官方 relation tuple 或独立人工复核列为 release 前条件 | [`../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md)；最终只读代码与证据复核 | project team |
 | 0.7.1 | 2026-09-03 | 更正 arXiv API 没有 DOI search field，明确 `all:"<DOI>"` 只是 DOI-string candidate retrieval；修复 relation provenance tuple、请求节流和同一 arXiv work 的固定 source-version selection；逐项复核 22 个 accepted candidates 的 linkage evidence | [`temporal_case_pipeline.md`](temporal_case_pipeline.md)；[`../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md`](../runs/EXP-TEMPORAL-PRODUCTION-004/accepted_linkage_review.md) | project team |
