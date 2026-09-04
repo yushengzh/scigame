@@ -16,6 +16,11 @@ from .galileo import GALILEO_INCLINED_PLANE_SPEC, make_galileo_inclined_plane_ca
 from .hooke_spring import HOOKE_SPRING_SPEC, make_hooke_spring_case
 from .kepler_orbit import KEPLER_ORBIT_SPEC, make_kepler_orbit_case
 from .matched import MATCHED_WORLDS, MatchedFamilySpec
+from .source import (
+    SourceFamilySpec,
+    make_source_case,
+    source_truth_submission,
+)
 from .michaelis_menten import MICHAELIS_MENTEN_SPEC, make_michaelis_menten_case
 from .newton_cooling import NEWTON_COOLING_SPEC, make_newton_cooling_case
 from .ohm_circuit import OHM_CIRCUIT_SPEC, make_ohm_circuit_case
@@ -112,12 +117,15 @@ __all__ = [
     "CASE_FAMILIES",
     "CASE_SPECS",
     "MATCHED_WORLDS",
+    "SourceFamilySpec",
     "PENDULUM_WORLDS",
     "YOUNG_DOUBLE_SLIT_WORLDS",
     "make_beer_lambert_case",
     "make_boyle_j_tube_case",
     "make_brownian_diffusion_case",
     "make_case",
+    "make_source_case",
+    "source_truth_submission",
     "make_coulomb_force_case",
     "make_faraday_induction_case",
     "make_galileo_inclined_plane_case",

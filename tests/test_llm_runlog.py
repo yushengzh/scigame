@@ -15,10 +15,15 @@ from role_benchmark.llm import (
     LLMPlayerBackend,
     Message,
     ModelTransportError,
+    PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
     TokenUsage,
     build_generation_request,
 )
-from role_benchmark.llm_oracle import OracleOutputError
+from role_benchmark.llm_oracle import (
+    ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
+    OracleOutputError,
+)
 from role_benchmark.models import BenchmarkTrack, PlayerAction, TerminationKind
 from role_benchmark.protocols import BenchmarkCase, CaseOracle
 from role_benchmark.runlog import (
@@ -282,6 +287,91 @@ class LLMDevelopmentLoopTest(unittest.TestCase):
                     str(tampered),
                     make_pendulum_case("historical"),
                 )
+
+    def test_json_hardened_player_and_oracle_versions_are_replayable(self):
+        player = SequencedFakeModel(
+            (
+                "```json\n{}\n```",
+                player_action_to_json(experiment_action()),
+                player_action_to_json(final_action()),
+            )
+        )
+        case = make_pendulum_case("historical")
+        authoritative = CaseOracle(case.definition, case.world_model).respond(
+            experiment_action().experiment
+        )
+        oracle = SequencedFakeModel(
+            (
+                json.dumps(
+                    {"message": authoritative.message},
+                    separators=(",", ":"),
+                ),
+            )
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "json-hardened.jsonl"
+            run_llm_episode(
+                player,
+                case,
+                str(path),
+                player_prompt_version=PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+                oracle_backend=oracle,
+                oracle_prompt_version=ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
+                max_repair_attempts=1,
+                run_metadata=comparison_metadata(),
+            )
+            loaded = load_run_log(str(path))
+
+            started = loaded.events[0]["payload"]
+            self.assertEqual(
+                started["llm_config"]["prompt_version"],
+                PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+            )
+            self.assertEqual(
+                started["llm_config"]["repair_prompt_version"],
+                PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+            )
+            self.assertEqual(
+                started["oracle_llm_config"]["prompt_version"],
+                ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
+            )
+            player_requests = [
+                event["payload"]["request"]
+                for event in loaded.events
+                if event["event_type"] == "model.requested"
+            ]
+            self.assertTrue(player_requests)
+            self.assertTrue(
+                all(
+                    request["metadata"]["prompt_version"]
+                    == PLAYER_PROMPT_VERSION_V2_JSON_HARDENED
+                    for request in player_requests
+                )
+            )
+            repair_request = next(
+                request
+                for request in player_requests
+                if request["metadata"]["purpose"] == "repair_action"
+            )
+            self.assertEqual(
+                repair_request["metadata"]["repair_prompt_version"],
+                PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+            )
+            oracle_request = next(
+                event["payload"]["request"]
+                for event in loaded.events
+                if event["event_type"] == "oracle.model.requested"
+            )
+            self.assertEqual(
+                oracle_request["metadata"]["prompt_version"],
+                ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
+            )
+
+            replay = replay_run_log(
+                str(path), make_pendulum_case("historical")
+            )
+            self.assertEqual(replay.prompt_requests_checked, 4)
 
     def test_repair_logged_run_and_replay(self):
         fake = SequencedFakeModel(

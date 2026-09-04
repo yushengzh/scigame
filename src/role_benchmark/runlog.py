@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 from .episode import Episode, EpisodeProtocolError
 from .llm import (
     AdapterOutputError,
+    DEFAULT_PLAYER_PROMPT_VERSION,
     DEVELOPMENT_EVALUATION_PROFILE,
     GenerationConfig,
     GenerationResponse,
@@ -20,6 +21,9 @@ from .llm import (
     LLMPlayerStats,
     MAX_LLM_ACTION_BYTES,
     ModelTransportError,
+    PLAYER_PROMPT_VERSION_V1,
+    PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
     TextGenerationBackend,
     TokenUsage,
     build_generation_request,
@@ -27,9 +31,12 @@ from .llm import (
     generation_response_to_payload,
 )
 from .llm_oracle import (
+    DEFAULT_ORACLE_PROMPT_VERSION,
     LLMOracle,
     LLMOracleStats,
     ORACLE_MESSAGE_SCHEMA,
+    ORACLE_PROMPT_VERSION_V1,
+    ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
     OracleOutputError,
     build_oracle_generation_request,
     oracle_message_from_json,
@@ -373,6 +380,9 @@ def run_logged_episode(
     oracle: Optional[Oracle] = None,
     max_actions: int = 100,
     run_metadata: Optional[Mapping[str, Any]] = None,
+    observation_budget: Optional[int] = None,
+    initial_attempts_used: int = 0,
+    require_budget_exhaustion: bool = False,
 ) -> EpisodeOutcome:
     """Run one episode while recording every decoded action and transition.
 
@@ -401,6 +411,33 @@ def run_logged_episode(
         if isinstance(effective_oracle, LLMOracle)
         else None
     )
+    episode = Episode(
+        case,
+        oracle=effective_oracle,
+        observation_budget=observation_budget,
+        initial_attempts_used=initial_attempts_used,
+        require_budget_exhaustion=require_budget_exhaustion,
+    )
+    policy: Dict[str, Any] = {
+        "max_actions": max_actions,
+        "durable_log": log.durable,
+    }
+    if (
+        observation_budget is not None
+        or initial_attempts_used != 0
+        or require_budget_exhaustion
+    ):
+        policy.update(
+            {
+                "observation_budget": (
+                    case.definition.budget
+                    if observation_budget is None
+                    else observation_budget
+                ),
+                "initial_attempts_used": initial_attempts_used,
+                "require_budget_exhaustion": require_budget_exhaustion,
+            }
+        )
     log.append(
         "run.started",
         {
@@ -409,13 +446,12 @@ def run_logged_episode(
             "action_schema": PLAYER_ACTION_SCHEMA,
             "player_kind": "llm" if isinstance(player, LLMPlayerBackend) else "custom",
             "llm_config": llm_config,
-            "policy": {"max_actions": max_actions, "durable_log": log.durable},
+            "policy": policy,
             "oracle_mode": oracle_mode,
             "oracle_llm_config": oracle_llm_config,
             "run_metadata": metadata,
         },
     )
-    episode = Episode(case, oracle=effective_oracle)
     for action_index in range(1, max_actions + 1):
         view_before = episode.view()
         try:
@@ -611,14 +647,19 @@ def run_llm_episode(
     log_path: str,
     *,
     config: Optional[GenerationConfig] = None,
+    player_prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
     oracle_backend: Optional[TextGenerationBackend] = None,
     oracle_config: Optional[GenerationConfig] = None,
+    oracle_prompt_version: str = DEFAULT_ORACLE_PROMPT_VERSION,
     max_repair_attempts: int = 0,
     max_action_bytes: int = DEFAULT_MAX_ACTION_BYTES,
     max_actions: int = 100,
     run_id: Optional[str] = None,
     run_metadata: Optional[Mapping[str, Any]] = None,
     durable_log: bool = False,
+    observation_budget: Optional[int] = None,
+    initial_attempts_used: int = 0,
+    require_budget_exhaustion: bool = False,
 ) -> LoggedEpisodeRun:
     """Run one logged development episode with an LLM on either track."""
     if isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1:
@@ -636,6 +677,13 @@ def run_llm_episode(
         )
     if config is not None and not isinstance(config, GenerationConfig):
         raise ValueError("config must be GenerationConfig or None")
+    if player_prompt_version not in (
+        PLAYER_PROMPT_VERSION_V1,
+        PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    ):
+        raise ValueError(
+            "unsupported Player prompt_version %r" % player_prompt_version
+        )
     if not callable(getattr(backend, "generate", None)):
         raise ValueError("backend must provide a callable generate method")
     if oracle_backend is not None and not callable(
@@ -646,11 +694,30 @@ def run_llm_episode(
         raise ValueError("oracle_config must be GenerationConfig or None")
     if oracle_backend is None and oracle_config is not None:
         raise ValueError("oracle_config requires oracle_backend")
+    if oracle_prompt_version not in (
+        ORACLE_PROMPT_VERSION_V1,
+        ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
+    ):
+        raise ValueError(
+            "unsupported Oracle prompt_version %r" % oracle_prompt_version
+        )
+    if (
+        oracle_backend is None
+        and oracle_prompt_version != DEFAULT_ORACLE_PROMPT_VERSION
+    ):
+        raise ValueError("oracle_prompt_version requires oracle_backend")
     if run_metadata is not None and not isinstance(run_metadata, Mapping):
         raise ValueError("run_metadata must be a mapping or None")
     if not isinstance(durable_log, bool):
         raise ValueError("durable_log must be boolean")
     canonical_json_dumps(dict(run_metadata or {}))
+    # Validate the method-specific episode policy before creating a run log.
+    Episode(
+        case,
+        observation_budget=observation_budget,
+        initial_attempts_used=initial_attempts_used,
+        require_budget_exhaustion=require_budget_exhaustion,
+    )
 
     resolved_run_id = run_id or uuid.uuid4().hex
     with JSONLRunLog(
@@ -663,6 +730,7 @@ def run_llm_episode(
             config=config,
             max_repair_attempts=max_repair_attempts,
             max_action_bytes=max_action_bytes,
+            prompt_version=player_prompt_version,
             event_sink=log.append,
         )
         llm_oracle = (
@@ -671,6 +739,7 @@ def run_llm_episode(
                 case.world_model,
                 oracle_backend,
                 config=oracle_config,
+                prompt_version=oracle_prompt_version,
                 event_sink=log.append,
             )
             if oracle_backend is not None
@@ -683,6 +752,9 @@ def run_llm_episode(
             oracle=llm_oracle,
             max_actions=max_actions,
             run_metadata=run_metadata,
+            observation_budget=observation_budget,
+            initial_attempts_used=initial_attempts_used,
+            require_budget_exhaustion=require_budget_exhaustion,
         )
         stats = player.stats
         oracle_stats = llm_oracle.stats if llm_oracle is not None else None
@@ -1043,16 +1115,32 @@ def _validate_parse_event(
 
 def _llm_policy_from_started(
     started: Mapping[str, Any],
-) -> Tuple[GenerationConfig, int, int]:
+) -> Tuple[GenerationConfig, int, int, str]:
     llm_config = started.get("llm_config")
-    if not isinstance(llm_config, dict) or set(llm_config) != {
+    base_keys = {
         "evaluation_profile",
         "action_schema",
         "generation_config",
         "max_action_bytes",
         "max_repair_attempts",
         "generation_policy",
+    }
+    if not isinstance(llm_config, dict):
+        raise RunReplayError("logged LLM configuration has an invalid shape")
+    if set(llm_config) == base_keys:
+        prompt_version = DEFAULT_PLAYER_PROMPT_VERSION
+    elif set(llm_config) == base_keys | {
+        "prompt_version",
+        "repair_prompt_version",
     }:
+        prompt_version = llm_config.get("prompt_version")
+        if (
+            prompt_version != PLAYER_PROMPT_VERSION_V2_JSON_HARDENED
+            or llm_config.get("repair_prompt_version")
+            != PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED
+        ):
+            raise RunReplayError("logged Player prompt version is unavailable")
+    else:
         raise RunReplayError("logged LLM configuration has an invalid shape")
     expected_values = {
         "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
@@ -1091,20 +1179,29 @@ def _llm_policy_from_started(
         config = GenerationConfig(**config_payload)
     except (TypeError, ValueError) as exc:
         raise RunReplayError("logged generation config is unavailable") from exc
-    return config, max_action_bytes, max_repair
+    return config, max_action_bytes, max_repair, prompt_version
 
 
 def _oracle_llm_policy_from_started(
     started: Mapping[str, Any],
-) -> Tuple[GenerationConfig, int]:
+) -> Tuple[GenerationConfig, int, str]:
     oracle_config = started.get("oracle_llm_config")
-    if not isinstance(oracle_config, dict) or set(oracle_config) != {
+    base_keys = {
         "evaluation_profile",
         "message_schema",
         "generation_config",
         "max_output_bytes",
         "generation_policy",
-    }:
+    }
+    if not isinstance(oracle_config, dict):
+        raise RunReplayError("logged Oracle LLM configuration has an invalid shape")
+    if set(oracle_config) == base_keys:
+        prompt_version = DEFAULT_ORACLE_PROMPT_VERSION
+    elif set(oracle_config) == base_keys | {"prompt_version"}:
+        prompt_version = oracle_config.get("prompt_version")
+        if prompt_version != ORACLE_PROMPT_VERSION_V2_JSON_HARDENED:
+            raise RunReplayError("logged Oracle prompt version is unavailable")
+    else:
         raise RunReplayError("logged Oracle LLM configuration has an invalid shape")
     expected_values = {
         "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
@@ -1134,7 +1231,7 @@ def _oracle_llm_policy_from_started(
         or max_output_bytes > 65_536
     ):
         raise RunReplayError("logged Oracle output byte limit is invalid")
-    return config, max_output_bytes
+    return config, max_output_bytes, prompt_version
 
 
 def _completed_event_grammar(
@@ -1810,35 +1907,75 @@ def replay_run_log(
         raise RunReplayError("logged action schema is unavailable")
     oracle_mode = started.get("oracle_mode")
     if oracle_mode not in ("case", "llm_case"):
-        raise RunReplayError("only truth-grounded case Oracle logs can be replayed")
+        raise RunReplayError("only deterministic case Oracle logs can be replayed")
     player_kind = started.get("player_kind")
     if player_kind not in ("llm", "custom"):
         raise RunReplayError("logged player kind is unavailable")
     policy = started.get("policy")
-    if not isinstance(policy, dict) or set(policy) != {"max_actions", "durable_log"}:
+    base_policy_fields = {"max_actions", "durable_log"}
+    observation_policy_fields = {
+        "observation_budget",
+        "initial_attempts_used",
+        "require_budget_exhaustion",
+    }
+    if not isinstance(policy, dict) or set(policy) not in (
+        base_policy_fields,
+        base_policy_fields | observation_policy_fields,
+    ):
         raise RunReplayError("run action/log policy is invalid")
     max_actions = policy.get("max_actions")
     if isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1:
         raise RunReplayError("logged max_actions is invalid")
     if not isinstance(policy.get("durable_log"), bool):
         raise RunReplayError("logged durability policy is invalid")
+    if observation_policy_fields.issubset(policy):
+        observation_budget = policy["observation_budget"]
+        initial_attempts_used = policy["initial_attempts_used"]
+        require_budget_exhaustion = policy["require_budget_exhaustion"]
+        if (
+            isinstance(observation_budget, bool)
+            or not isinstance(observation_budget, int)
+            or not 0 <= observation_budget <= case.definition.budget
+        ):
+            raise RunReplayError("logged observation budget is invalid")
+        if (
+            isinstance(initial_attempts_used, bool)
+            or not isinstance(initial_attempts_used, int)
+            or not 0 <= initial_attempts_used <= observation_budget
+        ):
+            raise RunReplayError("logged initial observation count is invalid")
+        if not isinstance(require_budget_exhaustion, bool):
+            raise RunReplayError("logged observation stopping policy is invalid")
+    else:
+        observation_budget = None
+        initial_attempts_used = 0
+        require_budget_exhaustion = False
     if player_kind == "llm":
-        config, max_action_bytes, max_repair = _llm_policy_from_started(started)
+        (
+            config,
+            max_action_bytes,
+            max_repair,
+            player_prompt_version,
+        ) = _llm_policy_from_started(started)
     else:
         if started.get("llm_config") is not None:
             raise RunReplayError("custom player must not have LLM configuration")
         config = GenerationConfig()
         max_action_bytes = _MAX_EVENT_BYTES
         max_repair = 0
+        player_prompt_version = DEFAULT_PLAYER_PROMPT_VERSION
     if oracle_mode == "llm_case":
-        oracle_config, oracle_max_output_bytes = _oracle_llm_policy_from_started(
-            started
-        )
+        (
+            oracle_config,
+            oracle_max_output_bytes,
+            oracle_prompt_version,
+        ) = _oracle_llm_policy_from_started(started)
     else:
         if started.get("oracle_llm_config") is not None:
             raise RunReplayError("case Oracle must not have LLM configuration")
         oracle_config = GenerationConfig()
         oracle_max_output_bytes = 65_536
+        oracle_prompt_version = DEFAULT_ORACLE_PROMPT_VERSION
 
     # Validate the physical cause/effect sequence before invoking any private
     # runtime component.  An undecodable turn is a model-event suffix with no
@@ -1905,7 +2042,13 @@ def replay_run_log(
     effective_oracle: Oracle = (
         replay_oracle if oracle_mode == "llm_case" else canonical_oracle
     )
-    episode = Episode(case, oracle=effective_oracle)
+    episode = Episode(
+        case,
+        oracle=effective_oracle,
+        observation_budget=observation_budget,
+        initial_attempts_used=initial_attempts_used,
+        require_budget_exhaustion=require_budget_exhaustion,
+    )
     prompt_requests_checked = 0
     oracle_turn = 0
     replayed_outcome: Optional[EpisodeOutcome] = None
@@ -1923,6 +2066,7 @@ def replay_run_log(
                     player_turn=expected_index,
                     config=config,
                     purpose="next_action",
+                    prompt_version=player_prompt_version,
                 )
             )
             if _payload(turn.primary_request, "model.requested").get(
@@ -1940,6 +2084,7 @@ def replay_run_log(
                         player_turn=expected_index,
                         config=config,
                         purpose="repair_action",
+                        prompt_version=player_prompt_version,
                         invalid_output=first_response.text,
                         wire_error=parse_failures[expected_index],
                     )
@@ -1990,6 +2135,7 @@ def replay_run_log(
                     authoritative,
                     oracle_turn=oracle_turn,
                     config=oracle_config,
+                    prompt_version=oracle_prompt_version,
                 )
             )
             if _payload(
@@ -2113,6 +2259,7 @@ def replay_run_log(
                 player_turn=failed_index,
                 config=config,
                 purpose="next_action",
+                prompt_version=player_prompt_version,
             )
         )
         if _payload(failed_attempt.primary_request, "model.requested").get(
@@ -2133,6 +2280,7 @@ def replay_run_log(
                     player_turn=failed_index,
                     config=config,
                     purpose="repair_action",
+                    prompt_version=player_prompt_version,
                     invalid_output=first_response.text,
                     wire_error=failed_primary_error,
                 )

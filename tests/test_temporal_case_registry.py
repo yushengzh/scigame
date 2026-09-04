@@ -33,28 +33,31 @@ class TemporalCaseRegistryTests(unittest.TestCase):
         self.assertTrue(set(TEMPORAL_CASE_FAMILIES).isdisjoint(CASE_FAMILIES))
 
     def test_registered_family_instantiates_all_four_cells(self):
-        for world in ("historical", "counterfactual"):
-            for track in (
+        for condition_id in ("condition_a", "condition_b"):
+            for task_setting in (
                 BenchmarkTrack.IDENTIFICATION,
                 BenchmarkTrack.DISCOVERY,
             ):
-                with self.subTest(world=world, track=track.value):
+                with self.subTest(
+                    condition_id=condition_id,
+                    task_setting=task_setting.value,
+                ):
                     case = make_temporal_case(
                         "kz_incompressible_energy_temperature_regimes",
-                        world,
-                        track,
+                        condition_id,
+                        task_setting,
                     )
-                    self.assertIs(case.definition.track, track)
+                    self.assertIs(case.definition.track, task_setting)
                     self.assertTrue(
                         case.definition.case_id.startswith(
                             "temporal.quenched_bec_energy_simulator"
                         )
                     )
 
-    def test_kz_historical_oracle_reports_the_central_fit_not_a_raw_mean(self):
+    def test_kz_condition_a_oracle_reports_the_central_fit_not_a_raw_mean(self):
         case = make_temporal_case(
             "kz_incompressible_energy_temperature_regimes",
-            "historical",
+            "condition_a",
             BenchmarkTrack.DISCOVERY,
         )
         readout = case.definition.resources.readouts[0]
@@ -108,7 +111,7 @@ class TemporalCaseRegistryTests(unittest.TestCase):
 
                 identification_case = make_temporal_case(
                     "kz_incompressible_energy_temperature_regimes",
-                    "historical",
+                    "condition_a",
                     BenchmarkTrack.IDENTIFICATION,
                 )
                 identification_response = CaseOracle(

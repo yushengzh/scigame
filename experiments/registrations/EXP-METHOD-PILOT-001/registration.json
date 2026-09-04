@@ -1,0 +1,244 @@
+{
+  "schema": "role_benchmark.experiment_registration.v1",
+  "experiment_id": "EXP-METHOD-PILOT-001",
+  "status": "ready",
+  "frozen_on": "2026-09-03",
+  "benchmark_release_id": "role-benchmark-development-v0.8.0",
+  "purpose": "Method pilot; this experiment does not support a formal capability claim.",
+  "scientific_problem": "Determine whether the three evaluation methods are executable under one prediction contract and whether the fixed and adaptive methods use the same observation budget.",
+  "proposed_change": "Run one Player profile on a small mechanism-diverse cohort with the three frozen evaluation methods.",
+  "simpler_alternative": "Unit tests establish contract correctness but do not measure model behavior across complete episodes.",
+  "assumptions": [
+    "The selected public development cases are adequate for a method pilot.",
+    "Provider behavior may change because the configured API model IDs do not identify immutable snapshots.",
+    "Temporal exposure remains unknown when model cutoff or prior benchmark exposure is undocumented."
+  ],
+  "stopping_rule": "Stop after both registered subruns complete, or immediately on an observation-budget mismatch, deterministic scoring failure, or systematic submission-parser failure.",
+  "schedule_seed": 20260825,
+  "repeats": 2,
+  "task_settings": [
+    "identification",
+    "discovery"
+  ],
+  "evaluation_methods": [
+    "prior-only baseline",
+    "fixed experimental design",
+    "adaptive experimental design"
+  ],
+  "observation_budget": {
+    "prior-only baseline": 0,
+    "fixed experimental design": "B equals the number of predefined diagnostic conditions for the family.",
+    "adaptive experimental design": "The same family-specific B used by fixed experimental design; early final submission is rejected."
+  },
+  "primary_outcome": {
+    "name": "held_out_prediction_score",
+    "version": "1.0",
+    "direction": "higher_is_better",
+    "range": "[0, 1]",
+    "definition": "1 / (1 + mean held-out tolerance-scaled absolute error)",
+    "weighting": "Equal weight per held-out condition-readout pair.",
+    "invalid_or_missing_player_submission": 0.0,
+    "infrastructure_failure": "Missing; rerun the same schedule position and report the failure."
+  },
+  "interfaces": {
+    "player": {
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "checkpoint_or_snapshot_id": "unknown",
+      "thinking": "disabled",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_output_tokens": 8192,
+      "max_repair_attempts": 1
+    },
+    "oracle": {
+      "mode": "deterministic",
+      "implementation": "role_benchmark.case_oracle",
+      "version": "deterministic-v1",
+      "llm_presentation_mode_in_primary_experiment": false
+    },
+    "evaluator": {
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "checkpoint_or_snapshot_id": "unknown",
+      "thinking": "disabled",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_output_tokens": 2048,
+      "role": "Post-hoc process evaluation only; it cannot change the scientific score."
+    }
+  },
+  "execution": {
+    "environment": {
+      "PYTHONPATH": "src:.",
+      "DEEPSEEK_API_KEY": "runtime credential for the Player and Evaluator interfaces"
+    },
+    "workers": 1,
+    "max_actions": 16,
+    "order": "Seeded randomized repeat blocks executed sequentially.",
+    "credentials": "Read at runtime and never written to experiment artifacts."
+  },
+  "subruns": [
+    {
+      "subrun_id": "curated",
+      "case_pack": "curated",
+      "families": [
+        "pendulum",
+        "young_double_slit",
+        "radioactive_decay",
+        "ohm_circuit",
+        "michaelis_menten",
+        "poiseuille_flow"
+      ],
+      "variants": [
+        "easy",
+        "hard"
+      ],
+      "conditions": [
+        "historical",
+        "counterfactual"
+      ],
+      "expected_episode_count": 288,
+      "command": [
+        "python3",
+        "experiments/run_case_matrix.py",
+        "--experiment-id",
+        "EXP-METHOD-PILOT-001",
+        "--output-dir",
+        "runs/EXP-METHOD-PILOT-001/curated",
+        "--case-pack",
+        "curated",
+        "--family",
+        "pendulum",
+        "--family",
+        "young_double_slit",
+        "--family",
+        "radioactive_decay",
+        "--family",
+        "ohm_circuit",
+        "--family",
+        "michaelis_menten",
+        "--family",
+        "poiseuille_flow",
+        "--variant",
+        "easy",
+        "--variant",
+        "hard",
+        "--repeats",
+        "2",
+        "--schedule-seed",
+        "20260825",
+        "--oracle-mode",
+        "deterministic",
+        "--player-provider",
+        "deepseek",
+        "--player-model",
+        "deepseek-v4-flash",
+        "--player-snapshot-id",
+        "unknown",
+        "--player-thinking",
+        "disabled",
+        "--player-max-output-tokens",
+        "8192",
+        "--max-repair-attempts",
+        "1",
+        "--evaluator-provider",
+        "deepseek",
+        "--evaluator-model",
+        "deepseek-v4-flash",
+        "--evaluator-snapshot-id",
+        "unknown",
+        "--evaluator-thinking",
+        "disabled",
+        "--evaluator-max-output-tokens",
+        "2048",
+        "--max-actions",
+        "16",
+        "--workers",
+        "1"
+      ]
+    },
+    {
+      "subrun_id": "temporal",
+      "case_pack": "temporal",
+      "families": [
+        "kz_incompressible_energy_temperature_regimes",
+        "viscous_inertial_rheology",
+        "self_similar_spreading_radius_ratio"
+      ],
+      "variant": "source_reported_v1",
+      "conditions": [
+        "condition_a",
+        "condition_b"
+      ],
+      "expected_episode_count": 72,
+      "command": [
+        "python3",
+        "experiments/run_case_matrix.py",
+        "--experiment-id",
+        "EXP-METHOD-PILOT-001",
+        "--output-dir",
+        "runs/EXP-METHOD-PILOT-001/temporal",
+        "--case-pack",
+        "temporal",
+        "--family",
+        "kz_incompressible_energy_temperature_regimes",
+        "--family",
+        "viscous_inertial_rheology",
+        "--family",
+        "self_similar_spreading_radius_ratio",
+        "--repeats",
+        "2",
+        "--schedule-seed",
+        "20260825",
+        "--oracle-mode",
+        "deterministic",
+        "--player-provider",
+        "deepseek",
+        "--player-model",
+        "deepseek-v4-flash",
+        "--player-snapshot-id",
+        "unknown",
+        "--player-thinking",
+        "disabled",
+        "--player-max-output-tokens",
+        "8192",
+        "--max-repair-attempts",
+        "1",
+        "--evaluator-provider",
+        "deepseek",
+        "--evaluator-model",
+        "deepseek-v4-flash",
+        "--evaluator-snapshot-id",
+        "unknown",
+        "--evaluator-thinking",
+        "disabled",
+        "--evaluator-max-output-tokens",
+        "2048",
+        "--max-actions",
+        "16",
+        "--workers",
+        "1"
+      ]
+    }
+  ],
+  "expected_episode_count": 360,
+  "temporal_source_registration": "temporal_sources.json",
+  "temporal_exposure_record_policy": {
+    "create_before_evaluation": false,
+    "evaluated_at": "Record the actual timezone-aware run start; do not substitute the registration date.",
+    "training_data_cutoff": "unknown",
+    "pre_evaluation_benchmark_exposure": "unknown",
+    "network_access": false,
+    "retrieval_access": false,
+    "expected_assessment": "exposure_unknown until documentary evidence changes the record",
+    "coverage": "One row per Player model profile and Temporal benchmark instance after evaluation."
+  },
+  "excluded_from_primary_pilot": [
+    "LLM Oracle presentation mode",
+    "Prompt paraphrase sensitivity analysis",
+    "The separate temporal_counterfactual case pack",
+    "Formal capability or contamination-resistance claims"
+  ],
+  "results": null
+}

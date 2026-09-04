@@ -486,7 +486,7 @@ def _authored_payload():
                     "identification_only": _trace(
                         [
                             "The shared source-defined power-law response scaffold "
-                            "with world-neutral scalar parameter slots."
+                            "with scalar parameter slots shared across conditions."
                         ],
                         ["linear_regime_claim", "quadratic_regime_claim"],
                         [(30, 32), (33, 35)],
@@ -3000,13 +3000,14 @@ class TemporalCaseAuthoringTests(unittest.TestCase):
             )
             valid = truth_submission(spec, world, BenchmarkTrack.IDENTIFICATION)
             self.assertTrue(case.evaluator.evaluate(valid).success)
-            invalid = replace(
+            legacy = replace(
                 valid,
-                parameters={**valid.parameters, "regime_selector": 0.0},
+                model=spec.identification_model,
+                parameters=dict(spec.truths[world].identification_values),
             )
-            rejected = case.evaluator.evaluate(invalid)
+            rejected = case.evaluator.evaluate(legacy)
             self.assertFalse(rejected.success)
-            self.assertIn("public contract exactly", rejected.message)
+            self.assertIn("executable expression representation", rejected.message)
 
     def test_identification_rejects_more_free_parameters_than_episode_observations(self):
         payload = _candidate_payload()

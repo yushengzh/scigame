@@ -1,0 +1,81 @@
+{
+  "schema": "role_benchmark.temporal_production_registration.v1",
+  "experiment_id": "EXP-TEMPORAL-PRODUCTION-001",
+  "status": "registered_for_execution",
+  "registered_on": "2026-09-03",
+  "purpose": "Produce at least 20 distinct executable Temporal benchmark families from sources first made public between 2026-01-01 and 2026-09-03.",
+  "interpretation": "Non-comparative benchmark production run. It does not estimate the causal effect of the revised authoring pipeline and does not modify EXP-TEMPORAL-AUTHORING-001.",
+  "source_manifest": "frozen_sources.json",
+  "cohort_size": 36,
+  "source_policy": {
+    "primary_venues": [
+      "Nature",
+      "Science"
+    ],
+    "fallback_venue": "Physical Review Letters",
+    "source_requirement": "Versioned arXiv TeX source packet",
+    "order": "Nature and Science sources that pass TeX availability and either exact-DOI linkage or the preregistered full-title search with official-record adjudication, followed by existing eligible Physical Review Letters source packets",
+    "post_authoring_replacement": "not permitted"
+  },
+  "time_window": {
+    "start": "2026-01-01",
+    "end": "2026-09-03",
+    "inclusive": true,
+    "date_rule": "earliest_public_date is the earlier of journal publication and arXiv first submission"
+  },
+  "target": {
+    "distinct_family_count": 20,
+    "counting_unit": "source paper",
+    "rule": "Count one family only after a nonempty minimal ScienceCard, separate-context source review retention, deterministic construction, and passing Identification and Discovery known-truth validation.",
+    "processing": "Process the complete frozen cohort; do not replace failed sources after observing authoring or review outcomes."
+  },
+  "authoring_engine": {
+    "interface": "interactive Codex Code Agent",
+    "requested_model_label": "gpt-5.6-fast",
+    "runtime_model_label": "unknown unless exposed by the session",
+    "immutable_snapshot_id": null,
+    "documented_knowledge_cutoff": {
+      "status": "unknown",
+      "date": null,
+      "evidence_locator": null
+    },
+    "external_sources_during_extraction": "not permitted",
+    "authored_fields": [
+      "formula",
+      "parameters",
+      "controls",
+      "readouts",
+      "domain",
+      "anchors"
+    ],
+    "generated_by_deterministic_code": [
+      "budget",
+      "diagnostic_conditions",
+      "held_out_conditions",
+      "public_template",
+      "provenance_mapping"
+    ]
+  },
+  "review": {
+    "execution": "A separate Code Agent context reviews each fixed source packet and frozen ScienceCard.",
+    "independence_claim": "Process separation only; this is not independent human or domain-expert review.",
+    "release_requirement": "Human source review remains required before public benchmark release."
+  },
+  "temporal_claim": {
+    "status": "not_established",
+    "reason": "The authoring engine knowledge cutoff and immutable snapshot are not documented.",
+    "permitted_description": "Recent-source Temporal benchmark candidates",
+    "prohibited_description": "Post-cutoff, unseen, or contamination-free benchmark cases"
+  },
+  "main_pipeline": {
+    "api_runner": "experiments/run_temporal_conversion.py",
+    "status": "unchanged",
+    "emergency_adapter": "experiments/run_temporal_code_agent_production.py"
+  },
+  "arxiv_linkage": {
+    "primary_rule": "Exact canonical DOI using official journal and arXiv metadata.",
+    "supplemental_recall": "For automatic not-found, ambiguous, markup-title, or truncated results, use a full-title web search only to discover candidates, then adjudicate with DOI, title, authors, and abstract from official journal and arXiv records.",
+    "numeric_overlap": "Never sufficient for identity.",
+    "main_matcher_modified": false
+  }
+}

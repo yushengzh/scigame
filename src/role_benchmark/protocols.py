@@ -1,4 +1,4 @@
-"""Player/Oracle interfaces and the truth-grounded case Oracle."""
+"""Player/Oracle interfaces and the deterministic case Oracle."""
 
 from __future__ import annotations
 

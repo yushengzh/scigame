@@ -12,6 +12,7 @@ from examples.render_run_log import (
     render_run_log,
 )
 from role_benchmark.cases import make_pendulum_case
+from role_benchmark.expression import EXPRESSION_MODEL
 from role_benchmark.llm import GenerationResponse, TokenUsage
 from role_benchmark.models import (
     ExperimentProposal,
@@ -60,6 +61,33 @@ class ScriptedPlayer:
         return self._actions.pop(0)
 
 
+def pendulum_program(mass_exponent):
+    return {
+        "outputs": {
+            "period_s": {
+                "op": "multiply",
+                "args": [
+                    2.0064,
+                    {
+                        "op": "power",
+                        "args": [{"var": "length_m"}, 0.5],
+                    },
+                    {
+                        "op": "power",
+                        "args": [
+                            {
+                                "op": "divide",
+                                "args": [{"var": "bob_mass_kg"}, 0.2],
+                            },
+                            mass_exponent,
+                        ],
+                    },
+                ],
+            }
+        }
+    }
+
+
 def renderer_actions():
     first_portfolio = HypothesisPortfolio(
         (
@@ -104,12 +132,8 @@ def renderer_actions():
         FinalSubmission(
             hypothesis_id="H1",
             explanation="Evidence supports H1 <img src=x onerror=alert(1)>.",
-            model="normalized_power_law",
-            parameters={
-                "reference_period_s": 2.0064,
-                "length_exponent": 0.5,
-                "mass_exponent": 0.0,
-            },
+            model=EXPRESSION_MODEL,
+            parameters=pendulum_program(0.0),
             scope_conditions=("small release angles",),
         ),
     )
@@ -190,12 +214,8 @@ def write_failure_fixture(path):
         FinalSubmission(
             hypothesis_id="H1",
             explanation="The period is independent of bob mass.",
-            model="normalized_power_law",
-            parameters={
-                "reference_period_s": 2.01,
-                "length_exponent": 0.5,
-                "mass_exponent": 0.0,
-            },
+            model=EXPRESSION_MODEL,
+            parameters=pendulum_program(0.0),
         ),
     )
     case = make_pendulum_case("counterfactual")

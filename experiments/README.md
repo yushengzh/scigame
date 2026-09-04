@@ -1,4 +1,49 @@
-# Pendulum minimal validation
+# Temporal authoring conversion study
+
+`EXP-TEMPORAL-AUTHORING-001` registers the revised Temporal authoring pipeline. Temporal admission requires at least one source-supported executable quantitative relation. A second source-reported condition is optional. Counterfactual variants are constructed only by the separate counterfactual construction pipeline when explicitly requested.
+
+The authoring model returns only a minimal ScienceCard containing `formula`, `parameters`, `controls`, `readouts`, `domain`, and `anchors`. Deterministic code generates the observation budget, diagnostic conditions, held-out conditions, public template, and provenance mapping.
+
+The experiment reuses all 37 source packets from the two historical runs in their registered order. It does not reacquire or replace papers. The first 17 papers retain a maximum of two total ScienceCard calls per paper; the remaining 20 retain a maximum of four. The four registered paper-level rates all use 37 as their denominator:
+
+- first-attempt structural validity;
+- post-repair structural validity;
+- source-review retention;
+- final acceptance.
+
+The protocol and exact source manifest are in [`registrations/EXP-TEMPORAL-AUTHORING-001/`](registrations/EXP-TEMPORAL-AUTHORING-001/). The historical descriptive values are 3/37 first-attempt valid, 13/37 valid after repair, 0/37 eligible at source review, and 0/37 finally accepted. Of the 13 structurally valid cards, the old paired-condition review requested revision for 6 and rejected 7. Revision-required cards are reported separately and are not counted as retained; the old decisions also cannot be retrospectively reclassified under the new admission rule.
+
+The experiment is currently blocked and has not been run. The historical artifacts saved the mutable model alias `deepseek-v4-flash`, but not an immutable checkpoint or snapshot identifier, and the runtime credential is unavailable. Therefore a later run against the same alias would be descriptive only and could not identify a causal effect of the pipeline revision.
+
+The following command validates the registration, all 37 paths, source order, and the 114-call upper bound without loading credentials or calling a provider:
+
+```bash
+PYTHONPATH=src:. python experiments/run_temporal_conversion.py \
+  /tmp/temporal-authoring-dry-run \
+  --registration experiments/registrations/EXP-TEMPORAL-AUTHORING-001/registration.json \
+  --authoring-snapshot-id unknown \
+  --dry-run
+```
+
+If the exact historical immutable snapshot becomes available and is callable by the provider, complete a documented pre-execution registration amendment before any model call: record the same snapshot in both snapshot fields, set the historical comparison status to `controlled`, set the experiment status to `ready_for_execution`, and commit that amendment. The runner sends the registered snapshot identifier as the provider's `model` value; the mutable alias is metadata only. Then run:
+
+```bash
+PYTHONPATH=src:. python experiments/run_temporal_conversion.py \
+  runs/EXP-TEMPORAL-AUTHORING-001 \
+  --registration experiments/registrations/EXP-TEMPORAL-AUTHORING-001/registration.json \
+  --authoring-snapshot-id SNAPSHOT_ID
+```
+
+Do not use `unknown` for this registered controlled comparison. If only the model alias can be matched, create a separate registration for a descriptive replication. Never write the credential to repository artifacts.
+
+After all independent source reviews and deterministic case validations are complete, generate the registered descriptive comparison with:
+
+```bash
+PYTHONPATH=src:. python experiments/compare_temporal_conversion.py \
+  runs/EXP-TEMPORAL-AUTHORING-001
+```
+
+## Pendulum minimal validation
 
 This directory runs one preregistered matrix:
 

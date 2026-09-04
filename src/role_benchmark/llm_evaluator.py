@@ -27,6 +27,11 @@ from .wire import WireDecodeError, canonical_json_dumps, strict_json_loads
 
 
 LLM_EVALUATION_SCHEMA = "role_benchmark.llm_transcript_evaluation"
+EVALUATOR_PROMPT_VERSION_V1 = "role_benchmark.evaluator_prompt.v1"
+EVALUATOR_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.evaluator_prompt.v2_json_hardened"
+)
+DEFAULT_EVALUATOR_PROMPT_VERSION = EVALUATOR_PROMPT_VERSION_V1
 MAX_LLM_EVALUATION_OUTPUT_BYTES = 262_144
 MAX_EVALUATOR_SUMMARY_CHARACTERS = 4_096
 MAX_FINDING_MESSAGE_CHARACTERS = 2_048
@@ -152,6 +157,29 @@ Findings must identify concrete observable errors and cite sequence numbers from
 the supplied transcript. Return exactly one JSON object matching the schema,
 with no Markdown, hidden reasoning, overall score, pass/fail field, or extra keys.
 """
+
+_JSON_HARDENED_SYSTEM_INSTRUCTION = _SYSTEM_INSTRUCTION + """
+Serialization preflight is mandatory. Construct one JSON value and serialize it
+exactly once. scores must contain exactly these six keys: experiment_design,
+evidence_use, hypothesis_revision, stopping_decision,
+claim_evidence_consistency, explanation_quality. Use null when the observable
+record is insufficient. Do not add an overall score.
+
+For every finding, code must be lower_snake_case, stage must be one allowed enum
+value, action_index must identify an observed action or be null, and
+event_sequences must be unique integers copied only from sequence fields
+present in the supplied transcript. The first non-whitespace character must be
+{ and the last must be }. Do not emit Markdown, comments, trailing commas,
+NaN, Infinity, or text outside the object.
+"""
+
+
+def _evaluator_prompt_text(prompt_version: str) -> str:
+    if prompt_version == EVALUATOR_PROMPT_VERSION_V1:
+        return _SYSTEM_INSTRUCTION
+    if prompt_version == EVALUATOR_PROMPT_VERSION_V2_JSON_HARDENED:
+        return _JSON_HARDENED_SYSTEM_INSTRUCTION
+    raise ValueError("unsupported Evaluator prompt_version %r" % prompt_version)
 
 
 class LLMEvaluatorError(RuntimeError):
@@ -414,16 +442,29 @@ def build_evaluator_generation_request(
     log: LoadedRunLog,
     *,
     config: GenerationConfig,
+    prompt_version: str = DEFAULT_EVALUATOR_PROMPT_VERSION,
 ) -> GenerationRequest:
     """Build the exact one-call request for post-hoc transcript evaluation."""
 
     if not isinstance(config, GenerationConfig):
         raise ValueError("config must be GenerationConfig")
+    system_instruction = _evaluator_prompt_text(prompt_version)
     schema = llm_evaluation_json_schema()
     projection = evaluator_transcript_projection(log)
-    system = _SYSTEM_INSTRUCTION + "\nEvaluator JSON Schema:\n" + canonical_json_dumps(
-        schema
+    system = (
+        system_instruction
+        + "\nEvaluator JSON Schema:\n"
+        + canonical_json_dumps(schema)
     )
+    metadata = {
+        "evaluation_schema": LLM_EVALUATION_SCHEMA,
+        "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
+        "run_id": log.run_id,
+        "purpose": "post_hoc_transcript_evaluation",
+    }
+    # Preserve the frozen v1 request payload unless v2 is explicitly selected.
+    if prompt_version != DEFAULT_EVALUATOR_PROMPT_VERSION:
+        metadata["prompt_version"] = prompt_version
     return GenerationRequest(
         messages=(
             Message("system", system),
@@ -431,12 +472,7 @@ def build_evaluator_generation_request(
         ),
         response_schema=schema,
         config=config,
-        metadata={
-            "evaluation_schema": LLM_EVALUATION_SCHEMA,
-            "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
-            "run_id": log.run_id,
-            "purpose": "post_hoc_transcript_evaluation",
-        },
+        metadata=metadata,
     )
 
 
@@ -468,6 +504,7 @@ class PostHocLLMEvaluator:
         *,
         config: Optional[GenerationConfig] = None,
         max_output_bytes: int = MAX_LLM_EVALUATION_OUTPUT_BYTES,
+        prompt_version: str = DEFAULT_EVALUATOR_PROMPT_VERSION,
     ) -> None:
         if not callable(getattr(backend, "generate", None)):
             raise ValueError("backend must provide a callable generate method")
@@ -483,12 +520,18 @@ class PostHocLLMEvaluator:
                 "max_output_bytes must be between 1 and %d"
                 % MAX_LLM_EVALUATION_OUTPUT_BYTES
             )
+        _evaluator_prompt_text(prompt_version)
         self._backend = backend
         self._config = GenerationConfig() if config is None else config
         self._max_output_bytes = max_output_bytes
+        self._prompt_version = prompt_version
 
     def evaluate(self, log: LoadedRunLog) -> LLMEvaluatorRun:
-        request = build_evaluator_generation_request(log, config=self._config)
+        request = build_evaluator_generation_request(
+            log,
+            config=self._config,
+            prompt_version=self._prompt_version,
+        )
         request_payload = generation_request_to_payload(request)
         try:
             response = self._backend.generate(request)
@@ -546,7 +589,10 @@ class PostHocLLMEvaluator:
 
 
 __all__ = [
+    "DEFAULT_EVALUATOR_PROMPT_VERSION",
     "EVALUATOR_FINDING_STAGES",
+    "EVALUATOR_PROMPT_VERSION_V1",
+    "EVALUATOR_PROMPT_VERSION_V2_JSON_HARDENED",
     "EVALUATOR_SCORE_AXES",
     "LLM_EVALUATION_SCHEMA",
     "LLMEvaluatorError",

@@ -29,6 +29,7 @@ def _item(
     url=None,
     given="Ada",
     family="Lovelace",
+    relation=None,
 ):
     item = {
         "DOI": doi,
@@ -40,6 +41,8 @@ def _item(
     }
     if url is not None:
         item["URL"] = url
+    if relation is not None:
+        item["relation"] = relation
     return item
 
 
@@ -257,6 +260,402 @@ class TemporalCensusTests(unittest.TestCase):
         bad_date = dict(census_paper_to_payload(paper), publication_date="2026-02-30")
         with self.assertRaisesRegex(ValueError, "must be an ISO date"):
             census_paper_from_payload(bad_date)
+        orphan_assertion = dict(
+            census_paper_to_payload(paper), has_preprint_asserted_by="object"
+        )
+        with self.assertRaisesRegex(ValueError, "requires arXiv ID"):
+            census_paper_from_payload(orphan_assertion)
+        orphan_identifier = dict(
+            census_paper_to_payload(paper), has_preprint_arxiv_id="2601.05846"
+        )
+        with self.assertRaisesRegex(ValueError, "requires arXiv ID"):
+            census_paper_from_payload(orphan_identifier)
+
+    def test_extracts_member_deposited_crossref_arxiv_relation(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "doi",
+                    "id": "https://doi.org/10.48550/arXiv.2601.05846",
+                    "asserted-by": "subject",
+                },
+                {
+                    "id-type": "doi",
+                    "id": "10.1101/2026.01.01.000001",
+                    "asserted-by": "subject",
+                },
+                {
+                    "id-type": "arxiv",
+                    "id": "arXiv:2601.05846",
+                    "asserted-by": "object",
+                },
+            ]
+        }
+        papers = collect_crossref_census(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/example",
+                                    "Explicit relation",
+                                    2,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {"message": {"items": []}},
+                }
+            ),
+        )
+
+        self.assertEqual(papers[0].has_preprint_arxiv_id, "2601.05846")
+        self.assertEqual(papers[0].has_preprint_asserted_by, "subject")
+        self.assertEqual(papers[0].has_preprint_identifier_type, "doi")
+        payload = census_paper_to_payload(papers[0])
+        self.assertEqual(payload["has_preprint_arxiv_id"], "2601.05846")
+        self.assertEqual(payload["has_preprint_asserted_by"], "subject")
+        self.assertEqual(payload["has_preprint_identifier_type"], "doi")
+        self.assertEqual(census_paper_from_payload(payload), papers[0])
+
+    def test_extracts_object_asserted_reciprocal_arxiv_relation(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Nature"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "arxiv",
+                    "id": "2601.05846",
+                    "asserted-by": "object",
+                }
+            ]
+        }
+        papers = collect_crossref_census(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Nature",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1038/example",
+                                    "Reciprocal relation",
+                                    2,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {"message": {"items": []}},
+                }
+            ),
+        )
+
+        self.assertEqual(papers[0].has_preprint_arxiv_id, "2601.05846")
+        self.assertEqual(papers[0].has_preprint_asserted_by, "object")
+        self.assertEqual(papers[0].has_preprint_identifier_type, "arxiv")
+        payload = census_paper_to_payload(papers[0])
+        self.assertEqual(payload["has_preprint_asserted_by"], "object")
+        self.assertEqual(payload["has_preprint_identifier_type"], "arxiv")
+        self.assertEqual(census_paper_from_payload(payload), papers[0])
+
+    def test_relation_provenance_is_one_observed_pair(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "doi",
+                    "id": "10.48550/arXiv.2601.05846",
+                    "asserted-by": "object",
+                },
+                {
+                    "id-type": "arxiv",
+                    "id": "2601.05846",
+                    "asserted-by": "subject",
+                },
+            ]
+        }
+        papers = collect_crossref_census(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/example",
+                                    "Observed provenance pair",
+                                    2,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {"message": {"items": []}},
+                }
+            ),
+        )
+
+        self.assertEqual(papers[0].has_preprint_asserted_by, "object")
+        self.assertEqual(papers[0].has_preprint_identifier_type, "doi")
+
+    def test_conflicting_subject_asserted_arxiv_relations_fail_closed(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "doi",
+                    "id": "10.48550/arXiv.2601.05846",
+                    "asserted-by": "subject",
+                },
+                {
+                    "id-type": "arxiv",
+                    "id": "2601.05847",
+                    "asserted-by": "subject",
+                },
+            ]
+        }
+        snapshot = collect_crossref_census_snapshot(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/conflict",
+                                    "Conflicting relation",
+                                    2,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {"message": {"items": []}},
+                }
+            ),
+        )
+
+        self.assertEqual(snapshot.papers, ())
+        self.assertEqual(
+            snapshot.dispositions[0].disposition,
+            "crossref_preprint_relation_conflict",
+        )
+
+    def test_arxiv_doi_suffix_is_not_parsed_as_an_id_type_arxiv_value(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "doi",
+                    "id": "10.48550/arXiv.arXiv:2601.05846",
+                    "asserted-by": "subject",
+                }
+            ]
+        }
+        snapshot = collect_crossref_census_snapshot(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/malformed-arxiv-doi",
+                                    "Malformed relation DOI",
+                                    2,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {"message": {"items": []}},
+                }
+            ),
+        )
+
+        self.assertEqual(snapshot.papers, ())
+        self.assertEqual(
+            snapshot.dispositions[0].disposition,
+            "crossref_preprint_relation_invalid",
+        )
+        self.assertIn("official arXiv DOI", snapshot.dispositions[0].detail)
+
+    def test_id_type_arxiv_accepts_its_explicit_identifier_prefix(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "arxiv",
+                    "id": "arXiv:2601.05846v2",
+                    "asserted-by": "subject",
+                }
+            ]
+        }
+        papers = collect_crossref_census(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/arxiv-id",
+                                    "Explicit arXiv identifier",
+                                    2,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {"message": {"items": []}},
+                }
+            ),
+        )
+
+        self.assertEqual(papers[0].has_preprint_arxiv_id, "2601.05846v2")
+        self.assertEqual(papers[0].has_preprint_identifier_type, "arxiv")
+
+    def test_duplicate_crossref_records_merge_one_arxiv_relation(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        relation = {
+            "has-preprint": [
+                {
+                    "id-type": "doi",
+                    "id": "10.48550/arXiv.2601.05846",
+                    "asserted-by": "subject",
+                }
+            ]
+        }
+        snapshot = collect_crossref_census_snapshot(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/shared",
+                                    "Shared record",
+                                    2,
+                                    citations=7,
+                                    url="https://doi.org/10.1103/shared",
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/shared",
+                                    "Shared record",
+                                    2,
+                                    citations=None,
+                                    relation=relation,
+                                )
+                            ]
+                        }
+                    },
+                }
+            ),
+        )
+
+        self.assertEqual(len(snapshot.papers), 1)
+        self.assertEqual(snapshot.papers[0].citation_count, 7)
+        self.assertEqual(snapshot.papers[0].has_preprint_arxiv_id, "2601.05846")
+        self.assertEqual(snapshot.papers[0].has_preprint_asserted_by, "subject")
+        self.assertEqual(snapshot.papers[0].has_preprint_identifier_type, "doi")
+        conflict = snapshot.duplicate_conflicts[0]
+        self.assertIn("has_preprint_arxiv_id", conflict.fields)
+        self.assertIsNone(conflict.selected_record.has_preprint_arxiv_id)
+        self.assertEqual(
+            conflict.alternate_record.has_preprint_arxiv_id,
+            "2601.05846",
+        )
+        self.assertEqual(
+            conflict.alternate_record.has_preprint_asserted_by,
+            "subject",
+        )
+        self.assertEqual(
+            conflict.alternate_record.has_preprint_identifier_type,
+            "doi",
+        )
+
+    def test_duplicate_relation_merge_preserves_an_observed_provenance_pair(self):
+        print_issn, online_issn = CROSSREF_VENUE_ISSNS["Physical Review Letters"]
+        subject_arxiv = {
+            "has-preprint": [
+                {
+                    "id-type": "arxiv",
+                    "id": "2601.05846",
+                    "asserted-by": "subject",
+                }
+            ]
+        }
+        object_doi = {
+            "has-preprint": [
+                {
+                    "id-type": "doi",
+                    "id": "10.48550/arXiv.2601.05846",
+                    "asserted-by": "object",
+                }
+            ]
+        }
+        snapshot = collect_crossref_census_snapshot(
+            start=date(2026, 6, 1),
+            end=date(2026, 6, 30),
+            venues=("Physical Review Letters",),
+            transport=_PagedTransport(
+                {
+                    (print_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/shared",
+                                    "Shared record",
+                                    2,
+                                    relation=subject_arxiv,
+                                )
+                            ]
+                        }
+                    },
+                    (online_issn, "*"): {
+                        "message": {
+                            "items": [
+                                _item(
+                                    "10.1103/shared",
+                                    "Shared record",
+                                    2,
+                                    relation=object_doi,
+                                )
+                            ]
+                        }
+                    },
+                }
+            ),
+        )
+
+        paper = snapshot.papers[0]
+        self.assertEqual(paper.has_preprint_asserted_by, "object")
+        self.assertEqual(paper.has_preprint_identifier_type, "doi")
 
     def test_cli_outputs_stable_json_and_returns_two_on_error(self):
         papers = (

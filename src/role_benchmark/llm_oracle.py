@@ -39,6 +39,11 @@ from .wire import (
 
 
 ORACLE_MESSAGE_SCHEMA = "role_benchmark.oracle_message"
+ORACLE_PROMPT_VERSION_V1 = "role_benchmark.oracle_prompt.v1"
+ORACLE_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.oracle_prompt.v2_json_hardened"
+)
+DEFAULT_ORACLE_PROMPT_VERSION = ORACLE_PROMPT_VERSION_V1
 MAX_LLM_ORACLE_OUTPUT_BYTES = 65_536
 MAX_ORACLE_MESSAGE_CHARACTERS = 4_096
 _MAX_SAFE_INTEGER = 2**53 - 1
@@ -93,6 +98,23 @@ identical. Do not add measurements, infer missing facts, evaluate Player
 hypotheses, or reveal hidden formulae. The benchmark runtime, not you, supplies
 the authoritative status, message, and experimental evidence.
 """
+
+_JSON_HARDENED_SYSTEM_INSTRUCTION = _SYSTEM_INSTRUCTION + """
+Construct an object with exactly one key, message. Treat
+authoritative_response.message as a string value and serialize it with JSON
+escaping; do not manually copy already-serialized punctuation. Before
+returning, verify that decoding your JSON produces a message exactly equal
+character-for-character to authoritative_response.message. The first
+non-whitespace character must be { and the last must be }; emit no other text.
+"""
+
+
+def _oracle_prompt_text(prompt_version: str) -> str:
+    if prompt_version == ORACLE_PROMPT_VERSION_V1:
+        return _SYSTEM_INSTRUCTION
+    if prompt_version == ORACLE_PROMPT_VERSION_V2_JSON_HARDENED:
+        return _JSON_HARDENED_SYSTEM_INSTRUCTION
+    raise ValueError("unsupported Oracle prompt_version %r" % prompt_version)
 
 
 def oracle_message_json_schema() -> Mapping[str, Any]:
@@ -156,6 +178,7 @@ def build_oracle_generation_request(
     *,
     oracle_turn: int,
     config: GenerationConfig,
+    prompt_version: str = DEFAULT_ORACLE_PROMPT_VERSION,
 ) -> GenerationRequest:
     """Build the exact request used to present one authoritative response."""
 
@@ -165,10 +188,13 @@ def build_oracle_generation_request(
         raise ValueError("oracle_turn must be a positive safe integer")
     if not isinstance(config, GenerationConfig):
         raise ValueError("config must be GenerationConfig")
+    system_instruction = _oracle_prompt_text(prompt_version)
     schema = oracle_message_json_schema()
     schema["properties"]["message"]["const"] = authoritative_response.message
-    system = _SYSTEM_INSTRUCTION + "\nOracle Message JSON Schema:\n" + canonical_json_dumps(
-        schema
+    system = (
+        system_instruction
+        + "\nOracle Message JSON Schema:\n"
+        + canonical_json_dumps(schema)
     )
     user_payload = {
         "case": case_definition_to_payload(definition),
@@ -184,6 +210,9 @@ def build_oracle_generation_request(
         "oracle_turn": oracle_turn,
         "purpose": "present_authoritative_response",
     }
+    # Preserve the frozen v1 request payload unless v2 is explicitly selected.
+    if prompt_version != DEFAULT_ORACLE_PROMPT_VERSION:
+        metadata["prompt_version"] = prompt_version
     return GenerationRequest(
         messages=(
             Message("system", system),
@@ -212,6 +241,7 @@ class LLMOracle:
         *,
         config: Optional[GenerationConfig] = None,
         max_output_bytes: int = MAX_LLM_ORACLE_OUTPUT_BYTES,
+        prompt_version: str = DEFAULT_ORACLE_PROMPT_VERSION,
         event_sink: Optional[EventSink] = None,
     ) -> None:
         if not isinstance(definition, CaseDefinition):
@@ -231,6 +261,7 @@ class LLMOracle:
             )
         if event_sink is not None and not callable(event_sink):
             raise ValueError("event_sink must be callable or None")
+        _oracle_prompt_text(prompt_version)
 
         definition_snapshot = copy.deepcopy(definition)
         self._definition = definition_snapshot
@@ -238,6 +269,7 @@ class LLMOracle:
         self._backend = backend
         self._config = GenerationConfig() if config is None else config
         self._max_output_bytes = max_output_bytes
+        self._prompt_version = prompt_version
         self._event_sink = event_sink
         self._oracle_turns = 0
         self._generation_calls = 0
@@ -249,13 +281,17 @@ class LLMOracle:
 
     @property
     def run_config(self) -> Mapping[str, Any]:
-        return {
+        run_config = {
             "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
             "message_schema": ORACLE_MESSAGE_SCHEMA,
             "generation_config": generation_config_to_payload(self._config),
             "max_output_bytes": self._max_output_bytes,
             "generation_policy": "authoritative_message_exact_copy_one_call",
         }
+        # Existing logged-run grammars expect the frozen v1 key set.
+        if self._prompt_version != DEFAULT_ORACLE_PROMPT_VERSION:
+            run_config["prompt_version"] = self._prompt_version
+        return run_config
 
     @property
     def stats(self) -> LLMOracleStats:
@@ -286,6 +322,7 @@ class LLMOracle:
             authoritative,
             oracle_turn=oracle_turn,
             config=self._config,
+            prompt_version=self._prompt_version,
         )
         request_payload = generation_request_to_payload(request)
         self._generation_calls += 1
@@ -381,11 +418,14 @@ class LLMOracle:
 
 
 __all__ = [
+    "DEFAULT_ORACLE_PROMPT_VERSION",
     "LLMOracle",
     "LLMOracleStats",
     "MAX_LLM_ORACLE_OUTPUT_BYTES",
     "MAX_ORACLE_MESSAGE_CHARACTERS",
     "ORACLE_MESSAGE_SCHEMA",
+    "ORACLE_PROMPT_VERSION_V1",
+    "ORACLE_PROMPT_VERSION_V2_JSON_HARDENED",
     "OracleAdapterError",
     "OracleOutputError",
     "build_oracle_generation_request",

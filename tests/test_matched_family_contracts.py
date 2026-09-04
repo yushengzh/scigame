@@ -10,13 +10,13 @@ import json
 import math
 import unittest
 from collections.abc import Mapping
-from dataclasses import replace
 
 from role_benchmark import (
     BenchmarkTrack,
     CaseOracle,
     Episode,
     ExperimentProposal,
+    FinalSubmission,
     Hypothesis,
     HypothesisPortfolio,
     OracleStatus,
@@ -29,7 +29,7 @@ from role_benchmark.cases import (
     make_case,
 )
 from role_benchmark.cases.matched import truth_submission
-from role_benchmark.expression import EXPRESSION_OPERATOR_ARITIES
+from role_benchmark.expression import EXPRESSION_MODEL, EXPRESSION_OPERATOR_ARITIES
 from role_benchmark.wire import (
     episode_view_to_payload,
     player_action_from_json,
@@ -109,7 +109,7 @@ def _assert_expression_fits_provider_schema(test, expression, operator_arities):
 
 
 class MatchedFamilyContractTest(unittest.TestCase):
-    def test_every_discovery_truth_fits_the_provider_action_schema(self):
+    def test_every_truth_submission_uses_the_provider_expression_schema(self):
         provider_arities = _provider_operator_arities()
         self.assertEqual(
             provider_arities,
@@ -126,9 +126,12 @@ class MatchedFamilyContractTest(unittest.TestCase):
             spec = CASE_SPECS[family]
             for world in MATCHED_WORLDS:
                 with self.subTest(family=family, world=world):
-                    final = truth_submission(
-                        spec, world, BenchmarkTrack.DISCOVERY
+                    submissions = tuple(
+                        truth_submission(spec, world, track) for track in TRACKS
                     )
+                    self.assertEqual(submissions[0], submissions[1])
+                    final = submissions[0]
+                    self.assertEqual(final.model, EXPRESSION_MODEL)
                     action = PlayerAction.submit_final(portfolio, final)
                     decoded = player_action_from_json(player_action_to_json(action))
                     self.assertEqual(decoded.final.parameters, final.parameters)
@@ -215,9 +218,21 @@ class MatchedFamilyContractTest(unittest.TestCase):
                         discovery.resources.max_replicates,
                     )
                     self.assertEqual(
-                        identification.resources.notes[:-1], spec.common_notes
+                        identification.resources.notes[:-1],
+                        discovery.resources.notes,
                     )
-                    self.assertEqual(discovery.resources.notes[:-1], spec.common_notes)
+                    self.assertIn(
+                        "Model specification:",
+                        identification.resources.notes[-1],
+                    )
+                    self.assertIn(
+                        "FinalSubmission.model must equal '%s'" % EXPRESSION_MODEL,
+                        discovery.resources.notes[-1],
+                    )
+                    self.assertEqual(
+                        discovery.resources.notes[:-1],
+                        spec.common_fixed_conditions + spec.common_notes,
+                    )
                     self.assertEqual(identification.budget, discovery.budget)
                     self.assertEqual(
                         identification.confidence_threshold,
@@ -263,7 +278,7 @@ class MatchedFamilyContractTest(unittest.TestCase):
                         spec.counterfactual_change.strip().lower(), serialized
                     )
 
-    def test_identification_parameter_contracts_are_public_complete_and_enforced(self):
+    def test_identification_model_specification_is_public_and_legacy_submission_is_rejected(self):
         for family in CASE_FAMILIES:
             spec = CASE_SPECS[family]
             with self.subTest(family=family):
@@ -295,30 +310,25 @@ class MatchedFamilyContractTest(unittest.TestCase):
                     family, "historical", BenchmarkTrack.IDENTIFICATION
                 )
                 public_notes = " ".join(identification.definition.resources.notes)
+                self.assertIn(spec.identification_model, public_notes)
+                self.assertIn(spec.identification_formula, public_notes)
                 for parameter in contracts:
                     self.assertIn(parameter.name, public_notes)
                     self.assertIn(parameter.description, public_notes)
 
-                submission = truth_submission(
-                    spec, "historical", BenchmarkTrack.IDENTIFICATION
+                legacy_parameters = (
+                    spec.truths["historical"].identification_values
+                    or spec.truths["historical"].parameters
                 )
-                bounded = next(
-                    item
-                    for item in contracts
-                    if item.minimum is not None or item.maximum is not None
-                )
-                invalid_value = (
-                    float(bounded.minimum) - 1.0
-                    if bounded.minimum is not None
-                    else float(bounded.maximum) + 1.0
-                )
-                invalid_parameters = dict(submission.parameters)
-                invalid_parameters[bounded.name] = invalid_value
                 result = identification.evaluator.evaluate(
-                    replace(submission, parameters=invalid_parameters)
+                    FinalSubmission(
+                        explanation="A legacy named-parameter submission.",
+                        model=spec.identification_model,
+                        parameters=dict(legacy_parameters),
+                    )
                 )
                 self.assertFalse(result.success)
-                self.assertIn("outside", result.message)
+                self.assertIn("executable expression representation", result.message)
 
     def test_same_world_identification_and_discovery_return_identical_evidence(self):
         for family in CASE_FAMILIES:
@@ -362,6 +372,14 @@ class MatchedFamilyContractTest(unittest.TestCase):
                 ("historical", "counterfactual"),
                 ("counterfactual", "historical"),
             ):
+                truth = truth_submission(
+                    spec, target_world, BenchmarkTrack.IDENTIFICATION
+                )
+                false_twin = truth_submission(
+                    spec, twin_world, BenchmarkTrack.DISCOVERY
+                )
+                results = []
+                false_twin_results = []
                 for track in TRACKS:
                     with self.subTest(
                         family=family,
@@ -371,20 +389,20 @@ class MatchedFamilyContractTest(unittest.TestCase):
                         evaluator = make_case(
                             family, target_world, track
                         ).evaluator
-                        truth_result = evaluator.evaluate(
-                            truth_submission(spec, target_world, track)
-                        )
-                        false_twin_result = evaluator.evaluate(
-                            truth_submission(spec, twin_world, track)
-                        )
-                        self.assertTrue(truth_result.success)
+                        result = evaluator.evaluate(truth)
+                        false_result = evaluator.evaluate(false_twin)
+                        self.assertTrue(result.success)
                         self.assertEqual(
-                            truth_result.scores["predictive_model_pass"], 1.0
+                            result.scores["predictive_model_pass"], 1.0
                         )
-                        self.assertFalse(false_twin_result.success)
+                        self.assertFalse(false_result.success)
                         self.assertEqual(
-                            false_twin_result.scores["predictive_model_pass"], 0.0
+                            false_result.scores["predictive_model_pass"], 0.0
                         )
+                        results.append(result)
+                        false_twin_results.append(false_result)
+                self.assertEqual(results[0], results[1])
+                self.assertEqual(false_twin_results[0], false_twin_results[1])
 
     def test_diagnostics_fit_the_budget_and_distinguish_the_two_worlds(self):
         for family in CASE_FAMILIES:

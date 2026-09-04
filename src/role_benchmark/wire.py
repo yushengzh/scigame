@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from .expression import EXPRESSION_MODEL, EXPRESSION_OPERATOR_ARITIES
 from .models import (
+    BenchmarkTrack,
     CaseDefinition,
     ControlSpec,
     EpisodeResult,
@@ -28,6 +29,7 @@ from .models import (
     HypothesisPortfolio,
     InstrumentSpec,
     OracleResponse,
+    OracleStatus,
     PlayerAction,
     ReadoutSpec,
     ResourceCatalog,
@@ -758,6 +760,294 @@ def episode_view_to_payload(view: EpisodeView) -> Dict[str, Any]:
     }
 
 
+def _optional_number(value: Any, path: str) -> Optional[float]:
+    if value is None:
+        return None
+    return _expect_number(value, path)
+
+
+def _control_from_payload(value: Any, path: str) -> ControlSpec:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(
+        payload,
+        ("name", "description", "unit", "minimum", "maximum", "allowed_values"),
+        path,
+    )
+    allowed_values = _expect_list(payload["allowed_values"], path + ".allowed_values")
+    return ControlSpec(
+        name=_expect_string(payload["name"], path + ".name"),
+        description=_expect_string(payload["description"], path + ".description"),
+        unit=_expect_string(payload["unit"], path + ".unit"),
+        minimum=_optional_number(payload["minimum"], path + ".minimum"),
+        maximum=_optional_number(payload["maximum"], path + ".maximum"),
+        allowed_values=tuple(
+            _convert_json_safe(item, path="%s.allowed_values[%d]" % (path, index))
+            for index, item in enumerate(allowed_values)
+        ),
+    )
+
+
+def _readout_from_payload(value: Any, path: str) -> ReadoutSpec:
+    payload = _expect_mapping(value, path)
+    basic = ("name", "description", "unit", "resolution")
+    extended = basic + ("statistic", "uncertainty", "resolution_kind")
+    if set(payload) == set(basic):
+        statistic = uncertainty = resolution_kind = ""
+    else:
+        _expect_exact_keys(payload, extended, path)
+        statistic = _expect_string(payload["statistic"], path + ".statistic")
+        uncertainty = _expect_string(payload["uncertainty"], path + ".uncertainty")
+        resolution_kind = _expect_string(
+            payload["resolution_kind"], path + ".resolution_kind"
+        )
+    return ReadoutSpec(
+        name=_expect_string(payload["name"], path + ".name"),
+        description=_expect_string(payload["description"], path + ".description"),
+        unit=_expect_string(payload["unit"], path + ".unit"),
+        resolution=_optional_number(payload["resolution"], path + ".resolution"),
+        statistic=statistic,
+        uncertainty=uncertainty,
+        resolution_kind=resolution_kind,
+    )
+
+
+def _instrument_from_payload(value: Any, path: str) -> InstrumentSpec:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(payload, ("name", "description", "controls", "readouts"), path)
+    return InstrumentSpec(
+        name=_expect_string(payload["name"], path + ".name"),
+        description=_expect_string(payload["description"], path + ".description"),
+        controls=_strings(payload["controls"], path + ".controls"),
+        readouts=_strings(payload["readouts"], path + ".readouts"),
+    )
+
+
+def resource_catalog_from_payload(value: Any, path: str = "$") -> ResourceCatalog:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(
+        payload,
+        ("instruments", "controls", "readouts", "max_replicates", "notes"),
+        path,
+    )
+    instruments = _expect_list(payload["instruments"], path + ".instruments")
+    controls = _expect_list(payload["controls"], path + ".controls")
+    readouts = _expect_list(payload["readouts"], path + ".readouts")
+    try:
+        return ResourceCatalog(
+            instruments=tuple(
+                _instrument_from_payload(item, "%s.instruments[%d]" % (path, index))
+                for index, item in enumerate(instruments)
+            ),
+            controls=tuple(
+                _control_from_payload(item, "%s.controls[%d]" % (path, index))
+                for index, item in enumerate(controls)
+            ),
+            readouts=tuple(
+                _readout_from_payload(item, "%s.readouts[%d]" % (path, index))
+                for index, item in enumerate(readouts)
+            ),
+            max_replicates=_expect_integer(
+                payload["max_replicates"], path + ".max_replicates"
+            ),
+            notes=_strings(payload["notes"], path + ".notes"),
+        )
+    except WireDecodeError:
+        raise
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise WireDecodeError("model_invariant", path, str(exc)) from exc
+
+
+def case_definition_from_payload(value: Any, path: str = "$") -> CaseDefinition:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(
+        payload,
+        (
+            "case_id", "track", "title", "background", "initial_observations",
+            "resources", "budget", "confidence_threshold", "max_hypotheses",
+        ),
+        path,
+    )
+    track_text = _expect_string(payload["track"], path + ".track")
+    try:
+        track = BenchmarkTrack(track_text)
+    except ValueError as exc:
+        raise WireDecodeError(
+            "invalid_value", path + ".track", "unsupported benchmark track"
+        ) from exc
+    try:
+        return CaseDefinition(
+            case_id=_expect_string(payload["case_id"], path + ".case_id"),
+            track=track,
+            title=_expect_string(payload["title"], path + ".title"),
+            background=_expect_string(payload["background"], path + ".background"),
+            initial_observations=_strings(
+                payload["initial_observations"], path + ".initial_observations"
+            ),
+            resources=resource_catalog_from_payload(
+                payload["resources"], path + ".resources"
+            ),
+            budget=_expect_integer(payload["budget"], path + ".budget"),
+            confidence_threshold=_expect_number(
+                payload["confidence_threshold"], path + ".confidence_threshold"
+            ),
+            max_hypotheses=_expect_integer(
+                payload["max_hypotheses"], path + ".max_hypotheses"
+            ),
+        )
+    except WireDecodeError:
+        raise
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise WireDecodeError("model_invariant", path, str(exc)) from exc
+
+
+def experiment_evidence_from_payload(
+    value: Any, path: str = "$"
+) -> ExperimentEvidence:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(payload, ("measurements", "units", "uncertainty", "message"), path)
+    measurements = _expect_mapping(payload["measurements"], path + ".measurements")
+    units = _expect_mapping(payload["units"], path + ".units")
+    uncertainty = _expect_mapping(payload["uncertainty"], path + ".uncertainty")
+    for key, item in units.items():
+        _expect_string(item, "%s.units.%s" % (path, key))
+    for key, item in uncertainty.items():
+        _expect_string(item, "%s.uncertainty.%s" % (path, key))
+    return ExperimentEvidence(
+        measurements=_convert_json_safe(measurements, path=path + ".measurements"),
+        units=dict(units),
+        uncertainty=dict(uncertainty),
+        message=_expect_string(payload["message"], path + ".message"),
+    )
+
+
+def oracle_response_from_payload(value: Any, path: str = "$") -> OracleResponse:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(payload, ("status", "message", "evidence"), path)
+    status_text = _expect_string(payload["status"], path + ".status")
+    try:
+        status = OracleStatus(status_text)
+    except ValueError as exc:
+        raise WireDecodeError(
+            "invalid_value", path + ".status", "unsupported oracle status"
+        ) from exc
+    evidence = (
+        None
+        if payload["evidence"] is None
+        else experiment_evidence_from_payload(payload["evidence"], path + ".evidence")
+    )
+    try:
+        return OracleResponse(
+            status=status,
+            message=_expect_string(payload["message"], path + ".message"),
+            evidence=evidence,
+        )
+    except WireDecodeError:
+        raise
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise WireDecodeError("model_invariant", path, str(exc)) from exc
+
+
+def experiment_turn_from_payload(value: Any, path: str = "$") -> ExperimentTurn:
+    payload = _expect_mapping(value, path)
+    _expect_exact_keys(
+        payload,
+        ("turn_index", "portfolio", "proposal", "response", "attempt_index"),
+        path,
+    )
+    attempt_index = payload["attempt_index"]
+    if attempt_index is not None:
+        attempt_index = _expect_integer(attempt_index, path + ".attempt_index")
+    try:
+        portfolio = _portfolio_from_payload(payload["portfolio"], path + ".portfolio")
+        proposal = _experiment_from_payload(payload["proposal"], path + ".proposal")
+        # Reuse the normative action invariant for the recorded pre-evidence
+        # portfolio, forecasts, and requested readouts.
+        PlayerAction.propose_experiment(portfolio, proposal)
+        response = oracle_response_from_payload(payload["response"], path + ".response")
+        if response.consumes_budget != (attempt_index is not None):
+            raise ValueError("attempt_index does not match Oracle budget semantics")
+        if attempt_index is not None and attempt_index < 1:
+            raise ValueError("attempt_index must be positive")
+        if response.evidence is not None:
+            requested = set(proposal.readouts)
+            if set(response.evidence.measurements) != requested:
+                raise ValueError("evidence measurements do not match requested readouts")
+            if set(response.evidence.units) != requested:
+                raise ValueError("evidence units do not match requested readouts")
+            if not set(response.evidence.uncertainty).issubset(requested):
+                raise ValueError("evidence uncertainty contains an unknown readout")
+        return ExperimentTurn(
+            turn_index=_expect_integer(payload["turn_index"], path + ".turn_index"),
+            portfolio=portfolio,
+            proposal=proposal,
+            response=response,
+            attempt_index=attempt_index,
+        )
+    except WireDecodeError:
+        raise
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise WireDecodeError("model_invariant", path, str(exc)) from exc
+
+
+def episode_view_from_payload(value: Any) -> EpisodeView:
+    _validate_json_tree(
+        value, path="$", depth=0, nodes=[0], error_type=WireDecodeError
+    )
+    payload = _expect_mapping(value, "$")
+    _expect_exact_keys(
+        payload, ("wire_schema", "case", "attempts_used", "attempts_remaining", "turns"), "$"
+    )
+    if _expect_string(payload["wire_schema"], "$.wire_schema") != EPISODE_VIEW_SCHEMA:
+        raise WireDecodeError(
+            "unsupported_schema", "$.wire_schema", "expected %r" % EPISODE_VIEW_SCHEMA
+        )
+    case = case_definition_from_payload(payload["case"], "$.case")
+    attempts_used = _expect_integer(payload["attempts_used"], "$.attempts_used")
+    attempts_remaining = _expect_integer(
+        payload["attempts_remaining"], "$.attempts_remaining"
+    )
+    if attempts_used < 0 or attempts_remaining < 0:
+        raise WireDecodeError(
+            "model_invariant", "$", "attempt counts must be non-negative"
+        )
+    if attempts_used + attempts_remaining > case.budget:
+        raise WireDecodeError(
+            "model_invariant", "$", "attempt counts exceed the public case budget"
+        )
+    turns_payload = _expect_list(payload["turns"], "$.turns")
+    turns = tuple(
+        experiment_turn_from_payload(item, "$.turns[%d]" % index)
+        for index, item in enumerate(turns_payload)
+    )
+    if any(turn.turn_index != index for index, turn in enumerate(turns, start=1)):
+        raise WireDecodeError(
+            "model_invariant", "$.turns", "turn_index values must be sequential"
+        )
+    consumed = [
+        turn.attempt_index for turn in turns if turn.attempt_index is not None
+    ]
+    if consumed:
+        expected = list(range(consumed[0], consumed[0] + len(consumed)))
+        if consumed != expected or consumed[-1] != attempts_used:
+            raise WireDecodeError(
+                "model_invariant",
+                "$.turns",
+                "attempt_index values must be contiguous and end at attempts_used",
+            )
+    return EpisodeView(
+        case=case,
+        attempts_used=attempts_used,
+        attempts_remaining=attempts_remaining,
+        turns=turns,
+    )
+
+
+def episode_view_from_json(
+    text: str, *, max_bytes: int = DEFAULT_MAX_JSON_BYTES
+) -> EpisodeView:
+    return episode_view_from_payload(strict_json_loads(text, max_bytes=max_bytes))
+
+
 def episode_view_to_json(
     view: EpisodeView,
     *,
@@ -1014,20 +1304,27 @@ __all__ = [
     "WireEncodeError",
     "WireError",
     "canonical_json_dumps",
+    "case_definition_from_payload",
     "case_definition_to_payload",
     "episode_result_to_payload",
+    "episode_view_from_json",
+    "episode_view_from_payload",
     "episode_view_to_json",
     "episode_view_to_payload",
     "evaluation_result_to_payload",
+    "experiment_evidence_from_payload",
     "experiment_evidence_to_payload",
     "experiment_proposal_to_payload",
+    "experiment_turn_from_payload",
     "final_submission_to_payload",
+    "oracle_response_from_payload",
     "oracle_response_to_payload",
     "player_action_from_json",
     "player_action_from_payload",
     "player_action_json_schema",
     "player_action_to_json",
     "player_action_to_payload",
+    "resource_catalog_from_payload",
     "resource_catalog_to_payload",
     "strict_json_loads",
 ]

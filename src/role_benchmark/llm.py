@@ -28,6 +28,15 @@ from .wire import (
 
 
 DEVELOPMENT_EVALUATION_PROFILE = "public_development_fixture"
+PLAYER_PROMPT_VERSION_V1 = "role_benchmark.player_prompt.v1"
+PLAYER_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.player_prompt.v2_json_hardened"
+)
+PLAYER_REPAIR_PROMPT_VERSION_V1 = "role_benchmark.player_repair_prompt.v1"
+PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.player_repair_prompt.v2_json_hardened"
+)
+DEFAULT_PLAYER_PROMPT_VERSION = PLAYER_PROMPT_VERSION_V1
 MAX_LLM_ACTION_BYTES = 1_048_576
 _MAX_METADATA_BYTES = 1_048_576
 _MAX_IDENTITY_TEXT_BYTES = 4_096
@@ -257,6 +266,64 @@ Do not reveal hidden chain-of-thought;
 put only concise, decision-relevant statements in public fields.
 """
 
+_JSON_HARDENED_SYSTEM_INSTRUCTION = _SYSTEM_INSTRUCTION + """
+Serialization preflight is mandatory. First construct one JSON value, then
+serialize it exactly once. The first non-whitespace character must be { and the
+last must be }. Use double-quoted JSON strings only. Do not emit Markdown,
+comments, trailing commas, NaN, Infinity, or text outside the object.
+
+Return exactly these five top-level keys: wire_schema, kind, portfolio,
+experiment, final. For kind=\"experiment\", experiment is an object and final is
+null. For kind=\"final\", experiment is null and final is an object.
+
+Before returning, verify that every object and array delimiter is balanced.
+Every expression operator node must be exactly
+{\"op\":\"<allowed operator>\",\"args\":[...]}. Prefer the shallowest
+algebraically equivalent valid expression tree.
+
+Recompute portfolio confidence normalization after all edits. If a final
+portfolio contains one hypothesis, its confidence must be exactly 1.0.
+Otherwise confidences must sum to 1 within 1e-6. final.hypothesis_id must
+exactly match one unique portfolio hypothesis_id. For experiments, forecast
+keys must exactly equal the portfolio hypothesis_ids, and each forecast must
+contain exactly every requested readout.
+"""
+
+_REPAIR_INSTRUCTION = (
+    "Generate exactly one valid action for the same episode view. "
+    "You received no Oracle response or evidence between calls. "
+    "This is a second generation and may differ semantically."
+)
+
+_JSON_HARDENED_REPAIR_INSTRUCTION = (
+    "Correct the previous output for the same episode view. No Oracle response "
+    "or new evidence was received. Preserve the intended scientific action, "
+    "hypotheses, numerical values, and conclusion wherever they are compatible "
+    "with the contract. Rebuild a fresh JSON value and serialize it once; do "
+    "not copy or manually patch the malformed delimiter sequence. Fix the "
+    "reported wire_error first, then run the complete serialization and schema "
+    "preflight. For an expression tree, reconstruct nodes from the leaves "
+    "upward, with each operator node exactly "
+    '{"op":"<allowed operator>","args":[...]}. Return exactly one corrected '
+    "JSON object and nothing else."
+)
+
+
+def _player_prompt_text(prompt_version: str) -> Tuple[str, str, str]:
+    if prompt_version == PLAYER_PROMPT_VERSION_V1:
+        return (
+            _SYSTEM_INSTRUCTION,
+            _REPAIR_INSTRUCTION,
+            PLAYER_REPAIR_PROMPT_VERSION_V1,
+        )
+    if prompt_version == PLAYER_PROMPT_VERSION_V2_JSON_HARDENED:
+        return (
+            _JSON_HARDENED_SYSTEM_INSTRUCTION,
+            _JSON_HARDENED_REPAIR_INSTRUCTION,
+            PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+        )
+    raise ValueError("unsupported Player prompt_version %r" % prompt_version)
+
 
 def generation_config_to_payload(config: GenerationConfig) -> Mapping[str, Any]:
     return {
@@ -302,6 +369,8 @@ def build_generation_request(
     player_turn: int,
     config: GenerationConfig,
     purpose: str = "next_action",
+    evaluation_profile: str = DEVELOPMENT_EVALUATION_PROFILE,
+    prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
     invalid_output: Optional[str] = None,
     wire_error: Optional[WireDecodeError] = None,
 ) -> GenerationRequest:
@@ -309,6 +378,15 @@ def build_generation_request(
 
     if purpose not in ("next_action", "repair_action"):
         raise ValueError("unsupported generation purpose")
+    _validate_utf8_text(
+        evaluation_profile,
+        "evaluation_profile",
+        nonempty=True,
+        max_bytes=_MAX_IDENTITY_TEXT_BYTES,
+    )
+    system_instruction, repair_instruction, repair_prompt_version = (
+        _player_prompt_text(prompt_version)
+    )
     schema = player_action_json_schema()
     # The executable-expression contract belongs only to Discovery.  Keeping
     # its recursive ``outputs`` shape in an Identification prompt gives the
@@ -319,7 +397,7 @@ def build_generation_request(
         schema["properties"]["final"].pop("allOf", None)
     episode_view_to_json(view)
     view_payload = episode_view_to_payload(view)
-    system = _SYSTEM_INSTRUCTION + "\nAction JSON Schema:\n" + canonical_json_dumps(
+    system = system_instruction + "\nAction JSON Schema:\n" + canonical_json_dumps(
         schema
     )
     if purpose == "next_action":
@@ -330,11 +408,7 @@ def build_generation_request(
         user_payload = {
             "episode_view": view_payload,
             "repair": {
-                "instruction": (
-                    "Generate exactly one valid action for the same episode view. "
-                    "You received no Oracle response or evidence between calls. "
-                    "This is a second generation and may differ semantically."
-                ),
+                "instruction": repair_instruction,
                 "invalid_output": invalid_output,
                 "wire_error": {
                     "code": wire_error.code,
@@ -345,12 +419,18 @@ def build_generation_request(
         }
     metadata = {
         "action_schema": PLAYER_ACTION_SCHEMA,
-        "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
+        "evaluation_profile": evaluation_profile,
         "case_id": view.case.case_id,
         "track": view.case.track.value,
         "player_turn": player_turn,
         "purpose": purpose,
     }
+    # Preserve the frozen v1 request payload; only opt-in profiles carry a
+    # version marker.
+    if prompt_version != DEFAULT_PLAYER_PROMPT_VERSION:
+        metadata["prompt_version"] = prompt_version
+        if purpose == "repair_action":
+            metadata["repair_prompt_version"] = repair_prompt_version
     return GenerationRequest(
         messages=(
             Message("system", system),
@@ -377,6 +457,8 @@ class LLMPlayerBackend:
         config: Optional[GenerationConfig] = None,
         max_repair_attempts: int = 0,
         max_action_bytes: int = DEFAULT_MAX_ACTION_BYTES,
+        evaluation_profile: str = DEVELOPMENT_EVALUATION_PROFILE,
+        prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
         event_sink: Optional[EventSink] = None,
     ) -> None:
         if isinstance(max_repair_attempts, bool) or max_repair_attempts not in (0, 1):
@@ -398,11 +480,20 @@ class LLMPlayerBackend:
             raise ValueError("backend must provide a callable generate method")
         if event_sink is not None and not callable(event_sink):
             raise ValueError("event_sink must be callable or None")
+        _validate_utf8_text(
+            evaluation_profile,
+            "evaluation_profile",
+            nonempty=True,
+            max_bytes=_MAX_IDENTITY_TEXT_BYTES,
+        )
+        _player_prompt_text(prompt_version)
         self._backend = backend
         self._config = GenerationConfig() if config is None else config
         self._max_repair_attempts = max_repair_attempts
         self._max_action_bytes = max_action_bytes
         self._event_sink = event_sink
+        self._evaluation_profile = evaluation_profile
+        self._prompt_version = prompt_version
         self._player_turns = 0
         self._generation_calls = 0
         self._primary_calls = 0
@@ -418,8 +509,8 @@ class LLMPlayerBackend:
     def run_config(self) -> Mapping[str, Any]:
         """Return the adapter settings needed to reconstruct this run."""
 
-        return {
-            "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
+        run_config = {
+            "evaluation_profile": self._evaluation_profile,
             "action_schema": PLAYER_ACTION_SCHEMA,
             "generation_config": generation_config_to_payload(self._config),
             "max_action_bytes": self._max_action_bytes,
@@ -430,6 +521,16 @@ class LLMPlayerBackend:
                 else "plain_text_one_schema_directed_regeneration"
             ),
         }
+        # Existing logged-run grammars expect the frozen v1 key set.
+        if self._prompt_version != DEFAULT_PLAYER_PROMPT_VERSION:
+            _, _, repair_prompt_version = _player_prompt_text(self._prompt_version)
+            run_config.update(
+                {
+                    "prompt_version": self._prompt_version,
+                    "repair_prompt_version": repair_prompt_version,
+                }
+            )
+        return run_config
 
     @property
     def stats(self) -> LLMPlayerStats:
@@ -621,6 +722,8 @@ class LLMPlayerBackend:
             player_turn=player_turn,
             config=self._config,
             purpose="next_action",
+            evaluation_profile=self._evaluation_profile,
+            prompt_version=self._prompt_version,
         )
         response, call_index = self._generate(
             request, player_turn=player_turn, purpose="next_action"
@@ -648,6 +751,8 @@ class LLMPlayerBackend:
                 player_turn=player_turn,
                 config=self._config,
                 purpose="repair_action",
+                evaluation_profile=self._evaluation_profile,
+                prompt_version=self._prompt_version,
                 invalid_output=response.text,
                 wire_error=first_error,
             )
@@ -673,6 +778,7 @@ class LLMPlayerBackend:
 
 __all__ = [
     "AdapterOutputError",
+    "DEFAULT_PLAYER_PROMPT_VERSION",
     "DEVELOPMENT_EVALUATION_PROFILE",
     "GenerationConfig",
     "GenerationRequest",
@@ -683,6 +789,10 @@ __all__ = [
     "MAX_LLM_ACTION_BYTES",
     "Message",
     "ModelTransportError",
+    "PLAYER_PROMPT_VERSION_V1",
+    "PLAYER_PROMPT_VERSION_V2_JSON_HARDENED",
+    "PLAYER_REPAIR_PROMPT_VERSION_V1",
+    "PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED",
     "TextGenerationBackend",
     "TokenUsage",
     "build_generation_request",
