@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import io
 import json
+import re
 import tempfile
 import threading
 import time
@@ -31,28 +32,40 @@ from role_benchmark import (
     TerminationKind,
     TokenUsage,
 )
-from role_benchmark.temporal_cases import TEMPORAL_CASE_FAMILIES
-
+from experiments.core160_pack import (
+    CORE160_TEMPORAL_COUNTERFACTUAL_CONDITION_ID,
+    CORE160_TEMPORAL_SOURCE_CONDITION_ID,
+    CORE160_TEMPORAL_SOURCE_RELATION_ID,
+    CORE160_TEMPORAL_VARIANT_ID,
+)
 from experiments.run_case_matrix import (
-    CASE_FAMILIES,
-    CONDITIONS,
-    COUNTERFACTUAL_DIFFICULTIES,
+    ACCEPTED_TEMPORAL_CASE_FAMILIES,
+    BOTH_CASE_FAMILIES,
+    CASE_PACKS,
+    CASE_SPECS,
     DEFAULT_SCHEDULE_SEED,
     DETERMINISTIC_ORACLE,
     EPISODE_RESULT_SCHEMA,
     EXPERIMENT_SCHEMA,
-    MATCHED_FAMILIES,
+    GEMINI_API_KEY_ENV,
+    GEMINI_ENDPOINT_TEMPLATE,
+    GEMINI_MODEL,
+    HISTORICAL_CASE_FAMILIES,
+    HISTORICAL_CONDITION_IDS,
+    LEGACY_TEMPORAL_CASE_FAMILIES,
     LLM_PRESENTATION_ORACLE,
     OPENAI_API_KEY_ENV,
     OPENAI_ENDPOINT,
-    TOTAL_EPISODES,
     TASK_SETTINGS,
+    TEMPORAL_CASE_FAMILIES,
     CaseMatrixDeepSeekBackend,
     ConcurrencyLimitedBackend,
+    _arxiv_base_id,
     _config_payload,
     _evaluated_result,
     _infrastructure_failed_result,
     _make_case,
+    _merge_unique_temporal_identities,
     _parser,
     _resolve_api_key,
     _resolve_api_keys,
@@ -75,7 +88,7 @@ def _args(output_dir):
     return argparse.Namespace(
         output_dir=str(output_dir),
         experiment_id="EXP-TEST-001",
-        case_pack="curated",
+        case_pack="historical",
         player_provider="deepseek",
         player_endpoint="https://player.invalid/chat/completions",
         player_model="deepseek-v4-flash",
@@ -231,6 +244,245 @@ def _evaluated_payload(spec, root, *, kind=TerminationKind.SUBMITTED, success=Tr
 
 
 class CaseMatrixExperimentTests(unittest.TestCase):
+    def test_cli_requires_an_explicit_case_pack_release(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                _parser().parse_args(["--output-dir", "unused", "--dry-run"])
+
+    def test_registry_exposes_only_three_named_case_packs(self):
+        self.assertEqual(tuple(CASE_PACKS), ("historical", "temporal", "both"))
+        historical = CASE_PACKS["historical"]
+        temporal = CASE_PACKS["temporal"]
+        both = CASE_PACKS["both"]
+
+        self.assertEqual(historical.families, HISTORICAL_CASE_FAMILIES)
+        self.assertEqual(len(historical.families), 20)
+        self.assertEqual(
+            temporal.families,
+            LEGACY_TEMPORAL_CASE_FAMILIES + ACCEPTED_TEMPORAL_CASE_FAMILIES,
+        )
+        self.assertEqual(len(LEGACY_TEMPORAL_CASE_FAMILIES), 9)
+        self.assertEqual(len(ACCEPTED_TEMPORAL_CASE_FAMILIES), 21)
+        self.assertEqual(
+            ACCEPTED_TEMPORAL_CASE_FAMILIES[-1],
+            "temporal_source_3047",
+        )
+        self.assertEqual(len(temporal.families), 30)
+        self.assertEqual(both.families, BOTH_CASE_FAMILIES)
+        self.assertEqual(
+            both.families,
+            HISTORICAL_CASE_FAMILIES + TEMPORAL_CASE_FAMILIES,
+        )
+        self.assertEqual(len(both.families), 50)
+        self.assertEqual(len(set(both.families)), 50)
+
+        paper_ids = tuple(temporal.source_paper_ids.values())
+        version_ids = tuple(temporal.source_version_ids.values())
+        arxiv_base_ids = tuple(
+            re.sub(r"v[0-9]+$", "", version_id)
+            for version_id in version_ids
+        )
+        self.assertEqual(len(paper_ids), 30)
+        self.assertEqual(len(set(paper_ids)), 30)
+        self.assertEqual(len(version_ids), 30)
+        self.assertEqual(len(set(arxiv_base_ids)), 30)
+
+        legacy_paper_ids = {
+            family: temporal.source_paper_ids[family]
+            for family in LEGACY_TEMPORAL_CASE_FAMILIES
+        }
+        accepted_paper_ids = {
+            family: temporal.source_paper_ids[family]
+            for family in ACCEPTED_TEMPORAL_CASE_FAMILIES
+        }
+        duplicated_paper_ids = dict(accepted_paper_ids)
+        duplicated_paper_ids[ACCEPTED_TEMPORAL_CASE_FAMILIES[0]] = (
+            legacy_paper_ids[LEGACY_TEMPORAL_CASE_FAMILIES[0]]
+        )
+        with self.assertRaisesRegex(ValueError, "source_paper_id values"):
+            _merge_unique_temporal_identities(
+                "source_paper_id",
+                legacy_paper_ids,
+                duplicated_paper_ids,
+            )
+
+        legacy_version_ids = {
+            family: temporal.source_version_ids[family]
+            for family in LEGACY_TEMPORAL_CASE_FAMILIES
+        }
+        accepted_version_ids = {
+            family: temporal.source_version_ids[family]
+            for family in ACCEPTED_TEMPORAL_CASE_FAMILIES
+        }
+        duplicated_version_ids = dict(accepted_version_ids)
+        legacy_base_id = _arxiv_base_id(
+            legacy_version_ids[LEGACY_TEMPORAL_CASE_FAMILIES[0]]
+        )
+        duplicated_version_ids[ACCEPTED_TEMPORAL_CASE_FAMILIES[0]] = (
+            legacy_base_id + "v999"
+        )
+        with self.assertRaisesRegex(ValueError, "source_version_id values"):
+            _merge_unique_temporal_identities(
+                "source_version_id",
+                legacy_version_ids,
+                duplicated_version_ids,
+                normalize=_arxiv_base_id,
+            )
+
+        for case_pack in CASE_PACKS:
+            parsed = _parser().parse_args(
+                [
+                    "--output-dir",
+                    "unused",
+                    "--dry-run",
+                    "--case-pack",
+                    case_pack,
+                ]
+            )
+            self.assertEqual(parsed.case_pack, case_pack)
+
+        retired_names = (
+            "curated",
+            "temporal_counterfactual",
+            "temporal_v1",
+            "public_v1",
+            "core160",
+        )
+        for case_pack in retired_names:
+            with self.subTest(case_pack=case_pack):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(SystemExit):
+                        _parser().parse_args(
+                            [
+                                "--output-dir",
+                                "unused",
+                                "--dry-run",
+                                "--case-pack",
+                                case_pack,
+                            ]
+                        )
+
+    def test_three_case_pack_slices_have_expected_instances(self):
+        method = EVALUATION_METHODS[0]
+        expected = {
+            "historical": (
+                80,
+                {"historical_counterfactual": 80},
+                {"canonical_v1"},
+            ),
+            "temporal": (
+                120,
+                {"temporal": 36, "temporal_counterfactual": 84},
+                {"source_reported_v1", CORE160_TEMPORAL_VARIANT_ID},
+            ),
+            "both": (
+                200,
+                {
+                    "historical_counterfactual": 80,
+                    "temporal": 36,
+                    "temporal_counterfactual": 84,
+                },
+                {
+                    "canonical_v1",
+                    "source_reported_v1",
+                    CORE160_TEMPORAL_VARIANT_ID,
+                },
+            ),
+        }
+        for pack_name, (count, dataset_counts, variants) in expected.items():
+            pack = CASE_PACKS[pack_name]
+            plan = build_plan(
+                repeats=1,
+                case_pack=pack_name,
+                evaluation_methods=(method,),
+            )
+            with self.subTest(case_pack=pack_name):
+                self.assertEqual(len(plan), count)
+                self.assertEqual(
+                    len({spec.benchmark_instance_id for spec in plan}),
+                    count,
+                )
+                self.assertEqual(
+                    Counter(spec.dataset_kind for spec in plan),
+                    dataset_counts,
+                )
+                self.assertEqual(
+                    Counter(spec.case_family for spec in plan),
+                    {family: 4 for family in pack.families},
+                )
+                self.assertEqual({spec.variant_id for spec in plan}, variants)
+                for spec in plan:
+                    case = _make_case(spec)
+                    self.assertIs(
+                        case.definition.track,
+                        BenchmarkTrack(spec.task_setting),
+                    )
+
+        historical = CASE_PACKS["historical"]
+        for family in historical.families:
+            self.assertIs(
+                historical.specifications[family]["canonical_v1"],
+                CASE_SPECS[family],
+            )
+
+        temporal = CASE_PACKS["temporal"]
+        legacy_family = LEGACY_TEMPORAL_CASE_FAMILIES[0]
+        legacy_cells = build_plan(
+            families=(legacy_family,),
+            repeats=1,
+            case_pack="temporal",
+            evaluation_methods=(method,),
+        )
+        self.assertEqual(
+            {spec.variant_id for spec in legacy_cells},
+            {"source_reported_v1"},
+        )
+        self.assertEqual(
+            {spec.condition_role for spec in legacy_cells},
+            {"source_reported"},
+        )
+
+        accepted_family = ACCEPTED_TEMPORAL_CASE_FAMILIES[0]
+        accepted_cells = build_plan(
+            families=(accepted_family,),
+            repeats=1,
+            case_pack="temporal",
+            evaluation_methods=(method,),
+        )
+        self.assertEqual(
+            dict(temporal.runtime_condition_ids[accepted_family]),
+            {
+                CORE160_TEMPORAL_SOURCE_CONDITION_ID: "historical",
+                CORE160_TEMPORAL_COUNTERFACTUAL_CONDITION_ID: "counterfactual",
+            },
+        )
+        self.assertEqual(
+            {spec.condition_id for spec in accepted_cells},
+            {
+                CORE160_TEMPORAL_SOURCE_CONDITION_ID,
+                CORE160_TEMPORAL_COUNTERFACTUAL_CONDITION_ID,
+            },
+        )
+        for spec in accepted_cells:
+            self.assertEqual(spec.dataset_kind, "temporal_counterfactual")
+            self.assertEqual(
+                spec.source_paper_id,
+                temporal.source_paper_ids[accepted_family],
+            )
+            self.assertEqual(
+                spec.source_version_id,
+                temporal.source_version_ids[accepted_family],
+            )
+            if spec.condition_id == CORE160_TEMPORAL_SOURCE_CONDITION_ID:
+                self.assertEqual(spec.condition_role, "source_reported")
+                self.assertEqual(
+                    spec.source_condition_id,
+                    CORE160_TEMPORAL_SOURCE_RELATION_ID,
+                )
+            else:
+                self.assertEqual(spec.condition_role, "counterfactual")
+                self.assertIsNone(spec.source_condition_id)
+
     def test_temporal_pack_has_an_independent_complete_plan(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -271,41 +523,12 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             self.assertNotIn("worlds", config["design"])
             self.assertNotIn("tracks", config["design"])
 
-    def test_authored_temporal_counterfactual_pack_is_separate(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            args = _args(root)
-            args.case_pack = "temporal_counterfactual"
-            args.repeats = 1
-            args.dry_run = True
-            with contextlib.redirect_stdout(io.StringIO()):
-                run_matrix(args)
-
-            config = json.loads((root / "config.json").read_text(encoding="utf-8"))
-            self.assertEqual(
-                config["design"]["counterfactual_difficulty"]["levels"],
-                ["easy", "hard"],
-            )
-            self.assertTrue(
-                config["design"]["counterfactual_difficulty"][
-                    "temporal_source_conditions_unchanged"
-                ]
-            )
-            self.assertTrue(
-                all(
-                    descriptor["dataset_kind"] == "historical_counterfactual"
-                    for variants in config["design"]["condition_semantics"].values()
-                    for descriptors in variants.values()
-                    for descriptor in descriptors
-                )
-            )
-
     def test_cli_selectors_define_the_frozen_design(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             args = _args(root)
             args.family = ["pendulum"]
-            args.variant = ["hard"]
+            args.variant = ["canonical_v1"]
             args.condition = ["counterfactual"]
             args.task_setting = ["discovery"]
             args.evaluation_method = [FIXED_EXPERIMENTAL_DESIGN]
@@ -326,20 +549,29 @@ class CaseMatrixExperimentTests(unittest.TestCase):
 
     def test_plan_has_exact_family_counts_and_repeat_blocks(self):
         plan = build_plan()
-        self.assertEqual(len(plan), TOTAL_EPISODES)
-        self.assertEqual(len({spec.episode_id for spec in plan}), TOTAL_EPISODES)
+        cells_per_repeat = (
+            len(HISTORICAL_CASE_FAMILIES)
+            * len(HISTORICAL_CONDITION_IDS)
+            * len(TASK_SETTINGS)
+            * len(EVALUATION_METHODS)
+        )
+        total_episodes = cells_per_repeat * 5
+        self.assertEqual(cells_per_repeat, 240)
+        self.assertEqual(total_episodes, 1200)
+        self.assertEqual(len(plan), total_episodes)
+        self.assertEqual(len({spec.episode_id for spec in plan}), total_episodes)
         self.assertEqual(
             [spec.schedule_index for spec in plan],
-            list(range(1, TOTAL_EPISODES + 1)),
+            list(range(1, total_episodes + 1)),
         )
         self.assertEqual(
             [sum(spec.repeat == repeat for spec in plan) for repeat in range(1, 6)],
-            [480, 480, 480, 480, 480],
+            [cells_per_repeat] * 5,
         )
 
         family_counts = Counter(spec.case_family for spec in plan)
-        for family in MATCHED_FAMILIES:
-            self.assertEqual(family_counts[family], 120)
+        for family in HISTORICAL_CASE_FAMILIES:
+            self.assertEqual(family_counts[family], 60)
 
         matched_cells = {
             (
@@ -350,9 +582,9 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 task_setting,
                 evaluation_method,
             )
-            for family in MATCHED_FAMILIES
-            for variant in COUNTERFACTUAL_DIFFICULTIES
-            for condition in CONDITIONS
+            for family in HISTORICAL_CASE_FAMILIES
+            for variant in ("canonical_v1",)
+            for condition in HISTORICAL_CONDITION_IDS
             for task_setting in TASK_SETTINGS
             for evaluation_method in EVALUATION_METHODS
         }
@@ -393,8 +625,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 and spec.task_setting == "discovery"
             ],
         )
-        self.assertEqual(len(select_plan(first, repeats=[1])), 480)
-        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 1440)
+        self.assertEqual(len(select_plan(first, repeats=[1])), 240)
+        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 720)
         self.assertEqual(
             len(
                 select_plan(
@@ -402,14 +634,14 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                     evaluation_methods=[EVALUATION_METHODS[0]],
                 )
             ),
-            800,
+            400,
         )
 
     def test_every_declared_cell_instantiates_through_the_generic_factory(self):
         unique = {}
         for spec in build_plan():
             unique.setdefault(spec.cell, spec)
-        self.assertEqual(len(unique), 480)
+        self.assertEqual(len(unique), 240)
         for spec in unique.values():
             with self.subTest(cell=spec.cell):
                 case = _make_case(spec)
@@ -476,6 +708,109 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         self.assertEqual(oracle._api_key, "oracle-secret")
         self.assertEqual(evaluator._api_key, "evaluator-secret")
 
+    def test_gemini_cli_defaults_to_native_model_endpoint_and_key_env(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = _parser().parse_args(
+                [
+                    "--output-dir",
+                    directory,
+                    "--case-pack",
+                    "historical",
+                    "--dry-run",
+                    "--player-provider",
+                    "gemini",
+                ]
+            )
+            runtime = _runtime_profile(args).player
+
+        self.assertEqual(runtime.provider, "gemini")
+        self.assertEqual(runtime.model, GEMINI_MODEL)
+        self.assertEqual(runtime.api_key_env, GEMINI_API_KEY_ENV)
+        self.assertEqual(
+            runtime.endpoint,
+            GEMINI_ENDPOINT_TEMPLATE.format(model=GEMINI_MODEL),
+        )
+        self.assertEqual(runtime.api, "generate_content")
+        self.assertEqual(runtime.response_format, "application/json")
+        self.assertIsNone(runtime.thinking)
+        self.assertIsNone(runtime.reasoning_effort)
+
+    def test_gemini_role_backends_keep_models_endpoints_and_keys_independent(self):
+        class StubBackend:
+            def generate(self, request):
+                raise AssertionError("this test must not make provider calls")
+
+        with tempfile.TemporaryDirectory() as directory:
+            args = _args(directory)
+            settings = {
+                "player": ("gemini-2.5-flash", None),
+                "oracle": (
+                    "gemini-2.5-pro",
+                    "https://gateway.invalid/oracle:generateContent",
+                ),
+                "evaluator": ("tunedModels/my model", None),
+            }
+            for role, (model, endpoint) in settings.items():
+                setattr(args, role + "_provider", "gemini")
+                setattr(args, role + "_model", model)
+                setattr(args, role + "_endpoint", endpoint)
+                setattr(args, role + "_thinking", None)
+                setattr(args, role + "_reasoning_effort", None)
+                setattr(args, role + "_api_key_env", None)
+
+            runtime = _runtime_profile(args)
+            stubs = [StubBackend(), StubBackend(), StubBackend()]
+            with mock.patch(
+                "experiments.run_case_matrix.GeminiGenerateContentBackend",
+                side_effect=stubs,
+            ) as backend_class:
+                player, oracle, evaluator = load_backends(
+                    args,
+                    **_runtime_keys(),
+                )
+
+        self.assertEqual(len({id(player), id(oracle), id(evaluator)}), 3)
+        self.assertEqual(runtime.player.api_key_env, GEMINI_API_KEY_ENV)
+        self.assertEqual(runtime.oracle.api_key_env, GEMINI_API_KEY_ENV)
+        self.assertEqual(runtime.evaluator.api_key_env, GEMINI_API_KEY_ENV)
+        self.assertEqual(
+            runtime.player.endpoint,
+            GEMINI_ENDPOINT_TEMPLATE.format(model="gemini-2.5-flash"),
+        )
+        self.assertEqual(
+            runtime.oracle.endpoint,
+            "https://gateway.invalid/oracle:generateContent",
+        )
+        self.assertEqual(
+            runtime.evaluator.endpoint,
+            GEMINI_ENDPOINT_TEMPLATE.format(
+                model="tunedModels%2Fmy%20model"
+            ),
+        )
+        self.assertEqual(
+            backend_class.call_args_list,
+            [
+                mock.call(
+                    endpoint=runtime.player.endpoint,
+                    api_key="player-secret",
+                    model="gemini-2.5-flash",
+                    timeout_seconds=1.0,
+                ),
+                mock.call(
+                    endpoint=runtime.oracle.endpoint,
+                    api_key="oracle-secret",
+                    model="gemini-2.5-pro",
+                    timeout_seconds=2.0,
+                ),
+                mock.call(
+                    endpoint=runtime.evaluator.endpoint,
+                    api_key="evaluator-secret",
+                    model="tunedModels/my model",
+                    timeout_seconds=3.0,
+                ),
+            ],
+        )
+
     def test_openai_config_records_effective_transport_without_credential(self):
         with tempfile.TemporaryDirectory() as directory:
             args = _args(directory)
@@ -520,8 +855,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             ):
                 self.assertNotIn(secret, serialized)
             self.assertNotIn("api_key", serialized.lower())
-            self.assertEqual(config["schedule"]["block_sizes"], [480] * 5)
-            self.assertEqual(len(config["schedule"]["execution_order"]), 2400)
+            self.assertEqual(config["schedule"]["block_sizes"], [240] * 5)
+            self.assertEqual(len(config["schedule"]["execution_order"]), 1200)
             prepare_output(root, config)
             stored = (root / "config.json").read_text(encoding="utf-8")
             for secret in (
@@ -535,7 +870,13 @@ class CaseMatrixExperimentTests(unittest.TestCase):
     def test_role_prompt_versions_are_cli_opt_in_and_config_tracked(self):
         with tempfile.TemporaryDirectory() as directory:
             defaults = _parser().parse_args(
-                ["--output-dir", directory, "--dry-run"]
+                [
+                    "--output-dir",
+                    directory,
+                    "--case-pack",
+                    "historical",
+                    "--dry-run",
+                ]
             )
             self.assertEqual(
                 defaults.player_prompt_version,
@@ -558,6 +899,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 [
                     "--output-dir",
                     directory,
+                    "--case-pack",
+                    "historical",
                     "--dry-run",
                     "--oracle-mode",
                     LLM_PRESENTATION_ORACLE,
@@ -592,6 +935,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 [
                     "--output-dir",
                     directory,
+                    "--case-pack",
+                    "historical",
                     "--dry-run",
                     "--workers",
                     "4",
@@ -987,7 +1332,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 build_plan(families=("pendulum",)), repeats=[1]
             )
             self.assertEqual(observed, [spec.episode_id for spec in selected])
-            self.assertEqual(len(observed), 24)
+            self.assertEqual(len(observed), 12)
             first = next(
                 result for result in results if result["episode_id"] == observed[0]
             )
@@ -1279,7 +1624,15 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             with mock.patch(
                 "experiments.run_case_matrix._resolve_api_key"
             ) as resolve, contextlib.redirect_stdout(io.StringIO()):
-                status = main(["--output-dir", directory, "--dry-run"])
+                status = main(
+                    [
+                        "--output-dir",
+                        directory,
+                        "--case-pack",
+                        "historical",
+                        "--dry-run",
+                    ]
+                )
             self.assertEqual(status, 0)
             resolve.assert_not_called()
 

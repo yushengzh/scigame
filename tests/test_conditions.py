@@ -27,7 +27,7 @@ def _descriptor(
     return ConditionDescriptor(
         dataset_kind=DatasetKind.HISTORICAL_COUNTERFACTUAL,
         family_id="example_family",
-        variant_id="public_v1",
+        variant_id="test_variant",
         condition_id=condition_id,
         condition_role=role,
     )
@@ -55,7 +55,7 @@ class ConditionContractTests(unittest.TestCase):
                 "schema_version": CONDITION_DESCRIPTOR_SCHEMA_VERSION,
                 "dataset_kind": "historical_counterfactual",
                 "family_id": "example_family",
-                "variant_id": "public_v1",
+                "variant_id": "test_variant",
                 "condition_id": "historical",
                 "condition_role": "historical",
                 "source_condition_id": None,
@@ -79,7 +79,7 @@ class ConditionContractTests(unittest.TestCase):
             ConditionDescriptor(
                 dataset_kind=DatasetKind.HISTORICAL_COUNTERFACTUAL,
                 family_id="example_family",
-                variant_id="public_v1",
+                variant_id="test_variant",
                 condition_id="condition_a",
                 condition_role=ConditionRole.SOURCE_REPORTED,
             )
@@ -145,6 +145,101 @@ class ConditionContractTests(unittest.TestCase):
                     TEMPORAL_SOURCE_VERSION_IDS[family_id],
                     r"^[0-9]{4}\.[0-9]{4,5}v[0-9]+$",
                 )
+
+    def test_temporal_counterfactual_pair_has_distinct_source_and_authored_roles(self):
+        source = ConditionDescriptor(
+            dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+            family_id="example_family",
+            variant_id="temporal_counterfactual_v1",
+            condition_id="source_reported",
+            condition_role=ConditionRole.SOURCE_REPORTED,
+            source_condition_id="paper_relation",
+        )
+        authored = ConditionDescriptor(
+            dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+            family_id="example_family",
+            variant_id="temporal_counterfactual_v1",
+            condition_id="counterfactual",
+            condition_role=ConditionRole.COUNTERFACTUAL,
+        )
+
+        pair = validate_condition_descriptors((source, authored))
+
+        self.assertEqual(
+            tuple(item.condition_role for item in pair),
+            (ConditionRole.SOURCE_REPORTED, ConditionRole.COUNTERFACTUAL),
+        )
+        self.assertEqual(
+            condition_descriptor_to_payload(source),
+            {
+                "schema_version": CONDITION_DESCRIPTOR_SCHEMA_VERSION,
+                "dataset_kind": "temporal_counterfactual",
+                "family_id": "example_family",
+                "variant_id": "temporal_counterfactual_v1",
+                "condition_id": "source_reported",
+                "condition_role": "source_reported",
+                "source_condition_id": "paper_relation",
+            },
+        )
+        self.assertIsNone(
+            condition_descriptor_to_payload(authored)["source_condition_id"]
+        )
+
+    def test_temporal_counterfactual_descriptor_enforces_provenance_boundary(self):
+        with self.assertRaisesRegex(ValueError, "require source_condition_id"):
+            ConditionDescriptor(
+                dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+                family_id="example_family",
+                variant_id="temporal_counterfactual_v1",
+                condition_id="source_reported",
+                condition_role=ConditionRole.SOURCE_REPORTED,
+            )
+        with self.assertRaisesRegex(ValueError, "must not set source_condition_id"):
+            ConditionDescriptor(
+                dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+                family_id="example_family",
+                variant_id="temporal_counterfactual_v1",
+                condition_id="counterfactual",
+                condition_role=ConditionRole.COUNTERFACTUAL,
+                source_condition_id="paper_relation",
+            )
+        with self.assertRaisesRegex(ValueError, "source condition_id"):
+            ConditionDescriptor(
+                dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+                family_id="example_family",
+                variant_id="temporal_counterfactual_v1",
+                condition_id="historical",
+                condition_role=ConditionRole.SOURCE_REPORTED,
+                source_condition_id="paper_relation",
+            )
+        with self.assertRaisesRegex(ValueError, "source_reported or counterfactual"):
+            ConditionDescriptor(
+                dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+                family_id="example_family",
+                variant_id="temporal_counterfactual_v1",
+                condition_id="condition_a",
+                condition_role=ConditionRole.HISTORICAL,
+            )
+
+    def test_temporal_counterfactual_pair_requires_one_of_each_role(self):
+        source_a = ConditionDescriptor(
+            dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+            family_id="example_family",
+            variant_id="temporal_counterfactual_v1",
+            condition_id="condition_a",
+            condition_role=ConditionRole.SOURCE_REPORTED,
+            source_condition_id="paper_relation_a",
+        )
+        source_b = ConditionDescriptor(
+            dataset_kind=DatasetKind.TEMPORAL_COUNTERFACTUAL,
+            family_id="example_family",
+            variant_id="temporal_counterfactual_v1",
+            condition_id="condition_b",
+            condition_role=ConditionRole.SOURCE_REPORTED,
+            source_condition_id="paper_relation_b",
+        )
+        with self.assertRaisesRegex(ValueError, "exactly one source_reported"):
+            validate_condition_descriptors((source_a, source_b))
 
     def test_condition_sets_reject_duplicate_or_mismatched_descriptors(self):
         historical = _descriptor(

@@ -31,9 +31,10 @@ import sys
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from urllib.parse import quote
 
 from role_benchmark import (
     ADAPTIVE_EXPERIMENTAL_DESIGN,
@@ -77,14 +78,8 @@ from role_benchmark.cases import (
     CASE_SPECS,
 )
 from role_benchmark.cases.matched import MatchedFamilySpec, make_matched_case
-from role_benchmark.counterfactual import (
-    AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES,
-    COUNTERFACTUAL_DIFFICULTIES,
-    make_authored_temporal_counterfactual_variants,
-    make_curated_counterfactual_variants,
-)
 from role_benchmark.temporal_cases import (
-    TEMPORAL_CASE_FAMILIES,
+    TEMPORAL_CASE_FAMILIES as LEGACY_TEMPORAL_CASE_FAMILIES,
     TEMPORAL_CASE_SPECS,
     TEMPORAL_SOURCE_CONDITIONS,
     TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP,
@@ -97,6 +92,8 @@ from role_benchmark.llm import (
 )
 from role_benchmark.wire import final_submission_to_payload
 
+from experiments.core160_pack import load_accepted_temporal_pack
+from experiments.gemini_generate_content import GeminiGenerateContentBackend
 from experiments.run_pendulum_matrix import DeepSeekChatBackend
 from experiments.openai_responses import OpenAIResponsesBackend
 
@@ -107,12 +104,19 @@ LLM_EVALUATOR_RESULT_SCHEMA = "role_benchmark.case_matrix_llm_evaluation.v2"
 DEFAULT_PROVIDER = "deepseek"
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 OPENAI_ENDPOINT = "https://api.openai.com/v1/responses"
+GEMINI_ENDPOINT_TEMPLATE = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "{model}:generateContent"
+)
 DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
+GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 
 DEFAULT_SCHEDULE_SEED = 20260825
-DEFAULT_CASE_PACK = "curated"
 DEFAULT_EXPERIMENT_ID = "development"
+HISTORICAL_CASE_PACK = "historical"
+TEMPORAL_CASE_PACK = "temporal"
+BOTH_CASE_PACK = "both"
 
 PLAYER_PROFILE = "player"
 PLAYER_MODEL = "deepseek-v4-flash"
@@ -123,6 +127,7 @@ EVALUATOR_MODEL = "deepseek-v4-flash"
 THINKING = "disabled"
 OPENAI_MODEL = "gpt-5.6"
 OPENAI_REASONING_EFFORT = "none"
+GEMINI_MODEL = "gemini-2.5-flash"
 ROLES: Tuple[str, ...] = ("player", "oracle", "evaluator")
 ROLE_PROMPT_VERSIONS: Mapping[str, Tuple[str, ...]] = {
     "player": (
@@ -151,21 +156,13 @@ ORACLE_MODES: Tuple[str, ...] = (
     LLM_PRESENTATION_ORACLE,
 )
 
-MATCHED_FAMILIES: Tuple[str, ...] = CASE_FAMILIES
-CONDITIONS: Tuple[str, ...] = ("historical", "counterfactual")
+HISTORICAL_CASE_FAMILIES: Tuple[str, ...] = CASE_FAMILIES
+HISTORICAL_CONDITION_IDS: Tuple[str, ...] = ("historical", "counterfactual")
 TASK_SETTINGS: Tuple[str, ...] = (
     BenchmarkTrack.IDENTIFICATION.value,
     BenchmarkTrack.DISCOVERY.value,
 )
 MATCHED_REPEATS = 5
-CELLS_PER_REPEAT = (
-    len(CASE_FAMILIES)
-    * len(COUNTERFACTUAL_DIFFICULTIES)
-    * len(CONDITIONS)
-    * len(TASK_SETTINGS)
-    * len(EVALUATION_METHODS)
-)
-TOTAL_EPISODES = CELLS_PER_REPEAT * MATCHED_REPEATS
 
 
 class CaseMatrixDeepSeekBackend(DeepSeekChatBackend):
@@ -305,6 +302,34 @@ def _role_runtime(args: argparse.Namespace, role: str) -> RoleRuntime:
             reasoning_effort=effort,
             timeout_s=float(timeout_s),
         )
+    if provider == "gemini":
+        if thinking_override is not None:
+            raise ValueError("--%s-thinking is only defined for DeepSeek" % role)
+        if effort_override not in (None, "none"):
+            raise ValueError(
+                "--%s-reasoning-effort is not supported for Gemini" % role
+            )
+        model = model_override or GEMINI_MODEL
+        return RoleRuntime(
+            role=role,
+            profile_id=profile_id,
+            provider="gemini",
+            endpoint=(
+                endpoint_override
+                or GEMINI_ENDPOINT_TEMPLATE.format(model=quote(model, safe=""))
+            ),
+            api="generate_content",
+            response_format="application/json",
+            binding_id=GeminiGenerateContentBackend.binding_id,
+            api_key_env=(
+                _role_value(args, role, "api_key_env") or GEMINI_API_KEY_ENV
+            ),
+            model=model,
+            checkpoint_or_snapshot_id=snapshot_override or "unknown",
+            thinking=None,
+            reasoning_effort=None,
+            timeout_s=float(timeout_s),
+        )
     raise ValueError("unsupported provider %r" % provider)
 
 
@@ -346,6 +371,9 @@ class CasePackDefinition:
     conditions: Mapping[str, Mapping[str, Tuple[ConditionDescriptor, ...]]]
     source_paper_ids: Mapping[str, str]
     source_version_ids: Mapping[str, str]
+    runtime_condition_ids: Mapping[str, Mapping[str, str]] = field(
+        default_factory=dict
+    )
 
 
 def _historical_counterfactual_conditions(
@@ -372,84 +400,173 @@ def _historical_counterfactual_conditions(
     )
 
 
-_CURATED_VARIANTS = {
-    family: make_curated_counterfactual_variants(specification)
-    for family, specification in CASE_SPECS.items()
-}
-_TEMPORAL_COUNTERFACTUAL_VARIANTS = {
-    family: make_authored_temporal_counterfactual_variants(
-        TEMPORAL_CASE_SPECS[family]
+_ACCEPTED_TEMPORAL_PACK = load_accepted_temporal_pack()
+ACCEPTED_TEMPORAL_CASE_FAMILIES: Tuple[str, ...] = (
+    _ACCEPTED_TEMPORAL_PACK.family_ids
+)
+TEMPORAL_CASE_FAMILIES: Tuple[str, ...] = (
+    LEGACY_TEMPORAL_CASE_FAMILIES + ACCEPTED_TEMPORAL_CASE_FAMILIES
+)
+if len(set(TEMPORAL_CASE_FAMILIES)) != len(TEMPORAL_CASE_FAMILIES):
+    raise ValueError(
+        "legacy and accepted Temporal releases contain duplicate families"
     )
-    for family in sorted(AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES)
-}
+BOTH_CASE_FAMILIES: Tuple[str, ...] = (
+    HISTORICAL_CASE_FAMILIES + TEMPORAL_CASE_FAMILIES
+)
+if len(set(BOTH_CASE_FAMILIES)) != len(BOTH_CASE_FAMILIES):
+    raise ValueError(
+        "Historical and Temporal releases contain duplicate families"
+    )
 
 
-def _variant_specifications(
-    variants: Mapping[str, Mapping[str, Any]],
-) -> Dict[str, Dict[str, MatchedFamilySpec]]:
-    return {
+def _merge_unique_temporal_identities(
+    label: str,
+    legacy: Mapping[str, str],
+    accepted: Mapping[str, str],
+    *,
+    normalize: Optional[Callable[[str], str]] = None,
+) -> Mapping[str, str]:
+    """Merge complete family identities while rejecting reused source data."""
+
+    merged = {**legacy, **accepted}
+    if set(merged) != set(TEMPORAL_CASE_FAMILIES):
+        raise ValueError("Temporal %s must cover every family exactly once" % label)
+    identities = tuple(merged.values())
+    if normalize is not None:
+        identities = tuple(normalize(value) for value in identities)
+    if len(set(identities)) != len(TEMPORAL_CASE_FAMILIES):
+        raise ValueError("Temporal %s values must be unique" % label)
+    return merged
+
+
+_TEMPORAL_SOURCE_PAPER_IDS = _merge_unique_temporal_identities(
+    "source_paper_id",
+    TEMPORAL_SOURCE_PAPER_IDS,
+    _ACCEPTED_TEMPORAL_PACK.source_paper_ids,
+)
+
+
+def _arxiv_base_id(versioned_id: str) -> str:
+    """Normalize an arXiv identity so different versions still collide."""
+
+    return re.sub(r"v[0-9]+$", "", versioned_id)
+
+
+_TEMPORAL_SOURCE_VERSION_IDS = _merge_unique_temporal_identities(
+    "source_version_id",
+    TEMPORAL_SOURCE_VERSION_IDS,
+    _ACCEPTED_TEMPORAL_PACK.source_version_ids,
+    normalize=_arxiv_base_id,
+)
+
+
+_HISTORICAL_PACK = CasePackDefinition(
+    name=HISTORICAL_CASE_PACK,
+    families=HISTORICAL_CASE_FAMILIES,
+    specifications={
+        family: {"canonical_v1": CASE_SPECS[family]}
+        for family in HISTORICAL_CASE_FAMILIES
+    },
+    conditions={
         family: {
-            variant_id: variant.spec
-            for variant_id, variant in family_variants.items()
-        }
-        for family, family_variants in variants.items()
-    }
-
-
-def _variant_conditions(
-    variants: Mapping[str, Mapping[str, Any]],
-) -> Dict[str, Dict[str, Tuple[ConditionDescriptor, ...]]]:
-    return {
-        family: {
-            variant_id: _historical_counterfactual_conditions(
-                family, variant_id
+            "canonical_v1": _historical_counterfactual_conditions(
+                family,
+                "canonical_v1",
             )
-            for variant_id in family_variants
         }
-        for family, family_variants in variants.items()
-    }
+        for family in HISTORICAL_CASE_FAMILIES
+    },
+    source_paper_ids={},
+    source_version_ids={},
+)
+_TEMPORAL_PACK = CasePackDefinition(
+    name=TEMPORAL_CASE_PACK,
+    families=TEMPORAL_CASE_FAMILIES,
+    specifications={
+        **{
+            family: {"source_reported_v1": TEMPORAL_CASE_SPECS[family]}
+            for family in LEGACY_TEMPORAL_CASE_FAMILIES
+        },
+        **_ACCEPTED_TEMPORAL_PACK.specifications,
+    },
+    conditions={
+        **{
+            family: {"source_reported_v1": TEMPORAL_SOURCE_CONDITIONS[family]}
+            for family in LEGACY_TEMPORAL_CASE_FAMILIES
+        },
+        **_ACCEPTED_TEMPORAL_PACK.conditions,
+    },
+    source_paper_ids=_TEMPORAL_SOURCE_PAPER_IDS,
+    source_version_ids=_TEMPORAL_SOURCE_VERSION_IDS,
+    runtime_condition_ids={
+        **TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP,
+        **_ACCEPTED_TEMPORAL_PACK.runtime_truth_keys,
+    },
+)
+
+
+def _combine_case_packs(
+    name: str,
+    first: CasePackDefinition,
+    second: CasePackDefinition,
+) -> CasePackDefinition:
+    """Combine two disjoint registered releases without count assumptions."""
+
+    families = first.families + second.families
+    if len(set(families)) != len(families):
+        raise ValueError("%s contains duplicate family IDs" % name)
+    return CasePackDefinition(
+        name=name,
+        families=families,
+        specifications={**first.specifications, **second.specifications},
+        conditions={**first.conditions, **second.conditions},
+        source_paper_ids={**first.source_paper_ids, **second.source_paper_ids},
+        source_version_ids={
+            **first.source_version_ids,
+            **second.source_version_ids,
+        },
+        runtime_condition_ids={
+            **first.runtime_condition_ids,
+            **second.runtime_condition_ids,
+        },
+    )
 
 
 CASE_PACKS: Mapping[str, CasePackDefinition] = {
-    "curated": CasePackDefinition(
-        name="curated",
-        families=CASE_FAMILIES,
-        specifications=_variant_specifications(_CURATED_VARIANTS),
-        conditions=_variant_conditions(_CURATED_VARIANTS),
-        source_paper_ids={},
-        source_version_ids={},
-    ),
-    "temporal": CasePackDefinition(
-        name="temporal",
-        families=TEMPORAL_CASE_FAMILIES,
-        specifications={
-            family: {"source_reported_v1": TEMPORAL_CASE_SPECS[family]}
-            for family in TEMPORAL_CASE_FAMILIES
-        },
-        conditions={
-            family: {"source_reported_v1": TEMPORAL_SOURCE_CONDITIONS[family]}
-            for family in TEMPORAL_CASE_FAMILIES
-        },
-        source_paper_ids=TEMPORAL_SOURCE_PAPER_IDS,
-        source_version_ids=TEMPORAL_SOURCE_VERSION_IDS,
-    ),
-    "temporal_counterfactual": CasePackDefinition(
-        name="temporal_counterfactual",
-        families=tuple(sorted(AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES)),
-        specifications=_variant_specifications(
-            _TEMPORAL_COUNTERFACTUAL_VARIANTS
-        ),
-        conditions=_variant_conditions(_TEMPORAL_COUNTERFACTUAL_VARIANTS),
-        source_paper_ids={
-            family: TEMPORAL_SOURCE_PAPER_IDS[family]
-            for family in sorted(AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES)
-        },
-        source_version_ids={
-            family: TEMPORAL_SOURCE_VERSION_IDS[family]
-            for family in sorted(AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES)
-        },
+    HISTORICAL_CASE_PACK: _HISTORICAL_PACK,
+    TEMPORAL_CASE_PACK: _TEMPORAL_PACK,
+    BOTH_CASE_PACK: _combine_case_packs(
+        BOTH_CASE_PACK,
+        _HISTORICAL_PACK,
+        _TEMPORAL_PACK,
     ),
 }
+
+CASE_PACK_FAMILY_CHOICES: Tuple[str, ...] = tuple(
+    dict.fromkeys(
+        family
+        for case_pack in CASE_PACKS.values()
+        for family in case_pack.families
+    )
+)
+CASE_PACK_VARIANT_CHOICES: Tuple[str, ...] = tuple(
+    dict.fromkeys(
+        variant_id
+        for case_pack in CASE_PACKS.values()
+        for family in case_pack.families
+        for variant_id in case_pack.conditions[family]
+    )
+)
+CASE_PACK_CONDITION_CHOICES: Tuple[str, ...] = tuple(
+    dict.fromkeys(
+        condition.condition_id
+        for case_pack in CASE_PACKS.values()
+        for family in case_pack.families
+        for conditions in case_pack.conditions[family].values()
+        for condition in conditions
+    )
+)
 
 
 @dataclass(frozen=True)
@@ -556,9 +673,9 @@ def _cell_tuple(
 def build_plan(
     schedule_seed: int = DEFAULT_SCHEDULE_SEED,
     *,
-    families: Sequence[str] = MATCHED_FAMILIES,
+    families: Optional[Sequence[str]] = None,
     repeats: int = MATCHED_REPEATS,
-    case_pack: str = DEFAULT_CASE_PACK,
+    case_pack: str = HISTORICAL_CASE_PACK,
     variants: Optional[Sequence[str]] = None,
     conditions: Optional[Sequence[str]] = None,
     task_settings: Optional[Sequence[str]] = None,
@@ -568,13 +685,13 @@ def build_plan(
 
     if isinstance(schedule_seed, bool) or not isinstance(schedule_seed, int):
         raise ValueError("schedule_seed must be an integer")
-    family_tuple = tuple(families)
-    if not family_tuple or len(set(family_tuple)) != len(family_tuple):
-        raise ValueError("families must be a non-empty sequence of unique names")
     try:
         pack = CASE_PACKS[case_pack]
     except KeyError as exc:
         raise ValueError("unknown case pack %r" % case_pack) from exc
+    family_tuple = tuple(pack.families if families is None else families)
+    if not family_tuple or len(set(family_tuple)) != len(family_tuple):
+        raise ValueError("families must be a non-empty sequence of unique names")
     unknown_families = set(family_tuple) - set(pack.families)
     if unknown_families:
         raise ValueError(
@@ -755,6 +872,13 @@ def _build_backend(runtime: RoleRuntime, api_key: str) -> TextGenerationBackend:
             model=runtime.model,
             reasoning_effort=runtime.reasoning_effort or OPENAI_REASONING_EFFORT,
             timeout_s=runtime.timeout_s,
+        )
+    if runtime.provider == "gemini":
+        return GeminiGenerateContentBackend(
+            endpoint=runtime.endpoint,
+            api_key=api_key,
+            model=runtime.model,
+            timeout_seconds=runtime.timeout_s,
         )
     raise ValueError("unsupported provider %r" % runtime.provider)
 
@@ -958,7 +1082,10 @@ def _oracle_provider_payload(
 
 
 def _case_pack(args: argparse.Namespace) -> CasePackDefinition:
-    name = str(getattr(args, "case_pack", DEFAULT_CASE_PACK))
+    value = getattr(args, "case_pack", None)
+    if value is None:
+        raise ValueError("case_pack is required")
+    name = str(value)
     try:
         return CASE_PACKS[name]
     except KeyError as exc:
@@ -1045,25 +1172,6 @@ def _config_payload(
         }
         for family in case_families
     }
-    difficulty_variants: Dict[str, Any] = {}
-    source_variants = (
-        _CURATED_VARIANTS
-        if case_pack.name == "curated"
-        else _TEMPORAL_COUNTERFACTUAL_VARIANTS
-        if case_pack.name == "temporal_counterfactual"
-        else {}
-    )
-    for family in case_families:
-        if family not in source_variants:
-            continue
-        difficulty_variants[family] = {
-            variant_id: {
-                "counterfactual_fraction": variant.counterfactual_fraction,
-                "fixed_design_separation": variant.fixed_design_separation,
-            }
-            for variant_id, variant in source_variants[family].items()
-            if variant_id in selected_variants
-        }
     oracle_mode = _oracle_mode(args)
     oracle_generation: Mapping[str, Any]
     if oracle_mode == DETERMINISTIC_ORACLE:
@@ -1197,19 +1305,7 @@ def _config_payload(
                 "adaptive_early_stopping": False,
             },
             "fixed_experimental_designs": fixed_designs,
-            "counterfactual_difficulty": (
-                {
-                    "levels": list(COUNTERFACTUAL_DIFFICULTIES),
-                    "definition": (
-                        "RMS symmetric tolerance-scaled separation under the fixed "
-                        "experimental design; easy is more separated than hard"
-                    ),
-                    "variants": difficulty_variants,
-                    "temporal_source_conditions_unchanged": True,
-                }
-                if source_variants
-                else None
-            ),
+            "counterfactual_difficulty": None,
             "primary_outcome": {
                 "name": HELD_OUT_PREDICTION_SCORE,
                 "version": HELD_OUT_PREDICTION_SCORE_VERSION,
@@ -1865,7 +1961,7 @@ def load_episode_results(output_dir: Path) -> List[Mapping[str, Any]]:
     return sorted(
         results,
         key=lambda result: (
-            result.get("schedule_index", TOTAL_EPISODES + 1),
+            result.get("schedule_index", sys.maxsize),
             result["episode_id"],
         ),
     )
@@ -1902,11 +1998,9 @@ def _make_case(
     case_factory: Optional[Callable[[str, str, BenchmarkTrack], Any]] = None,
 ) -> Any:
     pack = CASE_PACKS[spec.case_pack]
-    runtime_condition_id = spec.condition_id
-    if spec.case_pack == "temporal":
-        runtime_condition_id = TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP[
-            spec.case_family
-        ][spec.condition_id]
+    runtime_condition_id = pack.runtime_condition_ids.get(
+        spec.case_family, {}
+    ).get(spec.condition_id, spec.condition_id)
     task_setting = BenchmarkTrack(spec.task_setting)
     if case_factory is not None:
         return case_factory(spec.case_family, runtime_condition_id, task_setting)
@@ -2652,7 +2746,7 @@ def _add_role_arguments(parser: argparse.ArgumentParser, role: str) -> None:
     label = role.capitalize()
     parser.add_argument(
         "--%s-provider" % role,
-        choices=("deepseek", "openai"),
+        choices=("deepseek", "openai", "gemini"),
         default=DEFAULT_PROVIDER,
         help="%s provider binding" % label,
     )
@@ -2749,8 +2843,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--case-pack",
         choices=tuple(CASE_PACKS),
-        default=DEFAULT_CASE_PACK,
-        help="registered case collection; temporal cases remain separate from curated",
+        required=True,
+        help="required benchmark slice: historical, temporal, or both",
     )
     for role in ROLES:
         _add_role_arguments(parser, role)
@@ -2767,19 +2861,19 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--family",
         action="append",
-        choices=CASE_FAMILIES + TEMPORAL_CASE_FAMILIES,
+        choices=CASE_PACK_FAMILY_CHOICES,
         help="include a registered family in the experiment design",
     )
     parser.add_argument(
         "--variant",
         action="append",
-        choices=COUNTERFACTUAL_DIFFICULTIES + ("source_reported_v1",),
+        choices=CASE_PACK_VARIANT_CHOICES,
         help="include a registered variant in the experiment design",
     )
     parser.add_argument(
         "--condition",
         action="append",
-        choices=CONDITIONS + ("condition_a", "condition_b"),
+        choices=CASE_PACK_CONDITION_CHOICES,
         help="include a condition ID in the experiment design",
     )
     parser.add_argument(
