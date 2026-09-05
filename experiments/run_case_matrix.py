@@ -58,6 +58,7 @@ from role_benchmark import (
     ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
     PLAYER_PROMPT_VERSION_V1,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     PRIOR_ONLY_BASELINE,
     PostHocLLMEvaluator,
     TerminationKind,
@@ -133,6 +134,7 @@ ROLE_PROMPT_VERSIONS: Mapping[str, Tuple[str, ...]] = {
     "player": (
         PLAYER_PROMPT_VERSION_V1,
         PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+        PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     ),
     "oracle": (
         ORACLE_PROMPT_VERSION_V1,
@@ -1708,7 +1710,12 @@ def _run_evaluator(
                     else None
                 ),
                 "error_type": type(exc).__name__,
-                "error_message": "post-hoc evaluator call or decoding failed",
+                # ``PostHocLLMEvaluator`` has already reduced backend failures
+                # to credential-free details (for example, an HTTP status) and
+                # decoder failures to bounded wire diagnostics.  Preserve that
+                # distinction so an evaluator-only retry can be diagnosed
+                # without replaying the completed Player--Oracle episode.
+                "error_message": str(exc),
             }
         )
     except Exception as exc:

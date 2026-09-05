@@ -16,7 +16,10 @@ from role_benchmark.llm import (
     Message,
     ModelTransportError,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+    ProviderTransportError,
     TokenUsage,
     build_generation_request,
 )
@@ -373,6 +376,27 @@ class LLMDevelopmentLoopTest(unittest.TestCase):
             )
             self.assertEqual(replay.prompt_requests_checked, 4)
 
+    def test_case_bound_player_version_is_replayable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "case-bound.jsonl"
+            run_llm_episode(
+                SequencedFakeModel((player_action_to_json(final_action()),)),
+                make_pendulum_case("historical"),
+                str(path),
+                player_prompt_version=PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+                run_metadata=comparison_metadata(),
+            )
+            loaded = load_run_log(str(path))
+
+            self.assertEqual(
+                loaded.events[0]["payload"]["llm_config"]["repair_prompt_version"],
+                PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+            )
+            replay = replay_run_log(
+                str(path), make_pendulum_case("historical")
+            )
+            self.assertEqual(replay.prompt_requests_checked, 1)
+
     def test_repair_logged_run_and_replay(self):
         fake = SequencedFakeModel(
             (
@@ -671,6 +695,55 @@ class LLMDevelopmentLoopTest(unittest.TestCase):
         self.assertNotIn("The rationale field", system)
         self.assertNotIn("$defs", request.response_schema)
 
+        case_bound_request = build_generation_request(
+            Episode(make_pendulum_case("historical")).view(),
+            player_turn=1,
+            config=GenerationConfig(),
+            prompt_version=PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+        self.assertIn("$defs", case_bound_request.response_schema)
+        self.assertIn(
+            "never return an empty controls object",
+            case_bound_request.messages[0].content,
+        )
+        experiment_schema = case_bound_request.response_schema["properties"][
+            "experiment"
+        ]
+        controls_schema = experiment_schema["properties"]["controls"]
+        self.assertEqual(
+            set(controls_schema["properties"]),
+            {"length_m", "bob_mass_kg", "release_angle_deg"},
+        )
+        self.assertEqual(
+            set(controls_schema["required"]),
+            {"length_m", "bob_mass_kg", "release_angle_deg"},
+        )
+        self.assertFalse(controls_schema["additionalProperties"])
+        self.assertEqual(
+            experiment_schema["properties"]["apparatus"]["enum"],
+            ["simple_pendulum"],
+        )
+        self.assertEqual(
+            experiment_schema["properties"]["readouts"]["items"]["enum"],
+            ["period_s"],
+        )
+        final_properties = case_bound_request.response_schema["properties"][
+            "final"
+        ]["properties"]
+        self.assertEqual(final_properties["model"]["enum"], ["expression"])
+        self.assertEqual(
+            final_properties["parameters"],
+            {"$ref": "#/$defs/expression_program"},
+        )
+        output_schema = case_bound_request.response_schema["$defs"][
+            "expression_program"
+        ]["properties"]["outputs"]
+        self.assertEqual(output_schema["required"], ["period_s"])
+        self.assertEqual(
+            output_schema["properties"],
+            {"period_s": {"$ref": "#/$defs/expression"}},
+        )
+
         discovery_request = build_generation_request(
             Episode(
                 make_pendulum_case("historical", BenchmarkTrack.DISCOVERY)
@@ -794,6 +867,31 @@ class LLMDevelopmentLoopTest(unittest.TestCase):
                     "episode.terminal",
                     [event["event_type"] for event in loaded.events],
                 )
+
+    def test_safe_provider_status_survives_player_transport_wrapping(self):
+        class RejectedTransport:
+            def generate(self, request):
+                raise ProviderTransportError(http_status=403)
+
+        player = LLMPlayerBackend(RejectedTransport())
+        with self.assertRaisesRegex(
+            ModelTransportError, "provider HTTP status 403"
+        ):
+            player.next_action(Episode(make_pendulum_case()).view())
+
+    def test_arbitrary_provider_error_text_remains_hidden(self):
+        class UnsafeTransport:
+            def generate(self, request):
+                raise RuntimeError("must-not-be-persisted")
+
+        player = LLMPlayerBackend(UnsafeTransport())
+        with self.assertRaises(ModelTransportError) as raised:
+            player.next_action(Episode(make_pendulum_case()).view())
+        self.assertEqual(
+            str(raised.exception),
+            "text generation backend failed: RuntimeError",
+        )
+        self.assertNotIn("must-not-be-persisted", str(raised.exception))
 
     def test_oracle_paraphrase_is_an_infrastructure_failure(self):
         with tempfile.TemporaryDirectory() as directory:

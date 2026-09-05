@@ -17,6 +17,7 @@ from .llm import (
     ModelTransportError,
     PLAYER_PROMPT_VERSION_V1,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     TextGenerationBackend,
 )
 from .private_eval import PrivateEvaluationError
@@ -158,6 +159,7 @@ def run_private_llm_episode(
     if player_prompt_version not in (
         PLAYER_PROMPT_VERSION_V1,
         PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+        PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     ):
         raise ValueError(
             "unsupported Player prompt_version %r" % player_prompt_version

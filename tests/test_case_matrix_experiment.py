@@ -29,6 +29,8 @@ from role_benchmark import (
     JSONLRunLog,
     ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+    ProviderTransportError,
     TerminationKind,
     TokenUsage,
 )
@@ -905,7 +907,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                     "--oracle-mode",
                     LLM_PRESENTATION_ORACLE,
                     "--player-prompt-version",
-                    PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+                    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
                     "--oracle-prompt-version",
                     ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
                     "--evaluator-prompt-version",
@@ -918,7 +920,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
 
         self.assertEqual(
             explicit_config["player_generation"]["prompt_version"],
-            PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+            PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
         )
         self.assertEqual(
             explicit_config["oracle_generation"]["prompt_version"],
@@ -1523,6 +1525,40 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         self.assertEqual(result["response"]["text"], "not-json")
         self.assertEqual(result["llm_stats"]["input_tokens"], 7)
         self.assertEqual(result["llm_stats"]["output_tokens"], 2)
+
+    def test_evaluator_transport_status_is_preserved_without_response_body(self):
+        class RateLimitedEvaluatorBackend:
+            def generate(self, request):
+                raise ProviderTransportError(http_status=429)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "episodes").mkdir()
+            spec = build_plan()[0]
+            log_path = root / "episodes" / (spec.episode_id + ".jsonl")
+            with JSONLRunLog(str(log_path), run_id=spec.episode_id) as writer:
+                writer.append("run.started", {"case": {"case_id": "public.case"}})
+                writer.append("run.ended", {"status": "evaluated"})
+            result = _run_evaluator(
+                _args(root),
+                evaluator_backend=RateLimitedEvaluatorBackend(),
+                output_dir=root,
+                spec=spec,
+                episode_result={
+                    "run_id": spec.episode_id,
+                    "log_path": str(log_path.relative_to(root)),
+                },
+            )
+
+        self.assertEqual(result["status"], "infrastructure_failed")
+        self.assertEqual(result["error_type"], "LLMEvaluatorTransportError")
+        self.assertEqual(
+            result["error_message"],
+            "LLM evaluator backend failed: provider HTTP status 429",
+        )
+        self.assertIsNotNone(result["request"])
+        self.assertIsNone(result["response"])
+        self.assertIsNone(result["llm_stats"])
 
     def test_json_hardened_evaluator_version_is_tracked_in_failure_sidecar(self):
         class InvalidEvaluatorBackend:

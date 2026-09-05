@@ -12,7 +12,12 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
-from role_benchmark import GenerationRequest, GenerationResponse, TokenUsage
+from role_benchmark import (
+    GenerationRequest,
+    GenerationResponse,
+    ProviderTransportError,
+    TokenUsage,
+)
 
 
 DEFAULT_OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
@@ -147,9 +152,9 @@ class OpenAIResponsesBackend:
                 response_body = response.read()
         except urllib.error.HTTPError as exc:
             # Provider bodies and request headers are deliberately not surfaced.
-            raise RuntimeError("provider HTTP status %d" % exc.code) from exc
+            raise ProviderTransportError(http_status=exc.code) from exc
         except urllib.error.URLError as exc:
-            raise RuntimeError("provider connection failed") from exc
+            raise ProviderTransportError(connection_failed=True) from exc
 
         try:
             decoded = json.loads(response_body.decode("utf-8"))

@@ -20,6 +20,7 @@ from .llm import (
     GenerationResponse,
     Message,
     TextGenerationBackend,
+    _safe_transport_failure_detail,
     generation_request_to_payload,
 )
 from .runlog import LoadedRunLog
@@ -537,7 +538,8 @@ class PostHocLLMEvaluator:
             response = self._backend.generate(request)
         except Exception as exc:
             raise LLMEvaluatorTransportError(
-                "LLM evaluator backend failed: %s" % type(exc).__name__,
+                "LLM evaluator backend failed: %s"
+                % _safe_transport_failure_detail(exc),
                 request=request,
             ) from exc
         if not isinstance(response, GenerationResponse):

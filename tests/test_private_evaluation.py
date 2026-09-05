@@ -15,7 +15,9 @@ from role_benchmark import (
     PrivateEvaluationService,
     PrivateEvaluationUnit,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     TokenUsage,
     export_private_results,
     load_private_case_pack,
@@ -402,6 +404,31 @@ class PrivateEvaluationHTTPTest(unittest.TestCase):
         self.assertEqual(
             primary_request["metadata"]["prompt_version"],
             PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+        )
+
+    def test_remote_runner_can_select_case_bound_player_prompt(self):
+        log_path = os.path.join(self.temp.name, "private-v3-run.jsonl")
+        run_private_llm_episode(
+            OneResponseBackend(final_action()),
+            self.client,
+            log_path,
+            client_run_id="http-run-1",
+            player_prompt_version=PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+        loaded = load_run_log(log_path)
+        started = loaded.events[0]["payload"]
+        self.assertEqual(
+            started["llm_config"]["repair_prompt_version"],
+            PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+        primary_request = next(
+            event["payload"]["request"]
+            for event in loaded.events
+            if event["event_type"] == "model.requested"
+        )
+        self.assertTrue(
+            primary_request["response_schema"]["properties"]["experiment"]
+            ["properties"]["controls"]["required"]
         )
 
     def test_non_loopback_plaintext_is_rejected(self):

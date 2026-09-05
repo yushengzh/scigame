@@ -13,7 +13,9 @@ from role_benchmark.llm import (
     LLMPlayerBackend,
     PLAYER_PROMPT_VERSION_V1,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     build_generation_request,
     generation_request_to_payload,
 )
@@ -249,6 +251,55 @@ class PromptVersionTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.attempts, 1)
         self.assertEqual(len(backend.requests), 1)
+
+    def test_player_v3_is_separately_versioned_and_case_bound(self):
+        request = build_generation_request(
+            _view(),
+            player_turn=1,
+            config=GenerationConfig(),
+            prompt_version=PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+        repair = build_generation_request(
+            _view(),
+            player_turn=1,
+            config=GenerationConfig(),
+            purpose="repair_action",
+            prompt_version=PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+            invalid_output="not json",
+            wire_error=WireDecodeError("invalid_json", "$", "invalid JSON"),
+        )
+
+        self.assertEqual(
+            request.metadata["prompt_version"],
+            PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+        self.assertEqual(
+            repair.metadata["repair_prompt_version"],
+            PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+        self.assertIn("$defs", request.response_schema)
+        controls = request.response_schema["properties"]["experiment"][
+            "properties"
+        ]["controls"]
+        self.assertTrue(controls["required"])
+        self.assertNotEqual(
+            request.response_schema,
+            build_generation_request(
+                _view(),
+                player_turn=1,
+                config=GenerationConfig(),
+                prompt_version=PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+            ).response_schema,
+        )
+
+        run_config = LLMPlayerBackend(
+            _RecordingBackend(),
+            prompt_version=PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        ).run_config
+        self.assertEqual(
+            run_config["repair_prompt_version"],
+            PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
 
     def test_oracle_default_is_unchanged_and_v2_is_marked(self):
         case = make_pendulum_case("historical")

@@ -21,6 +21,7 @@ from .llm import (
     GenerationResponse,
     Message,
     ModelTransportError,
+    _safe_transport_failure_detail,
     TextGenerationBackend,
     generation_config_to_payload,
     generation_request_to_payload,
@@ -345,6 +346,7 @@ class LLMOracle:
                 raise TypeError("backend mutated the logical generation request")
             response_payload = generation_response_to_payload(response)
         except Exception as exc:
+            failure_detail = _safe_transport_failure_detail(exc)
             self._emit(
                 "oracle.model.completed",
                 {
@@ -353,13 +355,14 @@ class LLMOracle:
                     "error": {
                         "type": type(exc).__name__,
                         "message": (
-                            "provider binding failed before a valid response"
+                            "provider binding failed before a valid response: %s"
+                            % failure_detail
                         ),
                     },
                 },
             )
             raise ModelTransportError(
-                "Oracle text generation backend failed: %s" % type(exc).__name__
+                "Oracle text generation backend failed: %s" % failure_detail
             ) from exc
 
         if response.usage.input_tokens is None:

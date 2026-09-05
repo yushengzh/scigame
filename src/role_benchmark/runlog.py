@@ -23,7 +23,9 @@ from .llm import (
     ModelTransportError,
     PLAYER_PROMPT_VERSION_V1,
     PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     TextGenerationBackend,
     TokenUsage,
     build_generation_request,
@@ -680,6 +682,7 @@ def run_llm_episode(
     if player_prompt_version not in (
         PLAYER_PROMPT_VERSION_V1,
         PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+        PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     ):
         raise ValueError(
             "unsupported Player prompt_version %r" % player_prompt_version
@@ -1134,10 +1137,18 @@ def _llm_policy_from_started(
         "repair_prompt_version",
     }:
         prompt_version = llm_config.get("prompt_version")
+        expected_repair_version = {
+            PLAYER_PROMPT_VERSION_V2_JSON_HARDENED: (
+                PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED
+            ),
+            PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON: (
+                PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON
+            ),
+        }.get(prompt_version)
         if (
-            prompt_version != PLAYER_PROMPT_VERSION_V2_JSON_HARDENED
+            expected_repair_version is None
             or llm_config.get("repair_prompt_version")
-            != PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED
+            != expected_repair_version
         ):
             raise RunReplayError("logged Player prompt version is unavailable")
     else:
