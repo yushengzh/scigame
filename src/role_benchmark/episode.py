@@ -16,13 +16,13 @@ from .models import (
     FinalSubmission,
     HypothesisPortfolio,
     OracleResponse,
-    OracleStatus,
     PlayerAction,
     ProtocolViolation,
     TerminationKind,
 )
 from .metrics import HELD_OUT_PREDICTION_SCORE
 from .protocols import BenchmarkCase, CaseOracle, Oracle
+from .semantic_oracle import LLMSemanticOracle, prepare_semantic_oracle_case
 from .trajectory import score_trajectory
 
 
@@ -58,6 +58,12 @@ class Episode:
         initial_attempts_used: int = 0,
         require_budget_exhaustion: bool = False,
     ) -> None:
+        # The semantic Oracle's public contract and charging rule must also
+        # hold when callers use Episode directly, without the logged runner.
+        if isinstance(oracle, LLMSemanticOracle):
+            case = prepare_semantic_oracle_case(case)
+            if oracle.definition != case.definition:
+                raise ValueError("semantic Oracle definition must match the prepared case")
         # The public definition contains nested mappings/tuples.  Snapshot it so
         # external aliases cannot change resource or budget semantics mid-run.
         definition = copy.deepcopy(case.definition)
@@ -65,10 +71,13 @@ class Episode:
         self.oracle = oracle or CaseOracle(definition, case.world_model)
         if observation_budget is None:
             observation_budget = definition.budget
-        if (
+        elif definition.budget is None:
+            raise ValueError("an unlimited adaptive case cannot use a finite observation budget")
+        if observation_budget is not None and (
             isinstance(observation_budget, bool)
             or not isinstance(observation_budget, int)
-            or not 0 <= observation_budget <= definition.budget
+            or observation_budget < 0
+            or (definition.budget is not None and observation_budget > definition.budget)
         ):
             raise ValueError(
                 "observation_budget must be an integer between zero and case budget"
@@ -76,18 +85,22 @@ class Episode:
         if (
             isinstance(initial_attempts_used, bool)
             or not isinstance(initial_attempts_used, int)
-            or not 0 <= initial_attempts_used <= observation_budget
+            or initial_attempts_used < 0
+            or (observation_budget is not None and initial_attempts_used > observation_budget)
         ):
             raise ValueError(
                 "initial_attempts_used must be between zero and observation_budget"
             )
         if not isinstance(require_budget_exhaustion, bool):
             raise ValueError("require_budget_exhaustion must be boolean")
+        if observation_budget is None and require_budget_exhaustion:
+            raise ValueError("an unlimited experiment budget cannot require exhaustion")
         self._observation_budget = observation_budget
         self._require_budget_exhaustion = require_budget_exhaustion
         self._initial_attempts_used = initial_attempts_used
         self._attempts_used = initial_attempts_used
         self._turns: List[ExperimentTurn] = []
+        self._protocol_violations: List[ProtocolViolation] = []
         self._result: Optional[EpisodeResult] = None
         self._outcome: Optional[EpisodeOutcome] = None
 
@@ -124,7 +137,8 @@ class Episode:
         return EpisodeView(
             case=copy.deepcopy(self.case.definition),
             attempts_used=self._attempts_used,
-            attempts_remaining=self._observation_budget - self._attempts_used,
+            attempts_remaining=(None if self._observation_budget is None
+                                else self._observation_budget - self._attempts_used),
             turns=tuple(copy.deepcopy(self._turns)),
         )
 
@@ -222,9 +236,31 @@ class Episode:
                 "portfolio exceeds the case's max_hypotheses",
                 code="portfolio_limit_exceeded",
             )
+        # The action's portfolio is the belief state before its experiment.
+        # Unlimited adaptive episodes must stop as soon as that state crosses
+        # the public threshold, before any Oracle call or attempt is recorded.
+        threshold = getattr(self.case.definition, "confidence_threshold", None)
+        if (
+            self._observation_budget is None
+            and threshold is not None
+            and portfolio.top.confidence > threshold
+        ):
+            violation = ProtocolViolation(
+                code="confidence_stop_required",
+                message=(
+                    "Current portfolio confidence strictly exceeds the public "
+                    "threshold; submit a final predictor instead of an experiment."
+                ),
+            )
+            # The logged runner records the rejected action and terminates. A
+            # direct caller that catches this error must not erase the violation
+            # by subsequently committing a scientifically correct final.
+            if violation not in self._protocol_violations:
+                self._protocol_violations.append(violation)
+            raise EpisodeProtocolError(violation.message, code=violation.code)
 
     def _run_experiment(self, action: PlayerAction) -> OracleResponse:
-        if self._attempts_used >= self._observation_budget:
+        if self._observation_budget is not None and self._attempts_used >= self._observation_budget:
             raise EpisodeProtocolError(
                 "experiment budget is exhausted; commit a final submission",
                 code="experiment_budget_exhausted",
@@ -237,7 +273,7 @@ class Episode:
         proposal = copy.deepcopy(action.experiment)
         response = copy.deepcopy(self.oracle.respond(copy.deepcopy(proposal)))
         attempt_index = None
-        if response.consumes_budget:
+        if self.case.definition.count_all_experiment_attempts or response.consumes_budget:
             self._attempts_used += 1
             attempt_index = self._attempts_used
         self._turns.append(
@@ -266,21 +302,14 @@ class Episode:
             and self._attempts_used < self._observation_budget
         ):
             raise EpisodeProtocolError(
-                "the evaluation method requires exactly %d observations before final submission"
+                "the evaluation method requires exactly %d experiment attempts before final submission"
                 % self._observation_budget,
                 code="observation_budget_not_exhausted",
             )
-        if self._require_budget_exhaustion:
-            valid_observations = self._initial_attempts_used + sum(
-                turn.response.status is OracleStatus.VALID for turn in self._turns
-            )
-            if valid_observations < self._observation_budget:
-                raise EpisodeProtocolError(
-                    "the evaluation method requires exactly %d legal observations"
-                    % self._observation_budget,
-                    code="valid_observation_budget_not_met",
-                )
-        violations = []
+        # Invalid and out-of-range experiments already consume attempts.
+        # Once the attempt budget is exhausted, final submission must remain
+        # possible even if fewer valid observations were obtained.
+        violations = list(self._protocol_violations)
         if len(portfolio.hypotheses) > self.case.definition.max_hypotheses:
             violations.append(
                 ProtocolViolation(
@@ -354,10 +383,15 @@ class Episode:
             )
         else:
             selected_confidence = selected[0].confidence
-        budget_exhausted = self._attempts_used >= self._observation_budget
+        budget_exhausted = (
+            self._observation_budget is not None
+            and self._attempts_used >= self._observation_budget
+        )
         threshold_reached = (
             selected_confidence is not None
-            and selected_confidence >= self.case.definition.confidence_threshold
+            and (selected_confidence > self.case.definition.confidence_threshold
+                 if self._observation_budget is None
+                 else selected_confidence >= self.case.definition.confidence_threshold)
         )
         if (
             selected_confidence is not None
@@ -368,6 +402,9 @@ class Episode:
                 ProtocolViolation(
                     code="stopping_condition_not_met",
                     message=(
+                        "Selected portfolio confidence must strictly exceed the "
+                        "public threshold for an unlimited adaptive episode."
+                        if self._observation_budget is None else
                         "Selected portfolio confidence is below the public "
                         "threshold and the experiment budget is not exhausted."
                     ),

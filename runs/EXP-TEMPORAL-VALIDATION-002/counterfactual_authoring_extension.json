@@ -1,0 +1,110 @@
+{
+  "schema": "role_benchmark.temporal_counterfactual_authoring.v1",
+  "experiment_id": "EXP-TEMPORAL-VALIDATION-002",
+  "recorded_on": "2026-09-05",
+  "status": "extension_counterfactual_authoring_complete",
+  "scope": "Benchmark-authored second condition for every accepted Temporal extension family included in the temporal and both case packs. This artifact does not modify a source ScienceCard, registry, or prior artifact.",
+  "inputs": {
+    "release_manifest": "runs/EXP-TEMPORAL-VALIDATION-002/release_manifest.json",
+    "science_card_resolution": "For every family, read science_card.batch and resolve science_card.json_pointer from the release manifest.",
+    "family_ids": [
+      "temporal_source_3047"
+    ]
+  },
+  "authoring_contract": {
+    "selection_basis": "Parameter semantics and predeclared numerical/domain robustness only; no tested-LLM behavior or benchmark score was inspected or used.",
+    "performance_selection_used": false,
+    "intervention_rule": "Change exactly one source-model parameter to one finite target having the exact same unit. Keep controls, readouts, control domain, formula tree, all other parameters, and fixed experimental design unchanged.",
+    "preferred_target_rule": "Prefer a same-sign 25-50 percent change in a nonzero scale or coefficient. Depart from that range only when a discrete parameter requires integer values in both the full-target and midpoint variants.",
+    "constructor": "role_benchmark.temporal.counterfactual_construction.construct_temporal_counterfactual_variants",
+    "constructor_semantics": {
+      "easy": "Full preregistered target (fraction 1.0); selected here as the one benchmark-authored second condition for the four-case source/counterfactual by Identification/Discovery design.",
+      "hard": "Source-to-target midpoint (fraction 0.5); retained as a deterministic construction and ordering canary, not selected here as an additional temporal-pack condition."
+    },
+    "separation_metric": "RMS symmetric tolerance-scaled source-versus-counterfactual separation over the fixed diagnostic design.",
+    "acceptance_checks": [
+      "The request unit exactly matches the compiled source parameter unit.",
+      "The target differs from the source value and the expression remains total over the entire declared control domain.",
+      "The existing constructor returns ordered easy and hard variants.",
+      "MatchedFamilySpec validation succeeds for each returned variant.",
+      "Known-truth submissions for source and counterfactual both pass Identification and Discovery held-out evaluation."
+    ],
+    "excluded_work": [
+      "engineering audit",
+      "red-team testing",
+      "hash indexing"
+    ]
+  },
+  "summary": {
+    "families_targeted": 1,
+    "families_constructed": 1,
+    "families_blocked": 0,
+    "selected_full_target_second_conditions": 1,
+    "constructor_variants_validated": 2,
+    "matched_spec_validations_passed": 2,
+    "known_truth_cells_checked": 8,
+    "known_truth_cells_passed": 8,
+    "minimum_selected_full_target_separation": 4.444443850685694,
+    "minimum_midpoint_canary_separation": 2.3529408436369694,
+    "common_known_truth_score_signature": {
+      "success": true,
+      "predictive_model_pass": 1.0,
+      "held_out_prediction_score": 1.0,
+      "hidden_test_mean_scaled_error": 0.0,
+      "hidden_test_max_scaled_error": 0.0
+    }
+  },
+  "families": [
+    {
+      "family_id": "temporal_source_3047",
+      "paper_id": "paper_2607_27641v1",
+      "science_card": {
+        "batch": "runs/EXP-TEMPORAL-VALIDATION-002/reviews_batch_037_047.json",
+        "json_pointer": "/reviews/1/revised_science_card"
+      },
+      "request": {
+        "parameter_name": "bc_perp_0",
+        "source_value": 0.9,
+        "target_value": 1.125,
+        "unit": "T",
+        "target_to_source_magnitude_ratio": 1.25,
+        "same_sign": true
+      },
+      "rationale": "The positive fitted zero-temperature critical-field intercept is a multiplicative scale. Increasing it by 25 percent preserves tesla units, sign, the transition-temperature parameter, the linear temperature dependence, and the zero crossing at the source-supported Tc.",
+      "total_domain_check": "For temperature t in [0.25, 1.4] K, bc_perp_0*(1-t/tc) is finite and nonnegative for source, midpoint, and target bc_perp_0 values; all three retain the same zero at tc=1.4 K.",
+      "construction": {
+        "status": "pass",
+        "diagnostic_condition_count": 2,
+        "hidden_condition_count": 3,
+        "variants": {
+          "easy": {
+            "role": "selected_full_target_second_condition",
+            "counterfactual_fraction": 1.0,
+            "counterfactual_value": 1.125,
+            "fixed_design_separation": 4.444443850685694,
+            "matched_spec_validation": "pass",
+            "known_truth_validation": {
+              "source_identification": "pass",
+              "source_discovery": "pass",
+              "counterfactual_identification": "pass",
+              "counterfactual_discovery": "pass"
+            }
+          },
+          "hard": {
+            "role": "midpoint_construction_canary_not_selected_as_temporal_pack_condition",
+            "counterfactual_fraction": 0.5,
+            "counterfactual_value": 1.0125,
+            "fixed_design_separation": 2.3529408436369694,
+            "matched_spec_validation": "pass",
+            "known_truth_validation": {
+              "source_identification": "pass",
+              "source_discovery": "pass",
+              "counterfactual_identification": "pass",
+              "counterfactual_discovery": "pass"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

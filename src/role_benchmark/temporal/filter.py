@@ -7,10 +7,11 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from itertools import product
-from typing import Any, Dict, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Set, Tuple
 
 from role_benchmark.expression import (
     ExpressionError,
+    _cbrt,
     evaluate_expression_program,
     validate_expression_program,
 )
@@ -277,12 +278,90 @@ def _expression_interval(
             return _finite_interval(
                 math.log(arguments[0][0]), math.log(arguments[0][1])
             )
-        if operator == "sin":
-            return -1.0, 1.0
+        if operator in ("sin", "cos"):
+            lower, upper = arguments[0]
+            # Tighten on small ordinary-angle intervals so subdivision can
+            # prove, e.g., 1 + sin(x) > 0 inside (0, pi). Keep the universal
+            # enclosure when range reduction is large or covers a full period.
+            if upper - lower >= math.tau or max(abs(lower), abs(upper)) > 2**20:
+                return -1.0, 1.0
+            function = math.sin if operator == "sin" else math.cos
+            values = [function(lower), function(upper)]
+            shift = math.pi / 2 if operator == "sin" else 0.0
+            margin = 8 * math.ulp(max(1.0, abs(lower), abs(upper)))
+            first = math.floor((lower - shift) / math.pi) - 1
+            last = math.ceil((upper - shift) / math.pi) + 1
+            for index in range(first, last + 1):
+                critical = shift + index * math.pi
+                if lower - margin <= critical <= upper + margin:
+                    values.append(1.0 if index % 2 == 0 else -1.0)
+            return (max(-1.0, math.nextafter(math.nextafter(min(values), -math.inf), -math.inf)),
+                    min(1.0, math.nextafter(math.nextafter(max(values), math.inf), math.inf)))
+        if operator == "tan":
+            lower, upper = arguments[0]
+            # Refuse unresolved large-angle reductions as well as intervals
+            # containing a pole; point sampling cannot establish totality.
+            if (upper - lower >= math.pi or max(abs(lower), abs(upper)) > 2**40
+                    or math.ceil((lower - math.pi / 2) / math.pi)
+                    <= math.floor((upper - math.pi / 2) / math.pi)):
+                raise _UnsafeDomain("tan input can contain a pole")
+            return _finite_interval(math.tan(lower), math.tan(upper))
+        if operator in ("asin", "acos"):
+            lower, upper = arguments[0]
+            if lower < -1.0 or upper > 1.0:
+                raise _UnsafeDomain("inverse trigonometric input can leave [-1, 1]")
+            if operator == "acos":
+                return _finite_interval(math.acos(upper), math.acos(lower))
+            return _finite_interval(math.asin(lower), math.asin(upper))
+        if operator == "atan2":
+            # atan2 is finite for every finite pair, including (0, 0), under
+            # the runtime convention. Its branch cut needs a full-angle bound.
+            return -math.pi, math.pi
+        if operator in ("abs", "cosh"):
+            lower, upper = arguments[0]
+            near = 0.0 if lower <= 0.0 <= upper else min(abs(lower), abs(upper))
+            far = max(abs(lower), abs(upper))
+            if operator == "cosh":
+                return _finite_interval(math.cosh(near), math.cosh(far))
+            return near, far
+        if operator == "hypot":
+            nearest = [0.0 if lo <= 0.0 <= hi else min(abs(lo), abs(hi))
+                       for lo, hi in arguments]
+            farthest = [max(abs(lo), abs(hi)) for lo, hi in arguments]
+            return _finite_interval(math.hypot(*nearest), math.hypot(*farthest))
+        if operator == "sign":
+            lower, upper = arguments[0]
+            return float((lower > 0) - (lower < 0)), float((upper > 0) - (upper < 0))
+        monotone_functions = {
+            "atan": math.atan, "sinh": math.sinh, "tanh": math.tanh,
+            "asinh": math.asinh, "acosh": math.acosh, "atanh": math.atanh,
+            "sqrt": math.sqrt, "cbrt": _cbrt, "expm1": math.expm1,
+            "log1p": math.log1p, "log2": math.log2, "log10": math.log10,
+            "floor": math.floor, "ceil": math.ceil, "round": round,
+        }
+        if operator in monotone_functions:
+            # These functions have connected real domains and are increasing;
+            # endpoint domain/overflow checks therefore cover the interval.
+            function = monotone_functions[operator]
+            return _finite_interval(function(arguments[0][0]), function(arguments[0][1]))
+        if operator == "erf":
+            return _finite_interval(
+                math.erf(arguments[0][0]), math.erf(arguments[0][1])
+            )
+        if operator == "erfc":
+            # The complementary error function is decreasing on the real line.
+            return _finite_interval(
+                math.erfc(arguments[0][1]), math.erfc(arguments[0][0])
+            )
         if operator == "maximum":
             return _finite_interval(
                 max(item[0] for item in arguments),
                 max(item[1] for item in arguments),
+            )
+        if operator == "minimum":
+            return _finite_interval(
+                min(item[0] for item in arguments),
+                min(item[1] for item in arguments),
             )
         if operator == "step":
             return 0.0, 1.0
@@ -293,6 +372,62 @@ def _expression_interval(
             "%s is undefined over the control domain" % operator
         ) from exc
     raise _UnsafeDomain("unsupported expression operator")
+
+
+def _prove_subdivided_totality(
+    expression: Any,
+    domains: Iterable[Mapping[str, Tuple[float, float]]],
+    *,
+    max_depth: int = 20,
+    max_boxes: int = 4096,
+) -> None:
+    """Prove every covering box with the existing conservative evaluator.
+
+    Repeated occurrences of a variable can make a whole-domain interval too
+    broad. Bisection preserves the entire closed domain, including shared
+    boundaries; it never substitutes point samples for a domain proof. The
+    work limit applies across all enumerated settings for this output.
+    """
+
+    evaluated_boxes = 0
+    for domain in domains:
+        names = tuple(domain)
+        pending = [(dict(domain), 0, (0,) * len(names))]
+        while pending:
+            intervals, depth, split_counts = pending.pop()
+            if evaluated_boxes >= max_boxes:
+                raise _UnsafeDomain("interval subdivision box limit reached")
+            evaluated_boxes += 1
+            try:
+                _expression_interval(expression, intervals)
+                continue
+            except _UnsafeDomain as exc:
+                if depth >= max_depth:
+                    raise _UnsafeDomain(
+                        "%s (interval subdivision depth limit reached)" % exc
+                    ) from exc
+                candidates = []
+                for index, name in enumerate(names):
+                    lower, upper = intervals[name]
+                    # This midpoint cannot overflow for finite endpoints.
+                    midpoint = lower / 2.0 + upper / 2.0
+                    if lower < midpoint < upper:
+                        candidates.append((split_counts[index], index, midpoint))
+                if not candidates:
+                    raise _UnsafeDomain(
+                        "%s (interval cannot be subdivided further)" % exc
+                    ) from exc
+                # Balance subdivisions across coordinates without comparing
+                # dimensional widths or overflowing on a very wide interval.
+                _, index, midpoint = min(candidates)
+                name = names[index]
+                lower, upper = intervals[name]
+                left, right = dict(intervals), dict(intervals)
+                left[name], right[name] = (lower, midpoint), (midpoint, upper)
+                counts = list(split_counts)
+                counts[index] += 1
+                pending.append((right, depth + 1, tuple(counts)))
+                pending.append((left, depth + 1, tuple(counts)))
 
 
 def validate_materialized_outputs_totality(
@@ -321,20 +456,22 @@ def validate_materialized_outputs_totality(
         try:
             _expression_interval(expression, variable_intervals)
         except _UnsafeDomain as exc:
-            # An interval hull can include values between discrete settings.
-            # Retry with every enumerated coordinate fixed exactly.
-            if enumerated_controls:
-                try:
-                    for values in product(
-                        *(item.allowed_values for item in enumerated_controls)
-                    ):
-                        exact_intervals = dict(variable_intervals)
-                        for control, value in zip(enumerated_controls, values):
-                            exact_intervals[control.name] = (value, value)
-                        _expression_interval(expression, exact_intervals)
-                    continue
-                except _UnsafeDomain as exact_exc:
-                    exc = exact_exc
+            # Pin enumerated settings, whose hull can include invalid gaps,
+            # then subdivide continuous coordinates only when needed.
+            def exact_domains():
+                for values in product(
+                    *(item.allowed_values for item in enumerated_controls)
+                ):
+                    exact_intervals = dict(variable_intervals)
+                    for control, value in zip(enumerated_controls, values):
+                        exact_intervals[control.name] = (value, value)
+                    yield exact_intervals
+
+            try:
+                _prove_subdivided_totality(expression, exact_domains())
+                continue
+            except _UnsafeDomain as proof_exc:
+                exc = proof_exc
             raise ValueError(
                 "output %s is not total on the declared control domain: %s"
                 % (readout, exc)

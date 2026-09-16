@@ -95,7 +95,10 @@ from .minimal_science_card import (
 )
 from .admission import (
     AdmissionLineRange,
+    TEMPORAL_ADMISSION_CHECK_STATUSES_V2,
+    TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2,
     TEMPORAL_ADMISSION_REVIEW_SCHEMA,
+    TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2,
     TemporalAdmissionError,
     TemporalAdmissionIssue,
     TemporalAdmissionResult,
@@ -105,6 +108,7 @@ from .admission import (
     parse_temporal_admission_review_payload,
     temporal_admission_review_to_payload,
     temporal_admission_review_request_payload,
+    temporal_admission_review_v2_request_payload,
 )
 from .source_case import (
     TEMPORAL_PROVENANCE_SCHEMA,
@@ -325,7 +329,10 @@ __all__ = [
     "TemporalCaseCandidate",
     "TemporalCaseConstructionError",
     "TemporalSourceCaseBuild",
+    "TEMPORAL_ADMISSION_CHECK_STATUSES_V2",
+    "TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2",
     "TEMPORAL_ADMISSION_REVIEW_SCHEMA",
+    "TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2",
     "TEMPORAL_COUNTERFACTUAL_DIFFICULTIES",
     "TEMPORAL_PROVENANCE_SCHEMA",
     "TemporalAdmissionError",
@@ -419,6 +426,7 @@ __all__ = [
     "render_candidate_module",
     "review_request_payload",
     "temporal_admission_review_request_payload",
+    "temporal_admission_review_v2_request_payload",
     "resolve_arxiv_paper",
     "search_arxiv_papers",
     "select_temporal_cohort",

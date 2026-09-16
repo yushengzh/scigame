@@ -247,11 +247,18 @@ def _symbols(value: Any, variables: set[str], parameters: set[str]) -> None:
         _symbols(argument, variables, parameters)
 
 
-def _validate_relation(relation: MinimalQuantitativeRelation, path: str) -> None:
+def _readout_limit(max_readouts: int) -> int:
+    if isinstance(max_readouts, bool) or not isinstance(max_readouts, int) or not 1 <= max_readouts <= 8:
+        raise ValueError("max_readouts must be an integer between one and eight")
+    return max_readouts
+
+
+def _validate_relation(relation: MinimalQuantitativeRelation, path: str, *, max_readouts: int = 2) -> None:
     if not 1 <= len(relation.controls) <= 5:
         _error(path + ".controls", "must contain between one and five controls")
-    if not 1 <= len(relation.readouts) <= 2:
-        _error(path + ".readouts", "must contain one or two readouts")
+    if not 1 <= len(relation.readouts) <= max_readouts:
+        _error(path + ".readouts", "must contain one or two readouts" if max_readouts == 2
+               else "must contain between one and %d readouts" % max_readouts)
     parameter_names = tuple(item.name for item in relation.parameters)
     control_names = tuple(item.name for item in relation.controls)
     readout_names = tuple(item.name for item in relation.readouts)
@@ -298,7 +305,7 @@ def _validate_relation(relation: MinimalQuantitativeRelation, path: str) -> None
         _error(path + ".parameters", "every declared parameter must occur in the formula")
 
 
-def _decode_provider_payload(payload: Any) -> Tuple[MinimalQuantitativeRelation, ...]:
+def _decode_provider_payload(payload: Any, *, max_readouts: int = 2) -> Tuple[MinimalQuantitativeRelation, ...]:
     root = _object(payload, "$", {"relations"})
     raw_relations = _array(root["relations"], "$.relations")
     if len(raw_relations) > 1:
@@ -466,7 +473,7 @@ def _decode_provider_payload(payload: Any) -> Tuple[MinimalQuantitativeRelation,
             ),
             anchors=_anchors(item["anchors"], path + ".anchors"),
         )
-        _validate_relation(relation, path)
+        _validate_relation(relation, path, max_readouts=max_readouts)
         relations.append(relation)
     return tuple(relations)
 
@@ -478,7 +485,8 @@ def _validated_source(source: ScienceSource) -> ScienceSource:
     doi = _text(source.journal_doi, "$.source.journal_doi")
     if canonicalize_doi(doi) != doi:
         _error("$.source.journal_doi", "must be a canonical DOI")
-    arxiv_id = parse_versioned_arxiv_id(source.arxiv_versioned_id)
+    arxiv_id = (parse_versioned_arxiv_id(source.arxiv_versioned_id)
+                if source.arxiv_versioned_id is not None else None)
     return ScienceSource(citation=citation, journal_doi=doi, arxiv_versioned_id=arxiv_id)
 
 
@@ -486,12 +494,17 @@ def parse_minimal_science_card_provider_payload(
     payload: Any,
     *,
     source: ScienceSource,
+    max_readouts: int = 2,
 ) -> MinimalScienceCard:
-    """Parse model output and inject the caller-supplied source identity."""
+    """Parse model output and inject the caller-supplied source identity.
+
+    The original two-readout contract remains the default. A separate enriched
+    pipeline may explicitly permit up to eight complete scientific readouts.
+    """
 
     return MinimalScienceCard(
         source=_validated_source(source),
-        relations=_decode_provider_payload(payload),
+        relations=_decode_provider_payload(payload, max_readouts=_readout_limit(max_readouts)),
     )
 
 
@@ -528,8 +541,9 @@ def parse_minimal_science_card_provider_json(
     text: str,
     *,
     source: ScienceSource,
+    max_readouts: int = 2,
 ) -> MinimalScienceCard:
-    return parse_minimal_science_card_provider_payload(_decode_json(text), source=source)
+    return parse_minimal_science_card_provider_payload(_decode_json(text), source=source, max_readouts=max_readouts)
 
 
 def _anchor_payload(anchor: MinimalAnchor) -> Mapping[str, Any]:
@@ -629,7 +643,7 @@ def minimal_science_card_to_payload(card: MinimalScienceCard) -> Mapping[str, An
     }
 
 
-def parse_minimal_science_card_payload(payload: Any) -> MinimalScienceCard:
+def parse_minimal_science_card_payload(payload: Any, *, max_readouts: int = 2) -> MinimalScienceCard:
     root = _object(payload, "$", {"schema", "source", "relations"})
     if root["schema"] != MINIMAL_SCIENCE_CARD_SCHEMA:
         _error("$.schema", "unsupported minimal ScienceCard schema")
@@ -641,17 +655,17 @@ def parse_minimal_science_card_payload(payload: Any) -> MinimalScienceCard:
     source = ScienceSource(
         citation=_text(source_raw["citation"], "$.source.citation"),
         journal_doi=_text(source_raw["journal_doi"], "$.source.journal_doi"),
-        arxiv_versioned_id=_text(
+        arxiv_versioned_id=None if source_raw["arxiv_versioned_id"] is None else _text(
             source_raw["arxiv_versioned_id"], "$.source.arxiv_versioned_id"
         ),
     )
     return parse_minimal_science_card_provider_payload(
-        {"relations": root["relations"]}, source=source
+        {"relations": root["relations"]}, source=source, max_readouts=max_readouts
     )
 
 
-def parse_minimal_science_card_json(text: str) -> MinimalScienceCard:
-    return parse_minimal_science_card_payload(_decode_json(text))
+def parse_minimal_science_card_json(text: str, *, max_readouts: int = 2) -> MinimalScienceCard:
+    return parse_minimal_science_card_payload(_decode_json(text), max_readouts=max_readouts)
 
 
 def _all_anchors(card: MinimalScienceCard) -> Tuple[Tuple[str, MinimalAnchor], ...]:
@@ -697,9 +711,10 @@ def validate_minimal_science_card_lineage(
             )
 
 
-def minimal_science_card_json_schema() -> Mapping[str, Any]:
+def minimal_science_card_json_schema(*, max_readouts: int = 2) -> Mapping[str, Any]:
     """Return the provider-facing schema; source identity is intentionally absent."""
 
+    max_readouts = _readout_limit(max_readouts)
     identifier: Dict[str, Any] = {
         "type": "string",
         "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
@@ -838,7 +853,7 @@ def minimal_science_card_json_schema() -> Mapping[str, Any]:
                 "type": "array",
                 "items": named_evidence,
                 "minItems": 1,
-                "maxItems": 2,
+                "maxItems": max_readouts,
             },
             "domain": {
                 "type": "object",

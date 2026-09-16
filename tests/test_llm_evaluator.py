@@ -7,6 +7,7 @@ from pathlib import Path
 
 from role_benchmark import (
     EVALUATOR_SCORE_AXES,
+    DISCOVERY_SCORE_AXES,
     GenerationConfig,
     GenerationResponse,
     JSONLRunLog,
@@ -47,7 +48,9 @@ def _events():
         ),
         (
             "action.decoded",
-            {"action_index": 1, "action": {"kind": "experiment"}},
+            {"action_index": 1, "action": {"kind": "experiment", "portfolio": {
+                "hypotheses": [{"statement": "The response is linear in x within the tested range."}],
+            }}},
         ),
         (
             "protocol.transition",
@@ -100,6 +103,23 @@ def _valid_result(**overrides):
     return result
 
 
+def _reference():
+    return {"case_id": "public.case", "understanding_criteria": [
+        {"id": "relation", "question": "Does the claim recover the scientific relation?"},
+        {"id": "comparison", "question": "Are its variable dependencies understood?"},
+        {"id": "scope", "question": "Is its scope supported?"},
+    ]}
+
+
+def _discovery_result():
+    return {"understanding": {"items": [
+        {"criterion_id": row["id"], "before_score": None, "after_score": 0.5,
+         "before_claim": None, "after_claim": "The response is linear in x within the tested range.",
+         "rationale": "The relation and scope are stated but incompletely supported."}
+        for row in _reference()["understanding_criteria"]]},
+        "findings": [], "summary": "Only final expressed understanding is available."}
+
+
 class _Backend:
     def __init__(self, text):
         self.text = text
@@ -116,7 +136,7 @@ class _Backend:
 
 
 class LLMEvaluatorTests(unittest.TestCase):
-    def test_projection_keeps_all_player_outputs_and_oracle_evidence(self):
+    def test_historical_projection_preserves_its_original_observable_record(self):
         projection = evaluator_transcript_projection(_log())
         serialized = json.dumps(projection)
         self.assertIn("raw player output", serialized)
@@ -141,14 +161,16 @@ class LLMEvaluatorTests(unittest.TestCase):
         )
 
     def test_post_hoc_evaluator_returns_separate_strict_axes(self):
-        backend = _Backend(json.dumps(_valid_result()))
+        backend = _Backend(json.dumps(_discovery_result()))
         evaluator = PostHocLLMEvaluator(
             backend,
             config=GenerationConfig(max_output_tokens=512),
         )
-        run = evaluator.evaluate(_log())
-        self.assertEqual(set(run.evaluation.scores), set(EVALUATOR_SCORE_AXES))
-        self.assertEqual(run.evaluation.findings[0].event_sequences, (5,))
+        run = evaluator.evaluate(_log(), reference=_reference())
+        self.assertEqual(set(run.evaluation.scores), set(DISCOVERY_SCORE_AXES))
+        self.assertEqual(run.evaluation.scores["understanding_after"], 0.5)
+        self.assertIsNone(run.evaluation.scores["understanding_gain"])
+        self.assertEqual(run.evaluation.details["understanding"]["status"], "final_only")
         self.assertNotIn("active_pass", run.evaluation.scores)
         self.assertNotIn("predictive_model_pass", run.evaluation.scores)
         self.assertEqual(backend.request.metadata["purpose"], "post_hoc_transcript_evaluation")
@@ -169,12 +191,12 @@ class LLMEvaluatorTests(unittest.TestCase):
             llm_evaluation_from_json(json.dumps(out_of_range))
 
     def test_unknown_event_reference_is_rejected(self):
-        result = _valid_result()
-        result["findings"][0]["event_sequences"] = [999]
+        result = _discovery_result()
+        result["findings"] = [{"code": "F4", "rationale": "A claimed relation is unsupported.", "event_sequences": [999]}]
         backend = _Backend(json.dumps(result))
         evaluator = PostHocLLMEvaluator(backend)
         with self.assertRaises(LLMEvaluatorOutputError) as raised:
-            evaluator.evaluate(_log())
+            evaluator.evaluate(_log(), reference=_reference())
         self.assertIs(raised.exception.request, backend.request)
         self.assertEqual(raised.exception.response.text, json.dumps(result))
 
@@ -182,7 +204,7 @@ class LLMEvaluatorTests(unittest.TestCase):
         backend = _Backend("not-json")
         evaluator = PostHocLLMEvaluator(backend)
         with self.assertRaises(LLMEvaluatorOutputError) as raised:
-            evaluator.evaluate(_log())
+            evaluator.evaluate(_log(), reference=_reference())
         self.assertIs(raised.exception.request, backend.request)
         self.assertEqual(raised.exception.response.text, "not-json")
 

@@ -148,20 +148,28 @@ class CaseDefinition:
     background: str
     initial_observations: Tuple[str, ...]
     resources: ResourceCatalog
-    budget: int
+    budget: Optional[int]
     confidence_threshold: float
     track: BenchmarkTrack
     max_hypotheses: int = 6
+    count_all_experiment_attempts: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.track, BenchmarkTrack):
             raise ValueError("track must be a BenchmarkTrack")
+        if not isinstance(self.count_all_experiment_attempts, bool):
+            raise ValueError("count_all_experiment_attempts must be boolean")
         if not self.case_id.strip() or not self.title.strip() or not self.background.strip():
             raise ValueError("case_id, title, and background must be non-empty")
-        if self.budget < 1:
-            raise ValueError("experiment budget must be positive")
+        if self.budget is not None and (
+            isinstance(self.budget, bool) or not isinstance(self.budget, int)
+            or self.budget < 1
+        ):
+            raise ValueError("experiment budget must be positive or None for unlimited")
         if not 0.0 < self.confidence_threshold <= 1.0:
             raise ValueError("confidence_threshold must be in (0, 1]")
+        if self.budget is None and self.confidence_threshold == 1.0:
+            raise ValueError("unlimited confidence stopping requires a threshold below 1")
         if self.max_hypotheses < 2:
             raise ValueError("max_hypotheses must allow at least two hypotheses")
 
@@ -399,7 +407,7 @@ class ExperimentTurn:
 class EpisodeView:
     case: CaseDefinition
     attempts_used: int
-    attempts_remaining: int
+    attempts_remaining: Optional[int]
     turns: Tuple[ExperimentTurn, ...]
 
 

@@ -17,6 +17,20 @@ from .science_card import ScienceSource
 
 
 TEMPORAL_ADMISSION_REVIEW_SCHEMA = "role_benchmark.temporal_admission_review.v1"
+TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2 = "role_benchmark.temporal_admission_review.v2"
+TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2 = (
+    "source_coverage",
+    "quantitative_relation_support",
+    "formula_fidelity",
+    "parameter_support",
+    "control_support",
+    "readout_support",
+    "domain_support",
+    "anchor_accuracy",
+)
+TEMPORAL_ADMISSION_CHECK_STATUSES_V2 = frozenset(
+    {"pass", "fail", "not_assessable"}
+)
 _DECISIONS = {
     "eligible_for_temporal_case",
     "card_revision_required",
@@ -56,10 +70,12 @@ class TemporalAdmissionReview:
     reviewer: str
     decision: str
     assessment: str
-    source_support_confirmed: bool
-    cartesian_domain_supported: bool
-    deterministic_central_value_appropriate: bool
+    source_support_confirmed: Optional[bool]
+    cartesian_domain_supported: Optional[bool]
+    deterministic_central_value_appropriate: Optional[bool]
     issues: Tuple[TemporalAdmissionIssue, ...]
+    schema: str = TEMPORAL_ADMISSION_REVIEW_SCHEMA
+    precompile_checks: Optional[Mapping[str, str]] = None
 
 
 @dataclass(frozen=True)
@@ -110,13 +126,13 @@ def _source(value: Any, path: str) -> ScienceSource:
     return ScienceSource(
         citation=_text(item["citation"], path + ".citation"),
         journal_doi=_text(item["journal_doi"], path + ".journal_doi"),
-        arxiv_versioned_id=_text(
+        arxiv_versioned_id=None if item["arxiv_versioned_id"] is None else _text(
             item["arxiv_versioned_id"], path + ".arxiv_versioned_id"
         ),
     )
 
 
-def parse_temporal_admission_review_payload(payload: Any) -> TemporalAdmissionReview:
+def parse_temporal_admission_review_payload(payload: Any, *, max_readouts: int = 2) -> TemporalAdmissionReview:
     root = _object(
         payload,
         "$",
@@ -132,27 +148,51 @@ def parse_temporal_admission_review_payload(payload: Any) -> TemporalAdmissionRe
             "issues",
         },
     )
-    if root["schema"] != TEMPORAL_ADMISSION_REVIEW_SCHEMA:
+    schema = root["schema"]
+    if not isinstance(schema, str) or schema not in (
+        TEMPORAL_ADMISSION_REVIEW_SCHEMA,
+        TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2,
+    ):
         _error("$.schema", "unsupported admission-review schema")
-    checks = _object(
-        root["checks"],
-        "$.checks",
-        {
-            "source_support_confirmed",
-            "cartesian_domain_supported",
-            "deterministic_central_value_appropriate",
-        },
-    )
-    for name, value in checks.items():
-        if not isinstance(value, bool):
-            _error("$.checks.%s" % name, "must be a boolean")
+    if schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA:
+        checks = _object(
+            root["checks"],
+            "$.checks",
+            {
+                "source_support_confirmed",
+                "cartesian_domain_supported",
+                "deterministic_central_value_appropriate",
+            },
+        )
+        for name, value in checks.items():
+            if not isinstance(value, bool):
+                _error("$.checks.%s" % name, "must be a boolean")
+        precompile_checks = None
+    else:
+        checks = _object(
+            root["checks"],
+            "$.checks",
+            set(TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2),
+        )
+        for name, value in checks.items():
+            if (
+                not isinstance(value, str)
+                or value not in TEMPORAL_ADMISSION_CHECK_STATUSES_V2
+            ):
+                _error(
+                    "$.checks.%s" % name,
+                    "must be one of pass, fail, or not_assessable",
+                )
+        precompile_checks = {
+            name: checks[name] for name in TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2
+        }
     decision = _text(root["decision"], "$.decision")
     if decision not in _DECISIONS:
         _error("$.decision", "unsupported source-review decision")
     if not isinstance(root["review_material"], dict):
         _error("$.review_material", "must be a minimal ScienceCard object")
     try:
-        parse_minimal_science_card_payload(root["review_material"])
+        parse_minimal_science_card_payload(root["review_material"], max_readouts=max_readouts)
     except MinimalScienceCardError as exc:
         _error(
             "$.review_material",
@@ -202,7 +242,15 @@ def parse_temporal_admission_review_payload(payload: Any) -> TemporalAdmissionRe
             "an eligible decision cannot contain a blocking issue",
             "temporal_admission.decision",
         )
-    if decision == "eligible_for_temporal_case" and not all(checks.values()):
+    all_checks_pass = (
+        all(checks.values())
+        if schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA
+        else all(
+            checks[name] == "pass"
+            for name in TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2
+        )
+    )
+    if decision == "eligible_for_temporal_case" and not all_checks_pass:
         _error(
             "$.checks",
             "an eligible decision requires every source-review check to pass",
@@ -227,12 +275,24 @@ def parse_temporal_admission_review_payload(payload: Any) -> TemporalAdmissionRe
         reviewer=reviewer,
         decision=decision,
         assessment=assessment,
-        source_support_confirmed=checks["source_support_confirmed"],
-        cartesian_domain_supported=checks["cartesian_domain_supported"],
-        deterministic_central_value_appropriate=checks[
-            "deterministic_central_value_appropriate"
-        ],
+        source_support_confirmed=(
+            checks["source_support_confirmed"]
+            if schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA
+            else None
+        ),
+        cartesian_domain_supported=(
+            checks["cartesian_domain_supported"]
+            if schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA
+            else None
+        ),
+        deterministic_central_value_appropriate=(
+            checks["deterministic_central_value_appropriate"]
+            if schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA
+            else None
+        ),
         issues=tuple(issues),
+        schema=schema,
+        precompile_checks=precompile_checks,
     )
 
 
@@ -265,8 +325,8 @@ def _decode_json(text: str) -> Any:
         ) from exc
 
 
-def parse_temporal_admission_review_json(text: str) -> TemporalAdmissionReview:
-    return parse_temporal_admission_review_payload(_decode_json(text))
+def parse_temporal_admission_review_json(text: str, *, max_readouts: int = 2) -> TemporalAdmissionReview:
+    return parse_temporal_admission_review_payload(_decode_json(text), max_readouts=max_readouts)
 
 
 def _source_tuple(source: ScienceSource) -> Tuple[str, str, str]:
@@ -279,6 +339,7 @@ def assess_temporal_admission(
     *,
     paper_id: str,
     source_line_count: int,
+    max_readouts: int = 2,
 ) -> TemporalAdmissionResult:
     """Admit a paper when one independently reviewed relation is source-supported."""
 
@@ -313,7 +374,7 @@ def assess_temporal_admission(
             "temporal_admission.review_identity",
         )
     try:
-        reviewed_card = parse_minimal_science_card_payload(review.review_material)
+        reviewed_card = parse_minimal_science_card_payload(review.review_material, max_readouts=max_readouts)
     except MinimalScienceCardError as exc:
         _error(
             "$.review_material",
@@ -370,8 +431,29 @@ def temporal_admission_review_to_payload(
 ) -> Mapping[str, Any]:
     """Serialize one independent source-review decision."""
 
+    if review.schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA:
+        checks: Mapping[str, Any] = {
+            "source_support_confirmed": review.source_support_confirmed,
+            "cartesian_domain_supported": review.cartesian_domain_supported,
+            "deterministic_central_value_appropriate": (
+                review.deterministic_central_value_appropriate
+            ),
+        }
+    elif review.schema == TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2:
+        if review.precompile_checks is None:
+            _error(
+                "$.checks",
+                "v2 reviews require the eight pre-compile checks",
+            )
+        checks = {
+            name: review.precompile_checks[name]
+            for name in TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2
+        }
+    else:
+        _error("$.schema", "unsupported admission-review schema")
+
     return {
-        "schema": TEMPORAL_ADMISSION_REVIEW_SCHEMA,
+        "schema": review.schema,
         "paper_id": review.paper_id,
         "source": {
             "citation": review.source.citation,
@@ -382,13 +464,7 @@ def temporal_admission_review_to_payload(
         "reviewer": review.reviewer,
         "decision": review.decision,
         "assessment": review.assessment,
-        "checks": {
-            "source_support_confirmed": review.source_support_confirmed,
-            "cartesian_domain_supported": review.cartesian_domain_supported,
-            "deterministic_central_value_appropriate": (
-                review.deterministic_central_value_appropriate
-            ),
-        },
+        "checks": checks,
         "issues": [
             {
                 "code": item.code,
@@ -442,9 +518,46 @@ def temporal_admission_review_request_payload(
     }
 
 
+def temporal_admission_review_v2_request_payload(
+    card: MinimalScienceCard,
+    *,
+    paper_id: str,
+) -> Mapping[str, Any]:
+    """Return a non-approving v2 template for eight pre-compile checks."""
+
+    return {
+        "schema": TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2,
+        "paper_id": paper_id,
+        "source": {
+            "citation": card.source.citation,
+            "journal_doi": card.source.journal_doi,
+            "arxiv_versioned_id": card.source.arxiv_versioned_id,
+        },
+        "review_material": minimal_science_card_to_payload(card),
+        "reviewer": "REQUIRED_INDEPENDENT_SOURCE_REVIEWER",
+        "decision": "ineligible_for_temporal_case",
+        "assessment": "REPLACE_AFTER_CHECKING_THE_SOURCE_AND_EVERY_LINE_RANGE",
+        "checks": {
+            name: "not_assessable"
+            for name in TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2
+        },
+        "issues": [
+            {
+                "code": "review.pending",
+                "detail": "No independent source-review decision has been supplied.",
+                "blocking": True,
+                "line_ranges": [],
+            }
+        ],
+    }
+
+
 __all__ = [
     "AdmissionLineRange",
+    "TEMPORAL_ADMISSION_CHECK_STATUSES_V2",
+    "TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2",
     "TEMPORAL_ADMISSION_REVIEW_SCHEMA",
+    "TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2",
     "TemporalAdmissionError",
     "TemporalAdmissionIssue",
     "TemporalAdmissionResult",
@@ -454,4 +567,5 @@ __all__ = [
     "parse_temporal_admission_review_payload",
     "temporal_admission_review_to_payload",
     "temporal_admission_review_request_payload",
+    "temporal_admission_review_v2_request_payload",
 ]

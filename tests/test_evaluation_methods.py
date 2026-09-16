@@ -60,7 +60,7 @@ class _StaticBackend:
 
 
 class EvaluationMethodTests(unittest.TestCase):
-    def test_every_family_freezes_one_shared_fixed_and_adaptive_budget(self):
+    def test_every_family_has_finite_fixed_and_unlimited_adaptive_budget(self):
         registries = (CASE_SPECS, TEMPORAL_CASE_SPECS)
         for registry in registries:
             for family, spec in registry.items():
@@ -79,10 +79,8 @@ class EvaluationMethodTests(unittest.TestCase):
                         fixed.observation_budget,
                         len(spec.diagnostic_conditions),
                     )
-                    self.assertEqual(
-                        adaptive.observation_budget,
-                        fixed.observation_budget,
-                    )
+                    self.assertIsNone(adaptive.observation_budget)
+                    self.assertFalse(adaptive.require_budget_exhaustion)
                     self.assertLessEqual(fixed.observation_budget, spec.budget)
                     self.assertEqual(len(fixed.fixed_experiments), fixed.observation_budget)
                     self.assertEqual(adaptive.fixed_experiments, ())
@@ -167,11 +165,11 @@ class EvaluationMethodTests(unittest.TestCase):
         adaptive_episode = Episode(
             adaptive.case,
             observation_budget=adaptive.plan.observation_budget,
-            require_budget_exhaustion=True,
+            require_budget_exhaustion=False,
         )
-        with self.assertRaises(EpisodeProtocolError) as raised:
-            adaptive_episode.apply(final_action)
-        self.assertEqual(raised.exception.code, "observation_budget_not_exhausted")
+        self.assertIsNone(adaptive_episode.view().attempts_remaining)
+        adaptive_episode.apply(final_action)
+        self.assertTrue(adaptive_episode.outcome.active_pass)
 
         fixed = prepare_evaluation_case(case, spec, FIXED_EXPERIMENTAL_DESIGN)
         fixed_episode = Episode(
@@ -223,12 +221,10 @@ class EvaluationMethodTests(unittest.TestCase):
         self.assertEqual(run.outcome.attempts_used, len(spec.diagnostic_conditions))
         self.assertEqual(replay.outcome, run.outcome)
 
-    def test_nonlegal_adaptive_attempts_cannot_satisfy_observation_budget(self):
+    def test_nonlegal_finite_budget_attempts_exhaust_budget_and_allow_final(self):
         spec = CASE_SPECS["pendulum"]
         raw_case = make_case("pendulum", "historical")
-        prepared = prepare_evaluation_case(
-            raw_case, spec, ADAPTIVE_EXPERIMENTAL_DESIGN
-        )
+        budget = len(spec.diagnostic_conditions)
         portfolio = HypothesisPortfolio(
             (
                 Hypothesis("H1", "First competing relation.", 0.5),
@@ -252,22 +248,86 @@ class EvaluationMethodTests(unittest.TestCase):
             ),
         )
         episode = Episode(
-            prepared.case,
-            observation_budget=prepared.plan.observation_budget,
+            raw_case,
+            observation_budget=budget,
             require_budget_exhaustion=True,
         )
-        for _ in range(prepared.plan.observation_budget):
+        for _ in range(budget):
             episode.apply(invalid)
         with self.assertRaises(EpisodeProtocolError) as raised:
-            episode.apply(
-                _truth_action(spec, "historical", raw_case.definition.track)
-            )
+            episode.apply(invalid)
         self.assertEqual(
-            raised.exception.code,
-            "valid_observation_budget_not_met",
+            raised.exception.code, "experiment_budget_exhausted"
+        )
+        episode.apply(
+            _truth_action(spec, "historical", raw_case.definition.track)
+        )
+        self.assertTrue(episode.outcome.protocol_completed)
+        self.assertTrue(episode.outcome.evaluation.success)
+        self.assertEqual(
+            episode.outcome.attempts_used, budget
         )
 
-    def test_adaptive_early_final_is_logged_as_protocol_failure(self):
+    def test_mixed_valid_and_out_of_range_attempts_allow_final_and_replay(self):
+        spec = CASE_SPECS["pendulum"]
+        raw_case = make_case("pendulum", "historical")
+        budget = len(spec.diagnostic_conditions)
+        portfolio = HypothesisPortfolio((
+            Hypothesis("H1", "First competing relation.", 0.5),
+            Hypothesis("H2", "Second competing relation.", 0.5),
+        ))
+        readouts = tuple(item.name for item in spec.readouts)
+        actions = []
+        for index in range(budget):
+            controls = dict(spec.diagnostic_conditions[index])
+            if index == 0:
+                controls["length_m"] = -1.0
+            actions.append(PlayerAction.propose_experiment(
+                portfolio,
+                ExperimentProposal(
+                    intent="Measure the controlled response.",
+                    apparatus=spec.apparatus_name,
+                    controls=controls,
+                    readouts=readouts,
+                    forecasts={
+                        item.hypothesis_id: {name: 0.0 for name in readouts}
+                        for item in portfolio.hypotheses
+                    },
+                ),
+            ))
+        actions.append(_truth_action(spec, "historical", raw_case.definition.track))
+
+        class SequenceBackend(_StaticBackend):
+            def generate(self, request):
+                self.action = actions[len(self.requests)]
+                return super().generate(request)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "adaptive-attempt-budget.jsonl"
+            run = run_llm_episode(
+                SequenceBackend(None), raw_case, str(path),
+                max_actions=len(actions),
+                observation_budget=budget,
+                require_budget_exhaustion=True,
+            )
+            replay = replay_run_log(str(path), raw_case)
+        self.assertTrue(run.outcome.protocol_completed)
+        self.assertTrue(run.outcome.evaluation.success)
+        self.assertEqual(run.outcome.attempts_used, budget)
+        self.assertEqual(replay.outcome, run.outcome)
+
+    def test_adaptive_note_describes_unlimited_confidence_stopping(self):
+        spec = CASE_SPECS["pendulum"]
+        prepared = prepare_evaluation_case(
+            make_case("pendulum", "historical"), spec, ADAPTIVE_EXPERIMENTAL_DESIGN
+        )
+        note = prepared.case.definition.resources.notes[-1]
+        self.assertIn("experiment attempts", note)
+        self.assertIn("budget=null", note)
+        self.assertIn("strictly exceeds", note)
+        self.assertIn("no experiment budget or action-count limit", note)
+
+    def test_adaptive_confident_early_final_is_allowed_and_replays(self):
         spec = CASE_SPECS["pendulum"]
         raw_case = make_case("pendulum", "historical")
         prepared = prepare_evaluation_case(
@@ -282,20 +342,18 @@ class EvaluationMethodTests(unittest.TestCase):
                 backend,
                 prepared.case,
                 str(path),
-                max_actions=1,
+                max_actions=None,
                 observation_budget=prepared.plan.observation_budget,
-                require_budget_exhaustion=True,
+                require_budget_exhaustion=False,
                 run_metadata={
                     "evaluation_method": ADAPTIVE_EXPERIMENTAL_DESIGN
                 },
             )
             replay = replay_run_log(str(path), prepared.case)
 
-        self.assertIs(run.outcome.termination.kind, TerminationKind.ACTION_REJECTED)
-        self.assertEqual(
-            run.outcome.termination.code,
-            "observation_budget_not_exhausted",
-        )
+        self.assertTrue(run.outcome.active_pass)
+        self.assertTrue(run.outcome.protocol_completed)
+        self.assertEqual(run.outcome.attempts_used, 0)
         self.assertEqual(replay.outcome, run.outcome)
 
     def test_evaluation_method_names_are_the_frozen_public_terminology(self):

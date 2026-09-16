@@ -18,8 +18,11 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Set
 
 
 EXPRESSION_MODEL = "expression"
-EXPRESSION_MAX_DEPTH = 24
-EXPRESSION_MAX_NODES = 256
+EXPRESSION_LANGUAGE_VERSION = "scigame.expression.v2"
+# Resource limits, not a symbolic-complexity objective. Frozen runs retain
+# their own interpreter and original limits.
+EXPRESSION_MAX_DEPTH = 64
+EXPRESSION_MAX_NODES = 1024
 EXPRESSION_OPERATOR_ARITIES = MappingProxyType({
     "add": (2, None),
     "subtract": (2, 2),
@@ -32,8 +35,55 @@ EXPRESSION_OPERATOR_ARITIES = MappingProxyType({
     "sin": (1, 1),
     "maximum": (2, None),
     "step": (1, 1),
+    "erf": (1, 1),
+    "erfc": (1, 1),
+    "cos": (1, 1),
+    "tan": (1, 1),
+    "asin": (1, 1),
+    "acos": (1, 1),
+    "atan": (1, 1),
+    "atan2": (2, 2),
+    "sinh": (1, 1),
+    "cosh": (1, 1),
+    "tanh": (1, 1),
+    "asinh": (1, 1),
+    "acosh": (1, 1),
+    "atanh": (1, 1),
+    "sqrt": (1, 1),
+    "cbrt": (1, 1),
+    "abs": (1, 1),
+    "minimum": (2, None),
+    "expm1": (1, 1),
+    "log1p": (1, 1),
+    "log2": (1, 1),
+    "log10": (1, 1),
+    "hypot": (2, None),
+    "floor": (1, 1),
+    "ceil": (1, 1),
+    "round": (1, 1),
+    "sign": (1, 1),
 })
 EXPRESSION_OPERATORS = tuple(EXPRESSION_OPERATOR_ARITIES)
+
+
+def _cbrt(value: float) -> float:
+    # math.cbrt was added in Python 3.11; the project also supports 3.9/3.10.
+    if hasattr(math, "cbrt"):
+        return math.cbrt(value)
+    return math.copysign(abs(value) ** (1.0 / 3.0), value)
+
+
+_ADDITIONAL_UNARY_FUNCTIONS = MappingProxyType({
+    "cos": math.cos, "tan": math.tan,
+    "asin": math.asin, "acos": math.acos, "atan": math.atan,
+    "sinh": math.sinh, "cosh": math.cosh, "tanh": math.tanh,
+    "asinh": math.asinh, "acosh": math.acosh, "atanh": math.atanh,
+    "sqrt": math.sqrt, "cbrt": _cbrt, "abs": abs,
+    "expm1": math.expm1, "log1p": math.log1p,
+    "log2": math.log2, "log10": math.log10,
+    "floor": math.floor, "ceil": math.ceil, "round": round,
+    "sign": lambda value: float((value > 0) - (value < 0)),
+})
 
 
 class ExpressionError(ValueError):
@@ -43,7 +93,10 @@ class ExpressionError(ValueError):
 def _number(value: Any, path: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ExpressionError("%s must be a finite number" % path)
-    result = float(value)
+    try:
+        result = float(value)
+    except OverflowError as exc:
+        raise ExpressionError("%s must be a finite number" % path) from exc
     if not math.isfinite(result):
         raise ExpressionError("%s must be a finite number" % path)
     return result
@@ -101,7 +154,7 @@ def _validate_expression(
             "%s must contain exactly {'var'}, {'param'}, or {'op', 'args'}" % path
         )
     operator = expression["op"]
-    if operator not in EXPRESSION_OPERATOR_ARITIES:
+    if not isinstance(operator, str) or operator not in EXPRESSION_OPERATOR_ARITIES:
         raise ExpressionError("%s.op is unsupported" % path)
     arguments = expression["args"]
     if not isinstance(arguments, (list, tuple)):
@@ -172,7 +225,10 @@ def validate_expression_program(
         else None
     )
     nodes = [0]
-    for output, expression in outputs.items():
+    # JSON object order is not semantic and canonical run logs sort keys.
+    # Keep the first validation error reproducible after a log round trip.
+    for output in sorted(outputs):
+        expression = outputs[output]
         _validate_expression(
             expression,
             allowed_variables=allowed,
@@ -215,10 +271,28 @@ def _evaluate(expression: Any, variables: Mapping[str, float]) -> float:
             result = math.log(values[0])
         elif operator == "sin":
             result = math.sin(values[0])
+        elif operator == "erf":
+            result = math.erf(values[0])
+        elif operator == "erfc":
+            # Evaluate directly to preserve small positive tail probabilities.
+            result = math.erfc(values[0])
         elif operator == "maximum":
             result = max(values)
-        else:
+        elif operator == "step":
             result = 1.0 if values[0] > 0.0 else 0.0
+        elif operator in _ADDITIONAL_UNARY_FUNCTIONS:
+            result = _ADDITIONAL_UNARY_FUNCTIONS[operator](values[0])
+        elif operator == "atan2":
+            # Standard atan2(y, x), in radians.
+            result = math.atan2(values[0], values[1])
+        elif operator == "hypot":
+            result = math.hypot(*values)
+        elif operator == "minimum":
+            result = min(values)
+        else:
+            raise ExpressionError("unsupported expression operator")
+    except ExpressionError:
+        raise
     except (ArithmeticError, OverflowError, ValueError) as exc:
         raise ExpressionError("expression is undefined for these controls") from exc
     if isinstance(result, complex) or not math.isfinite(float(result)):
@@ -241,13 +315,14 @@ def evaluate_expression_program(
         required_outputs=required_outputs,
     )
     return {
-        output: _evaluate(expression, controls)
-        for output, expression in parameters["outputs"].items()
+        output: _evaluate(parameters["outputs"][output], controls)
+        for output in sorted(parameters["outputs"])
     }
 
 
 __all__ = [
     "EXPRESSION_MODEL",
+    "EXPRESSION_LANGUAGE_VERSION",
     "EXPRESSION_MAX_DEPTH",
     "EXPRESSION_MAX_NODES",
     "EXPRESSION_OPERATOR_ARITIES",

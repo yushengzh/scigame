@@ -1,9 +1,9 @@
-"""Post-hoc LLM evaluation of a completed observable episode transcript.
+"""One-call scientific understanding evaluation of a completed episode.
 
 The case-owned ``FinalEvaluator`` remains the authoritative scientific scorer.
-This module adds separately named, exploratory process/result ratings after the
-Player--Oracle interaction has ended.  It never changes ``predictive_model_pass``
-or ``active_pass`` and it never requires hidden chain-of-thought.
+The discovery judge measures expressed understanding against an active-world
+reference and reports observable scientific defects. Historical six-axis
+record readers remain available without a callable historical prompt path.
 """
 
 from __future__ import annotations
@@ -20,13 +20,27 @@ from .llm import (
     GenerationResponse,
     Message,
     TextGenerationBackend,
+    _safe_transport_failure_detail,
     generation_request_to_payload,
+    validate_generation_completion,
 )
 from .runlog import LoadedRunLog
 from .wire import WireDecodeError, canonical_json_dumps, strict_json_loads
+from .discovery_evaluation import (DISCOVERY_PROMPT_VERSION, DISCOVERY_INSTRUCTION,
+    discovery_json_schema, discovery_projection, decode_discovery_evaluation)
 
 
 LLM_EVALUATION_SCHEMA = "role_benchmark.llm_transcript_evaluation"
+
+# Historical record identifiers only; they are not selectable evaluator prompts.
+EVALUATOR_PROMPT_VERSION_V1 = "role_benchmark.evaluator_prompt.v1"
+EVALUATOR_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.evaluator_prompt.v2_json_hardened"
+)
+DEFAULT_EVALUATOR_PROMPT_VERSION = DISCOVERY_PROMPT_VERSION
+DISCOVERY_SCORE_AXES: Tuple[str, ...] = (
+    "understanding_before", "understanding_after", "understanding_gain",
+)
 MAX_LLM_EVALUATION_OUTPUT_BYTES = 262_144
 MAX_EVALUATOR_SUMMARY_CHARACTERS = 4_096
 MAX_FINDING_MESSAGE_CHARACTERS = 2_048
@@ -132,26 +146,10 @@ _LLM_EVALUATION_JSON_SCHEMA: Mapping[str, Any] = {
     },
 }
 
-_SYSTEM_INSTRUCTION = """You are a post-hoc evaluator of an interactive scientific benchmark.
-The Player--Oracle episode is already complete. Score only the observable record
-provided by the user; never infer or request hidden chain-of-thought. The
-case-owned deterministic predictive evaluation is authoritative scientific
-ground truth. Your ratings are separate diagnostics and must not replace,
-average with, or reinterpret predictive_model_pass or active_pass.
-
-For each axis return a number in [0,1], or null when the observable record is
-insufficient to score it:
-- experiment_design: whether requested experiments were relevant and discriminative;
-- evidence_use: whether conclusions tracked the returned evidence;
-- hypothesis_revision: whether support changed appropriately after evidence;
-- stopping_decision: whether finalization or termination was justified by the record;
-- claim_evidence_consistency: whether the final claim, if any, matches observed evidence;
-- explanation_quality: whether the submitted explanation, if any, is concise and faithful.
-
-Findings must identify concrete observable errors and cite sequence numbers from
-the supplied transcript. Return exactly one JSON object matching the schema,
-with no Markdown, hidden reasoning, overall score, pass/fail field, or extra keys.
-"""
+def _evaluator_prompt_text(prompt_version: str) -> str:
+    if prompt_version != DISCOVERY_PROMPT_VERSION:
+        raise ValueError("unsupported Evaluator prompt_version %r" % prompt_version)
+    return DISCOVERY_INSTRUCTION
 
 
 class LLMEvaluatorError(RuntimeError):
@@ -209,6 +207,7 @@ class LLMTranscriptEvaluation:
     scores: Mapping[str, Optional[float]]
     findings: Tuple[LLMEvaluatorFinding, ...]
     summary: str
+    details: Optional[Mapping[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -219,7 +218,7 @@ class LLMEvaluatorRun:
 
 
 def llm_evaluation_json_schema() -> Mapping[str, Any]:
-    """Return a detached copy of the evaluator's strict JSON Schema."""
+    """Return the schema needed to read historical six-axis evaluator records."""
 
     return strict_json_loads(canonical_json_dumps(_LLM_EVALUATION_JSON_SCHEMA))
 
@@ -268,7 +267,7 @@ def llm_evaluation_from_json(
     *,
     max_bytes: int = MAX_LLM_EVALUATION_OUTPUT_BYTES,
 ) -> LLMTranscriptEvaluation:
-    """Strictly decode one post-hoc evaluator result."""
+    """Strictly decode a historical six-axis result without reinterpreting it."""
 
     value = strict_json_loads(text, max_bytes=max_bytes)
     if not isinstance(value, dict):
@@ -376,7 +375,7 @@ def llm_evaluation_from_json(
 
 
 def evaluator_transcript_projection(log: LoadedRunLog) -> Mapping[str, Any]:
-    """Project one sealed log onto the observable evidence needed by the Judge."""
+    """Read the original observable view of a historical six-axis evaluation."""
 
     if not isinstance(log, LoadedRunLog):
         raise ValueError("log must be a LoadedRunLog")
@@ -414,16 +413,29 @@ def build_evaluator_generation_request(
     log: LoadedRunLog,
     *,
     config: GenerationConfig,
+    prompt_version: str = DEFAULT_EVALUATOR_PROMPT_VERSION,
+    reference: Optional[Mapping[str, Any]] = None,
 ) -> GenerationRequest:
     """Build the exact one-call request for post-hoc transcript evaluation."""
 
     if not isinstance(config, GenerationConfig):
         raise ValueError("config must be GenerationConfig")
-    schema = llm_evaluation_json_schema()
-    projection = evaluator_transcript_projection(log)
-    system = _SYSTEM_INSTRUCTION + "\nEvaluator JSON Schema:\n" + canonical_json_dumps(
-        schema
+    system_instruction = _evaluator_prompt_text(prompt_version)
+    schema = discovery_json_schema()
+    projection = discovery_projection(log, reference)
+    system = (
+        system_instruction
+        + "\nEvaluator JSON Schema:\n"
+        + canonical_json_dumps(schema)
     )
+    metadata = {
+        "evaluation_schema": LLM_EVALUATION_SCHEMA,
+        "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
+        "run_id": log.run_id,
+        "purpose": "post_hoc_transcript_evaluation",
+    }
+    metadata["prompt_version"] = prompt_version
+    metadata["require_structured_output"] = True
     return GenerationRequest(
         messages=(
             Message("system", system),
@@ -431,19 +443,14 @@ def build_evaluator_generation_request(
         ),
         response_schema=schema,
         config=config,
-        metadata={
-            "evaluation_schema": LLM_EVALUATION_SCHEMA,
-            "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
-            "run_id": log.run_id,
-            "purpose": "post_hoc_transcript_evaluation",
-        },
+        metadata=metadata,
     )
 
 
 def llm_evaluation_to_payload(
     evaluation: LLMTranscriptEvaluation,
 ) -> Mapping[str, Any]:
-    return {
+    result = {
         "scores": dict(evaluation.scores),
         "findings": [
             {
@@ -457,6 +464,9 @@ def llm_evaluation_to_payload(
         ],
         "summary": evaluation.summary,
     }
+    if evaluation.details is not None:
+        result["details"] = evaluation.details
+    return result
 
 
 class PostHocLLMEvaluator:
@@ -468,6 +478,7 @@ class PostHocLLMEvaluator:
         *,
         config: Optional[GenerationConfig] = None,
         max_output_bytes: int = MAX_LLM_EVALUATION_OUTPUT_BYTES,
+        prompt_version: str = DEFAULT_EVALUATOR_PROMPT_VERSION,
     ) -> None:
         if not callable(getattr(backend, "generate", None)):
             raise ValueError("backend must provide a callable generate method")
@@ -483,18 +494,26 @@ class PostHocLLMEvaluator:
                 "max_output_bytes must be between 1 and %d"
                 % MAX_LLM_EVALUATION_OUTPUT_BYTES
             )
+        _evaluator_prompt_text(prompt_version)
         self._backend = backend
         self._config = GenerationConfig() if config is None else config
         self._max_output_bytes = max_output_bytes
+        self._prompt_version = prompt_version
 
-    def evaluate(self, log: LoadedRunLog) -> LLMEvaluatorRun:
-        request = build_evaluator_generation_request(log, config=self._config)
+    def evaluate(self, log: LoadedRunLog, *, reference=None) -> LLMEvaluatorRun:
+        request = build_evaluator_generation_request(
+            log,
+            config=self._config,
+            prompt_version=self._prompt_version,
+            reference=reference,
+        )
         request_payload = generation_request_to_payload(request)
         try:
             response = self._backend.generate(request)
         except Exception as exc:
             raise LLMEvaluatorTransportError(
-                "LLM evaluator backend failed: %s" % type(exc).__name__,
+                "LLM evaluator backend failed: %s"
+                % _safe_transport_failure_detail(exc),
                 request=request,
             ) from exc
         if not isinstance(response, GenerationResponse):
@@ -509,9 +528,17 @@ class PostHocLLMEvaluator:
                 response=response,
             )
         try:
-            evaluation = llm_evaluation_from_json(
-                response.text,
+            validate_generation_completion(response)
+            payload = decode_discovery_evaluation(
+                response.text, discovery_projection(log, reference),
                 max_bytes=self._max_output_bytes,
+            )
+            understanding = payload["understanding"]
+            evaluation = LLMTranscriptEvaluation(
+                scores={"understanding_before": understanding["before_score"],
+                        "understanding_after": understanding["after_score"],
+                        "understanding_gain": understanding["delta"]},
+                findings=(), summary=payload["summary"], details=payload,
             )
         except WireDecodeError as exc:
             raise LLMEvaluatorOutputError(
@@ -520,24 +547,6 @@ class PostHocLLMEvaluator:
                 response=response,
             ) from exc
 
-        available_sequences = {
-            item["sequence"]
-            for item in evaluator_transcript_projection(log)["observable_transcript"]
-        }
-        for finding_index, finding in enumerate(evaluation.findings):
-            unknown = set(finding.event_sequences) - available_sequences
-            if unknown:
-                error = _wire_error(
-                    "unknown_reference",
-                    "$.findings[%d].event_sequences" % finding_index,
-                    "unknown event sequence(s): %s"
-                    % ", ".join(str(value) for value in sorted(unknown)),
-                )
-                raise LLMEvaluatorOutputError(
-                    error,
-                    request=request,
-                    response=response,
-                )
         return LLMEvaluatorRun(
             request=request,
             response=response,
@@ -546,7 +555,11 @@ class PostHocLLMEvaluator:
 
 
 __all__ = [
+    "DEFAULT_EVALUATOR_PROMPT_VERSION",
+    "DISCOVERY_SCORE_AXES",
     "EVALUATOR_FINDING_STAGES",
+    "EVALUATOR_PROMPT_VERSION_V1",
+    "EVALUATOR_PROMPT_VERSION_V2_JSON_HARDENED",
     "EVALUATOR_SCORE_AXES",
     "LLM_EVALUATION_SCHEMA",
     "LLMEvaluatorError",

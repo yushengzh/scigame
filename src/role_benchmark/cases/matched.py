@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from role_benchmark.expression import (
+    EXPRESSION_LANGUAGE_VERSION,
+    EXPRESSION_MAX_DEPTH,
+    EXPRESSION_MAX_NODES,
     EXPRESSION_MODEL,
     EXPRESSION_OPERATORS,
     ExpressionError,
@@ -77,6 +80,7 @@ class IdentificationParameterSpec:
     unit: str
     minimum: Optional[float] = None
     maximum: Optional[float] = None
+    allowed_values: Tuple[float, ...] = ()
 
     def __post_init__(self) -> None:
         if (
@@ -105,6 +109,17 @@ class IdentificationParameterSpec:
             raise ValueError(
                 "identification parameter minimum must be below maximum"
             )
+        for value in self.allowed_values:
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or (self.minimum is not None and value < self.minimum)
+                or (self.maximum is not None and value > self.maximum)
+            ):
+                raise ValueError("identification allowed values must be finite and within bounds")
+        if len(set(self.allowed_values)) != len(self.allowed_values):
+            raise ValueError("identification allowed values must be unique")
 
     def contains(self, value: float) -> bool:
         if (
@@ -115,7 +130,8 @@ class IdentificationParameterSpec:
             return False
         numeric = float(value)
         return (
-            (self.minimum is None or numeric >= float(self.minimum))
+            (not self.allowed_values or numeric in self.allowed_values)
+            and (self.minimum is None or numeric >= float(self.minimum))
             and (self.maximum is None or numeric <= float(self.maximum))
         )
 
@@ -152,6 +168,7 @@ class MatchedFamilySpec:
     relative_tolerance: float = 0.05
     absolute_tolerances: Mapping[str, float] = field(default_factory=dict)
     identification_predict: Optional[PredictionFunction] = None
+    case_id_includes_track: bool = False
 
     def __post_init__(self) -> None:
         validate_matched_family_spec(self)
@@ -270,6 +287,8 @@ def _absolute_tolerance(spec: MatchedFamilySpec, readout: str) -> float:
 
 
 def _parameter_domain_text(parameter: IdentificationParameterSpec) -> str:
+    if parameter.allowed_values:
+        return "{" + ", ".join("%g" % value for value in parameter.allowed_values) + "}"
     if parameter.minimum is None and parameter.maximum is None:
         return "any finite real value"
     if parameter.minimum is None:
@@ -296,11 +315,22 @@ def _resources(spec: MatchedFamilySpec, track: BenchmarkTrack) -> ResourceCatalo
         "with exactly these readouts: %s. EXPR is the expression format shared "
         "across all benchmark families: a JSON arithmetic tree over public "
         "controls. Materialize fitted constants "
-        "as finite JSON numbers. Supported operators are: %s."
+        "as finite JSON numbers. Supported operators are: %s. "
+        "Expression language: %s. The total expression size across readouts "
+        "must not exceed %d nodes, with root depth zero and maximum depth %d. "
+        "Functions are real-valued. Trigonometric input angles and inverse-"
+        "trigonometric output angles are in radians. "
+        "atan2 uses arguments (y, x); cbrt is the real cube root. "
+        "round rounds to the nearest integer with ties to even. "
+        "step(x) is 1 for x > 0 and 0 otherwise; sign(0) is 0. "
+        "Undefined or non-finite values are invalid, not clipped or repaired."
         % (
             EXPRESSION_MODEL,
             required_outputs,
             ", ".join(EXPRESSION_OPERATORS),
+            EXPRESSION_LANGUAGE_VERSION,
+            EXPRESSION_MAX_NODES,
+            EXPRESSION_MAX_DEPTH,
         )
     )
     notes = spec.common_fixed_conditions + spec.common_notes + (submission_note,)
@@ -500,6 +530,8 @@ def make_matched_case(
     if spec.swap_public_instance_ids:
         world_index = 1 - world_index
     case_id = "%s.instance_%d" % (spec.case_id_prefix, world_index + 1)
+    if spec.case_id_includes_track:
+        case_id = "%s.%s" % (case_id, track.value)
     definition = CaseDefinition(
         case_id=case_id,
         track=track,

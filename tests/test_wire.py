@@ -13,9 +13,12 @@ from role_benchmark.models import (
 )
 from role_benchmark.protocols import CaseOracle
 from role_benchmark.wire import (
+    DEFAULT_MAX_ACTION_BYTES,
     WireDecodeError,
     WireEncodeError,
     canonical_json_dumps,
+    episode_view_from_json,
+    episode_view_from_payload,
     episode_view_to_json,
     episode_view_to_payload,
     player_action_from_json,
@@ -96,6 +99,26 @@ class WireEncodingTest(unittest.TestCase):
         self.assertNotIn("world_model", first)
         self.assertNotIn("evaluator", first)
         self.assertNotIn("_truth", first)
+        self.assertEqual(
+            episode_view_to_payload(episode_view_from_json(first)), payload
+        )
+
+    def test_episode_view_decoder_is_strict_and_checks_public_invariants(self):
+        payload = episode_view_to_payload(Episode(make_pendulum_case()).view())
+        decoded = episode_view_from_payload(payload)
+        self.assertEqual(episode_view_to_payload(decoded), payload)
+
+        payload["unknown"] = True
+        with self.assertRaises(WireDecodeError) as context:
+            episode_view_from_payload(payload)
+        self.assertEqual(context.exception.code, "unknown_field")
+
+        del payload["unknown"]
+        payload["attempts_used"] = payload["case"]["budget"]
+        payload["attempts_remaining"] = 1
+        with self.assertRaises(WireDecodeError) as context:
+            episode_view_from_payload(payload)
+        self.assertEqual(context.exception.code, "model_invariant")
 
     def test_actions_round_trip_with_one_canonical_shape(self):
         for action in (experiment_action(), final_action()):
@@ -167,7 +190,7 @@ class WireEncodingTest(unittest.TestCase):
 
         nested = []
         cursor = nested
-        for _ in range(70):
+        for _ in range(170):
             child = []
             cursor.append(child)
             cursor = child
@@ -186,7 +209,7 @@ class WireEncodingTest(unittest.TestCase):
         large = PlayerAction.submit_final(
             portfolio(0.95),
             FinalSubmission(
-                explanation="x" * 70_000,
+                explanation="x" * DEFAULT_MAX_ACTION_BYTES,
                 hypothesis_id="H1",
                 model="normalized_power_law",
                 parameters={},
@@ -194,8 +217,11 @@ class WireEncodingTest(unittest.TestCase):
         )
         with self.assertRaises(WireEncodeError):
             player_action_to_json(large)
-        text = player_action_to_json(large, max_bytes=100_000)
-        decoded = player_action_from_json(text, max_bytes=100_000)
+        extended_limit = 2 * DEFAULT_MAX_ACTION_BYTES
+        text = player_action_to_json(large, max_bytes=extended_limit)
+        with self.assertRaises(WireDecodeError):
+            player_action_from_json(text)
+        decoded = player_action_from_json(text, max_bytes=extended_limit)
         self.assertEqual(decoded.final.explanation, large.final.explanation)
 
         with self.assertRaises(ValueError):
@@ -239,13 +265,38 @@ class WireDecodingTest(unittest.TestCase):
             "9007199254740993.0": "number_out_of_range",
             "9.007199254740993e15": "number_out_of_range",
             "1e-9999": "number_underflow",
-            "1.234567890123456789": "number_precision_loss",
         }
         for number, code in cases.items():
             with self.subTest(number=number):
                 with self.assertRaises(WireDecodeError) as context:
                     strict_json_loads(number)
                 self.assertEqual(context.exception.code, code)
+
+    def test_parser_rounds_finite_decimal_numbers_to_binary64(self):
+        numbers = (
+            "1.234567890123456789",
+            "0.49362768860345353",
+            "0.49362768860345355",
+            "1.2311046094277448",
+            "1.2150407851047474",
+            "1.7347959557226084",
+            "0.5000278931578313",
+            "-1.234567890123456789e-20",
+        )
+        for number in numbers:
+            with self.subTest(number=number):
+                self.assertEqual(strict_json_loads(number), float(number))
+                text = player_action_to_json(experiment_action()).replace(
+                    '"period_s":2.01', '"period_s":%s' % number
+                )
+                action = player_action_from_json(text)
+                self.assertEqual(
+                    action.experiment.forecasts["H1"]["period_s"],
+                    float(number),
+                )
+                self.assertEqual(
+                    player_action_from_json(player_action_to_json(action)), action
+                )
 
     def test_decoder_rejects_surrogate_keys_and_detaches_nested_input(self):
         with self.assertRaises(WireDecodeError) as context:

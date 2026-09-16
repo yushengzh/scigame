@@ -12,7 +12,12 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
-from role_benchmark import GenerationRequest, GenerationResponse, TokenUsage
+from role_benchmark import (
+    GenerationRequest,
+    GenerationResponse,
+    ProviderTransportError,
+    TokenUsage,
+)
 
 
 DEFAULT_OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
@@ -76,6 +81,7 @@ class OpenAIResponsesBackend:
     """Standard-library OpenAI Responses implementation of TextGenerationBackend."""
 
     binding_id = "case_matrix.openai_responses"
+    supports_strict_action_schema = True
 
     def __init__(
         self,
@@ -129,6 +135,15 @@ class OpenAIResponsesBackend:
             "text": {"format": {"type": "json_object"}},
             "store": False,
         }
+        structured = (request.metadata.get("require_structured_output") is True
+            or request.metadata.get("purpose") in {"present_authoritative_response", "post_hoc_transcript_evaluation"})
+        if structured:
+            if not request.response_schema:
+                raise ValueError("structured output requires a nonempty schema")
+            payload["text"] = {"format": {
+                "type": "json_schema", "name": "scientific_player_action",
+                "strict": True, "schema": dict(request.response_schema),
+            }}
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"
         )
@@ -147,9 +162,9 @@ class OpenAIResponsesBackend:
                 response_body = response.read()
         except urllib.error.HTTPError as exc:
             # Provider bodies and request headers are deliberately not surfaced.
-            raise RuntimeError("provider HTTP status %d" % exc.code) from exc
+            raise ProviderTransportError(http_status=exc.code) from exc
         except urllib.error.URLError as exc:
-            raise RuntimeError("provider connection failed") from exc
+            raise ProviderTransportError(connection_failed=True) from exc
 
         try:
             decoded = json.loads(response_body.decode("utf-8"))
@@ -211,7 +226,9 @@ class OpenAIResponsesBackend:
             ),
             metadata={
                 "binding_id": self.binding_id,
-                "structured_output_transport": "responses_json_object",
+                "structured_output_transport": (
+                    "responses_json_schema_strict" if structured else "responses_json_object"
+                ),
                 "reasoning_effort": self._reasoning_effort,
                 "reasoning_context": "current_turn",
                 "returned_model": returned_model,

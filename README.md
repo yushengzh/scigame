@@ -4,6 +4,8 @@
 
 Player 是接受测评的 LLM。它根据有限背景提出多个工作假设与置信度，选择当前资源允许的实验，并在获得结果后保留、修改、删除或新建假设。Oracle 知道当前 case 的完整真相，检查实验能否执行，并只返回由该真相决定的实验结果。循环持续到 Player 提交最终模型与 rationale 或耗尽实验预算。
 
+**当前 Temporal dataset（2026-09-16）：[Temporal29 v1](docs/TEMPORAL29_DATASET.md)，29 families、28 篇论文、116 cases。** 在 Temporal28 上新增经两名独立 subagent 完整审查的 100001：original GPT‑5.5 Discovery 成功，使用 7 次有效观测。继承目录共有 18 个严格标签，其中旧 90314 因停止规则漏检暂停认可；排除此已知阻断后为 17 个严格项，另有 11 个此前获准保留的 4 次成功项。最新指针为 [`datasets/temporal_latest.json`](datasets/temporal_latest.json)，新实验用 `experiments/run_iclr_main.py prepare --source-group Temporal`，自动采用对应 Fixed‑2/4/8 设计。下文 `run_case_matrix.py` 的 30-family 注册表与既有 Temporal23 结果是各自历史实验入口，不决定本版成员。
+
 ## 研究边界
 
 本框架承载两个不同的评测构念：
@@ -11,13 +13,23 @@ Player 是接受测评的 LLM。它根据有限背景提出多个工作假设与
 - `identification`：公开完整模型族，在有限主动实验下估计未知参数；
 - `discovery`：不公开目标函数族，以所有 task families 共用的表示提交可执行 predictor，并按声明评测域内的 held-out interventions 评分。
 
-公开有限候选族内的选择归入受约束的 identification，不称为 scientific law discovery。当前有 20 个内置 Historical/Counterfactual（H/C）task families，共 80 个公开 development instances；另有 9 个独立注册的 Temporal task families，每个 family 含两个 source-reported conditions，共 36 个公开 development instances。Temporal 的两个 conditions 不是 H/C conditions。每个 condition 均有 `IDENTIFICATION` 和 `DISCOVERY` 两种 task settings，因此合计为 29 个 task families、116 个公开 development instances。Discovery 只公开所有 task families 共用的 `expression` 表示，不公开目标 model class 或 parameter slots。这些 benchmark instances 的 data-generating processes 和 evaluation procedures 均随源码公开，因此属于 public development set，不是 private test set。当前 private test set 数量为 0。
+公开有限候选族内的选择归入受约束的 identification，不称为 scientific law discovery。用于复现早期实验的 `run_case_matrix.py` 提供三个 case-pack 入口：`historical` 含 20 个 Historical/Counterfactual（H/C）families、80 个 cases；`temporal` 合并两批互不重复的 Temporal 资产，含 30 families、120 cases；`both` 是两者并集，含 50 families、200 cases。每个 family 均展开两个 conditions × `IDENTIFICATION`/`DISCOVERY` 两种 task settings，不另外展开 `easy/hard`。旧 9-family registry、21-family release 和早期 160-case 组合只是历史产物，不再是 CLI 选项或推荐入口。Discovery 只公开所有 task families 共用的 `expression` 表示，不公开目标 model class 或 parameter slots。这些 benchmark cases 的 data-generating processes 和 evaluation procedures 均随源码公开，因此属于 public development set，不是 private test set。当前 private test set 数量为 0。
 
-当前主要结果变量是连续的 held-out prediction score：先用每个 readout 的 absolute tolerance 与 relative tolerance 缩放 held-out absolute error，再计算 `1 / (1 + mean scaled error)`；取值范围为 `[0,1]`，越高越好。二元 `predictive_model_pass`、protocol completion 和过程诊断均单独报告，不替代连续主指标。该评分不要求逐字恢复 benchmark reference 的完整公式，也不能由有限测试证明全域规律等价。每次实验还必须预注册各活动假设的数值 forecast；episode 结束后，框架机械计算预测分离度和 evidence-aligned support-weight movement。自然语言 hypotheses 未必互斥完备，因此归一化 `confidence` 只视为 Player 报告的支持权重，不宣称 Bayesian posterior。可选的 post-hoc LLM Evaluator 会另行报告过程/结果诊断，但绝不覆盖确定性科学评分；这些 Judge 轴在完成人工校准前属于 exploratory metrics。历史发现可以提供背景、仪器与问题，但只要允许历史上没有实际执行过的新实验，case 就是一个受历史约束的理想化实验条件，而不是历史档案的逐字重放。
+运行规模统一按 `episodes = cases × selected methods × repeats` 计算。三种 methods、单 repeat 时，`historical`/`temporal`/`both` 分别为 240/360/600 episodes；默认五 repeats 分别为 1,200/1,800/3,000。
 
-P0.1–P0.6 的核心合同及测试已经实现。三种 evaluation methods 为 prior-only baseline、fixed experimental design 和 adaptive experimental design；三者共享最终 predictor 表示、held-out conditions、评分器、生成配置和工具权限。Prior-only baseline 不接收实验观测，fixed 与 adaptive experimental design 使用相同的 family-specific observation budget \(B\)。P0.5 用显式 condition role 将 H/C conditions 与 Temporal source-reported conditions 分开。P0.6 逐 model-profile × Temporal benchmark instance 记录公开日期、model checkpoint 或 snapshot、training-data cutoff、评测时间、联网/检索权限和已知暴露；缺失证据保持 `exposure_unknown`，不得推断为 `unseen` 或 `contamination-free`。
+评价关注 Player 通过合法实验是否找到了科学关系，并形成与证据相符的公开解释。当前标准 case-matrix 默认进行[科学后评估](docs/SCIENTIFIC_POSTEVALUATION.md)：保留二元 `active_pass = protocol_completion && evaluation_success`，独立报告 normalized error、表达式等价、科学理解的起点／终点／增量，并汇总失败 episode 的 F1–F5 多标签分布。各项不加权；当前二元成败仍由协议完成和确定性数值评价决定，不等于已经证明科学关系等价或理解正确。
 
-H/C difficulty variants 是完整的 H/C pairs，不是新增 condition。Curated families 的 easy variant 使用原 counterfactual condition，hard variant 使用 Historical 与原 Counterfactual 机制坐标的中点。四个具有连续机制坐标的 Temporal families 另有独立的 benchmark-authored H/C pack：`self_similar_spreading_radius_ratio`、`statistical_mean_field_effective_detuning`、`stealthy_hyperuniform_localization_scaling` 和 `uamo_lyapunov`。该 pack 的 easy 与 hard counterfactual 分别位于从其固定参考关系到 source-reported comparison relation 的 `0.75` 和 `0.5` 位置；原 Temporal registry 的两个 source-reported conditions 保持不变。Development method pilot `EXP-METHOD-PILOT-001` 的配置已经冻结但尚未运行，见 [`experiments/registrations/EXP-METHOD-PILOT-001/`](experiments/registrations/EXP-METHOD-PILOT-001/)；本文不报告实验结果。
+原 held-out prediction score 保留为 `1 / (1 + mean scaled error)`：每个 readout 的误差按 absolute tolerance 与 relative tolerance 缩放。有限测试点吻合不能证明全域表达式等价；解释 Judge 的语义可靠性也仍需人工一致性验证。每次实验预注册各活动假设的数值 forecast，episode 结束后另报预测分离度和 evidence-aligned support-weight movement。自然语言 hypotheses 未必互斥完备，归一化 `confidence` 只视为 Player 报告的支持权重，不宣称 Bayesian posterior。历史发现可以提供背景、仪器与问题，但只要允许历史上没有实际执行过的新实验，case 就是受历史约束的理想化实验条件，而不是历史档案的逐字重放。
+
+P0.1–P0.7 的核心合同及测试已经实现。三种 evaluation methods 为 prior-only baseline、fixed experimental design 和 adaptive experimental design；三者共享最终 predictor 表示、held-out conditions、评分器、生成配置和工具权限。Prior-only baseline 不接收实验观测，fixed 与 adaptive experimental design 使用相同的 family-specific observation budget \(B\)。P0.5 用显式 condition role 将 H/C conditions 与 Temporal source-reported conditions 分开。P0.6 逐 model-profile × Temporal benchmark instance 记录公开日期、model checkpoint 或 snapshot、training-data cutoff、评测时间、联网/检索权限和已知暴露；缺失证据保持 `exposure_unknown`，不得推断为 `unseen` 或 `contamination-free`。P0.7 提供可分离部署的可信评测服务、Player/Admin 分权、持久化恢复和全 pack 结果 embargo；这不改变当前 private test set 为 0 的事实。
+
+历史 authoring 产物中的 H/C difficulty variants 是完整的 H/C pairs，不是新增 condition：`easy` 使用原 counterfactual condition，`hard` 使用 Historical 与原 Counterfactual 机制坐标的中点。四个 Temporal 主题也留有早期 benchmark-authored H/C 变体产物。这些变体仅用于解释历史 authoring/pilot 记录，不是当前 case-pack 入口。未执行的 development method pilot `EXP-METHOD-PILOT-001` 已随旧 pack 合同归档，见 [`experiments/registrations/EXP-METHOD-PILOT-001/`](experiments/registrations/EXP-METHOD-PILOT-001/)；其旧命令不是当前 runner 入口。
+
+当前总体阶段是 **Phase 0 已完成、旧 Phase 1 临时 agent-simulated run 已作为不完整快照归档，新的标准 API 路径为 `ready`**。截至 2026-09-05，归档的 `EXP-METHOD-PILOT-GPT56-AGENT-001` 快照仍是旧 curated 79/288 个完整 active+Evaluator 单元、另有 3 个当时在途但不计为完成的单元，旧 Temporal 0/72；79 个完成单元为 58 `pass`、18 `scientific_failure`、2 `player_generation_failure` 和 1 `player_protocol_failure`。这些结果文件不删除、不改写，也不通过当前三入口 runner 续跑。下一步是在用户提供 LLM API 参数后先执行精确 1-case smoke，必要时扩为 2 cases，再以新 Experiment ID 启动当前 200-case `both` bench。
+
+`EXP-TEMPORAL-VALIDATION-002` 已按“control 必须是论文中实际设置或操纵的数值量”这一门槛重新检查原候选，并对修订项与替代项执行 admission、compile 及 Identification/Discovery known-truth canary。原 source review 的 11 个 `retain` 只是 provisional decisions，其中 4 个在该门槛下被排除；原 22 项合计排除 6 项。最终 21 个 source-reported families 通过当前模型来源复核和确定性验证，并为 21/21 各冻结一个同单位、单参数 benchmark-authored 第二条件；full-target 与 midpoint 两套构造中的 168 个 source/counterfactual × Identification/Discovery known-truth checks 全部通过。另一批早期 9 个 Temporal families 与这 21 个在 family ID、arXiv、DOI、paper identity 和完整科学接口上均无重复，因此当前 `temporal` 纳入全部 30 个。早期的 9/21 分批、前 20/core 与第 21/extension 标记只是历史产物，不形成当前 CLI 入口或质量分级。midpoint 仅作构造 canary，不增加 benchmark case。这些 Temporal families 仍是模型化来源复核后的 release candidates，尚未完成人工领域专家 release review，也不能据此声称 unseen 或 contamination-resistant。
+
+`DEEPSEEK_API_KEY` 暂时不可用期间，项目另设三个独立 `gpt-5.6-sol` agent，以 capture/replay 方式分别模拟 Player provider、Oracle presentation provider 和 post-hoc Evaluator provider。公开 pendulum plumbing smoke 已完成，但产物明确属于非 API 等价 sandbox，不计入 `EXP-METHOD-PILOT-001`，也不改变标准 API credential 路径的 `ready` 状态。正式 pipeline 仍使用冻结的标准 API 调用流程。运行边界、复现命令和产物见 [`docs/gpt56_agent_provider_sandbox.md`](docs/gpt56_agent_provider_sandbox.md)。
 
 双轨判据、评分语义、第一性原理/奥卡姆约束及正式隔离威胁模型，以 [`docs/evaluation_policy.md`](docs/evaluation_policy.md) 为唯一规范来源。
 后续研究优先级、实验登记、执行状态、结果摘要、风险和方案变更统一维护在
@@ -29,7 +41,7 @@ H/C difficulty variants 是完整的 H/C pairs，不是新增 condition。Curate
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md)。
 20 个内置 family 的科学复核、逐项修正记录与真实 inventory 见
 [`docs/case_scientific_audit.md`](docs/case_scientific_audit.md)；从近期论文构造定期更新的 temporal evaluation instances 时采用的来源选择、纳入标准、Oracle 构建与验证流程见
-[`docs/temporal_case_pipeline.md`](docs/temporal_case_pipeline.md)。当前 29 个已接纳 family 的统一质量复核、拒收项及机器验证证据见
+[`docs/temporal_case_pipeline.md`](docs/temporal_case_pipeline.md)。旧 29-family registries 的统一质量复核、拒收项及机器验证证据见
 [`reports/case_objectivity_reaudit_2026-08-30/report.md`](reports/case_objectivity_reaudit_2026-08-30/report.md)。
 
 ## 两个可见角色
@@ -74,7 +86,9 @@ WorldModel -----------> measurement + unit + uncertainty
 
 由此，当前确定性 Oracle 的“客观正确”具有一个明确而有限的含义：它的响应始终符合该 case 预先定义的实验世界。它不是关于真实自然界任意实验的绝对正确性声明。
 
-当前实现中的“私有”只是正常 API 不把 WorldModel 放进 `EpisodeView`；同进程、公开源码并不是安全边界。正式结果要求 Player 与可信 Oracle/evaluator 分离部署，只通过序列化接口交互，并记录隔离 profile、case pack、scorer、模型、prompt 与工具权限版本。当前仓库中的公开 fixtures 不能用于抗污染排行榜。
+P0.7 已实现可独立部署的私有评测边界：service-only process 加载 active case pack、WorldModel、held-out conditions 和 evaluator；Player 只经鉴权 JSON 接口接收 `EpisodeView`/`OracleResponse` 并提交 `PlayerAction`，终局只得到不含分数的 receipt；完整结果由独立 Admin credential 在全部 pack units 结束后一次性导出。服务支持 request idempotency、revision、SQLite 崩溃恢复、pack artifact digest 绑定，并拒绝非 loopback 明文 HTTP。架构、威胁模型和部署步骤见 [`docs/private_evaluation_environment.md`](docs/private_evaluation_environment.md)，信任边界图见 [`docs/private_evaluation_trust_boundary.drawio`](docs/private_evaluation_trust_boundary.drawio)。
+
+同进程调用、公开源码或 loopback 开发测试仍不自动构成安全边界。正式结果要求在 Player 不可访问的主机/工作负载和文件系统身份下部署可信服务，并冻结隔离 profile、private case pack、scorer、模型、prompt、网络与工具权限版本。当前仓库仍没有正式 private benchmark instances，公开 fixtures 不能用于抗污染排行榜。
 
 ## Episode
 
@@ -227,7 +241,7 @@ Coordinator 要求 `cohort.json` 同目录存在与之逐项一致的 `acquisiti
 
 两份 review request 都原样携带被审的普通 JSON 内容；reviewer 修改 verdict 时必须保留这部分，coordinator 会按 JSON 类型和值精确比较。Resume 会重新执行 metadata、lineage、两道 review、filter 和 canary，不能仅凭旧 `case_accepted` 状态跳过这些 gate。
 
-截至 2026-09-03，独立 Temporal registry 含 9 个通过来源复核的 task families，共 36 个公开 development instances。每个 family 的两个 conditions 都由 source paper 报告；它们不构成 H/C pair，也不能仅因来源较新而称为未暴露实例。
+截至 2026-09-03 的历史快照中，早期独立 Temporal registry 含 9 个通过来源复核的 task families、36 个公开 development instances。它们现已与后续 21 个互不重复的 accepted families 合并进当前 `temporal` pack，旧 registry 名称不再是可运行入口。早期 9 个 family 的两个 conditions 都由 source paper 报告；它们不构成 H/C pair，也不能仅因来源较新而称为未暴露实例。
 
 ## 最小示例
 
@@ -327,7 +341,9 @@ python examples/run_fake_llm_development.py --log /tmp/role-benchmark-demo.jsonl
 
 这仍然是 `public_development_fixture`，可以运行 identification 或 discovery 协议，但不是正式隔离评测结果。provider binding 合同、第二次生成、inference accounting、事件格式和重放方式见 [`docs/llm_development_evaluation.md`](docs/llm_development_evaluation.md)。
 
-JSONL 已保存 Judge 所需的可观测轨迹：Player 与可选 LLM Oracle presentation 的逐次原始 completion（包括解析失败的输出）、结构化 action/portfolio、实验前 forecast、WorldModel 决定的 Oracle evidence、最终提交（若存在）与结构化终止 outcome。episode 结束后会独立给出 forecast separation、evidence-aligned movement 及其 per-mode counts；它们不改变连续 `held_out_prediction_score` 或二元 pass。Post-hoc LLM Evaluator 只在交互结束后读取该轨迹，不是第三个在线 bench 角色；可选的三套 API 参数见 [`docs/THREE_LLM_EVALUATION.md`](docs/THREE_LLM_EVALUATION.md)。
+JSONL 已保存 Judge 所需的可观测轨迹：Player 与可选 LLM Oracle presentation 的逐次原始 completion（包括解析失败的输出）、结构化 action/portfolio、实验前 forecast、WorldModel 决定的 Oracle evidence、最终提交（若存在）与结构化终止 outcome。episode 结束后会独立给出 forecast separation、evidence-aligned movement 及其 per-mode counts；它们不改变连续 `held_out_prediction_score` 或二元 pass。Post-hoc LLM Evaluator 只在交互结束后读取该轨迹，不是第三个在线 bench 角色。
+
+正式 `run_case_matrix` 已支持跨独立 episode 的有界并发：`--workers` 控制同时执行的 episode pipelines，`--player-concurrency`、`--oracle-concurrency` 和 `--evaluator-concurrency` 分别限制三个角色的同时 API 调用数。单个 episode 内的 Player–Oracle 轮次仍严格串行；Evaluator 只在该 episode 的 active result 与轨迹封存并持久化后启动。并发完成顺序可以不同，但冻结 schedule、确定性汇总顺序和 episode ID 不变；恢复时接受乱序 sidecars，并只重试缺失或失败的阶段。三个角色仍分别初始化 backend/runtime，因此可以使用三个不同的 endpoint、model 和 API key。内置 binding 现包括 DeepSeek Chat Completions、OpenAI Responses 与 Google Gemini 原生 `generateContent`。可复制的零调用 dry-run、精确 1/2-case smoke、Gemini 参数和完整 `historical`/`temporal`/`both` 命令见 [`docs/RUN_CASE_MATRIX.md`](docs/RUN_CASE_MATRIX.md)；pack membership 与评分边界分别见 [`docs/case_catalog.md`](docs/case_catalog.md) 和 [`docs/THREE_LLM_EVALUATION.md`](docs/THREE_LLM_EVALUATION.md)。
 
 对于失败 episode，可以直接定位 terminal failure 和最早可观察失误：
 
@@ -337,7 +353,7 @@ PYTHONPATH=src python experiments/analyze_failure_modes.py \
   runs/completed-run/episodes.json runs/completed-run/analysis/failure_modes
 ```
 
-输出会区分 action generation、协议/停止、belief update、final synthesis、模型合同与 held-out generalization，并保留 action/turn 和 JSONL event 引用。全部当前内置 case 的公开 final-model 合同都可在 Player 已见 evidence 上重放。成功修复的格式错误只记为 recovered incident。HTML renderer 会在失败对话后显示同一诊断。数值可重放的错误仍由确定性规则判断；LLM Evaluator 对自然语言与过程的评分单列为 exploratory diagnostics。
+输出会区分 action generation、协议/停止、belief update、final synthesis、模型合同与 held-out generalization，并保留 action/turn 和 JSONL event 引用。全部当前内置 case 的公开 final-model 合同都可在 Player 已见 evidence 上重放。成功修复的格式错误只记为 recovered incident。HTML renderer 会在失败对话后显示同一诊断。数值可重放的错误仍由确定性规则判断；当前标准流程还按[科学后评估](docs/SCIENTIFIC_POSTEVALUATION.md)输出独立理解评分与 F1–F5 科学失败分布，语义判断仍需人工一致性验证。
 
 仓库中的 `examples/run_scripted_pendulum.py` 提供“多个假设—三次实验—更新置信度—最终提交—预测条件评价”的完整版本：
 
@@ -373,7 +389,7 @@ counterfactual_discovery = make_young_double_slit_case(
 Young 的 historical-law world 使用归一化关系
 `spacing = 1.10 mm * (wavelength/550 nm)^1 * (distance/1 m)^1 * (separation/0.50 mm)^-1`；counterfactual twin 只把最后一个指数从 `-1` 改为 `-0.5`。两个 track 共用相应 world 的 `WorldModel` 和同一组 hidden interventions，只改变 Player 是否看到幂律骨架。这里的 historical 是**受史实启发的现代、理想化规律世界**，不是 Young 原始档案、原始装置或原始测量的逐条重放。
 
-内置 registry 包含以下 20 个科学 case families；另有 9 个通过同一质量门槛、但在独立目录注册的 temporal families：
+当前 `historical` pack 包含以下 20 个科学 case families；当前 `temporal` pack 另含 30 个与它们互不重复的 temporal families：
 
 | short name | 现象 | short name | 现象 |
 | --- | --- | --- | --- |
@@ -402,7 +418,7 @@ for name in CASE_FAMILIES:
             print(case.definition.case_id)
 ```
 
-20 个 curated families 中，每个 counterfactual condition 只改动一个事先声明的机制坐标；同一 condition 的两种 task settings 共用 truth、WorldModel 和 held-out interventions，只改变 Player 可见的模型信息。9 个 Temporal families 则各含两个 source-reported conditions，不进入 H/C estimands。29 个 families 的实现广度不等于跨领域有效性；116 个 instances 仍是公开开发样例，当前 formal private families/instances 均为 0。
+20 个 Historical families 中，每个 counterfactual condition 只改动一个事先声明的机制坐标；同一 condition 的两种 task settings 共用 truth、WorldModel 和 held-out interventions，只改变 Player 可见的模型信息。30 个 Temporal families 由互不重复的早期 9-family 资产与后续 21-family accepted release 合并而成；早期 9 个各含两个 source-reported conditions，后续 21 个各含 source-reported 与 benchmark-authored counterfactual conditions。当前 pack membership 见 [`docs/case_catalog.md`](docs/case_catalog.md)。公开实现广度不等于跨领域有效性，当前 formal private families/instances 均为 0。
 
 ## 添加一个新 case
 
@@ -458,6 +474,6 @@ def make_my_case(resources):
     )
 ```
 
-内置 evaluator 的 `scores["predictive_model_pass"]` 只表示结构化模型是否通过数值预测条件；自然语言 `explanation`、`scope_conditions` 和动态假设轨迹目前不进入正确性评分。`EpisodeOutcome.track` 随每个终止结果保留构念标签；第三方 evaluator 仍可定义自己的明确指标，通用科学正确性字段只有合法提交上的 `EvaluationResult.success`。
+内置确定性 evaluator 的 `scores["predictive_model_pass"]` 只表示结构化模型是否通过数值预测条件；自然语言 `explanation`、`scope_conditions` 和动态假设轨迹由科学后评估独立测量，不参与该数值 pass。`EpisodeOutcome.track` 随每个终止结果保留构念标签；第三方 evaluator 仍可定义自己的明确指标，通用科学正确性字段只有合法提交上的 `EvaluationResult.success`。
 
 框架不依赖某个特定规律或历史时期。后续 case factory 可以据此实例化摆、量热、光电效应或相同仪器下的 counterfactual worlds，而无需修改 episode runner。

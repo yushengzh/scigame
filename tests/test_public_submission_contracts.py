@@ -1,5 +1,9 @@
 import unittest
 
+from role_benchmark.expression import (
+    EXPRESSION_LANGUAGE_VERSION, EXPRESSION_MAX_DEPTH, EXPRESSION_MAX_NODES,
+    EXPRESSION_OPERATORS,
+)
 from role_benchmark import BenchmarkTrack, Episode
 from role_benchmark.cases import (
     make_boyle_j_tube_case,
@@ -98,6 +102,10 @@ class PublicSubmissionContractTest(unittest.TestCase):
                 )
                 contract = " ".join(matching_notes)
                 self.assertIn("'%s'" % model, contract)
+                self.assertIn(EXPRESSION_LANGUAGE_VERSION, contract)
+                self.assertIn("%d nodes" % EXPRESSION_MAX_NODES, contract)
+                self.assertIn("maximum depth %d" % EXPRESSION_MAX_DEPTH, contract)
+                self.assertIn(", ".join(EXPRESSION_OPERATORS), contract)
                 for key in parameter_keys:
                     self.assertIn(key, contract)
 

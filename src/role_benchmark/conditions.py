@@ -1,8 +1,9 @@
 """Condition semantics shared by benchmark registries and result schemas.
 
-The contract deliberately separates authored historical/counterfactual pairs
-from source-reported temporal conditions.  Runtime storage keys are not
-scientific condition roles and therefore do not belong in this module.
+The contract distinguishes historical/counterfactual pairs, legacy pairs of
+source-reported temporal conditions, and source-reported/authored-counterfactual
+temporal pairs.  Runtime storage keys are not scientific condition roles and
+therefore do not belong in this module.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ class DatasetKind(str, Enum):
 
     HISTORICAL_COUNTERFACTUAL = "historical_counterfactual"
     TEMPORAL = "temporal"
+    TEMPORAL_COUNTERFACTUAL = "temporal_counterfactual"
 
 
 class ConditionRole(str, Enum):
@@ -44,9 +46,10 @@ def _require_identifier(value: str, label: str) -> None:
 class ConditionDescriptor:
     """One condition in a versioned family variant.
 
-    ``condition_id`` is the stable benchmark key.  Temporal IDs must remain
-    neutral with respect to H/C and intended difficulty.  Their source-facing
-    identity is recorded separately as ``source_condition_id``.
+    ``condition_id`` is the stable benchmark key.  Source-reported temporal
+    IDs must remain neutral with respect to historical/counterfactual status
+    and intended difficulty.  Their source-facing identity is recorded
+    separately as ``source_condition_id``.
     """
 
     dataset_kind: DatasetKind
@@ -81,16 +84,53 @@ class ConditionDescriptor:
                 )
             return
 
-        if self.condition_role is not ConditionRole.SOURCE_REPORTED:
-            raise ValueError("temporal conditions must have source_reported role")
-        if self.source_condition_id is None:
-            raise ValueError("temporal conditions require source_condition_id")
-        _require_identifier(self.source_condition_id, "source_condition_id")
-        condition_tokens = frozenset(self.condition_id.split("_"))
-        if condition_tokens & _NON_NEUTRAL_TEMPORAL_TOKENS:
-            raise ValueError(
-                "temporal condition_id must not encode H/C or easy/hard semantics"
-            )
+        if self.dataset_kind is DatasetKind.TEMPORAL:
+            if self.condition_role is not ConditionRole.SOURCE_REPORTED:
+                raise ValueError("temporal conditions must have source_reported role")
+            if self.source_condition_id is None:
+                raise ValueError("temporal conditions require source_condition_id")
+            _require_identifier(self.source_condition_id, "source_condition_id")
+            condition_tokens = frozenset(self.condition_id.split("_"))
+            if condition_tokens & _NON_NEUTRAL_TEMPORAL_TOKENS:
+                raise ValueError(
+                    "temporal condition_id must not encode H/C or easy/hard "
+                    "semantics"
+                )
+            return
+
+        if self.condition_role is ConditionRole.SOURCE_REPORTED:
+            if self.source_condition_id is None:
+                raise ValueError(
+                    "temporal_counterfactual source_reported conditions require "
+                    "source_condition_id"
+                )
+            _require_identifier(self.source_condition_id, "source_condition_id")
+            condition_tokens = frozenset(self.condition_id.split("_"))
+            if condition_tokens & _NON_NEUTRAL_TEMPORAL_TOKENS:
+                raise ValueError(
+                    "temporal_counterfactual source condition_id must not encode "
+                    "historical, counterfactual, or easy/hard semantics"
+                )
+            return
+
+        if self.condition_role is ConditionRole.COUNTERFACTUAL:
+            if self.source_condition_id is not None:
+                raise ValueError(
+                    "temporal_counterfactual authored counterfactual conditions "
+                    "must not set source_condition_id"
+                )
+            condition_tokens = frozenset(self.condition_id.split("_"))
+            if condition_tokens & {"historical", "easy", "hard"}:
+                raise ValueError(
+                    "temporal_counterfactual counterfactual condition_id must not "
+                    "encode historical or easy/hard semantics"
+                )
+            return
+
+        raise ValueError(
+            "temporal_counterfactual conditions must have a source_reported or "
+            "counterfactual role"
+        )
 
 
 def validate_condition_descriptors(
@@ -124,7 +164,7 @@ def validate_condition_descriptors(
                 "historical_counterfactual variants require exactly one historical "
                 "and one counterfactual condition"
             )
-    else:
+    elif first.dataset_kind is DatasetKind.TEMPORAL:
         if any(
             item.condition_role is not ConditionRole.SOURCE_REPORTED
             for item in result
@@ -134,6 +174,16 @@ def validate_condition_descriptors(
         if len(set(source_ids)) != len(source_ids):
             raise ValueError(
                 "source_condition_id values must be unique within a temporal variant"
+            )
+    else:
+        roles = {item.condition_role for item in result}
+        if roles != {
+            ConditionRole.SOURCE_REPORTED,
+            ConditionRole.COUNTERFACTUAL,
+        }:
+            raise ValueError(
+                "temporal_counterfactual variants require exactly one "
+                "source_reported and one counterfactual condition"
             )
     return result
 

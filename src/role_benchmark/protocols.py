@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Protocol, runtime_checkable
 
 from .models import (
@@ -83,7 +83,18 @@ class CaseOracle:
         self._definition = definition
         self._world_model = world_model
 
+    def validate_proposal(self, proposal: ExperimentProposal) -> Any:
+        """Check public setup constraints without executing the world model.
+
+        Semantic reviewers use the same hard checks as ``respond``. A model
+        cannot override a rejection or obtain observations during validation.
+        """
+        if not isinstance(proposal, ExperimentProposal):
+            raise TypeError("proposal must be ExperimentProposal")
+        return self._validate(self._normalize_boundary_controls(proposal))
+
     def respond(self, proposal: ExperimentProposal) -> OracleResponse:
+        proposal = self._normalize_boundary_controls(proposal)
         problem = self._validate(proposal)
         if problem is not None:
             return problem
@@ -113,6 +124,38 @@ class CaseOracle:
             message=evidence.message or "The experiment was executed as specified.",
             evidence=evidence,
         )
+
+    def _normalize_boundary_controls(
+        self, proposal: ExperimentProposal
+    ) -> ExperimentProposal:
+        """Snap only the adjacent outside float to a continuous domain endpoint.
+
+        This handles decimal-to-binary rounding without a scale-dependent
+        tolerance. Execute at the declared endpoint so private world models
+        can retain strict domain checks. Preserve the submitted proposal.
+        """
+        controls = dict(proposal.controls)
+        changed = False
+        for name, value in proposal.controls.items():
+            spec = self._definition.resources.control(name)
+            if spec is None or spec.allowed_values or not _finite_number(value):
+                continue
+            numeric = float(value)
+            if (
+                spec.minimum is not None
+                and numeric < spec.minimum
+                and math.nextafter(numeric, math.inf) == spec.minimum
+            ):
+                controls[name] = spec.minimum
+                changed = True
+            elif (
+                spec.maximum is not None
+                and numeric > spec.maximum
+                and math.nextafter(numeric, -math.inf) == spec.maximum
+            ):
+                controls[name] = spec.maximum
+                changed = True
+        return replace(proposal, controls=controls) if changed else proposal
 
     def _validate(self, proposal: ExperimentProposal) -> Any:
         if not proposal.intent.strip():

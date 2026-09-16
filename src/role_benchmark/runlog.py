@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as _datetime
 import copy
+from itertools import count
 import os
 import uuid
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple
 from .episode import Episode, EpisodeProtocolError
 from .llm import (
     AdapterOutputError,
+    DEFAULT_PLAYER_PROMPT_VERSION,
     DEVELOPMENT_EVALUATION_PROFILE,
     GenerationConfig,
     GenerationResponse,
@@ -20,16 +22,30 @@ from .llm import (
     LLMPlayerStats,
     MAX_LLM_ACTION_BYTES,
     ModelTransportError,
+    PLAYER_PROMPT_VERSION_V1,
+    PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+    PLAYER_PROMPT_VERSION_V4_STRUCTURED,
+    PLAYER_PROMPT_VERSION_V5_PERFORMANCE,
+    STRUCTURED_PLAYER_PROMPTS,
+    validate_generation_completion,
+    PLAYER_REPAIR_PROMPT_VERSION_V4_STRUCTURED,
+    PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+    PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
     TextGenerationBackend,
     TokenUsage,
     build_generation_request,
+    decode_player_response,
     generation_request_to_payload,
     generation_response_to_payload,
 )
 from .llm_oracle import (
+    DEFAULT_ORACLE_PROMPT_VERSION,
     LLMOracle,
     LLMOracleStats,
     ORACLE_MESSAGE_SCHEMA,
+    ORACLE_PROMPT_VERSION_V1,
+    ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
     OracleOutputError,
     build_oracle_generation_request,
     oracle_message_from_json,
@@ -44,6 +60,15 @@ from .models import (
     TerminationKind,
 )
 from .protocols import BenchmarkCase, CaseOracle, Oracle, PlayerBackend
+from .semantic_oracle import (
+    LLMSemanticOracle,
+    ORACLE_PROMPT_VERSION_V3_SEMANTIC,
+    SEMANTIC_ORACLE_SCHEMA,
+    build_semantic_oracle_request,
+    decision_to_response,
+    prepare_semantic_oracle_case,
+    semantic_decision_from_response,
+)
 from .wire import (
     DEFAULT_MAX_ACTION_BYTES,
     PLAYER_ACTION_SCHEMA,
@@ -371,7 +396,7 @@ def run_logged_episode(
     log: JSONLRunLog,
     *,
     oracle: Optional[Oracle] = None,
-    max_actions: int = 100,
+    max_actions: Optional[int] = 100,
     run_metadata: Optional[Mapping[str, Any]] = None,
     observation_budget: Optional[int] = None,
     initial_attempts_used: int = 0,
@@ -384,21 +409,32 @@ def run_logged_episode(
     log before this runner records the decoded action.
     """
 
-    if isinstance(max_actions, bool) or not isinstance(max_actions, int):
-        raise ValueError("max_actions must be an integer")
-    if max_actions < 1:
-        raise ValueError("max_actions must be positive")
+    if max_actions is not None and (
+        isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1
+    ):
+        raise ValueError("max_actions must be positive or None for unlimited")
+    if case.definition.budget is None and max_actions is not None:
+        raise ValueError("unlimited adaptive episodes require max_actions=None")
     if log.event_count != 0:
         raise RunLogError("run log must be empty before an episode starts")
+    if isinstance(oracle, LLMSemanticOracle):
+        case = prepare_semantic_oracle_case(case)
+        if case_definition_to_payload(oracle.definition) != case_definition_to_payload(
+            case.definition
+        ):
+            raise ValueError("semantic Oracle definition must match the prepared case")
     metadata = strict_json_loads(canonical_json_dumps(dict(run_metadata or {})))
     public_case = case_definition_to_payload(case.definition)
     effective_oracle: Oracle = oracle or CaseOracle(
         case.definition, case.world_model
     )
     llm_config = player.run_config if isinstance(player, LLMPlayerBackend) else None
-    oracle_mode = "llm_case" if isinstance(effective_oracle, LLMOracle) else (
-        "custom" if oracle is not None else "case"
-    )
+    if isinstance(effective_oracle, LLMSemanticOracle):
+        oracle_mode = "llm_semantic"
+    elif isinstance(effective_oracle, LLMOracle):
+        oracle_mode = "llm_case"
+    else:
+        oracle_mode = "custom" if oracle is not None else "case"
     oracle_llm_config = (
         effective_oracle.run_config
         if isinstance(effective_oracle, LLMOracle)
@@ -417,6 +453,7 @@ def run_logged_episode(
     }
     if (
         observation_budget is not None
+        or case.definition.budget is None
         or initial_attempts_used != 0
         or require_budget_exhaustion
     ):
@@ -445,7 +482,7 @@ def run_logged_episode(
             "run_metadata": metadata,
         },
     )
-    for action_index in range(1, max_actions + 1):
+    for action_index in (count(1) if max_actions is None else range(1, max_actions + 1)):
         view_before = episode.view()
         try:
             action = player.next_action(view_before)
@@ -640,11 +677,13 @@ def run_llm_episode(
     log_path: str,
     *,
     config: Optional[GenerationConfig] = None,
+    player_prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
     oracle_backend: Optional[TextGenerationBackend] = None,
     oracle_config: Optional[GenerationConfig] = None,
+    oracle_prompt_version: str = DEFAULT_ORACLE_PROMPT_VERSION,
     max_repair_attempts: int = 0,
     max_action_bytes: int = DEFAULT_MAX_ACTION_BYTES,
-    max_actions: int = 100,
+    max_actions: Optional[int] = 100,
     run_id: Optional[str] = None,
     run_metadata: Optional[Mapping[str, Any]] = None,
     durable_log: bool = False,
@@ -653,8 +692,12 @@ def run_llm_episode(
     require_budget_exhaustion: bool = False,
 ) -> LoggedEpisodeRun:
     """Run one logged development episode with an LLM on either track."""
-    if isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1:
-        raise ValueError("max_actions must be a positive integer")
+    if max_actions is not None and (
+        isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1
+    ):
+        raise ValueError("max_actions must be a positive integer or None")
+    if case.definition.budget is None and max_actions is not None:
+        raise ValueError("unlimited adaptive episodes require max_actions=None")
     if isinstance(max_repair_attempts, bool) or max_repair_attempts not in (0, 1):
         raise ValueError("max_repair_attempts must be 0 or 1")
     if (
@@ -668,6 +711,16 @@ def run_llm_episode(
         )
     if config is not None and not isinstance(config, GenerationConfig):
         raise ValueError("config must be GenerationConfig or None")
+    if player_prompt_version not in (
+        PLAYER_PROMPT_VERSION_V1,
+        PLAYER_PROMPT_VERSION_V2_JSON_HARDENED,
+        PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        PLAYER_PROMPT_VERSION_V4_STRUCTURED,
+        PLAYER_PROMPT_VERSION_V5_PERFORMANCE,
+    ):
+        raise ValueError(
+            "unsupported Player prompt_version %r" % player_prompt_version
+        )
     if not callable(getattr(backend, "generate", None)):
         raise ValueError("backend must provide a callable generate method")
     if oracle_backend is not None and not callable(
@@ -678,11 +731,26 @@ def run_llm_episode(
         raise ValueError("oracle_config must be GenerationConfig or None")
     if oracle_backend is None and oracle_config is not None:
         raise ValueError("oracle_config requires oracle_backend")
+    if oracle_prompt_version not in (
+        ORACLE_PROMPT_VERSION_V1,
+        ORACLE_PROMPT_VERSION_V2_JSON_HARDENED,
+        ORACLE_PROMPT_VERSION_V3_SEMANTIC,
+    ):
+        raise ValueError(
+            "unsupported Oracle prompt_version %r" % oracle_prompt_version
+        )
+    if (
+        oracle_backend is None
+        and oracle_prompt_version != DEFAULT_ORACLE_PROMPT_VERSION
+    ):
+        raise ValueError("oracle_prompt_version requires oracle_backend")
     if run_metadata is not None and not isinstance(run_metadata, Mapping):
         raise ValueError("run_metadata must be a mapping or None")
     if not isinstance(durable_log, bool):
         raise ValueError("durable_log must be boolean")
     canonical_json_dumps(dict(run_metadata or {}))
+    if oracle_prompt_version == ORACLE_PROMPT_VERSION_V3_SEMANTIC:
+        case = prepare_semantic_oracle_case(case)
     # Validate the method-specific episode policy before creating a run log.
     Episode(
         case,
@@ -702,14 +770,21 @@ def run_llm_episode(
             config=config,
             max_repair_attempts=max_repair_attempts,
             max_action_bytes=max_action_bytes,
+            prompt_version=player_prompt_version,
             event_sink=log.append,
         )
+        oracle_class = (
+            LLMSemanticOracle
+            if oracle_prompt_version == ORACLE_PROMPT_VERSION_V3_SEMANTIC
+            else LLMOracle
+        )
         llm_oracle = (
-            LLMOracle(
+            oracle_class(
                 case.definition,
                 case.world_model,
                 oracle_backend,
                 config=oracle_config,
+                prompt_version=oracle_prompt_version,
                 event_sink=log.append,
             )
             if oracle_backend is not None
@@ -813,6 +888,7 @@ def _validate_oracle_request_event(
     *,
     call_index: int,
     oracle_turn: int,
+    purpose: str = "present_authoritative_response",
 ) -> None:
     payload = _payload(event, "oracle.model.requested")
     if set(payload) != {
@@ -824,7 +900,7 @@ def _validate_oracle_request_event(
         raise RunReplayError("oracle.model.requested has an invalid payload shape")
     _expect_index(payload.get("call_index"), call_index, "Oracle model call index")
     _expect_index(payload.get("oracle_turn"), oracle_turn, "Oracle turn")
-    if payload.get("purpose") != "present_authoritative_response":
+    if payload.get("purpose") != purpose:
         raise RunReplayError("Oracle request purpose differs from event grammar")
     request = payload.get("request")
     if not isinstance(request, dict):
@@ -833,7 +909,7 @@ def _validate_oracle_request_event(
     if not isinstance(metadata, dict):
         raise RunReplayError("logical Oracle request metadata is invalid")
     if (
-        metadata.get("purpose") != "present_authoritative_response"
+        metadata.get("purpose") != purpose
         or metadata.get("oracle_turn") != oracle_turn
     ):
         raise RunReplayError("logical Oracle request metadata differs from its event")
@@ -1042,20 +1118,26 @@ def _validate_oracle_parse_event(
     *,
     completion_event: Mapping[str, Any],
     oracle_turn: int,
+    semantic_mode: bool = False,
 ) -> None:
     payload = _payload(event, "oracle.output.parsed")
     completion = _payload(completion_event, "oracle.model.completed")
-    if set(payload) != {
+    expected_keys = {
         "call_index",
         "oracle_turn",
         "oracle_response",
-    }:
+    }
+    if semantic_mode:
+        expected_keys.add("decision")
+    if set(payload) != expected_keys:
         raise RunReplayError("oracle.output.parsed has an invalid payload shape")
     if payload.get("call_index") != completion.get("call_index"):
         raise RunReplayError("Oracle parser event does not reference its completion")
     _expect_index(payload.get("oracle_turn"), oracle_turn, "Oracle parser turn")
     if not isinstance(payload.get("oracle_response"), dict):
         raise RunReplayError("parsed Oracle response is invalid")
+    if semantic_mode and not isinstance(payload.get("decision"), dict):
+        raise RunReplayError("parsed semantic Oracle decision is invalid")
 
 
 def _validate_parse_event(
@@ -1085,16 +1167,42 @@ def _validate_parse_event(
 
 def _llm_policy_from_started(
     started: Mapping[str, Any],
-) -> Tuple[GenerationConfig, int, int]:
+) -> Tuple[GenerationConfig, int, int, str]:
     llm_config = started.get("llm_config")
-    if not isinstance(llm_config, dict) or set(llm_config) != {
+    base_keys = {
         "evaluation_profile",
         "action_schema",
         "generation_config",
         "max_action_bytes",
         "max_repair_attempts",
         "generation_policy",
+    }
+    if not isinstance(llm_config, dict):
+        raise RunReplayError("logged LLM configuration has an invalid shape")
+    if set(llm_config) == base_keys:
+        prompt_version = DEFAULT_PLAYER_PROMPT_VERSION
+    elif set(llm_config) == base_keys | {
+        "prompt_version",
+        "repair_prompt_version",
     }:
+        prompt_version = llm_config.get("prompt_version")
+        expected_repair_version = {
+            PLAYER_PROMPT_VERSION_V2_JSON_HARDENED: (
+                PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED
+            ),
+            PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON: (
+                PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON
+            ),
+            PLAYER_PROMPT_VERSION_V4_STRUCTURED: PLAYER_REPAIR_PROMPT_VERSION_V4_STRUCTURED,
+            PLAYER_PROMPT_VERSION_V5_PERFORMANCE: PLAYER_REPAIR_PROMPT_VERSION_V4_STRUCTURED,
+        }.get(prompt_version)
+        if (
+            expected_repair_version is None
+            or llm_config.get("repair_prompt_version")
+            != expected_repair_version
+        ):
+            raise RunReplayError("logged Player prompt version is unavailable")
+    else:
         raise RunReplayError("logged LLM configuration has an invalid shape")
     expected_values = {
         "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
@@ -1111,6 +1219,10 @@ def _llm_policy_from_started(
         if max_repair == 0
         else "plain_text_one_schema_directed_regeneration"
     )
+    if prompt_version in STRUCTURED_PLAYER_PROMPTS:
+        if max_repair != 0:
+            raise RunReplayError("structured v4 forbids output regeneration")
+        expected_policy = "structured_output_no_regeneration"
     if llm_config.get("generation_policy") != expected_policy:
         raise RunReplayError("generation policy name and limit differ")
     max_action_bytes = llm_config.get("max_action_bytes")
@@ -1133,25 +1245,47 @@ def _llm_policy_from_started(
         config = GenerationConfig(**config_payload)
     except (TypeError, ValueError) as exc:
         raise RunReplayError("logged generation config is unavailable") from exc
-    return config, max_action_bytes, max_repair
+    return config, max_action_bytes, max_repair, prompt_version
 
 
 def _oracle_llm_policy_from_started(
     started: Mapping[str, Any],
-) -> Tuple[GenerationConfig, int]:
+) -> Tuple[GenerationConfig, int, str]:
     oracle_config = started.get("oracle_llm_config")
-    if not isinstance(oracle_config, dict) or set(oracle_config) != {
+    base_keys = {
         "evaluation_profile",
         "message_schema",
         "generation_config",
         "max_output_bytes",
         "generation_policy",
-    }:
+    }
+    if not isinstance(oracle_config, dict):
+        raise RunReplayError("logged Oracle LLM configuration has an invalid shape")
+    semantic_mode = started.get("oracle_mode") == "llm_semantic"
+    if semantic_mode:
+        if set(oracle_config) != base_keys | {"prompt_version"}:
+            raise RunReplayError("logged semantic Oracle configuration has an invalid shape")
+        prompt_version = oracle_config.get("prompt_version")
+        if prompt_version != ORACLE_PROMPT_VERSION_V3_SEMANTIC:
+            raise RunReplayError("logged semantic Oracle prompt version is unavailable")
+    elif set(oracle_config) == base_keys:
+        prompt_version = DEFAULT_ORACLE_PROMPT_VERSION
+    elif set(oracle_config) == base_keys | {"prompt_version"}:
+        prompt_version = oracle_config.get("prompt_version")
+        if prompt_version != ORACLE_PROMPT_VERSION_V2_JSON_HARDENED:
+            raise RunReplayError("logged Oracle prompt version is unavailable")
+    else:
         raise RunReplayError("logged Oracle LLM configuration has an invalid shape")
     expected_values = {
         "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
-        "message_schema": ORACLE_MESSAGE_SCHEMA,
-        "generation_policy": "authoritative_message_exact_copy_one_call",
+        "message_schema": (
+            SEMANTIC_ORACLE_SCHEMA if semantic_mode else ORACLE_MESSAGE_SCHEMA
+        ),
+        "generation_policy": (
+            "hard_checks_then_semantic_review_one_call"
+            if semantic_mode
+            else "authoritative_message_exact_copy_one_call"
+        ),
     }
     for key, expected in expected_values.items():
         if oracle_config.get(key) != expected:
@@ -1176,7 +1310,7 @@ def _oracle_llm_policy_from_started(
         or max_output_bytes > 65_536
     ):
         raise RunReplayError("logged Oracle output byte limit is invalid")
-    return config, max_output_bytes
+    return config, max_output_bytes, prompt_version
 
 
 def _completed_event_grammar(
@@ -1184,7 +1318,7 @@ def _completed_event_grammar(
     *,
     player_kind: str,
     oracle_mode: str,
-    max_actions: int,
+    max_actions: Optional[int],
     max_repair_attempts: int,
     terminal_position: Optional[int] = None,
     termination_kind: Optional[TerminationKind] = TerminationKind.SUBMITTED,
@@ -1297,7 +1431,7 @@ def _completed_event_grammar(
         oracle_completion = None
         oracle_parsed = None
         if (
-            oracle_mode == "llm_case"
+            oracle_mode in ("llm_case", "llm_semantic")
             and action_body.get("kind") == "experiment"
             and position < terminal_position
             and events[position].get("event_type") == "oracle.model.requested"
@@ -1309,6 +1443,11 @@ def _completed_event_grammar(
                 oracle_request,
                 call_index=expected_oracle_call,
                 oracle_turn=expected_oracle_turn,
+                purpose=(
+                    "validate_experiment"
+                    if oracle_mode == "llm_semantic"
+                    else "present_authoritative_response"
+                ),
             )
             position += 1
             oracle_completion = events[position]
@@ -1322,6 +1461,7 @@ def _completed_event_grammar(
                 oracle_parsed,
                 completion_event=oracle_completion,
                 oracle_turn=expected_oracle_turn,
+                semantic_mode=oracle_mode == "llm_semantic",
             )
             position += 1
             expected_oracle_call += 1
@@ -1351,6 +1491,11 @@ def _completed_event_grammar(
             "final_evaluation",
         ):
             raise RunReplayError("successful transition has an invalid outcome kind")
+        if oracle_mode == "llm_semantic":
+            for key in ("attempts_used_before", "attempts_used_after"):
+                value = transition.get(key)
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise RunReplayError("semantic Oracle attempt counts must be nonnegative integers")
         _expect_index(transition.get("action_index"), expected_turn, "transition index")
         turns.append(
             _ReplayTurn(
@@ -1369,7 +1514,7 @@ def _completed_event_grammar(
         )
         position += 1
         expected_turn += 1
-    if len(turns) > max_actions:
+    if max_actions is not None and len(turns) > max_actions:
         raise RunReplayError("run exceeds its action policy")
     kinds = [
         _payload(turn.transition, "protocol.transition").get("outcome_kind")
@@ -1386,7 +1531,7 @@ def _completed_event_grammar(
         if any(kind != "experiment_evidence" for kind in kinds[:-1]):
             raise RunReplayError("only the final action may be rejected")
     elif termination_kind == TerminationKind.ACTION_LIMIT:
-        if len(turns) != max_actions:
+        if max_actions is None or len(turns) != max_actions:
             raise RunReplayError("action-limit run does not reach max_actions")
         if any(kind != "experiment_evidence" for kind in kinds):
             raise RunReplayError("action-limit run may contain only experiments")
@@ -1518,7 +1663,8 @@ def _failed_attempt_event_grammar(
 
 
 def _replay_parsers(
-    turns: Sequence[_ReplayTurn], max_action_bytes: int
+    turns: Sequence[_ReplayTurn], max_action_bytes: int,
+    prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
 ) -> Tuple[Dict[int, PlayerAction], Dict[int, WireDecodeError], int]:
     actions: Dict[int, PlayerAction] = {}
     failures: Dict[int, WireDecodeError] = {}
@@ -1538,7 +1684,9 @@ def _replay_parsers(
         source = primary
         if turn.parse_failure is not None:
             try:
-                player_action_from_json(primary.text, max_bytes=max_action_bytes)
+                decode_player_response(primary.text, max_bytes=max_action_bytes,
+                    prompt_version=prompt_version, finish_reason=primary.finish_reason,
+                    metadata=primary.metadata)
             except WireDecodeError as exc:
                 actual_error = {
                     "code": exc.code,
@@ -1564,7 +1712,9 @@ def _replay_parsers(
             )
             repairs += 1
         try:
-            action = player_action_from_json(source.text, max_bytes=max_action_bytes)
+            action = decode_player_response(source.text, max_bytes=max_action_bytes,
+                prompt_version=prompt_version, finish_reason=source.finish_reason,
+                metadata=source.metadata)
         except WireDecodeError as exc:
             raise RunReplayError(
                 "recorded successful parse no longer decodes: %s" % exc
@@ -1583,10 +1733,13 @@ def _replay_one_parse_failure(
     parse_failure: Mapping[str, Any],
     *,
     max_action_bytes: int,
+    prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
 ) -> WireDecodeError:
     response = _response_from_completion(completion, request_event=request)
     try:
-        player_action_from_json(response.text, max_bytes=max_action_bytes)
+        decode_player_response(response.text, max_bytes=max_action_bytes,
+            prompt_version=prompt_version, finish_reason=response.finish_reason,
+            metadata=response.metadata)
     except WireDecodeError as exc:
         recorded = _payload(parse_failure, "action.parse_failed").get("wire_error")
         if recorded != _wire_error_payload(exc):
@@ -1599,6 +1752,7 @@ def _replay_failed_attempt(
     failed: _ReplayFailedAttempt,
     *,
     max_action_bytes: int,
+    prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
 ) -> Tuple[WireDecodeError, WireDecodeError, int]:
     primary_payload = _payload(failed.primary_completion, "model.completed")
     if primary_payload.get("status") == "output_rejected":
@@ -1614,6 +1768,7 @@ def _replay_failed_attempt(
             failed.primary_request,
             failed.primary_parse_failure,
             max_action_bytes=max_action_bytes,
+            prompt_version=prompt_version,
         )
     if failed.repair_completion is None:
         return primary_error, primary_error, 0
@@ -1633,6 +1788,7 @@ def _replay_failed_attempt(
             failed.repair_request,
             failed.repair_parse_failure,
             max_action_bytes=max_action_bytes,
+            prompt_version=prompt_version,
         )
     return primary_error, final_error, 1
 
@@ -1844,15 +2000,22 @@ def replay_run_log(
     run_metadata = started.get("run_metadata")
     if not isinstance(run_metadata, dict):
         raise RunReplayError("run metadata is invalid")
+    oracle_mode = started.get("oracle_mode")
+    if oracle_mode not in ("case", "llm_case", "llm_semantic"):
+        raise RunReplayError("logged Oracle mode is unavailable for replay")
+    if oracle_mode == "llm_semantic":
+        case = prepare_semantic_oracle_case(case)
     current_case = case_definition_to_payload(case.definition)
     recorded_case = started.get("case")
+    if oracle_mode == "llm_semantic" and (
+        not isinstance(recorded_case, dict)
+        or recorded_case.get("count_all_experiment_attempts") is not True
+    ):
+        raise RunReplayError("semantic Oracle case must count every experiment attempt")
     if recorded_case != current_case:
         raise RunReplayError("public case snapshot does not match supplied case")
     if started.get("action_schema") != PLAYER_ACTION_SCHEMA:
         raise RunReplayError("logged action schema is unavailable")
-    oracle_mode = started.get("oracle_mode")
-    if oracle_mode not in ("case", "llm_case"):
-        raise RunReplayError("only deterministic case Oracle logs can be replayed")
     player_kind = started.get("player_kind")
     if player_kind not in ("llm", "custom"):
         raise RunReplayError("logged player kind is unavailable")
@@ -1869,24 +2032,33 @@ def replay_run_log(
     ):
         raise RunReplayError("run action/log policy is invalid")
     max_actions = policy.get("max_actions")
-    if isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1:
+    if max_actions is not None and (
+        isinstance(max_actions, bool) or not isinstance(max_actions, int) or max_actions < 1
+    ):
         raise RunReplayError("logged max_actions is invalid")
+    if case.definition.budget is None and max_actions is not None:
+        raise RunReplayError("unlimited adaptive run has a finite action limit")
     if not isinstance(policy.get("durable_log"), bool):
         raise RunReplayError("logged durability policy is invalid")
     if observation_policy_fields.issubset(policy):
         observation_budget = policy["observation_budget"]
         initial_attempts_used = policy["initial_attempts_used"]
         require_budget_exhaustion = policy["require_budget_exhaustion"]
-        if (
+        if observation_budget is None:
+            if case.definition.budget is not None or require_budget_exhaustion:
+                raise RunReplayError("logged unlimited observation budget is inconsistent")
+        elif (
             isinstance(observation_budget, bool)
             or not isinstance(observation_budget, int)
-            or not 0 <= observation_budget <= case.definition.budget
+            or observation_budget < 0
+            or (case.definition.budget is not None and observation_budget > case.definition.budget)
         ):
             raise RunReplayError("logged observation budget is invalid")
         if (
             isinstance(initial_attempts_used, bool)
             or not isinstance(initial_attempts_used, int)
-            or not 0 <= initial_attempts_used <= observation_budget
+            or initial_attempts_used < 0
+            or (observation_budget is not None and initial_attempts_used > observation_budget)
         ):
             raise RunReplayError("logged initial observation count is invalid")
         if not isinstance(require_budget_exhaustion, bool):
@@ -1896,22 +2068,31 @@ def replay_run_log(
         initial_attempts_used = 0
         require_budget_exhaustion = False
     if player_kind == "llm":
-        config, max_action_bytes, max_repair = _llm_policy_from_started(started)
+        (
+            config,
+            max_action_bytes,
+            max_repair,
+            player_prompt_version,
+        ) = _llm_policy_from_started(started)
     else:
         if started.get("llm_config") is not None:
             raise RunReplayError("custom player must not have LLM configuration")
         config = GenerationConfig()
         max_action_bytes = _MAX_EVENT_BYTES
         max_repair = 0
-    if oracle_mode == "llm_case":
-        oracle_config, oracle_max_output_bytes = _oracle_llm_policy_from_started(
-            started
-        )
+        player_prompt_version = DEFAULT_PLAYER_PROMPT_VERSION
+    if oracle_mode in ("llm_case", "llm_semantic"):
+        (
+            oracle_config,
+            oracle_max_output_bytes,
+            oracle_prompt_version,
+        ) = _oracle_llm_policy_from_started(started)
     else:
         if started.get("oracle_llm_config") is not None:
             raise RunReplayError("case Oracle must not have LLM configuration")
         oracle_config = GenerationConfig()
         oracle_max_output_bytes = 65_536
+        oracle_prompt_version = DEFAULT_ORACLE_PROMPT_VERSION
 
     # Validate the physical cause/effect sequence before invoking any private
     # runtime component.  An undecodable turn is a model-event suffix with no
@@ -1959,7 +2140,7 @@ def replay_run_log(
             termination_kind=termination_kind,
         )
     parsed_actions, parse_failures, repair_count = _replay_parsers(
-        turns, max_action_bytes
+        turns, max_action_bytes, player_prompt_version
     )
     failed_primary_error = None
     failed_final_error = None
@@ -1971,12 +2152,15 @@ def replay_run_log(
         ) = _replay_failed_attempt(
             failed_attempt,
             max_action_bytes=max_action_bytes,
+            prompt_version=player_prompt_version,
         )
         repair_count += failed_repair_count
     canonical_oracle = CaseOracle(case.definition, case.world_model)
     replay_oracle = _ReplayOracle()
     effective_oracle: Oracle = (
-        replay_oracle if oracle_mode == "llm_case" else canonical_oracle
+        replay_oracle
+        if oracle_mode in ("llm_case", "llm_semantic")
+        else canonical_oracle
     )
     episode = Episode(
         case,
@@ -2002,6 +2186,7 @@ def replay_run_log(
                     player_turn=expected_index,
                     config=config,
                     purpose="next_action",
+                    prompt_version=player_prompt_version,
                 )
             )
             if _payload(turn.primary_request, "model.requested").get(
@@ -2019,6 +2204,7 @@ def replay_run_log(
                         player_turn=expected_index,
                         config=config,
                         purpose="repair_action",
+                        prompt_version=player_prompt_version,
                         invalid_output=first_response.text,
                         wire_error=parse_failures[expected_index],
                     )
@@ -2041,7 +2227,81 @@ def replay_run_log(
                 raise RunReplayError("adapter parse and runner action differ")
 
         rejected_turn = transition.get("outcome_kind") == "protocol_rejected"
+        oracle_events = (
+            turn.oracle_request,
+            turn.oracle_completion,
+            turn.oracle_parsed,
+        )
         if (
+            oracle_mode == "llm_semantic"
+            and action.kind == "experiment"
+            and not rejected_turn
+        ):
+            if action.experiment is None:
+                raise RunReplayError("experiment action lacks a proposal")
+            try:
+                hard_response = canonical_oracle.validate_proposal(action.experiment)
+            except Exception as exc:
+                raise RunReplayError(
+                    "supplied hard validator rejected Oracle proposal %d: %s"
+                    % (expected_index, type(exc).__name__)
+                ) from exc
+            if hard_response is not None:
+                if any(event is not None for event in oracle_events):
+                    raise RunReplayError("hard-rejected proposal contains Oracle model events")
+                visible_response = copy.deepcopy(hard_response)
+            else:
+                if any(event is None for event in oracle_events):
+                    raise RunReplayError("experiment lacks recorded Oracle model events")
+                oracle_turn += 1
+                expected_oracle_request = generation_request_to_payload(
+                    build_semantic_oracle_request(
+                        case.definition,
+                        action.experiment,
+                        oracle_turn=oracle_turn,
+                        config=oracle_config,
+                    )
+                )
+                if _payload(
+                    turn.oracle_request, "oracle.model.requested"
+                ).get("request") != expected_oracle_request:
+                    raise RunReplayError("Oracle logical prompt/request differs")
+                oracle_completion = _response_from_oracle_completion(
+                    turn.oracle_completion,
+                    request_event=turn.oracle_request,
+                )
+                try:
+                    decision = semantic_decision_from_response(
+                        oracle_completion,
+                        case.definition,
+                        max_bytes=oracle_max_output_bytes,
+                    )
+                except WireDecodeError as exc:
+                    raise RunReplayError(
+                        "recorded Oracle completion no longer decodes: %s" % exc
+                    ) from exc
+                if _payload(turn.oracle_parsed, "oracle.output.parsed").get(
+                    "decision"
+                ) != decision:
+                    raise RunReplayError("Oracle parser replay produced a different decision")
+                if decision["status"] == "VALID":
+                    try:
+                        visible_response = canonical_oracle.respond(action.experiment)
+                    except Exception as exc:
+                        raise RunReplayError(
+                            "supplied world model rejected Oracle proposal %d: %s"
+                            % (expected_index, type(exc).__name__)
+                        ) from exc
+                else:
+                    visible_response = decision_to_response(decision)
+                parsed_oracle_response = _payload(
+                    turn.oracle_parsed, "oracle.output.parsed"
+                ).get("oracle_response")
+                if parsed_oracle_response != oracle_response_to_payload(visible_response):
+                    raise RunReplayError("Oracle parser replay produced a different response")
+                prompt_requests_checked += 1
+            replay_oracle.prepare(action.experiment, visible_response)
+        elif (
             oracle_mode == "llm_case"
             and action.kind == "experiment"
             and not rejected_turn
@@ -2069,6 +2329,7 @@ def replay_run_log(
                     authoritative,
                     oracle_turn=oracle_turn,
                     config=oracle_config,
+                    prompt_version=oracle_prompt_version,
                 )
             )
             if _payload(
@@ -2080,6 +2341,7 @@ def replay_run_log(
                 request_event=turn.oracle_request,
             )
             try:
+                validate_generation_completion(oracle_completion)
                 oracle_message_from_json(
                     oracle_completion.text,
                     authoritative_message=authoritative.message,
@@ -2099,14 +2361,7 @@ def replay_run_log(
                 raise RunReplayError("Oracle parser replay produced a different response")
             replay_oracle.prepare(action.experiment, visible_response)
             prompt_requests_checked += 1
-        elif any(
-            event is not None
-            for event in (
-                turn.oracle_request,
-                turn.oracle_completion,
-                turn.oracle_parsed,
-            )
-        ):
+        elif any(event is not None for event in oracle_events):
             raise RunReplayError("non-experiment turn contains Oracle model events")
 
         attempts_before = episode.view().attempts_used
@@ -2192,6 +2447,7 @@ def replay_run_log(
                 player_turn=failed_index,
                 config=config,
                 purpose="next_action",
+                prompt_version=player_prompt_version,
             )
         )
         if _payload(failed_attempt.primary_request, "model.requested").get(
@@ -2212,6 +2468,7 @@ def replay_run_log(
                     player_turn=failed_index,
                     config=config,
                     purpose="repair_action",
+                    prompt_version=player_prompt_version,
                     invalid_output=first_response.text,
                     wire_error=failed_primary_error,
                 )
@@ -2283,7 +2540,7 @@ def replay_run_log(
         raise RunReplayError("final LLM statistics differ from model events")
     if player_kind == "custom" and ended.get("llm_stats") is not None:
         raise RunReplayError("custom-player run contains LLM statistics")
-    if oracle_mode == "llm_case" and ended.get(
+    if oracle_mode in ("llm_case", "llm_semantic") and ended.get(
         "oracle_llm_stats"
     ) != _expected_oracle_llm_stats(turns):
         raise RunReplayError("final Oracle LLM statistics differ from model events")

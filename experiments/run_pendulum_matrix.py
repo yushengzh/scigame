@@ -256,7 +256,11 @@ class DeepSeekChatBackend:
         try:
             decoded = json.loads(response_body.decode("utf-8"))
             choice = decoded["choices"][0]
-            text = choice["message"]["content"]
+            message = choice["message"]
+            refusal = message.get("refusal")
+            text = message.get("content")
+            if text is None and isinstance(refusal, str) and refusal:
+                text = refusal
         except (
             KeyError,
             IndexError,
@@ -267,6 +271,9 @@ class DeepSeekChatBackend:
             raise RuntimeError("provider returned an invalid chat-completion response") from exc
         if not isinstance(text, str):
             raise RuntimeError("provider returned non-text assistant content")
+        finish_reason = choice.get("finish_reason")
+        if not isinstance(finish_reason, str) or not finish_reason.strip():
+            raise RuntimeError("provider response omitted completion status")
 
         usage = decoded.get("usage") or {}
         input_tokens = usage.get("prompt_tokens")
@@ -277,13 +284,14 @@ class DeepSeekChatBackend:
             text=text,
             provider="deepseek",
             model=str(decoded.get("model") or self._model),
-            finish_reason=str(choice.get("finish_reason") or ""),
+            finish_reason=finish_reason,
             response_id=str(decoded.get("id") or ""),
             usage=TokenUsage(
                 input_tokens=input_tokens if isinstance(input_tokens, int) else None,
                 output_tokens=output_tokens if isinstance(output_tokens, int) else None,
             ),
             metadata={
+                **({"content_kind": "refusal"} if refusal else {}),
                 "binding_id": self.binding_id,
                 "structured_output_transport": "chat_completions_json_object",
                 "thinking": self._thinking,

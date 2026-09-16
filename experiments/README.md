@@ -1,4 +1,30 @@
-# Temporal authoring conversion study
+# Experiment entry points
+
+For new Temporal benchmark runs, `run_iclr_main.py prepare` follows
+[`datasets/temporal_latest.json`](../datasets/temporal_latest.json): currently
+**Temporal29** (29 families, 28 papers, 116 cases, `temporal29.v1.20260916`).
+The [current dataset contract](../docs/TEMPORAL29_DATASET.md) retains all Temporal24
+members and adds five independently reviewed families. The 18 frozen strict labels
+include the known stopping-protocol hold on 90314: excluding this hold leaves 17
+strict successes, alongside 11 retained four-observation successes. New 100001
+qualified with 7 VALID observations in original GPT-5.5 Discovery.
+New runs also freeze the matching Fixed-2/4/8 design: eight settings per family,
+with explicit evaluation-input coverage labels. The prior
+[Temporal24 design](../docs/TEMPORAL24_FIXED_DESIGN.md) remains unchanged.
+Use `--temporal-fixed-design none` only to reproduce the original shorter designs.
+All 116 cases and 348 Fixed configurations passed release validation; default
+consumer preparation passed 580 case/method configurations without model calls.
+The existing manuscript's run-1 main cells and
+Temporal23 ablations use [`analyze_temporal23_followup.py`](analyze_temporal23_followup.py),
+with [source/replay and completeness rules](TEMPORAL23_FOLLOWUP_ANALYSIS.md).
+`analyze_iclr_main.py` remains a general full-schedule diagnostic; it is not
+the candidate-condition or paper-selected-run aggregator. Dataset acceptance,
+freezing, and legacy-result isolation for those older runs are specified in
+[`docs/TEMPORAL23_DATASET.md`](../docs/TEMPORAL23_DATASET.md).
+The studies below and the `run_temporal_case44_*` scripts retain their original
+registered cohorts; they are not the default for new Temporal experiments.
+
+## Temporal authoring conversion study
 
 `EXP-TEMPORAL-AUTHORING-001` registers the revised Temporal authoring pipeline. Temporal admission requires at least one source-supported executable quantitative relation. A second source-reported condition is optional. Counterfactual variants are constructed only by the separate counterfactual construction pipeline when explicitly requested.
 
@@ -135,41 +161,71 @@ terminal schema; a new run must use a fresh output directory.
 
 ## Cross-case three-LLM evaluation
 
-`run_case_matrix.py` is the current cross-case runner. Its frozen development
-schedule has 400 episodes: all 20 families contribute
-`2 worlds × 2 tracks × 5 repeats`. Each repeat is a seeded, randomly ordered
-complete block of 80 matched cells. Player, Oracle, and post-hoc Evaluator each
-have independent provider/model/endpoint/credential/reasoning/timeout settings.
+`run_case_matrix.py` is the current cross-case runner. It requires an explicit
+`--case-pack`: `historical` has 20 families/80 cases, `temporal` has 30/120,
+and `both` is their disjoint union with 50/200. Episodes are derived as
+`cases × selected evaluation methods × repeats`. Player, Oracle, and post-hoc
+Evaluator each have independent provider/model/endpoint/credential/reasoning/timeout settings.
 The Oracle LLM still does not create measurements: the private WorldModel
 computes authoritative evidence and the Oracle model only presents it. The LLM
 Evaluator is called after the episode JSONL is sealed and cannot change the
-deterministic scientific score.
+deterministic scientific score or binary `active_pass`. New case-matrix runs use
+one default scientific post-evaluation flow: normalized error, expression
+equivalence, expressed understanding before/after and its change, and F1–F5
+multi-label failure distributions. These measurements remain independent; no
+weighted total is computed. The current definitions and commands are maintained
+in [Scientific post-evaluation](../docs/SCIENTIFIC_POSTEVALUATION.md).
 
-The Responses transport requests JSON-object output. The full benchmark action
-schema remains in the prompt and the local strict decoder remains normative.
-It is not sent as OpenAI strict Structured Outputs because the public action
-contract intentionally contains dynamic control, forecast, and parameter keys
-plus conditional and recursive expression structures outside that API's strict
-schema subset. This preserves the same bench action contract instead of
-weakening it for one provider.
+To add these measurements to existing standard case-matrix results without
+rerunning Player or Oracle:
+
+```bash
+PYTHONPATH=src:. python3 -B -m experiments.postevaluate_science \
+  --run-dir runs/existing_case_matrix \
+  --output-dir runs/existing_scientific_postevaluation
+```
+
+This offline command computes expression comparisons, reuses compatible
+scientific Judge outputs, and reports missing coverage. Add `--judge` and the
+usual Evaluator provider/model/credential options to fill missing Judge results.
+Original episode outcomes remain unchanged in the source run.
+
+The current Player requires native recursive JSON Schema output. The OpenAI
+Responses binding sends strict structured output schemas; local decoding still
+checks the benchmark action contract. The default Player provider is `openai`,
+while Oracle and Evaluator default to `deepseek`. The examples below configure
+all three roles explicitly.
 
 Validate the complete schedule without a credential:
 
 ```bash
 PYTHONPATH=src python -m experiments.run_case_matrix \
-  --player-provider deepseek \
+  --case-pack both \
+  --evaluation-method "adaptive experimental design" \
+  --repeats 1 \
+  --player-provider openai \
   --oracle-provider openai \
   --evaluator-provider openai \
-  --output-dir runs/openai_gpt56_case_matrix_20260825 \
+  --output-dir runs/both_case_matrix_dry_run \
   --dry-run
 ```
+
+This produces a 200-episode plan and makes no API calls. Use the exact one- or
+two-case selectors in the runbook before any paid full run.
 
 Run with three independently injected runtime credentials:
 
 ```bash
 PYTHONPATH=src python -m experiments.run_case_matrix \
-  --player-provider deepseek \
-  --player-model deepseek-v4-flash \
+  --case-pack temporal \
+  --family temporal_source_007 \
+  --condition source_reported \
+  --task-setting identification \
+  --evaluation-method "adaptive experimental design" \
+  --repeats 1 \
+  --oracle-mode llm_presentation \
+  --player-provider openai \
+  --player-model gpt-5.6 \
   --player-api-key-env BENCH_PLAYER_API_KEY \
   --oracle-provider openai \
   --oracle-model gpt-5.6 \
@@ -179,7 +235,7 @@ PYTHONPATH=src python -m experiments.run_case_matrix \
   --evaluator-model gpt-5.6 \
   --evaluator-reasoning-effort high \
   --evaluator-api-key-env BENCH_EVALUATOR_API_KEY \
-  --output-dir runs/openai_gpt56_case_matrix_20260825
+  --output-dir runs/three_llm_smoke
 ```
 
 Then produce the aggregate scores, failure-mode tables, and one left/right
@@ -187,22 +243,26 @@ Player–Oracle page per canonical episode log:
 
 ```bash
 PYTHONPATH=src python -m experiments.analyze_case_matrix \
-  runs/openai_gpt56_case_matrix_20260825
+  runs/three_llm_smoke
 
 PYTHONPATH=src python -m experiments.analyze_failure_modes \
-  runs/openai_gpt56_case_matrix_20260825/episodes.json \
-  runs/openai_gpt56_case_matrix_20260825/analysis/failure_modes
+  runs/three_llm_smoke/episodes.json \
+  runs/three_llm_smoke/analysis/failure_modes
 
 PYTHONPATH=src python -m experiments.render_case_matrix \
-  runs/openai_gpt56_case_matrix_20260825/episodes.json \
-  ../role_benchmark_visualizations/openai_gpt56_case_matrix_20260825
+  runs/three_llm_smoke/episodes.json \
+  ../role_benchmark_visualizations/three_llm_smoke
 ```
 
 The requested model IDs, provider-returned IDs, response IDs and token usage are
 recorded without credentials. Evaluator request/response/decoded output is kept
 under `evaluations/`; evaluator failure preserves the completed active episode
-and resume retries only the evaluator. Full parameter and scoring semantics are
-documented in [`docs/THREE_LLM_EVALUATION.md`](../docs/THREE_LLM_EVALUATION.md).
+and resume retries only the missing post-evaluation stages. Current scientific
+metric and failure-distribution definitions are documented in
+[`docs/SCIENTIFIC_POSTEVALUATION.md`](../docs/SCIENTIFIC_POSTEVALUATION.md).
+Copy-ready zero-call dry runs, exact one/two-case smoke selectors, Gemini 2.5
+Flash parameters, and the complete `both` command are documented in
+[`docs/RUN_CASE_MATRIX.md`](../docs/RUN_CASE_MATRIX.md).
 
 ## Failure-mode analysis
 

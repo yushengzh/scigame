@@ -25,12 +25,13 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from role_benchmark import (
     ADAPTIVE_EXPERIMENTAL_DESIGN,
-    EVALUATOR_SCORE_AXES,
+    DISCOVERY_SCORE_AXES,
     FIXED_EXPERIMENTAL_DESIGN,
     HELD_OUT_PREDICTION_SCORE,
     PRIOR_ONLY_BASELINE,
 )
 from role_benchmark.expression import ExpressionError, evaluate_expression_program
+from role_benchmark.postevaluation import aggregate_scientific_postevaluation
 
 
 ANALYSIS_SCHEMA = "role_benchmark.case_matrix_analysis.v2"
@@ -130,8 +131,9 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
                 (evaluation.get("scores") or {}).get(axis)
                 for evaluation in llm_evaluations
             )
-            for axis in EVALUATOR_SCORE_AXES
+            for axis in DISCOVERY_SCORE_AXES
         },
+        "scientific_postevaluation": aggregate_scientific_postevaluation(rows),
         "elapsed_s": sum(float(row.get("elapsed_s") or 0.0) for row in evaluated),
     }
 

@@ -933,6 +933,7 @@ def _evaluation_failure_stage(evaluation: Mapping[str, Any]) -> Tuple[str, str]:
 
 def analyze_failure_events(
     events: Sequence[Mapping[str, Any]],
+    *, include_success: bool = False,
 ) -> Mapping[str, Any]:
     """Return one structured failure analysis for a completed run log.
 
@@ -970,11 +971,12 @@ def analyze_failure_events(
     ]
     actions = _indexed_payloads(events, "action.decoded")
     incidents = _recovered_incidents(events, actions)
-    if (
+    passed = (
         termination_kind == "submitted"
         and evaluation.get("success") is True
         and not protocol_violations
-    ):
+    )
+    if passed and not include_success:
         return {
             "schema": FAILURE_ANALYSIS_SCHEMA,
             "status": "passed_no_failure",
@@ -1135,7 +1137,7 @@ def analyze_failure_events(
                     ),
                 )
             )
-    else:
+    elif not passed:
         final_indices = [
             index
             for index, payload in actions.items()
@@ -1179,7 +1181,7 @@ def analyze_failure_events(
     )
     return {
         "schema": FAILURE_ANALYSIS_SCHEMA,
-        "status": "failed_analyzed",
+        "status": "passed_analyzed" if passed else "failed_analyzed",
         "terminal_failure": terminal_failure,
         "first_observed_misstep": _primary_mode(modes),
         "modes": modes,

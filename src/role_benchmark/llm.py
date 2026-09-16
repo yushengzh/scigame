@@ -14,6 +14,10 @@ from enum import Enum
 from typing import Any, Callable, Mapping, Optional, Protocol, Tuple, runtime_checkable
 
 from .models import BenchmarkTrack, EpisodeView, PlayerAction
+from .structured_actions import (
+    STRUCTURED_ACTION_SCHEMA, structured_action_from_json,
+    structured_action_json_schema,
+)
 from .wire import (
     DEFAULT_MAX_ACTION_BYTES,
     PLAYER_ACTION_SCHEMA,
@@ -28,6 +32,25 @@ from .wire import (
 
 
 DEVELOPMENT_EVALUATION_PROFILE = "public_development_fixture"
+PLAYER_PROMPT_VERSION_V1 = "role_benchmark.player_prompt.v1"
+PLAYER_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.player_prompt.v2_json_hardened"
+)
+PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON = (
+    "role_benchmark.player_prompt.v3_case_bound_json"
+)
+PLAYER_PROMPT_VERSION_V4_STRUCTURED = "role_benchmark.player_prompt.v4_structured"
+PLAYER_PROMPT_VERSION_V5_PERFORMANCE = "role_benchmark.player_prompt.v5_performance"
+STRUCTURED_PLAYER_PROMPTS = (PLAYER_PROMPT_VERSION_V4_STRUCTURED, PLAYER_PROMPT_VERSION_V5_PERFORMANCE)
+PLAYER_REPAIR_PROMPT_VERSION_V4_STRUCTURED = "role_benchmark.player_repair_prompt.v4_disabled"
+PLAYER_REPAIR_PROMPT_VERSION_V1 = "role_benchmark.player_repair_prompt.v1"
+PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED = (
+    "role_benchmark.player_repair_prompt.v2_json_hardened"
+)
+PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON = (
+    "role_benchmark.player_repair_prompt.v3_case_bound_json"
+)
+DEFAULT_PLAYER_PROMPT_VERSION = PLAYER_PROMPT_VERSION_V1
 MAX_LLM_ACTION_BYTES = 1_048_576
 _MAX_METADATA_BYTES = 1_048_576
 _MAX_IDENTITY_TEXT_BYTES = 4_096
@@ -59,6 +82,113 @@ def _json_copy(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_json_copy(child) for child in value]
     return value
+
+
+def _provider_control_value_schema(control: Any) -> Mapping[str, Any]:
+    """Describe one public control closely enough for structured generation."""
+
+    result: dict[str, Any] = {"description": control.description}
+    allowed_values = list(control.allowed_values)
+    if allowed_values:
+        result["enum"] = _json_copy(allowed_values)
+        if all(isinstance(value, str) for value in allowed_values):
+            result["type"] = "string"
+        elif all(_finite_number(value) for value in allowed_values):
+            result["type"] = "number"
+        else:
+            result["anyOf"] = [
+                {"type": "number"},
+                {"type": "string"},
+                {"type": "boolean"},
+            ]
+        return result
+
+    result["type"] = "number"
+    if control.minimum is not None:
+        result["minimum"] = control.minimum
+    if control.maximum is not None:
+        result["maximum"] = control.maximum
+    return result
+
+
+def _specialize_player_action_schema(
+    schema: dict[str, Any], view: EpisodeView
+) -> bool:
+    """Bind open action objects to names already public in this episode."""
+
+    resources = view.case.resources
+    experiment_schema = schema["properties"]["experiment"]
+    experiment_properties = experiment_schema["properties"]
+
+    controls_by_name = {
+        control.name: _provider_control_value_schema(control)
+        for control in resources.controls
+    }
+    controls_schema = experiment_properties["controls"]
+    controls_schema.update(
+        {
+            "additionalProperties": False,
+            "properties": controls_by_name,
+        }
+    )
+
+    # All released benchmark cases expose one apparatus.  Requiring that
+    # apparatus's complete setup prevents structured-output providers from
+    # satisfying a generic object schema with ``controls: {}``.  For a future
+    # multi-apparatus case, names remain enumerated without over-constraining
+    # one apparatus to another's controls.
+    if len(resources.instruments) == 1:
+        controls_schema["required"] = list(resources.instruments[0].controls)
+
+    experiment_properties["apparatus"]["enum"] = [
+        instrument.name for instrument in resources.instruments
+    ]
+    experiment_properties["readouts"]["items"]["enum"] = [
+        readout.name for readout in resources.readouts
+    ]
+
+    expression_required = any(
+        note.startswith(
+            "Submit an executable predictor. FinalSubmission.model must equal "
+            "'expression'."
+        )
+        for note in resources.notes
+    )
+    if not expression_required:
+        return False
+
+    final_schema = schema["properties"]["final"]
+    final_properties = final_schema["properties"]
+    final_properties["model"] = {
+        "type": "string",
+        "enum": ["expression"],
+    }
+    final_properties["parameters"] = {
+        "$ref": "#/$defs/expression_program"
+    }
+    final_schema.pop("allOf", None)
+
+    outputs_schema = schema["$defs"]["expression_program"]["properties"][
+        "outputs"
+    ]
+    outputs_schema.update(
+        {
+            "additionalProperties": False,
+            "properties": {
+                readout.name: {"$ref": "#/$defs/expression"}
+                for readout in resources.readouts
+            },
+            "required": [readout.name for readout in resources.readouts],
+        }
+    )
+    for expression_variant in schema["$defs"]["expression"]["oneOf"]:
+        properties = expression_variant.get("properties", {})
+        if "var" in properties:
+            properties["var"]["enum"] = [
+                control.name for control in resources.controls
+            ]
+            break
+    return True
 
 
 def _validate_utf8_text(
@@ -217,6 +347,58 @@ class ModelTransportError(LLMAdapterError):
     """The provider binding failed before returning a usable response object."""
 
 
+class ProviderTransportError(RuntimeError):
+    """A credential-free provider failure that is safe to persist in run logs."""
+
+    def __init__(
+        self,
+        *,
+        http_status: Optional[int] = None,
+        connection_failed: bool = False,
+        safe_reason: Optional[str] = None,
+    ) -> None:
+        if http_status is not None and (
+            isinstance(http_status, bool)
+            or not isinstance(http_status, int)
+            or not 100 <= http_status <= 599
+        ):
+            raise ValueError("http_status must be an integer between 100 and 599")
+        if (http_status is None) == (not connection_failed):
+            raise ValueError(
+                "set exactly one of http_status or connection_failed"
+            )
+        if safe_reason is not None and (
+            not isinstance(safe_reason, str)
+            or not 1 <= len(safe_reason) <= 64
+            or any(
+                character not in "abcdefghijklmnopqrstuvwxyz0123456789_"
+                for character in safe_reason
+            )
+        ):
+            raise ValueError(
+                "safe_reason must be a lowercase credential-free identifier"
+            )
+        self.http_status = http_status
+        self.connection_failed = connection_failed
+        self.safe_reason = safe_reason
+        message = (
+            "provider HTTP status %d" % http_status
+            if http_status is not None
+            else "provider connection failed"
+        )
+        if safe_reason is not None:
+            message += " (%s)" % safe_reason
+        super().__init__(message)
+
+
+def _safe_transport_failure_detail(exc: Exception) -> str:
+    """Expose only provider failures constructed without response bodies."""
+
+    if isinstance(exc, ProviderTransportError):
+        return str(exc)
+    return type(exc).__name__
+
+
 class AdapterOutputError(LLMAdapterError):
     """The enabled generation calls did not yield a decodable action."""
 
@@ -256,6 +438,155 @@ The final.explanation field is a concise rationale and is not itself scored.
 Do not reveal hidden chain-of-thought;
 put only concise, decision-relevant statements in public fields.
 """
+
+_JSON_HARDENED_SYSTEM_INSTRUCTION = _SYSTEM_INSTRUCTION + """
+Serialization preflight is mandatory. First construct one JSON value, then
+serialize it exactly once. The first non-whitespace character must be { and the
+last must be }. Use double-quoted JSON strings only. Do not emit Markdown,
+comments, trailing commas, NaN, Infinity, or text outside the object.
+
+Return exactly these five top-level keys: wire_schema, kind, portfolio,
+experiment, final. For kind=\"experiment\", experiment is an object and final is
+null. For kind=\"final\", experiment is null and final is an object.
+
+Before returning, verify that every object and array delimiter is balanced.
+Every expression operator node must be exactly
+{\"op\":\"<allowed operator>\",\"args\":[...]}. Prefer the shallowest
+algebraically equivalent valid expression tree.
+
+Recompute portfolio confidence normalization after all edits. If a final
+portfolio contains one hypothesis, its confidence must be exactly 1.0.
+Otherwise confidences must sum to 1 within 1e-6. final.hypothesis_id must
+exactly match one unique portfolio hypothesis_id. For experiments, forecast
+keys must exactly equal the portfolio hypothesis_ids, and each forecast must
+contain exactly every requested readout.
+"""
+
+_CASE_BOUND_JSON_SYSTEM_INSTRUCTION = _JSON_HARDENED_SYSTEM_INSTRUCTION + """
+The supplied action schema is specialized to this public case. Use only its
+enumerated apparatus, control, readout, variable, model, and output names.
+For an experiment, include every control listed as required by the selected
+apparatus; never return an empty controls object when controls are required.
+"""
+
+_REPAIR_INSTRUCTION = (
+    "Generate exactly one valid action for the same episode view. "
+    "You received no Oracle response or evidence between calls. "
+    "This is a second generation and may differ semantically."
+)
+
+_JSON_HARDENED_REPAIR_INSTRUCTION = (
+    "Correct the previous output for the same episode view. No Oracle response "
+    "or new evidence was received. Preserve the intended scientific action, "
+    "hypotheses, numerical values, and conclusion wherever they are compatible "
+    "with the contract. Rebuild a fresh JSON value and serialize it once; do "
+    "not copy or manually patch the malformed delimiter sequence. Fix the "
+    "reported wire_error first, then run the complete serialization and schema "
+    "preflight. For an expression tree, reconstruct nodes from the leaves "
+    "upward, with each operator node exactly "
+    '{"op":"<allowed operator>","args":[...]}. Return exactly one corrected '
+    "JSON object and nothing else."
+)
+
+
+def _player_prompt_text(prompt_version: str) -> Tuple[str, str, str]:
+    if prompt_version == PLAYER_PROMPT_VERSION_V5_PERFORMANCE:
+        system, repair, repair_version = _player_prompt_text(PLAYER_PROMPT_VERSION_V4_STRUCTURED)
+        system = system.replace(
+            "The final.explanation field is a concise rationale and is not itself scored.",
+            "Three separate metrics assess your performance: numerical prediction, "
+            "formula consistency with the benchmark world, and scientific explanation. "
+            "Mathematically equivalent formulas are allowed; matching a few measurements "
+            "does not establish formula equivalence. In final.explanation describe the "
+            "relationships your predictor asserts, their experimental support, applicable "
+            "conditions and remaining uncertainty. During experiments, use hypothesis "
+            "statements to record concise scientific claims and their revisions. "
+            "Explain which observations support retaining or changing a claim. "
+            "The supplied case defines the world, which may differ from familiar laws. "
+            "Do not claim a mechanism beyond what the case and evidence establish.")
+        return system, repair, repair_version
+    if prompt_version == PLAYER_PROMPT_VERSION_V4_STRUCTURED:
+        return (
+            _SYSTEM_INSTRUCTION + """
+Use the structured provider representation in the supplied schema. Controls
+are arrays of {"name": <control name>, "value": <value>}. Forecasts are arrays
+of {"name": <hypothesis_id>, "value": [{"name": <readout>, "value": <number>}]}.
+Each name must be unique within its array. These arrays represent dictionaries,
+not additional experiments. For expression models, final.parameters is
+{"outputs": [{"name": <readout>, "value": <expression tree>}]}.
+Expression trees use the public canonical number, {"var": "x"}, and
+{"op": "add", "args": [...]} representations without other encoding.
+For other parameter dictionaries use {"entries": [{"name": <key>,
+"value": <value>}]}, recursively wrapping dictionary values in entries.
+Public episode views and their history retain the canonical dictionary format.
+The provider schema constrains serialization only. Experimental permissions
+and scientific correctness are checked independently by the benchmark.
+""",
+            "No output regeneration is permitted in this protocol version.",
+            PLAYER_REPAIR_PROMPT_VERSION_V4_STRUCTURED,
+        )
+    if prompt_version == PLAYER_PROMPT_VERSION_V1:
+        return (
+            _SYSTEM_INSTRUCTION,
+            _REPAIR_INSTRUCTION,
+            PLAYER_REPAIR_PROMPT_VERSION_V1,
+        )
+    if prompt_version == PLAYER_PROMPT_VERSION_V2_JSON_HARDENED:
+        return (
+            _JSON_HARDENED_SYSTEM_INSTRUCTION,
+            _JSON_HARDENED_REPAIR_INSTRUCTION,
+            PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED,
+        )
+    if prompt_version == PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON:
+        return (
+            _CASE_BOUND_JSON_SYSTEM_INSTRUCTION,
+            _JSON_HARDENED_REPAIR_INSTRUCTION,
+            PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON,
+        )
+    raise ValueError("unsupported Player prompt_version %r" % prompt_version)
+
+
+def generation_completion_status(finish_reason, metadata=None):
+    """Normalize provider termination without inspecting or repairing content.
+
+    Empty reasons remain unspecified for legacy in-process backends. API
+    adapters must supply a terminal reason; unknown nonempty reasons fail closed.
+    """
+    metadata = metadata or {}
+    reason = (finish_reason or "").strip().lower()
+    if (metadata.get("content_kind") == "refusal" or reason in {
+            "refusal", "content_filter", "safety", "recitation", "blocklist",
+            "prohibited_content", "spii", "image_safety", "image_prohibited_content",
+        } or reason.startswith("prompt_blocked:") or "content_filter" in reason):
+        return "refused"
+    if reason in {"length", "max_tokens", "max_output_tokens", "model_length"} or reason.startswith("incomplete"):
+        return "truncated"
+    if reason in {"stop", "completed", "end_turn", "stop_sequence", "eos"}:
+        return "completed"
+    return "unknown" if reason else "unspecified"
+
+
+def validate_generation_completion(response):
+    """Shared by every role and strict replay; never repair provider output."""
+    completion = generation_completion_status(response.finish_reason, response.metadata)
+    if completion in {"truncated", "unknown"}:
+        raise WireDecodeError("incomplete_output", "$", "provider output was not completed normally")
+    if completion == "refused":
+        raise WireDecodeError("provider_refusal", "$", "provider returned a refusal or blocked output")
+
+
+def decode_player_response(text, *, prompt_version=DEFAULT_PLAYER_PROMPT_VERSION,
+                           max_bytes=DEFAULT_MAX_ACTION_BYTES, finish_reason="", metadata=None):
+    _player_prompt_text(prompt_version)
+    completion = generation_completion_status(finish_reason, metadata)
+    if completion in {"truncated", "unknown"}:
+        raise WireDecodeError("incomplete_output", "$", "provider output was not completed normally")
+    if completion == "refused":
+        raise WireDecodeError("provider_refusal", "$", "provider returned a refusal or blocked output")
+    decoder = (structured_action_from_json
+               if prompt_version in STRUCTURED_PLAYER_PROMPTS
+               else player_action_from_json)
+    return decoder(text, max_bytes=max_bytes)
 
 
 def generation_config_to_payload(config: GenerationConfig) -> Mapping[str, Any]:
@@ -302,6 +633,8 @@ def build_generation_request(
     player_turn: int,
     config: GenerationConfig,
     purpose: str = "next_action",
+    evaluation_profile: str = DEVELOPMENT_EVALUATION_PROFILE,
+    prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
     invalid_output: Optional[str] = None,
     wire_error: Optional[WireDecodeError] = None,
 ) -> GenerationRequest:
@@ -309,17 +642,39 @@ def build_generation_request(
 
     if purpose not in ("next_action", "repair_action"):
         raise ValueError("unsupported generation purpose")
+    _validate_utf8_text(
+        evaluation_profile,
+        "evaluation_profile",
+        nonempty=True,
+        max_bytes=_MAX_IDENTITY_TEXT_BYTES,
+    )
+    system_instruction, repair_instruction, repair_prompt_version = (
+        _player_prompt_text(prompt_version)
+    )
+    structured = prompt_version in STRUCTURED_PLAYER_PROMPTS
+    if structured and purpose != "next_action":
+        raise ValueError("structured v4 does not permit output regeneration")
     schema = player_action_json_schema()
-    # The executable-expression contract belongs only to Discovery.  Keeping
-    # its recursive ``outputs`` shape in an Identification prompt gives the
-    # model a second, irrelevant parameter format and can contaminate the
-    # otherwise explicit case-owned submission contract.
-    if view.case.track is BenchmarkTrack.IDENTIFICATION:
+    expression_submission_required = False
+    if prompt_version == PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON:
+        expression_submission_required = _specialize_player_action_schema(
+            schema, view
+        )
+    # A case that does not publicly request the shared expression predictor
+    # keeps its case-owned Identification format without an irrelevant
+    # recursive expression schema.  Released matched cases explicitly request
+    # the shared expression format in both tracks and retain the bound schema.
+    if (
+        view.case.track is BenchmarkTrack.IDENTIFICATION
+        and not expression_submission_required
+    ):
         schema.pop("$defs", None)
         schema["properties"]["final"].pop("allOf", None)
+    if structured:
+        schema = structured_action_json_schema()
     episode_view_to_json(view)
     view_payload = episode_view_to_payload(view)
-    system = _SYSTEM_INSTRUCTION + "\nAction JSON Schema:\n" + canonical_json_dumps(
+    system = system_instruction + "\nAction JSON Schema:\n" + canonical_json_dumps(
         schema
     )
     if purpose == "next_action":
@@ -330,11 +685,7 @@ def build_generation_request(
         user_payload = {
             "episode_view": view_payload,
             "repair": {
-                "instruction": (
-                    "Generate exactly one valid action for the same episode view. "
-                    "You received no Oracle response or evidence between calls. "
-                    "This is a second generation and may differ semantically."
-                ),
+                "instruction": repair_instruction,
                 "invalid_output": invalid_output,
                 "wire_error": {
                     "code": wire_error.code,
@@ -345,12 +696,21 @@ def build_generation_request(
         }
     metadata = {
         "action_schema": PLAYER_ACTION_SCHEMA,
-        "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
+        "evaluation_profile": evaluation_profile,
         "case_id": view.case.case_id,
         "track": view.case.track.value,
         "player_turn": player_turn,
         "purpose": purpose,
     }
+    # Preserve the frozen v1 request payload; only opt-in profiles carry a
+    # version marker.
+    if prompt_version != DEFAULT_PLAYER_PROMPT_VERSION:
+        metadata["prompt_version"] = prompt_version
+        if purpose == "repair_action":
+            metadata["repair_prompt_version"] = repair_prompt_version
+    if structured:
+        metadata["provider_action_schema"] = STRUCTURED_ACTION_SCHEMA
+        metadata["require_structured_output"] = True
     return GenerationRequest(
         messages=(
             Message("system", system),
@@ -377,6 +737,8 @@ class LLMPlayerBackend:
         config: Optional[GenerationConfig] = None,
         max_repair_attempts: int = 0,
         max_action_bytes: int = DEFAULT_MAX_ACTION_BYTES,
+        evaluation_profile: str = DEVELOPMENT_EVALUATION_PROFILE,
+        prompt_version: str = DEFAULT_PLAYER_PROMPT_VERSION,
         event_sink: Optional[EventSink] = None,
     ) -> None:
         if isinstance(max_repair_attempts, bool) or max_repair_attempts not in (0, 1):
@@ -398,11 +760,25 @@ class LLMPlayerBackend:
             raise ValueError("backend must provide a callable generate method")
         if event_sink is not None and not callable(event_sink):
             raise ValueError("event_sink must be callable or None")
+        _validate_utf8_text(
+            evaluation_profile,
+            "evaluation_profile",
+            nonempty=True,
+            max_bytes=_MAX_IDENTITY_TEXT_BYTES,
+        )
+        _player_prompt_text(prompt_version)
+        if prompt_version in STRUCTURED_PLAYER_PROMPTS:
+            if max_repair_attempts != 0:
+                raise ValueError("structured v4 requires max_repair_attempts=0")
+            if getattr(backend, "supports_strict_action_schema", False) is not True:
+                raise ValueError("structured v4 requires an enforcing provider backend")
         self._backend = backend
         self._config = GenerationConfig() if config is None else config
         self._max_repair_attempts = max_repair_attempts
         self._max_action_bytes = max_action_bytes
         self._event_sink = event_sink
+        self._evaluation_profile = evaluation_profile
+        self._prompt_version = prompt_version
         self._player_turns = 0
         self._generation_calls = 0
         self._primary_calls = 0
@@ -418,8 +794,8 @@ class LLMPlayerBackend:
     def run_config(self) -> Mapping[str, Any]:
         """Return the adapter settings needed to reconstruct this run."""
 
-        return {
-            "evaluation_profile": DEVELOPMENT_EVALUATION_PROFILE,
+        run_config = {
+            "evaluation_profile": self._evaluation_profile,
             "action_schema": PLAYER_ACTION_SCHEMA,
             "generation_config": generation_config_to_payload(self._config),
             "max_action_bytes": self._max_action_bytes,
@@ -430,6 +806,18 @@ class LLMPlayerBackend:
                 else "plain_text_one_schema_directed_regeneration"
             ),
         }
+        # Existing logged-run grammars expect the frozen v1 key set.
+        if self._prompt_version != DEFAULT_PLAYER_PROMPT_VERSION:
+            _, _, repair_prompt_version = _player_prompt_text(self._prompt_version)
+            run_config.update(
+                {
+                    "prompt_version": self._prompt_version,
+                    "repair_prompt_version": repair_prompt_version,
+                }
+            )
+        if self._prompt_version in STRUCTURED_PLAYER_PROMPTS:
+            run_config["generation_policy"] = "structured_output_no_regeneration"
+        return run_config
 
     @property
     def stats(self) -> LLMPlayerStats:
@@ -479,6 +867,7 @@ class LLMPlayerBackend:
             if generation_request_to_payload(request) != request_payload:
                 raise TypeError("backend mutated the logical generation request")
         except Exception as exc:
+            failure_detail = _safe_transport_failure_detail(exc)
             self._emit(
                 "model.completed",
                 {
@@ -488,12 +877,15 @@ class LLMPlayerBackend:
                     "status": "error",
                     "error": {
                         "type": type(exc).__name__,
-                        "message": "provider binding failed before a valid response",
+                        "message": (
+                            "provider binding failed before a valid response: %s"
+                            % failure_detail
+                        ),
                     },
                 },
             )
             raise ModelTransportError(
-                "text generation backend failed: %s" % type(exc).__name__
+                "text generation backend failed: %s" % failure_detail
             ) from exc
 
         if response.usage.input_tokens is not None:
@@ -507,10 +899,14 @@ class LLMPlayerBackend:
 
         response_bytes = response.text.encode("utf-8")
         if len(response_bytes) > self._max_action_bytes:
+            completion = generation_completion_status(response.finish_reason, response.metadata)
+            code = ("provider_refusal" if completion == "refused" else "incomplete_output"
+                    if completion in {"truncated", "unknown"} else "payload_too_large")
             wire_error = WireDecodeError(
-                "payload_too_large",
+                code,
                 "$",
-                "JSON input exceeds %d bytes" % self._max_action_bytes,
+                "provider output was not completed normally" if code != "payload_too_large"
+                else "JSON input exceeds %d bytes" % self._max_action_bytes,
             )
             self._emit(
                 "model.completed",
@@ -583,8 +979,10 @@ class LLMPlayerBackend:
         repair_attempt: int,
     ) -> PlayerAction:
         try:
-            action = player_action_from_json(
-                response.text, max_bytes=self._max_action_bytes
+            action = decode_player_response(
+                response.text, max_bytes=self._max_action_bytes,
+                prompt_version=self._prompt_version,
+                finish_reason=response.finish_reason, metadata=response.metadata,
             )
         except WireDecodeError as exc:
             self._emit(
@@ -621,6 +1019,8 @@ class LLMPlayerBackend:
             player_turn=player_turn,
             config=self._config,
             purpose="next_action",
+            evaluation_profile=self._evaluation_profile,
+            prompt_version=self._prompt_version,
         )
         response, call_index = self._generate(
             request, player_turn=player_turn, purpose="next_action"
@@ -648,6 +1048,8 @@ class LLMPlayerBackend:
                 player_turn=player_turn,
                 config=self._config,
                 purpose="repair_action",
+                evaluation_profile=self._evaluation_profile,
+                prompt_version=self._prompt_version,
                 invalid_output=response.text,
                 wire_error=first_error,
             )
@@ -673,6 +1075,7 @@ class LLMPlayerBackend:
 
 __all__ = [
     "AdapterOutputError",
+    "DEFAULT_PLAYER_PROMPT_VERSION",
     "DEVELOPMENT_EVALUATION_PROFILE",
     "GenerationConfig",
     "GenerationRequest",
@@ -683,9 +1086,23 @@ __all__ = [
     "MAX_LLM_ACTION_BYTES",
     "Message",
     "ModelTransportError",
+    "PLAYER_PROMPT_VERSION_V1",
+    "PLAYER_PROMPT_VERSION_V2_JSON_HARDENED",
+    "PLAYER_PROMPT_VERSION_V3_CASE_BOUND_JSON",
+    "PLAYER_PROMPT_VERSION_V4_STRUCTURED",
+    "PLAYER_PROMPT_VERSION_V5_PERFORMANCE",
+    "STRUCTURED_PLAYER_PROMPTS",
+    "generation_completion_status",
+    "validate_generation_completion",
+    "PLAYER_REPAIR_PROMPT_VERSION_V4_STRUCTURED",
+    "PLAYER_REPAIR_PROMPT_VERSION_V1",
+    "PLAYER_REPAIR_PROMPT_VERSION_V2_JSON_HARDENED",
+    "PLAYER_REPAIR_PROMPT_VERSION_V3_CASE_BOUND_JSON",
+    "ProviderTransportError",
     "TextGenerationBackend",
     "TokenUsage",
     "build_generation_request",
+    "decode_player_response",
     "generation_request_to_payload",
     "generation_response_to_payload",
     "generation_config_to_payload",
