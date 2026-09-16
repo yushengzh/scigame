@@ -25,7 +25,11 @@ PYTHONPATH=src:. python3 experiments/run_case_matrix.py --help
 | `temporal` | 30 | 2 conditions × 2 task settings | 120 |
 | `both` | 50 | 2 conditions × 2 task settings | 200 |
 
-`historical` 始终指当前唯一 Historical 数据集：20 个经典关系理想化世界及其三步结构变异反事实。`both` 是它与当前公开 Temporal 的无重复并集。数据说明见 [Historical dataset](HISTORICAL_DATASET.md)，清单为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)。数据演进由 Git 记录，CLI 不保留旧 Historical 包选项。既有实验保留当时的数据含义，不改名冒充当前结果。
+`historical` 始终指当前唯一 Historical 数据集：20 个经典关系理想化世界及其三步结构变异反事实。`temporal` 是 29 篇论文中的 30 个关系，每个关系都与作者构造的反事实配对。`both` 是这两份当前数据的无重复并集。
+
+两份数据都使用 `--variant canonical`。Historical 的条件是 `historical` / `counterfactual`；Temporal 的条件是 `source_reported` / `counterfactual`，分别表示论文来源关系和 benchmark 作者构造的关系。旧公开 Temporal 中 9 个双来源条件 family 加 21 个参数反事实 family 的组成已经退役，虽然它也恰好有 30 个 family。
+
+数据说明见 [Historical dataset](HISTORICAL_DATASET.md)、[Temporal dataset](TEMPORAL_DATASET.md)，固定清单为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)、[`datasets/temporal/manifest.json`](../datasets/temporal/manifest.json)。运行所需卡片随 Python 包提供。数据演进由 Git 记录，CLI 不保留旧数据包选项。既有实验保留当时的数据含义，不改名冒充当前结果。
 
 运行量按下面的公式计算：
 
@@ -69,7 +73,8 @@ export GEMINI_API_KEY='...'
 ```bash
 PYTHONPATH=src:. python3 experiments/run_case_matrix.py \
   --case-pack temporal \
-  --family temporal_source_007 \
+  --family defect_sre \
+  --variant canonical \
   --condition source_reported \
   --task-setting identification \
   --evaluation-method "adaptive experimental design" \
@@ -267,8 +272,8 @@ runner 使用的 Responses 请求字段，并返回标准的 status、output 和
 | 参数 | 行为 |
 |---|---|
 | `--family FAMILY` | 可重复；只选择指定 families |
-| `--variant VARIANT` | 可重复；只选择指定内部 variants |
-| `--condition CONDITION` | 可重复；只选择指定 conditions |
+| `--variant canonical` | 当前两份数据均使用这个唯一 variant；可省略 |
+| `--condition CONDITION` | Historical 为 `historical` / `counterfactual`；Temporal 为 `source_reported` / `counterfactual`；可重复，省略表示全选 |
 | `--task-setting SETTING` | `identification` 或 `discovery`；可重复 |
 | `--evaluation-method METHOD` | 三种 method 之一；可重复；省略表示三种全选 |
 

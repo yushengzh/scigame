@@ -9,11 +9,8 @@ from .conditions import (
     validate_condition_descriptors,
 )
 from .counterfactual import (
-    AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES,
-    AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE,
     COUNTERFACTUAL_DIFFICULTIES,
     CounterfactualVariant,
-    make_authored_temporal_counterfactual_variants,
     make_counterfactual_variant,
     rms_symmetric_tolerance_scaled_separation,
 )
@@ -198,8 +195,6 @@ from .temporal.contamination import (
 __all__ = [
     "AdapterOutputError",
     "ADAPTIVE_EXPERIMENTAL_DESIGN",
-    "AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES",
-    "AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE",
     "BenchmarkCase",
     "BenchmarkTrack",
     "CaseDefinition",
@@ -324,7 +319,6 @@ __all__ = [
     "llm_evaluation_json_schema",
     "llm_evaluation_to_payload",
     "load_run_log",
-    "make_authored_temporal_counterfactual_variants",
     "make_counterfactual_variant",
     "evaluate_expression_program",
     "evaluation_method_plan_to_payload",

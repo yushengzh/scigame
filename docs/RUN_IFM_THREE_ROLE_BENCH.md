@@ -31,17 +31,17 @@ runner 不读取 `IFM_BASE_URL` 或 `IFM_MODEL` 来自动覆盖这些参数。
 
 ## 2. 六 episode 并行 smoke
 
-下面的 Bash 函数可直接复制使用。`run_ifm smoke --dry-run` 只生成计划、配置，不读取 key、
-不调用 API；检查后执行 `run_ifm smoke`。再次执行相同命令即恢复。
+下面的 Bash 函数可直接复制使用，前两个参数分别是数据包和实验名称。带 `--dry-run` 时只生成计划、配置，不读取 key、不调用 API；检查后去掉该参数执行。再次执行相同命令即恢复。
 
 ```bash
 run_ifm() {
-  local experiment_name="$1"
-  shift
+  local case_pack="$1"
+  local experiment_name="$2"
+  shift 2
   python3 -B -m experiments.run_case_matrix \
     --output-dir "out/ifm_science_${experiment_name}" \
     --experiment-id "IFM-SCIENCE-${experiment_name}" \
-    --case-pack historical --repeats 1 \
+    --case-pack "$case_pack" --variant canonical --repeats 1 \
     --player-provider ifm --oracle-provider ifm --evaluator-provider ifm \
     --player-model IFM/K2-Horizon-375B-A23B \
     --oracle-model IFM/K2-Horizon-375B-A23B \
@@ -61,8 +61,12 @@ run_ifm() {
     --ifm-context-window-tokens 524288 --workers 3 "$@"
 }
 
-run_ifm smoke --family ohm_circuit --task-setting discovery --dry-run
-run_ifm smoke --family ohm_circuit --task-setting discovery
+run_ifm historical historical_smoke --family ohm_circuit --task-setting discovery --dry-run
+run_ifm historical historical_smoke --family ohm_circuit --task-setting discovery
+
+# Temporal 的原论文关系 / 作者构造反事实配对，同样为 6 episodes。
+run_ifm temporal temporal_smoke --family defect_sre --task-setting discovery --dry-run
+run_ifm temporal temporal_smoke --family defect_sre --task-setting discovery
 ```
 
 这里是一个 family × 两个 world × 三种方法 = **6 episodes**。
@@ -73,23 +77,33 @@ Oracle LLM 只检查实验程序是否合法。观测值仍由 case 的确定性
 Evaluator 在当前 episode 的 Player–Oracle 日志封存后，读取完整可观察轨迹和该 world 的
 参考关系进行科学理解评分与失败分类；不会回写 Player 或修改确定性数值分数和二元成败。
 
-## 3. 扩大到完整 Historical 数据集
+## 3. 扩大到完整数据集
 
 `historical` 是唯一当前 Historical 包，包含 20 个 family 的原关系与三步结构变异反事实，共 80 个 case。数据说明及 Git 追溯规则见 [Historical dataset](HISTORICAL_DATASET.md)。
+
+`temporal` 是唯一当前 Temporal 包，包含 29 篇论文中的 30 个关系及对应作者构造反事实，共 120 个 case；两类条件为 `source_reported` / `counterfactual`。说明见 [Temporal dataset](TEMPORAL_DATASET.md)。`both` 合并这两份当前数据，包含 50 个 family、200 个 case。固定清单分别为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)、[`datasets/temporal/manifest.json`](../datasets/temporal/manifest.json)。
 
 先使用**新的名称和目录**检查计划：
 
 ```bash
 # 20 families × 2 worlds × discovery × 3 methods = 120 episodes
-run_ifm historical_discovery --task-setting discovery --dry-run
-run_ifm historical_discovery --task-setting discovery
+run_ifm historical historical_discovery --task-setting discovery --dry-run
+run_ifm historical historical_discovery --task-setting discovery
 
 # 同时包括 discovery 和 identification：240 episodes
-run_ifm historical_all --dry-run
-run_ifm historical_all
+run_ifm historical historical_all --dry-run
+run_ifm historical historical_all
+
+# 30 families × 2 worlds × discovery × 3 methods = 180 episodes
+run_ifm temporal temporal_discovery --task-setting discovery --dry-run
+run_ifm temporal temporal_discovery --task-setting discovery
+
+# Temporal 的两种任务共 360 episodes；both 共 600 episodes。
+run_ifm temporal temporal_all --dry-run
+run_ifm both both_all --dry-run
 ```
 
-不要并行执行上面两项，它们是可选范围。`--repeats` 默认值在函数中显式设为 1。
+上面列出的是可选范围，选择需要的一项运行，避免重复启动重叠矩阵。`--repeats` 默认值在函数中显式设为 1。
 实际启动前确认 dry-run 输出的计划数量。此 smoke 不代表已完成所有 family 的 API 测试。
 
 ## 4. 并发、输出预算与恢复

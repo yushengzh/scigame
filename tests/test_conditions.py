@@ -12,8 +12,9 @@ from role_benchmark import (
 )
 from role_benchmark.temporal_cases import (
     TEMPORAL_CASE_FAMILIES,
-    TEMPORAL_SOURCE_CONDITIONS,
-    TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP,
+    TEMPORAL_CONDITIONS,
+    TEMPORAL_CONDITION_RUNTIME_MAP,
+    TEMPORAL_SCIENCE_CARDS,
     TEMPORAL_SOURCE_PAPER_IDS,
     TEMPORAL_SOURCE_VERSION_IDS,
 )
@@ -111,40 +112,48 @@ class ConditionContractTests(unittest.TestCase):
                         source_condition_id="source_condition_a",
                     )
 
-    def test_temporal_registry_has_two_source_reported_conditions_per_family(self):
-        self.assertEqual(tuple(TEMPORAL_SOURCE_CONDITIONS), TEMPORAL_CASE_FAMILIES)
+    def test_temporal_registry_has_source_and_authored_conditions_per_family(self):
+        self.assertEqual(tuple(TEMPORAL_CONDITIONS), TEMPORAL_CASE_FAMILIES)
         self.assertEqual(
-            tuple(TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP), TEMPORAL_CASE_FAMILIES
+            tuple(TEMPORAL_CONDITION_RUNTIME_MAP), TEMPORAL_CASE_FAMILIES
         )
         self.assertEqual(tuple(TEMPORAL_SOURCE_PAPER_IDS), TEMPORAL_CASE_FAMILIES)
         self.assertEqual(tuple(TEMPORAL_SOURCE_VERSION_IDS), TEMPORAL_CASE_FAMILIES)
         for family_id in TEMPORAL_CASE_FAMILIES:
             with self.subTest(family_id=family_id):
-                descriptors = TEMPORAL_SOURCE_CONDITIONS[family_id]
+                descriptors = TEMPORAL_CONDITIONS[family_id]
                 self.assertEqual(
                     tuple(item.condition_id for item in descriptors),
-                    ("condition_a", "condition_b"),
+                    ("source_reported", "counterfactual"),
                 )
                 self.assertTrue(
                     all(
-                        item.dataset_kind is DatasetKind.TEMPORAL
-                        and item.condition_role is ConditionRole.SOURCE_REPORTED
+                        item.dataset_kind is DatasetKind.TEMPORAL_COUNTERFACTUAL
                         and item.family_id == family_id
                         for item in descriptors
                     )
                 )
-                runtime_map = TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP[family_id]
-                self.assertEqual(set(runtime_map), {"condition_a", "condition_b"})
-                # Old storage values do not alter the descriptors' source roles.
+                runtime_map = TEMPORAL_CONDITION_RUNTIME_MAP[family_id]
+                self.assertEqual(set(runtime_map), {"source_reported", "counterfactual"})
+                self.assertEqual(
+                    [item.condition_role for item in descriptors],
+                    [ConditionRole.SOURCE_REPORTED, ConditionRole.COUNTERFACTUAL],
+                )
+                # Runtime world keys do not alter the source/authored distinction.
                 self.assertEqual(
                     set(runtime_map.values()),
                     {"historical", "counterfactual"},
                 )
-                self.assertTrue(TEMPORAL_SOURCE_PAPER_IDS[family_id].startswith("arxiv:"))
-                self.assertRegex(
-                    TEMPORAL_SOURCE_VERSION_IDS[family_id],
-                    r"^[0-9]{4}\.[0-9]{4,5}v[0-9]+$",
-                )
+                publication = TEMPORAL_SCIENCE_CARDS[family_id]["publication"]
+                self.assertEqual(TEMPORAL_SOURCE_PAPER_IDS[family_id],
+                                 "doi:" + publication["doi"])
+                self.assertEqual(TEMPORAL_SOURCE_VERSION_IDS[family_id],
+                                 publication.get("source_arxiv_version"))
+                version = TEMPORAL_SOURCE_VERSION_IDS[family_id]
+                if version is not None:
+                    self.assertRegex(version, r"^[0-9]{4}\.[0-9]{4,5}v[0-9]+$")
+
+        self.assertEqual(len(set(TEMPORAL_SOURCE_PAPER_IDS.values())), 29)
 
     def test_temporal_counterfactual_pair_has_distinct_source_and_authored_roles(self):
         source = ConditionDescriptor(

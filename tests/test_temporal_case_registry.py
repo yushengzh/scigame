@@ -1,136 +1,57 @@
 from __future__ import annotations
 
-import math
 import unittest
 
 from role_benchmark.cases import CASE_FAMILIES
 from role_benchmark.models import BenchmarkTrack, ExperimentProposal, OracleStatus
 from role_benchmark.protocols import CaseOracle
 from role_benchmark.temporal_cases import (
-    TEMPORAL_CASE_FAMILIES,
-    TEMPORAL_CASE_SPECS,
-    make_temporal_case,
+    TEMPORAL_CASE_FAMILIES, TEMPORAL_CASE_SPECS,
+    TEMPORAL_CONDITIONS, TEMPORAL_CONDITION_RUNTIME_MAP,
+    TEMPORAL_SOURCE_PAPER_IDS, make_temporal_case,
 )
 
 
 class TemporalCaseRegistryTests(unittest.TestCase):
-    def test_temporal_registry_is_separate_and_aligned(self):
-        self.assertEqual(
-            TEMPORAL_CASE_FAMILIES,
-            (
-                "kz_incompressible_energy_temperature_regimes",
-                "viscous_inertial_rheology",
-                "rilw_msd_scaling",
-                "defect_sre",
-                "trxas_lorentzian_fit",
-                "self_similar_spreading_radius_ratio",
-                "stealthy_hyperuniform_localization_scaling",
-                "uamo_lyapunov",
-                "statistical_mean_field_effective_detuning",
-            ),
-        )
+    def test_current_registry_is_complete_and_distinct_from_historical(self):
+        self.assertEqual(len(TEMPORAL_CASE_FAMILIES), 30)
         self.assertEqual(tuple(TEMPORAL_CASE_SPECS), TEMPORAL_CASE_FAMILIES)
+        self.assertEqual(len(set(TEMPORAL_SOURCE_PAPER_IDS.values())), 29)
         self.assertTrue(set(TEMPORAL_CASE_FAMILIES).isdisjoint(CASE_FAMILIES))
+        self.assertIn("temporal_enriched_104003", TEMPORAL_CASE_FAMILIES)
+        self.assertNotIn("kz_incompressible_energy_temperature_regimes", TEMPORAL_CASE_FAMILIES)
 
-    def test_registered_family_instantiates_all_four_cells(self):
-        for condition_id in ("condition_a", "condition_b"):
-            for task_setting in (
-                BenchmarkTrack.IDENTIFICATION,
-                BenchmarkTrack.DISCOVERY,
-            ):
-                with self.subTest(
-                    condition_id=condition_id,
-                    task_setting=task_setting.value,
-                ):
-                    case = make_temporal_case(
-                        "kz_incompressible_energy_temperature_regimes",
-                        condition_id,
-                        task_setting,
+    def test_all_families_instantiate_both_worlds_and_tracks(self):
+        for family in TEMPORAL_CASE_FAMILIES:
+            for descriptor in TEMPORAL_CONDITIONS[family]:
+                for track in BenchmarkTrack:
+                    with self.subTest(family=family, condition=descriptor.condition_id, track=track):
+                        case = make_temporal_case(family, descriptor.condition_id, track)
+                        self.assertIs(case.definition.track, track)
+                        self.assertTrue(case.definition.case_id.startswith("temporal."))
+                        self.assertEqual(descriptor.variant_id, "canonical")
+                        self.assertEqual(descriptor.dataset_kind.value, "temporal_counterfactual")
+            self.assertEqual(TEMPORAL_CONDITION_RUNTIME_MAP[family], {
+                "source_reported": "historical", "counterfactual": "counterfactual",
+            })
+
+    def test_observations_repeat_and_are_shared_across_task_settings(self):
+        for family, spec in TEMPORAL_CASE_SPECS.items():
+            for condition in ("source_reported", "counterfactual"):
+                with self.subTest(family=family, condition=condition):
+                    cases = [make_temporal_case(family, condition, track) for track in BenchmarkTrack]
+                    proposal = ExperimentProposal(
+                        intent="Measure the relation at a declared experimental condition.",
+                        apparatus=spec.apparatus_name,
+                        controls=dict(spec.diagnostic_conditions[0]),
+                        readouts=tuple(item.name for item in spec.readouts),
+                        replicates=1,
                     )
-                    self.assertIs(case.definition.track, task_setting)
-                    self.assertTrue(
-                        case.definition.case_id.startswith(
-                            "temporal.quenched_bec_energy_simulator"
-                        )
-                    )
-
-    def test_kz_condition_a_oracle_reports_the_central_fit_not_a_raw_mean(self):
-        case = make_temporal_case(
-            "kz_incompressible_energy_temperature_regimes",
-            "condition_a",
-            BenchmarkTrack.DISCOVERY,
-        )
-        readout = case.definition.resources.readouts[0]
-        self.assertEqual(
-            readout.statistic,
-            (
-                "Central value of the source-reported weighted-least-squares fit to "
-                "ensemble-mean data."
-            ),
-        )
-        self.assertEqual(
-            readout.uncertainty,
-            (
-                "Central fit only; source-reported +/- fit-parameter values are not "
-                "propagated into this queried value."
-            ),
-        )
-
-        oracle = CaseOracle(case.definition, case.world_model)
-        for tau_q in (100.0, 271.828, 1000.0):
-            with self.subTest(tau_q=tau_q):
-                proposal = ExperimentProposal(
-                    intent="Query the source-anchored response at a permitted duration.",
-                    apparatus="quenched_bec_energy_simulator",
-                    controls={"tau_q": tau_q},
-                    readouts=("e_i",),
-                    replicates=1,
-                )
-                first = oracle.respond(proposal)
-                second = oracle.respond(proposal)
-                self.assertIs(first.status, OracleStatus.VALID)
-                self.assertIs(second.status, OracleStatus.VALID)
-                evidence = first.evidence
-                self.assertIsNotNone(evidence)
-                self.assertTrue(
-                    math.isclose(
-                        evidence.measurements["e_i"],
-                        197740.0 * tau_q**-0.971,
-                        rel_tol=1e-15,
-                        abs_tol=0.0,
-                    )
-                )
-                self.assertEqual(evidence.units["e_i"], "dimensionless")
-                self.assertEqual(evidence.uncertainty["e_i"], readout.uncertainty)
-                self.assertIn("central value", evidence.message.lower())
-                self.assertIn(
-                    "weighted-least-squares fit", evidence.message.lower()
-                )
-                self.assertNotIn("deterministic mean of", evidence.message.lower())
-                self.assertEqual(second.evidence, evidence)
-
-                identification_case = make_temporal_case(
-                    "kz_incompressible_energy_temperature_regimes",
-                    "condition_a",
-                    BenchmarkTrack.IDENTIFICATION,
-                )
-                identification_response = CaseOracle(
-                    identification_case.definition,
-                    identification_case.world_model,
-                ).respond(proposal)
-                self.assertEqual(identification_response.evidence, evidence)
-
-        invalid_replicates = oracle.respond(
-            ExperimentProposal(
-                intent="Attempt unsupported resampling.",
-                apparatus="quenched_bec_energy_simulator",
-                controls={"tau_q": 271.828},
-                readouts=("e_i",),
-                replicates=2,
-            )
-        )
-        self.assertIs(invalid_replicates.status, OracleStatus.OUT_OF_RANGE)
-        self.assertIsNone(invalid_replicates.evidence)
+                    oracles = [CaseOracle(case.definition, case.world_model) for case in cases]
+                    responses = [oracle.respond(proposal) for oracle in oracles]
+                    self.assertTrue(all(item.status is OracleStatus.VALID for item in responses))
+                    self.assertEqual(responses[0].evidence, responses[1].evidence)
+                    self.assertEqual(oracles[0].respond(proposal).evidence, responses[0].evidence)
 
 
 if __name__ == "__main__":

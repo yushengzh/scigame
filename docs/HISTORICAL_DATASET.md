@@ -12,7 +12,7 @@
 | `temporal` | 30 | 120 | 360 episodes |
 | `both` | 50 | 200 | 600 episodes |
 
-每个 Historical family 包含 `historical` / `counterfactual` 两个 world，以及 `identification` / `discovery` 两种任务。`both` 包含当前这 20 个 Historical family 和公开 Temporal 的 30 个 family。
+每个 Historical family 包含 `historical` / `counterfactual` 两个 world，以及 `identification` / `discovery` 两种任务，variant 统一为 `canonical`。`both` 包含当前这 20 个 Historical family 和 [Temporal](TEMPORAL_DATASET.md) 的 30 个 family。Temporal 来自 29 篇论文，其每个来源关系同样与一个作者构造的反事实配对。
 
 Historical 原关系来自经典科学规律的确定性理想化，包括单摆、双缝、气体关系、电磁现象、热学、反应动力学等。题目公开控制变量、读数与适用域；测量由可执行的 world 生成。这些是受历史科学启发的实验世界，不是历史原始测量记录的逐点复刻。
 

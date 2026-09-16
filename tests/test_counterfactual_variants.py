@@ -9,14 +9,10 @@ from role_benchmark.cases.matched import (
     truth_submission,
 )
 from role_benchmark.counterfactual import (
-    AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES,
-    AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE,
-    make_authored_temporal_counterfactual_variants,
     make_counterfactual_variant,
     rms_symmetric_tolerance_scaled_separation,
 )
 from role_benchmark.models import BenchmarkTrack
-from role_benchmark.temporal_cases import TEMPORAL_CASE_SPECS
 
 
 TRACKS = (BenchmarkTrack.IDENTIFICATION, BenchmarkTrack.DISCOVERY)
@@ -98,120 +94,6 @@ class CounterfactualVariantTests(unittest.TestCase):
         self.assertAlmostEqual(forward, reverse)
         self.assertAlmostEqual(forward, explicit)
 
-    def test_temporal_variants_are_separate_authored_pairs_for_four_families(self):
-        expected_families = {
-            "self_similar_spreading_radius_ratio",
-            "stealthy_hyperuniform_localization_scaling",
-            "uamo_lyapunov",
-            "statistical_mean_field_effective_detuning",
-        }
-        self.assertEqual(
-            AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES,
-            expected_families,
-        )
-
-        for family in sorted(expected_families):
-            source = TEMPORAL_CASE_SPECS[family]
-            source_historical = source.truths["historical"]
-            source_counterfactual = source.truths["counterfactual"]
-            source_truths = source.truths
-            with self.subTest(family=family):
-                variants = make_authored_temporal_counterfactual_variants(source)
-                easy = variants["easy"]
-                hard = variants["hard"]
-
-                self.assertIs(TEMPORAL_CASE_SPECS[family], source)
-                self.assertIs(source.truths, source_truths)
-                self.assertIs(source.truths["historical"], source_historical)
-                self.assertIs(source.truths["counterfactual"], source_counterfactual)
-                self.assertEqual(easy.counterfactual_fraction, 0.75)
-                self.assertEqual(hard.counterfactual_fraction, 0.5)
-
-                parameter = _changed_key(
-                    source_historical.parameters,
-                    source_counterfactual.parameters,
-                )
-                historical_value = float(source_historical.parameters[parameter])
-                source_value = float(source_counterfactual.parameters[parameter])
-                for variant, fraction in ((easy, 0.75), (hard, 0.5)):
-                    counterfactual = variant.spec.truths["counterfactual"]
-                    self.assertIs(
-                        variant.spec.truths["historical"], source_historical
-                    )
-                    self.assertAlmostEqual(
-                        counterfactual.parameters[parameter],
-                        historical_value + fraction * (source_value - historical_value),
-                    )
-                    self.assertIn(
-                        AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE,
-                        variant.spec.common_notes,
-                    )
-                    self.assertIn(
-                        "not a source-reported condition",
-                        variant.spec.counterfactual_change,
-                    )
-                    self.assert_experimental_contract_unchanged(
-                        source, variant.spec
-                    )
-                    self.assertEqual(
-                        _formula_structure(
-                            counterfactual.discovery_outputs
-                        ),
-                        _formula_structure(
-                            source_counterfactual.discovery_outputs
-                        ),
-                    )
-                    self.assert_truth_submissions_pass(variant.spec)
-
-                historical_identification = source_historical.identification_values
-                source_identification = source_counterfactual.identification_values
-                self.assertIsNotNone(historical_identification)
-                self.assertIsNotNone(source_identification)
-                identification_parameter = _changed_key(
-                    historical_identification,
-                    source_identification,
-                )
-                historical_identification_value = float(
-                    historical_identification[identification_parameter]
-                )
-                source_identification_value = float(
-                    source_identification[identification_parameter]
-                )
-                for variant, fraction in ((easy, 0.75), (hard, 0.5)):
-                    value = variant.spec.truths[
-                        "counterfactual"
-                    ].identification_values[identification_parameter]
-                    self.assertAlmostEqual(
-                        value,
-                        historical_identification_value
-                        + fraction
-                        * (
-                            source_identification_value
-                            - historical_identification_value
-                        ),
-                    )
-
-                self.assertGreater(
-                    easy.fixed_design_separation,
-                    hard.fixed_design_separation,
-                )
-                self.assertGreater(hard.fixed_design_separation, 0.0)
-
-    def test_discrete_temporal_source_pairs_are_not_eligible(self):
-        for family in (
-            "kz_incompressible_energy_temperature_regimes",
-            "viscous_inertial_rheology",
-            "rilw_msd_scaling",
-            "defect_sre",
-            "trxas_lorentzian_fit",
-        ):
-            with self.subTest(family=family):
-                with self.assertRaisesRegex(
-                    ValueError, "four continuous-coordinate families"
-                ):
-                    make_authored_temporal_counterfactual_variants(
-                        TEMPORAL_CASE_SPECS[family]
-                    )
 
 
 if __name__ == "__main__":

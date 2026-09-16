@@ -55,6 +55,14 @@ def _episode_spec(row):
         raise ValueError(
             "Archived Historical results require their original dataset reference and Git revision; "
             "they cannot be relabelled or scored as the current historical dataset.")
+    if (spec.dataset_kind in {matrix.DatasetKind.TEMPORAL.value,
+                              matrix.DatasetKind.TEMPORAL_COUNTERFACTUAL.value}
+            and (spec.case_pack not in {matrix.TEMPORAL_CASE_PACK, matrix.BOTH_CASE_PACK}
+                 or spec.variant_id != "canonical"
+                 or spec.dataset_kind != matrix.DatasetKind.TEMPORAL_COUNTERFACTUAL.value)):
+        raise ValueError(
+            "Archived Temporal results require their original dataset reference and Git revision; "
+            "they cannot be relabelled or scored as the current temporal dataset.")
     try:
         pack = matrix.CASE_PACKS[spec.case_pack]
         family = pack.specifications[spec.case_family][spec.variant_id]

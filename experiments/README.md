@@ -4,7 +4,9 @@
 
 `run_case_matrix.py` runs public development cases with independently configured Player, Oracle, and post-hoc Evaluator roles. The packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contributes two conditions × identification/discovery.
 
-`historical` selects the current Historical dataset with three-step structural counterfactuals. `both` includes exactly this Historical dataset plus Temporal. The name and [manifest path](../datasets/historical/manifest.json) stay fixed; Git records dataset evolution. Earlier Historical packs are retired, and older experiment outputs retain their original scientific meaning. See [Historical dataset](../docs/HISTORICAL_DATASET.md).
+`historical` selects twenty classical relations with three-step structural counterfactuals. `temporal` selects 30 relations from 29 papers, each with an authored counterfactual. `both` includes exactly these two current datasets. Both use variant `canonical`. Historical conditions are `historical` / `counterfactual`; Temporal conditions are `source_reported` / `counterfactual`.
+
+Names and manifest paths stay fixed: [Historical manifest](../datasets/historical/manifest.json), [Temporal manifest](../datasets/temporal/manifest.json). Git records their evolution. Earlier datasets are retired; the old public Temporal mixture of source A/B pairs and parameter twins is not the current 30-family dataset. Older experiment outputs retain their original scientific meaning. See [Historical dataset](../docs/HISTORICAL_DATASET.md) and [Temporal dataset](../docs/TEMPORAL_DATASET.md).
 
 ```text
 episodes = cases × selected evaluation methods × repeats
@@ -49,7 +51,8 @@ This selects 200 episodes. For a real run, begin with one case and explicitly co
 ```bash
 PYTHONPATH=src:. python3 -m experiments.run_case_matrix \
   --case-pack temporal \
-  --family temporal_source_007 \
+  --family defect_sre \
+  --variant canonical \
   --condition source_reported \
   --task-setting identification \
   --evaluation-method "adaptive experimental design" \

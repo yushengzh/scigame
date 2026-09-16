@@ -102,3 +102,5 @@ PYTHONPATH=src:. python3 -B -m experiments.postevaluate_science \
 本轮使用实际 case runner、确定性 Oracle/scorer 与固定模型响应进行端到端验证；不把固定响应测试当成真实 Judge 的语义可靠性证据。重点覆盖：成功与理解增量独立、Fixed 无前测、无新观测复核、CF 参考、已纠正错误不算最终失败、旧 Judge 不算新测量完成、Judge 失败保持原结果以及分组分母。
 
 独立 subagent 的发现、修正与复查记录见 [集成独立审查](postevaluation_integration_review_20260916.md)。后续研究仍需用少量真实解释作人工独立判读，确认语义评分的一致性。
+
+当前 Temporal 同样只使用 `temporal` 的当前科学定义。旧 `source_reported_v1` 或 `authored_v1` 结果必须使用原 Git 提交和原始关系补评，不能改名套用当前真值；参见 [Temporal 数据说明](TEMPORAL_DATASET.md)。

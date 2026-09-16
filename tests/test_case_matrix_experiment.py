@@ -36,14 +36,7 @@ from role_benchmark import (
 from role_benchmark.discovery_evaluation import DISCOVERY_PROMPT_VERSION, _claim_text
 from role_benchmark.llm import PLAYER_PROMPT_VERSION_V5_PERFORMANCE
 from role_benchmark.performance import PERFORMANCE_PROTOCOL
-from experiments.core160_pack import (
-    CORE160_TEMPORAL_COUNTERFACTUAL_CONDITION_ID,
-    CORE160_TEMPORAL_SOURCE_CONDITION_ID,
-    CORE160_TEMPORAL_SOURCE_RELATION_ID,
-    CORE160_TEMPORAL_VARIANT_ID,
-)
 from experiments.run_case_matrix import (
-    ACCEPTED_TEMPORAL_CASE_FAMILIES,
     BOTH_CASE_FAMILIES,
     CASE_PACKS,
     CASE_SPECS,
@@ -57,7 +50,6 @@ from experiments.run_case_matrix import (
     IFM_API_KEY_ENV,
     HISTORICAL_CASE_FAMILIES,
     HISTORICAL_CONDITION_IDS,
-    LEGACY_TEMPORAL_CASE_FAMILIES,
     LLM_PRESENTATION_ORACLE,
     OPENAI_API_KEY_ENV,
     OPENAI_ENDPOINT,
@@ -65,12 +57,10 @@ from experiments.run_case_matrix import (
     TEMPORAL_CASE_FAMILIES,
     CaseMatrixDeepSeekBackend,
     ConcurrencyLimitedBackend,
-    _arxiv_base_id,
     _config_payload,
     _evaluated_result,
     _infrastructure_failed_result,
     _make_case,
-    _merge_unique_temporal_identities,
     _parser,
     _provider_payload,
     _resolve_api_key,
@@ -298,16 +288,9 @@ class CaseMatrixExperimentTests(unittest.TestCase):
 
         self.assertEqual(historical.families, HISTORICAL_CASE_FAMILIES)
         self.assertEqual(len(historical.families), 20)
-        self.assertEqual(
-            temporal.families,
-            LEGACY_TEMPORAL_CASE_FAMILIES + ACCEPTED_TEMPORAL_CASE_FAMILIES,
-        )
-        self.assertEqual(len(LEGACY_TEMPORAL_CASE_FAMILIES), 9)
-        self.assertEqual(len(ACCEPTED_TEMPORAL_CASE_FAMILIES), 21)
-        self.assertEqual(
-            ACCEPTED_TEMPORAL_CASE_FAMILIES[-1],
-            "temporal_source_3047",
-        )
+        self.assertEqual(temporal.families, TEMPORAL_CASE_FAMILIES)
+        self.assertIn("temporal_enriched_104003", temporal.families)
+        self.assertNotIn("kz_incompressible_energy_temperature_regimes", temporal.families)
         self.assertEqual(len(temporal.families), 30)
         self.assertEqual(both.families, BOTH_CASE_FAMILIES)
         self.assertEqual(
@@ -319,56 +302,10 @@ class CaseMatrixExperimentTests(unittest.TestCase):
 
         paper_ids = tuple(temporal.source_paper_ids.values())
         version_ids = tuple(temporal.source_version_ids.values())
-        arxiv_base_ids = tuple(
-            re.sub(r"v[0-9]+$", "", version_id)
-            for version_id in version_ids
-        )
         self.assertEqual(len(paper_ids), 30)
-        self.assertEqual(len(set(paper_ids)), 30)
+        self.assertEqual(len(set(paper_ids)), 29)
         self.assertEqual(len(version_ids), 30)
-        self.assertEqual(len(set(arxiv_base_ids)), 30)
-
-        legacy_paper_ids = {
-            family: temporal.source_paper_ids[family]
-            for family in LEGACY_TEMPORAL_CASE_FAMILIES
-        }
-        accepted_paper_ids = {
-            family: temporal.source_paper_ids[family]
-            for family in ACCEPTED_TEMPORAL_CASE_FAMILIES
-        }
-        duplicated_paper_ids = dict(accepted_paper_ids)
-        duplicated_paper_ids[ACCEPTED_TEMPORAL_CASE_FAMILIES[0]] = (
-            legacy_paper_ids[LEGACY_TEMPORAL_CASE_FAMILIES[0]]
-        )
-        with self.assertRaisesRegex(ValueError, "source_paper_id values"):
-            _merge_unique_temporal_identities(
-                "source_paper_id",
-                legacy_paper_ids,
-                duplicated_paper_ids,
-            )
-
-        legacy_version_ids = {
-            family: temporal.source_version_ids[family]
-            for family in LEGACY_TEMPORAL_CASE_FAMILIES
-        }
-        accepted_version_ids = {
-            family: temporal.source_version_ids[family]
-            for family in ACCEPTED_TEMPORAL_CASE_FAMILIES
-        }
-        duplicated_version_ids = dict(accepted_version_ids)
-        legacy_base_id = _arxiv_base_id(
-            legacy_version_ids[LEGACY_TEMPORAL_CASE_FAMILIES[0]]
-        )
-        duplicated_version_ids[ACCEPTED_TEMPORAL_CASE_FAMILIES[0]] = (
-            legacy_base_id + "v999"
-        )
-        with self.assertRaisesRegex(ValueError, "source_version_id values"):
-            _merge_unique_temporal_identities(
-                "source_version_id",
-                legacy_version_ids,
-                duplicated_version_ids,
-                normalize=_arxiv_base_id,
-            )
+        self.assertEqual(sum(value is None for value in version_ids), 6)
 
         for case_pack in CASE_PACKS:
             parsed = _parser().parse_args(
@@ -413,20 +350,17 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             ),
             "temporal": (
                 120,
-                {"temporal": 36, "temporal_counterfactual": 84},
-                {"source_reported_v1", CORE160_TEMPORAL_VARIANT_ID},
+                {"temporal_counterfactual": 120},
+                {"canonical"},
             ),
             "both": (
                 200,
                 {
                     "historical_counterfactual": 80,
-                    "temporal": 36,
-                    "temporal_counterfactual": 84,
+                    "temporal_counterfactual": 120,
                 },
                 {
                     "canonical",
-                    "source_reported_v1",
-                    CORE160_TEMPORAL_VARIANT_ID,
                 },
             ),
         }
@@ -467,23 +401,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             )
 
         temporal = CASE_PACKS["temporal"]
-        legacy_family = LEGACY_TEMPORAL_CASE_FAMILIES[0]
-        legacy_cells = build_plan(
-            families=(legacy_family,),
-            repeats=1,
-            case_pack="temporal",
-            evaluation_methods=(method,),
-        )
-        self.assertEqual(
-            {spec.variant_id for spec in legacy_cells},
-            {"source_reported_v1"},
-        )
-        self.assertEqual(
-            {spec.condition_role for spec in legacy_cells},
-            {"source_reported"},
-        )
-
-        accepted_family = ACCEPTED_TEMPORAL_CASE_FAMILIES[0]
+        accepted_family = TEMPORAL_CASE_FAMILIES[0]
         accepted_cells = build_plan(
             families=(accepted_family,),
             repeats=1,
@@ -493,15 +411,15 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         self.assertEqual(
             dict(temporal.runtime_condition_ids[accepted_family]),
             {
-                CORE160_TEMPORAL_SOURCE_CONDITION_ID: "historical",
-                CORE160_TEMPORAL_COUNTERFACTUAL_CONDITION_ID: "counterfactual",
+                "source_reported": "historical",
+                "counterfactual": "counterfactual",
             },
         )
         self.assertEqual(
             {spec.condition_id for spec in accepted_cells},
             {
-                CORE160_TEMPORAL_SOURCE_CONDITION_ID,
-                CORE160_TEMPORAL_COUNTERFACTUAL_CONDITION_ID,
+                "source_reported",
+                "counterfactual",
             },
         )
         for spec in accepted_cells:
@@ -514,11 +432,11 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 spec.source_version_id,
                 temporal.source_version_ids[accepted_family],
             )
-            if spec.condition_id == CORE160_TEMPORAL_SOURCE_CONDITION_ID:
+            if spec.condition_id == "source_reported":
                 self.assertEqual(spec.condition_role, "source_reported")
                 self.assertEqual(
                     spec.source_condition_id,
-                    CORE160_TEMPORAL_SOURCE_RELATION_ID,
+                    "paper_relation",
                 )
             else:
                 self.assertEqual(spec.condition_role, "counterfactual")
@@ -555,10 +473,10 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             )
             temporal_conditions = config["design"]["condition_semantics"][
                 TEMPORAL_CASE_FAMILIES[0]
-            ]["source_reported_v1"]
+            ]["canonical"]
             self.assertEqual(
                 [item["condition_role"] for item in temporal_conditions],
-                ["source_reported", "source_reported"],
+                ["source_reported", "counterfactual"],
             )
             self.assertIsNone(config["design"]["counterfactual_difficulty"])
             self.assertNotIn("worlds", config["design"])

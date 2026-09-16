@@ -81,10 +81,10 @@ from role_benchmark.cases import (
 )
 from role_benchmark.cases.matched import MatchedFamilySpec, make_matched_case
 from role_benchmark.temporal_cases import (
-    TEMPORAL_CASE_FAMILIES as LEGACY_TEMPORAL_CASE_FAMILIES,
+    TEMPORAL_CASE_FAMILIES,
     TEMPORAL_CASE_SPECS,
-    TEMPORAL_SOURCE_CONDITIONS,
-    TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP,
+    TEMPORAL_CONDITIONS,
+    TEMPORAL_CONDITION_RUNTIME_MAP,
     TEMPORAL_SOURCE_PAPER_IDS,
     TEMPORAL_SOURCE_VERSION_IDS,
 )
@@ -94,7 +94,6 @@ from role_benchmark.llm import (
 )
 from role_benchmark.wire import DEFAULT_MAX_ACTION_BYTES, final_submission_to_payload
 
-from experiments.core160_pack import load_accepted_temporal_pack
 from experiments.gemini_generate_content import GeminiGenerateContentBackend
 from experiments.ifm_chat_completions import (
     DEFAULT_IFM_CHAT_COMPLETIONS_ENDPOINT,
@@ -451,7 +450,7 @@ class CasePackDefinition:
     specifications: Mapping[str, Mapping[str, MatchedFamilySpec]]
     conditions: Mapping[str, Mapping[str, Tuple[ConditionDescriptor, ...]]]
     source_paper_ids: Mapping[str, str]
-    source_version_ids: Mapping[str, str]
+    source_version_ids: Mapping[str, Optional[str]]
     runtime_condition_ids: Mapping[str, Mapping[str, str]] = field(
         default_factory=dict
     )
@@ -482,65 +481,11 @@ def _historical_counterfactual_conditions(
     )
 
 
-_ACCEPTED_TEMPORAL_PACK = load_accepted_temporal_pack()
-ACCEPTED_TEMPORAL_CASE_FAMILIES: Tuple[str, ...] = (
-    _ACCEPTED_TEMPORAL_PACK.family_ids
-)
-TEMPORAL_CASE_FAMILIES: Tuple[str, ...] = (
-    LEGACY_TEMPORAL_CASE_FAMILIES + ACCEPTED_TEMPORAL_CASE_FAMILIES
-)
-if len(set(TEMPORAL_CASE_FAMILIES)) != len(TEMPORAL_CASE_FAMILIES):
-    raise ValueError(
-        "legacy and accepted Temporal releases contain duplicate families"
-    )
 BOTH_CASE_FAMILIES: Tuple[str, ...] = (
     HISTORICAL_CASE_FAMILIES + TEMPORAL_CASE_FAMILIES
 )
 if len(set(BOTH_CASE_FAMILIES)) != len(BOTH_CASE_FAMILIES):
-    raise ValueError(
-        "Historical and Temporal releases contain duplicate families"
-    )
-
-
-def _merge_unique_temporal_identities(
-    label: str,
-    legacy: Mapping[str, str],
-    accepted: Mapping[str, str],
-    *,
-    normalize: Optional[Callable[[str], str]] = None,
-) -> Mapping[str, str]:
-    """Merge complete family identities while rejecting reused source data."""
-
-    merged = {**legacy, **accepted}
-    if set(merged) != set(TEMPORAL_CASE_FAMILIES):
-        raise ValueError("Temporal %s must cover every family exactly once" % label)
-    identities = tuple(merged.values())
-    if normalize is not None:
-        identities = tuple(normalize(value) for value in identities)
-    if len(set(identities)) != len(TEMPORAL_CASE_FAMILIES):
-        raise ValueError("Temporal %s values must be unique" % label)
-    return merged
-
-
-_TEMPORAL_SOURCE_PAPER_IDS = _merge_unique_temporal_identities(
-    "source_paper_id",
-    TEMPORAL_SOURCE_PAPER_IDS,
-    _ACCEPTED_TEMPORAL_PACK.source_paper_ids,
-)
-
-
-def _arxiv_base_id(versioned_id: str) -> str:
-    """Normalize an arXiv identity so different versions still collide."""
-
-    return re.sub(r"v[0-9]+$", "", versioned_id)
-
-
-_TEMPORAL_SOURCE_VERSION_IDS = _merge_unique_temporal_identities(
-    "source_version_id",
-    TEMPORAL_SOURCE_VERSION_IDS,
-    _ACCEPTED_TEMPORAL_PACK.source_version_ids,
-    normalize=_arxiv_base_id,
-)
+    raise ValueError("Historical and Temporal contain duplicate families")
 
 
 _HISTORICAL_PACK = CasePackDefinition(
@@ -566,25 +511,16 @@ _TEMPORAL_PACK = CasePackDefinition(
     name=TEMPORAL_CASE_PACK,
     families=TEMPORAL_CASE_FAMILIES,
     specifications={
-        **{
-            family: {"source_reported_v1": TEMPORAL_CASE_SPECS[family]}
-            for family in LEGACY_TEMPORAL_CASE_FAMILIES
-        },
-        **_ACCEPTED_TEMPORAL_PACK.specifications,
+        family: {"canonical": TEMPORAL_CASE_SPECS[family]}
+        for family in TEMPORAL_CASE_FAMILIES
     },
     conditions={
-        **{
-            family: {"source_reported_v1": TEMPORAL_SOURCE_CONDITIONS[family]}
-            for family in LEGACY_TEMPORAL_CASE_FAMILIES
-        },
-        **_ACCEPTED_TEMPORAL_PACK.conditions,
+        family: {"canonical": TEMPORAL_CONDITIONS[family]}
+        for family in TEMPORAL_CASE_FAMILIES
     },
-    source_paper_ids=_TEMPORAL_SOURCE_PAPER_IDS,
-    source_version_ids=_TEMPORAL_SOURCE_VERSION_IDS,
-    runtime_condition_ids={
-        **TEMPORAL_SOURCE_CONDITION_RUNTIME_MAP,
-        **_ACCEPTED_TEMPORAL_PACK.runtime_truth_keys,
-    },
+    source_paper_ids=TEMPORAL_SOURCE_PAPER_IDS,
+    source_version_ids=TEMPORAL_SOURCE_VERSION_IDS,
+    runtime_condition_ids=TEMPORAL_CONDITION_RUNTIME_MAP,
 )
 
 
@@ -625,11 +561,17 @@ CASE_PACKS: Mapping[str, CasePackDefinition] = {
     ),
 }
 
-def _historical_dataset_metadata() -> Mapping[str, Any]:
-    """Record the selected dataset identity without a separate metric release."""
-    path = Path(__file__).resolve().parents[1] / "datasets/historical/manifest.json"
+def _dataset_metadata(name: str) -> Mapping[str, Any]:
+    """Record the current dataset identity in each run."""
+    path = Path(__file__).resolve().parents[1] / "datasets" / name / "manifest.json"
     metadata = json.loads(path.read_text(encoding="utf-8"))
-    return {key: metadata[key] for key in ("dataset_id", "status", "family_count", "case_count") if key in metadata}
+    return {key: metadata[key] for key in (
+        "dataset_id", "status", "family_count", "case_count", "distinct_source_papers"
+    ) if key in metadata}
+
+
+def _historical_dataset_metadata() -> Mapping[str, Any]:
+    return _dataset_metadata(HISTORICAL_CASE_PACK)
 
 
 CASE_PACK_FAMILY_CHOICES: Tuple[str, ...] = tuple(
@@ -1214,10 +1156,12 @@ def _case_pack(args: argparse.Namespace) -> CasePackDefinition:
             "unknown case pack %r; choose one of %s"
             % (name, ", ".join(CASE_PACKS))
         ) from exc
-    if pack.name in (HISTORICAL_CASE_PACK, BOTH_CASE_PACK):
-        historical = dict(_historical_dataset_metadata())
-        pack = replace(pack, release_metadata=(historical if pack.name == HISTORICAL_CASE_PACK
-                                               else {"historical": historical}))
+    metadata = (
+        {name: dict(_dataset_metadata(name))
+         for name in (HISTORICAL_CASE_PACK, TEMPORAL_CASE_PACK)}
+        if pack.name == BOTH_CASE_PACK else dict(_dataset_metadata(pack.name))
+    )
+    pack = replace(pack, release_metadata=metadata)
     return pack
 
 
@@ -1595,7 +1539,7 @@ def _base_result(
     release_metadata = (
         _historical_dataset_metadata()
         if spec.dataset_kind == DatasetKind.HISTORICAL_COUNTERFACTUAL.value
-        else case_pack.release_metadata
+        else _dataset_metadata(TEMPORAL_CASE_PACK)
     )
     observation_budget = build_evaluation_method_plan(
         case_pack.specifications[spec.case_family][spec.variant_id],

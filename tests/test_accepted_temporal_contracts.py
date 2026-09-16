@@ -20,36 +20,7 @@ from role_benchmark.protocols import CaseOracle
 from role_benchmark.temporal_cases import TEMPORAL_CASE_SPECS
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ACCEPTED_INDEX = (
-    ROOT
-    / "runs/temporal_window_2026-04-01_2026-06-30"
-    / "objectivity_and_generation_report/accepted_families.json"
-)
 TRACKS = (BenchmarkTrack.IDENTIFICATION, BenchmarkTrack.DISCOVERY)
-
-
-def _accepted_specs():
-    payload = json.loads(ACCEPTED_INDEX.read_text(encoding="utf-8"))
-    if len(payload["families"]) != payload["acceptance"]["accepted_family_count"]:
-        raise AssertionError("accepted-family index count is inconsistent")
-    result = []
-    for index, item in enumerate(payload["families"]):
-        path = ROOT / item["case_path"]
-        module_spec = importlib.util.spec_from_file_location(
-            "_accepted_temporal_contract_%d" % index, path
-        )
-        if module_spec is None or module_spec.loader is None:
-            raise AssertionError("cannot import accepted temporal case %s" % path)
-        module = importlib.util.module_from_spec(module_spec)
-        module_spec.loader.exec_module(module)
-        family_spec = next(
-            value
-            for name, value in vars(module).items()
-            if name.endswith("_SPEC") and isinstance(value, MatchedFamilySpec)
-        )
-        result.append((item["family"], family_spec))
-    return tuple(result)
 
 
 def _proposal(spec, condition):
@@ -65,18 +36,7 @@ def _proposal(spec, condition):
 class AcceptedTemporalContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        accepted = _accepted_specs()
-        accepted_names = tuple(family for family, _ in accepted)
-        cls.asserted_accepted_names = accepted_names
-        if not set(accepted_names).issubset(TEMPORAL_CASE_SPECS):
-            raise AssertionError("every accepted temporal family must be registered")
         cls.specs = tuple(TEMPORAL_CASE_SPECS.items())
-
-    def test_accepted_batch_is_promoted_after_the_registered_warmup(self):
-        self.assertEqual(
-            self.asserted_accepted_names,
-            tuple(TEMPORAL_CASE_SPECS)[1:],
-        )
 
     def test_identification_parameter_contract_is_complete_and_public(self):
         for family, spec in self.specs:
@@ -89,7 +49,9 @@ class AcceptedTemporalContractTests(unittest.TestCase):
                     unique_conditions = math.prod(
                         len(control.allowed_values) for control in spec.controls
                     )
-                    self.assertGreater(unique_conditions, spec.budget)
+                    # Fixed observation coverage must leave unobserved inputs.
+                    # The episode resource cap is not an observation design.
+                    self.assertGreater(unique_conditions, len(spec.diagnostic_conditions))
                     self.assertLessEqual(
                         len(contracts), unique_conditions * len(spec.readouts)
                     )

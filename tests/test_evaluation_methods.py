@@ -28,7 +28,7 @@ from role_benchmark.cases import CASE_SPECS, make_case
 from role_benchmark.cases.matched import truth_submission
 from role_benchmark.temporal_cases import (
     TEMPORAL_CASE_SPECS,
-    TEMPORAL_SOURCE_CONDITIONS,
+    TEMPORAL_CONDITIONS,
     make_temporal_case,
 )
 from role_benchmark.wire import player_action_to_json
@@ -101,7 +101,7 @@ class EvaluationMethodTests(unittest.TestCase):
                 make_temporal_case,
                 lambda family: tuple(
                     item.condition_id
-                    for item in TEMPORAL_SOURCE_CONDITIONS[family]
+                    for item in TEMPORAL_CONDITIONS[family]
                 ),
             ),
         )

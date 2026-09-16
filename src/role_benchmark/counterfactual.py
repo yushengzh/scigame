@@ -3,9 +3,8 @@
 The variants in this module are complete two-world pairs.  ``easy`` and
 ``hard`` are therefore design variants of the same family, not additional
 world labels. Numeric interpolation applies only to pairs with the same
-expression structure. Current Historical structural twins do not satisfy this
-assumption. Construction is separate from the temporal registry so
-source-reported temporal conditions remain unchanged.
+expression structure and compatible parameter domains and predictors.
+This utility does not define current benchmark dataset membership.
 """
 
 from __future__ import annotations
@@ -27,21 +26,6 @@ from role_benchmark.cases.matched import (
 
 COUNTERFACTUAL_DIFFICULTIES: Tuple[str, ...] = ("easy", "hard")
 
-AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES = frozenset(
-    {
-        "self_similar_spreading_radius_ratio",
-        "statistical_mean_field_effective_detuning",
-        "stealthy_hyperuniform_localization_scaling",
-        "uamo_lyapunov",
-    }
-)
-
-AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE = (
-    "The alternate mechanism values in this easy/hard pair are "
-    "benchmark-authored counterfactuals, not source-reported conditions."
-)
-
-_AUTHORED_TEMPORAL_FRACTIONS = {"easy": 0.75, "hard": 0.5}
 _AUTHORED_APPLICABILITY = (
     "Benchmark-authored counterfactual relation over the unchanged declared "
     "control and readout domains.",
@@ -246,7 +230,6 @@ def make_counterfactual_variant(
     difficulty: str,
     *,
     counterfactual_fraction: float,
-    temporal_authored: bool = False,
 ) -> CounterfactualVariant:
     """Construct an H/C pair; fractions below one require matching structures."""
 
@@ -262,31 +245,14 @@ def make_counterfactual_variant(
         or not 0.0 < float(counterfactual_fraction) <= 1.0
     ):
         raise ValueError("counterfactual_fraction must be finite and in (0, 1]")
-    if (
-        temporal_authored
-        and spec.family not in AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES
-    ):
-        raise ValueError(
-            "authored temporal variants are limited to the four "
-            "continuous-coordinate families"
-        )
-
     fraction = float(counterfactual_fraction)
     historical = spec.truths["historical"]
     parameter = _changed_parameter(spec)
-    if fraction == 1.0 and not temporal_authored:
+    if fraction == 1.0:
         variant_spec = spec
     else:
         counterfactual = _interpolated_truth(spec, fraction)
         source_counterfactual = spec.truths["counterfactual"]
-        notes = spec.common_notes
-        if temporal_authored and AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE not in notes:
-            notes += (AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE,)
-        provenance = (
-            " This is benchmark-authored and is not a source-reported condition."
-            if temporal_authored
-            else ""
-        )
         variant_spec = replace(
             spec,
             truths={
@@ -296,16 +262,14 @@ def make_counterfactual_variant(
             counterfactual_change=(
                 "The counterfactual sets %s to %.12g of the interval from the "
                 "historical value %.12g toward the reference counterfactual "
-                "value %.12g; all other mechanism parameters are unchanged.%s"
+                "value %.12g; all other mechanism parameters are unchanged."
                 % (
                     parameter,
                     fraction,
                     float(historical.parameters[parameter]),
                     float(source_counterfactual.parameters[parameter]),
-                    provenance,
                 )
             ),
-            common_notes=notes,
         )
 
     separation = rms_symmetric_tolerance_scaled_separation(variant_spec)
@@ -317,58 +281,9 @@ def make_counterfactual_variant(
     )
 
 
-def _make_variants(
-    spec: MatchedFamilySpec,
-    fractions: Mapping[str, float],
-    *,
-    temporal_authored: bool,
-) -> Dict[str, CounterfactualVariant]:
-    variants = {
-        difficulty: make_counterfactual_variant(
-            spec,
-            difficulty,
-            counterfactual_fraction=fractions[difficulty],
-            temporal_authored=temporal_authored,
-        )
-        for difficulty in COUNTERFACTUAL_DIFFICULTIES
-    }
-    easy = variants["easy"]
-    hard = variants["hard"]
-    if not easy.fixed_design_separation > hard.fixed_design_separation:
-        raise ValueError(
-            "easy fixed-design separation must be greater than hard separation"
-        )
-    hard_scaled = _symmetric_scaled_separations(
-        hard.spec,
-        hard.spec.truths["historical"],
-        hard.spec.truths["counterfactual"],
-        hard.spec.diagnostic_conditions,
-    )
-    if not any(value > 1.0 for value in hard_scaled):
-        raise ValueError(
-            "the hard pair must remain distinguishable in the fixed design"
-        )
-    return variants
-
-
-def make_authored_temporal_counterfactual_variants(
-    spec: MatchedFamilySpec,
-) -> Dict[str, CounterfactualVariant]:
-    """Return separate authored temporal pairs at 0.75 and 0.5 of H-to-C."""
-
-    return _make_variants(
-        spec,
-        _AUTHORED_TEMPORAL_FRACTIONS,
-        temporal_authored=True,
-    )
-
-
 __all__ = [
-    "AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES",
-    "AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE",
     "COUNTERFACTUAL_DIFFICULTIES",
     "CounterfactualVariant",
-    "make_authored_temporal_counterfactual_variants",
     "make_counterfactual_variant",
     "rms_symmetric_tolerance_scaled_separation",
 ]
