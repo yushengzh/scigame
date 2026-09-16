@@ -290,7 +290,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
     def test_registry_exposes_only_three_named_case_packs(self):
         self.assertEqual(
             tuple(CASE_PACKS),
-            ("historical", "historical_v2", "temporal", "both"),
+            ("historical", "temporal", "both"),
         )
         historical = CASE_PACKS["historical"]
         temporal = CASE_PACKS["temporal"]
@@ -409,7 +409,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             "historical": (
                 80,
                 {"historical_counterfactual": 80},
-                {"canonical_v1"},
+                {"canonical"},
             ),
             "temporal": (
                 120,
@@ -424,7 +424,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                     "temporal_counterfactual": 84,
                 },
                 {
-                    "canonical_v1",
+                    "canonical",
                     "source_reported_v1",
                     CORE160_TEMPORAL_VARIANT_ID,
                 },
@@ -462,7 +462,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         historical = CASE_PACKS["historical"]
         for family in historical.families:
             self.assertIs(
-                historical.specifications[family]["canonical_v1"],
+                historical.specifications[family]["canonical"],
                 CASE_SPECS[family],
             )
 
@@ -569,7 +569,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             root = Path(directory)
             args = _args(root)
             args.family = ["pendulum"]
-            args.variant = ["canonical_v1"]
+            args.variant = ["canonical"]
             args.condition = ["counterfactual"]
             args.task_setting = ["discovery"]
             args.evaluation_method = [FIXED_EXPERIMENTAL_DESIGN]
@@ -624,7 +624,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 evaluation_method,
             )
             for family in HISTORICAL_CASE_FAMILIES
-            for variant in ("canonical_v1",)
+            for variant in ("canonical",)
             for condition in HISTORICAL_CONDITION_IDS
             for task_setting in TASK_SETTINGS
             for evaluation_method in EVALUATION_METHODS
@@ -783,7 +783,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                     "--output-dir",
                     directory,
                     "--case-pack",
-                    "historical_v2",
+                    "historical",
                     "--dry-run",
                     "--player-provider",
                     "ifm",

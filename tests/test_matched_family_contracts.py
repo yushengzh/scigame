@@ -156,12 +156,12 @@ class MatchedFamilyContractTest(unittest.TestCase):
                 self.assertEqual(len(cells), 4)
                 for (world, track), case in cells.items():
                     self.assertIs(case.definition.track, track)
-                    self.assertNotIn(world, case.definition.case_id.lower())
+                    self.assertNotIn(world, case.definition.case_id.lower().split(".")[2:])
 
                 for world in MATCHED_WORLDS:
                     self.assertEqual(
-                        cells[(world, BenchmarkTrack.IDENTIFICATION)].definition.case_id,
-                        cells[(world, BenchmarkTrack.DISCOVERY)].definition.case_id,
+                        cells[(world, BenchmarkTrack.IDENTIFICATION)].definition.case_id.rsplit(".", 1)[0],
+                        cells[(world, BenchmarkTrack.DISCOVERY)].definition.case_id.rsplit(".", 1)[0],
                     )
                 self.assertNotEqual(
                     cells[("historical", BenchmarkTrack.IDENTIFICATION)].definition.case_id,
@@ -195,7 +195,8 @@ class MatchedFamilyContractTest(unittest.TestCase):
                         family, world, BenchmarkTrack.DISCOVERY
                     ).definition
 
-                    self.assertEqual(identification.case_id, discovery.case_id)
+                    self.assertEqual(identification.case_id.rsplit(".", 1)[0],
+                                     discovery.case_id.rsplit(".", 1)[0])
                     self.assertEqual(identification.background, discovery.background)
                     self.assertEqual(
                         identification.initial_observations,

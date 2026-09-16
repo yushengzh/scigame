@@ -78,8 +78,6 @@ from role_benchmark import (
 from role_benchmark.cases import (
     CASE_FAMILIES,
     CASE_SPECS,
-    HISTORICAL_V2_CASE_SPECS,
-    HISTORICAL_V2_FAMILIES,
 )
 from role_benchmark.cases.matched import MatchedFamilySpec, make_matched_case
 from role_benchmark.temporal_cases import (
@@ -130,7 +128,6 @@ IFM_API_KEY_ENV = "IFM_API_KEY"
 DEFAULT_SCHEDULE_SEED = 20260825
 DEFAULT_EXPERIMENT_ID = "development"
 HISTORICAL_CASE_PACK = "historical"
-HISTORICAL_V2_CASE_PACK = "historical_v2"
 TEMPORAL_CASE_PACK = "temporal"
 BOTH_CASE_PACK = "both"
 
@@ -550,40 +547,20 @@ _HISTORICAL_PACK = CasePackDefinition(
     name=HISTORICAL_CASE_PACK,
     families=HISTORICAL_CASE_FAMILIES,
     specifications={
-        family: {"canonical_v1": CASE_SPECS[family]}
+        family: {"canonical": CASE_SPECS[family]}
         for family in HISTORICAL_CASE_FAMILIES
     },
     conditions={
         family: {
-            "canonical_v1": _historical_counterfactual_conditions(
+            "canonical": _historical_counterfactual_conditions(
                 family,
-                "canonical_v1",
+                "canonical",
             )
         }
         for family in HISTORICAL_CASE_FAMILIES
     },
     source_paper_ids={},
     source_version_ids={},
-)
-_HISTORICAL_V2_PACK = CasePackDefinition(
-    name=HISTORICAL_V2_CASE_PACK,
-    families=HISTORICAL_V2_FAMILIES,
-    specifications={
-        family: {"structural_v2": HISTORICAL_V2_CASE_SPECS[family]}
-        for family in HISTORICAL_V2_FAMILIES
-    },
-    conditions={
-        family: {
-            "structural_v2": _historical_counterfactual_conditions(
-                family, "structural_v2"
-            )
-        }
-        for family in HISTORICAL_V2_FAMILIES
-    },
-    source_paper_ids={},
-    source_version_ids={},
-    # Populated after a read-only preflight only when this pack is selected.
-    release_metadata={},
 )
 _TEMPORAL_PACK = CasePackDefinition(
     name=TEMPORAL_CASE_PACK,
@@ -640,7 +617,6 @@ def _combine_case_packs(
 
 CASE_PACKS: Mapping[str, CasePackDefinition] = {
     HISTORICAL_CASE_PACK: _HISTORICAL_PACK,
-    HISTORICAL_V2_CASE_PACK: _HISTORICAL_V2_PACK,
     TEMPORAL_CASE_PACK: _TEMPORAL_PACK,
     BOTH_CASE_PACK: _combine_case_packs(
         BOTH_CASE_PACK,
@@ -651,9 +627,9 @@ CASE_PACKS: Mapping[str, CasePackDefinition] = {
 
 def _historical_dataset_metadata() -> Mapping[str, Any]:
     """Record the selected dataset identity without a separate metric release."""
-    path = Path(__file__).resolve().parents[1] / "datasets/historical20_v2/manifest.json"
+    path = Path(__file__).resolve().parents[1] / "datasets/historical/manifest.json"
     metadata = json.loads(path.read_text(encoding="utf-8"))
-    return {key: metadata[key] for key in ("dataset_id", "version", "status") if key in metadata}
+    return {key: metadata[key] for key in ("dataset_id", "status", "family_count", "case_count") if key in metadata}
 
 
 CASE_PACK_FAMILY_CHOICES: Tuple[str, ...] = tuple(
@@ -1238,11 +1214,10 @@ def _case_pack(args: argparse.Namespace) -> CasePackDefinition:
             "unknown case pack %r; choose one of %s"
             % (name, ", ".join(CASE_PACKS))
         ) from exc
-    if pack.name == HISTORICAL_V2_CASE_PACK:
-        pack = replace(
-            pack,
-            release_metadata=dict(_historical_dataset_metadata()),
-        )
+    if pack.name in (HISTORICAL_CASE_PACK, BOTH_CASE_PACK):
+        historical = dict(_historical_dataset_metadata())
+        pack = replace(pack, release_metadata=(historical if pack.name == HISTORICAL_CASE_PACK
+                                               else {"historical": historical}))
     return pack
 
 
@@ -1619,7 +1594,7 @@ def _base_result(
     case_pack = CASE_PACKS[spec.case_pack]
     release_metadata = (
         _historical_dataset_metadata()
-        if case_pack.name == HISTORICAL_V2_CASE_PACK
+        if spec.dataset_kind == DatasetKind.HISTORICAL_COUNTERFACTUAL.value
         else case_pack.release_metadata
     )
     observation_budget = build_evaluation_method_plan(

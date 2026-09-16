@@ -145,8 +145,8 @@ class ScientificPipelineTests(unittest.TestCase):
             self.assertEqual(player.generate.call_count, 2)
 
     def test_historical_rc_has_fixed_case_specific_questions(self):
-        pack = matrix.CASE_PACKS["historical_v2"]
-        spec = pack.specifications["rc_discharge"]["structural_v2"]
+        pack = matrix.CASE_PACKS["historical"]
+        spec = pack.specifications["rc_discharge"]["canonical"]
         case = matrix.make_matched_case(spec, "counterfactual", matrix.BenchmarkTrack.DISCOVERY)
         reference = discovery_reference_context(case, spec, "counterfactual")
         questions = reference["understanding_criteria"]

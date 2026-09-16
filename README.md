@@ -30,7 +30,9 @@ Inspect available selectors and role-specific API options:
 PYTHONPATH=src:. python3 -m experiments.run_case_matrix --help
 ```
 
-The main development packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contains two conditions and two task settings. Run size is `cases × selected evaluation methods × repeats`; `--help` lists additional registered packs and selectors.
+The development packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contains two conditions and two task settings. Run size is `cases × selected evaluation methods × repeats`.
+
+`historical` is the single current Historical dataset: twenty source-grounded idealizations, each paired with a structural counterfactual constructed through three recorded mutations. `both` includes this same Historical dataset and the published Temporal dataset. Dataset changes are recorded in Git, without numbered dataset names or selectable older Historical packs. The catalog is [datasets/historical/manifest.json](datasets/historical/manifest.json); scientific scope and treatment of older results are described in the [Historical dataset guide](docs/HISTORICAL_DATASET.md).
 
 Start with a one-case plan that makes no API calls:
 

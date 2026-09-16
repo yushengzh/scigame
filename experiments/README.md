@@ -2,7 +2,9 @@
 
 ## Current case-matrix runner
 
-`run_case_matrix.py` runs public development cases with independently configured Player, Oracle, and post-hoc Evaluator roles. The main packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contributes two conditions × identification/discovery. Additional registered packs are listed by `--help`.
+`run_case_matrix.py` runs public development cases with independently configured Player, Oracle, and post-hoc Evaluator roles. The packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contributes two conditions × identification/discovery.
+
+`historical` selects the current Historical dataset with three-step structural counterfactuals. `both` includes exactly this Historical dataset plus Temporal. The name and [manifest path](../datasets/historical/manifest.json) stay fixed; Git records dataset evolution. Earlier Historical packs are retired, and older experiment outputs retain their original scientific meaning. See [Historical dataset](../docs/HISTORICAL_DATASET.md).
 
 ```text
 episodes = cases × selected evaluation methods × repeats

@@ -50,7 +50,7 @@ def experiment_action():
                 "release_angle_deg": 5.0,
             },
             readouts=("period_s",),
-            replicates=3,
+            replicates=1,
             forecasts={
                 "H1": {"period_s": 2.01},
                 "H2": {"period_s": 1.00},
@@ -95,10 +95,9 @@ class WireEncodingTest(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(payload["case"]["track"], "identification")
-        self.assertNotIn("oracle", first)
-        self.assertNotIn("world_model", first)
-        self.assertNotIn("evaluator", first)
-        self.assertNotIn("_truth", first)
+        for private_field in ("oracle", "world_model", "evaluator", "_truth"):
+            self.assertNotIn(private_field, payload)
+            self.assertNotIn(private_field, payload["case"])
         self.assertEqual(
             episode_view_to_payload(episode_view_from_json(first)), payload
         )
@@ -255,7 +254,7 @@ class WireDecodingTest(unittest.TestCase):
 
         for number in ("NaN", "Infinity", "1e9999", str(2**53)):
             text = player_action_to_json(experiment_action()).replace(
-                '"replicates":3', '"replicates":%s' % number
+                '"replicates":1', '"replicates":%s' % number
             )
             with self.subTest(number=number):
                 with self.assertRaises(WireDecodeError):

@@ -8,7 +8,8 @@ from role_benchmark import (
     FinalSubmission,
     evaluate_expression_program,
 )
-from role_benchmark.cases import make_pendulum_case
+from role_benchmark.cases import PENDULUM_SPEC, make_pendulum_case
+from role_benchmark.cases.matched import truth_submission
 
 
 def pendulum_expression(mass_exponent):
@@ -47,7 +48,10 @@ class PendulumDiscoveryTest(unittest.TestCase):
             "counterfactual", BenchmarkTrack.DISCOVERY
         )
 
-        self.assertEqual(identification.definition.case_id, discovery.definition.case_id)
+        self.assertEqual(
+            identification.definition.case_id.rsplit(".", 1)[0],
+            discovery.definition.case_id.rsplit(".", 1)[0],
+        )
         self.assertEqual(identification.definition.background, discovery.definition.background)
         self.assertEqual(
             identification.definition.resources.controls,
@@ -55,26 +59,35 @@ class PendulumDiscoveryTest(unittest.TestCase):
         )
         identification_notes = " ".join(identification.definition.resources.notes)
         discovery_notes = " ".join(discovery.definition.resources.notes)
-        self.assertIn("normalized_power_law", identification_notes)
+        self.assertIn("two_branch_structural_response_family", identification_notes)
         self.assertIn(EXPRESSION_MODEL, discovery_notes)
-        self.assertNotIn("normalized_power_law", discovery_notes)
+        self.assertNotIn("two_branch_structural_response_family", discovery_notes)
         self.assertNotIn("length_exponent", discovery_notes)
         self.assertNotIn("mass_exponent", discovery_notes)
 
     def test_family_neutral_expression_passes_both_private_worlds(self):
-        for world, mass_exponent in (("historical", 0.0), ("counterfactual", 0.25)):
+        for world in ("historical", "counterfactual"):
             with self.subTest(world=world):
                 case = make_pendulum_case(world, BenchmarkTrack.DISCOVERY)
                 result = case.evaluator.evaluate(
-                    FinalSubmission(
-                        explanation="An executable expression predicts the period.",
-                        model=EXPRESSION_MODEL,
-                        parameters=pendulum_expression(mass_exponent),
-                    )
+                    truth_submission(PENDULUM_SPEC, world, BenchmarkTrack.DISCOVERY)
                 )
                 self.assertTrue(result.success)
                 self.assertEqual(result.scores["predictive_model_pass"], 1.0)
                 self.assertNotIn("mass_exponent_absolute_error", result.scores)
+
+    def test_original_historical_law_still_passes_but_old_parameter_twin_is_retired(self):
+        for world, exponent, expected in (("historical", 0.0, True),
+                                           ("counterfactual", 0.25, False)):
+            with self.subTest(world=world):
+                result = make_pendulum_case(world, BenchmarkTrack.DISCOVERY).evaluator.evaluate(
+                    FinalSubmission(
+                        explanation="The original simple power-law predictor.",
+                        model=EXPRESSION_MODEL,
+                        parameters=pendulum_expression(exponent),
+                    )
+                )
+                self.assertEqual(result.success, expected)
 
     def test_expression_contract_is_strict_and_supports_track_wide_unary_ops(self):
         program = {

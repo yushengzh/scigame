@@ -39,7 +39,7 @@ def pendulum_proposal(mass_kg):
             "release_angle_deg": 5.0,
         },
         readouts=("period_s",),
-        replicates=3,
+        replicates=1,
     )
 
 
@@ -178,7 +178,8 @@ class CaseFactoryTest(unittest.TestCase):
             historical.definition.case_id,
             counterfactual.definition.case_id,
         )
-        self.assertNotIn("historical", historical.definition.case_id)
+        self.assertTrue(historical.definition.case_id.startswith("historical.pendulum."))
+        self.assertNotIn("historical", historical.definition.case_id.split(".")[2:])
         self.assertNotIn("counterfactual", counterfactual.definition.case_id)
         self.assertIs(
             historical.definition.track,

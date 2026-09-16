@@ -8,7 +8,8 @@ from role_benchmark import (
     FinalSubmission,
     OracleStatus,
 )
-from role_benchmark.cases import make_young_double_slit_case
+from role_benchmark.cases import YOUNG_DOUBLE_SLIT_SPEC, make_young_double_slit_case
+from role_benchmark.cases.matched import truth_submission
 
 
 WORLDS = ("historical", "counterfactual")
@@ -29,7 +30,7 @@ def young_proposal(
             "slit_separation_mm": slit_separation_mm,
         },
         readouts=("fringe_spacing_mm",),
-        replicates=4,
+        replicates=1,
         forecasts={
             "H1": {"fringe_spacing_mm": 0.44},
             "H2": {"fringe_spacing_mm": 0.62},
@@ -107,16 +108,17 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
 
         self.assertEqual(
             cases[("historical", BenchmarkTrack.IDENTIFICATION)].definition.case_id,
-            "optical.interference.instance_2",
+            "historical.young_double_slit.instance_2.identification",
         )
         self.assertEqual(
             cases[("counterfactual", BenchmarkTrack.IDENTIFICATION)].definition.case_id,
-            "optical.interference.instance_1",
+            "historical.young_double_slit.instance_1.identification",
         )
         for world in WORLDS:
             identification = cases[(world, BenchmarkTrack.IDENTIFICATION)].definition
             discovery = cases[(world, BenchmarkTrack.DISCOVERY)].definition
-            self.assertEqual(identification.case_id, discovery.case_id)
+            self.assertEqual(identification.case_id.rsplit(".", 1)[0],
+                             discovery.case_id.rsplit(".", 1)[0])
             self.assertEqual(identification.background, discovery.background)
             self.assertEqual(
                 identification.initial_observations,
@@ -171,8 +173,9 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
             "wavelength_exponent",
             "screen_distance_exponent",
             "slit_separation_exponent",
-            "historical",
-            "counterfactual",
+            "counterfactual_selector",
+            "branch_0=",
+            "branch_1=",
         )
         for world in WORLDS:
             definition = make_young_double_slit_case(
@@ -194,9 +197,9 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
                     self.assertNotIn(token, public_text)
 
     def test_one_expression_predictor_and_score_path_serves_both_tracks(self):
-        exponents = {"historical": -1.0, "counterfactual": -0.5}
-        for world, exponent in exponents.items():
-            submission = expression_submission(exponent)
+        for world in WORLDS:
+            submission = truth_submission(YOUNG_DOUBLE_SLIT_SPEC, world,
+                                          BenchmarkTrack.DISCOVERY)
             results = []
             for track in TRACKS:
                 with self.subTest(world=world, track=track.value):
@@ -231,18 +234,25 @@ class YoungDoubleSlitPairingTest(unittest.TestCase):
                 self.assertIn("executable expression representation", result.message)
 
     def test_each_world_rejects_the_other_worlds_law(self):
-        pairs = (
-            ("historical", -0.5),
-            ("counterfactual", -1.0),
-        )
-        for world, false_exponent in pairs:
-            submission = expression_submission(false_exponent)
+        for world, other_world in (("historical", "counterfactual"),
+                                   ("counterfactual", "historical")):
+            submission = truth_submission(YOUNG_DOUBLE_SLIT_SPEC, other_world,
+                                          BenchmarkTrack.DISCOVERY)
             for track in TRACKS:
                 with self.subTest(world=world, track=track.value):
                     case = make_young_double_slit_case(world=world, track=track)
                     result = case.evaluator.evaluate(submission)
                     self.assertFalse(result.success)
                     self.assertEqual(result.scores["predictive_model_pass"], 0.0)
+
+    def test_historical_simple_law_passes_and_retired_parameter_twin_fails(self):
+        for world, exponent, expected in (("historical", -1.0, True),
+                                           ("counterfactual", -0.5, False)):
+            with self.subTest(world=world):
+                result = make_young_double_slit_case(world=world).evaluator.evaluate(
+                    expression_submission(exponent)
+                )
+                self.assertEqual(result.success, expected)
 
     def test_invalid_factory_and_submission_parameters_fail_cleanly(self):
         with self.assertRaises(ValueError):

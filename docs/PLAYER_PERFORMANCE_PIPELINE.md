@@ -5,3 +5,5 @@
 一次 episode 保留独立的二元成败，分别报告 normalized error、表达式等价、公开科学理解的起点／终点／增量，并对失败 episode 汇总 F1–F5 多标签分布。各指标不加权，也不覆盖原 `active_pass`。
 
 新运行直接使用 `experiments.run_case_matrix`；已有标准 case-matrix 结果使用 `experiments.postevaluate_science` 写入独立补评目录。模型、provider 与凭据配置沿用现有三角色接口。历史原始结果保留，当前代码只维护一条默认科学后评估路径。
+
+Historical 数据入口统一为 `--case-pack historical`，`both` 包含同一份当前数据。数据演进使用 Git 记录；旧结果保留原始参考关系与科学含义，见 [Historical dataset](HISTORICAL_DATASET.md)。

@@ -49,6 +49,12 @@ def _episode_spec(row):
     if missing:
         raise ValueError("Case-matrix episode is missing fields: " + ", ".join(missing))
     spec = matrix.EpisodeSpec(**{name: row[name] for name in names})
+    if (spec.dataset_kind == matrix.DatasetKind.HISTORICAL_COUNTERFACTUAL.value
+            and (spec.case_pack not in {matrix.HISTORICAL_CASE_PACK, matrix.BOTH_CASE_PACK}
+                 or spec.variant_id != "canonical")):
+        raise ValueError(
+            "Archived Historical results require their original dataset reference and Git revision; "
+            "they cannot be relabelled or scored as the current historical dataset.")
     try:
         pack = matrix.CASE_PACKS[spec.case_pack]
         family = pack.specifications[spec.case_family][spec.variant_id]

@@ -15,7 +15,6 @@ from .counterfactual import (
     CounterfactualVariant,
     make_authored_temporal_counterfactual_variants,
     make_counterfactual_variant,
-    make_curated_counterfactual_variants,
     rms_symmetric_tolerance_scaled_separation,
 )
 from .episode import Episode, EpisodeProtocolError
@@ -327,7 +326,6 @@ __all__ = [
     "load_run_log",
     "make_authored_temporal_counterfactual_variants",
     "make_counterfactual_variant",
-    "make_curated_counterfactual_variants",
     "evaluate_expression_program",
     "evaluation_method_plan_to_payload",
     "fixed_observation_to_payload",

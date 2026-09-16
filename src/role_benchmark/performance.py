@@ -36,7 +36,7 @@ def discovery_reference_context(case, spec, world):
             "predictor": {"outputs": deepcopy(dict(original.discovery_outputs))},
             "purpose": "Comparison only. Grade the active world, never demand historical names or facts.",
         }
-    # The historical-v2 RC task has two independently meaningful relationships.
+    # The Historical RC task has two independently meaningful relationships.
     # Freeze both questions across endpoints; do not let a judge choose whichever
     # happened to improve in a particular run.
     if spec.family == "rc_discharge":

@@ -8,8 +8,10 @@
 
 从仓库根目录执行，使用 Bash 和已有的 Python 3 环境：
 
+将下面的 `/path/to/scigame` 换成自己的克隆目录。
+
 ```bash
-cd /home/yusheng.zhao/scigame
+cd /path/to/scigame
 export PYTHONPATH=src:.
 read -r -s -p 'IFM API key: ' IFM_API_KEY
 echo
@@ -39,7 +41,7 @@ run_ifm() {
   python3 -B -m experiments.run_case_matrix \
     --output-dir "out/ifm_science_${experiment_name}" \
     --experiment-id "IFM-SCIENCE-${experiment_name}" \
-    --case-pack historical_v2 --repeats 1 \
+    --case-pack historical --repeats 1 \
     --player-provider ifm --oracle-provider ifm --evaluator-provider ifm \
     --player-model IFM/K2-Horizon-375B-A23B \
     --oracle-model IFM/K2-Horizon-375B-A23B \
@@ -71,7 +73,9 @@ Oracle LLM 只检查实验程序是否合法。观测值仍由 case 的确定性
 Evaluator 在当前 episode 的 Player–Oracle 日志封存后，读取完整可观察轨迹和该 world 的
 参考关系进行科学理解评分与失败分类；不会回写 Player 或修改确定性数值分数和二元成败。
 
-## 3. 扩大到 Historical v2
+## 3. 扩大到完整 Historical 数据集
+
+`historical` 是唯一当前 Historical 包，包含 20 个 family 的原关系与三步结构变异反事实，共 80 个 case。数据说明及 Git 追溯规则见 [Historical dataset](HISTORICAL_DATASET.md)。
 
 先使用**新的名称和目录**检查计划：
 

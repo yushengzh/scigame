@@ -11,9 +11,8 @@ from role_benchmark.cases.matched import (
 from role_benchmark.counterfactual import (
     AUTHORED_TEMPORAL_COUNTERFACTUAL_FAMILIES,
     AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE,
-    COUNTERFACTUAL_DIFFICULTIES,
     make_authored_temporal_counterfactual_variants,
-    make_curated_counterfactual_variants,
+    make_counterfactual_variant,
     rms_symmetric_tolerance_scaled_separation,
 )
 from role_benchmark.models import BenchmarkTrack
@@ -71,66 +70,15 @@ class CounterfactualVariantTests(unittest.TestCase):
                 )
                 self.assertTrue(result.success, (spec.family, world, track))
 
-    def test_curated_easy_and_hard_are_complete_pairs(self):
+    def test_structural_historical_relations_do_not_support_parameter_interpolation(self):
         for family, source in CASE_SPECS.items():
             with self.subTest(family=family):
-                variants = make_curated_counterfactual_variants(source)
-                self.assertEqual(tuple(variants), COUNTERFACTUAL_DIFFICULTIES)
-                easy = variants["easy"]
-                hard = variants["hard"]
-
-                self.assertIs(easy.spec, source)
-                self.assertEqual(easy.counterfactual_fraction, 1.0)
-                self.assertEqual(hard.counterfactual_fraction, 0.5)
-                self.assertEqual(set(hard.spec.truths), set(MATCHED_WORLDS))
-                self.assertIs(
-                    hard.spec.truths["historical"],
-                    source.truths["historical"],
-                )
-                self.assertIs(
-                    easy.spec.truths["counterfactual"],
-                    source.truths["counterfactual"],
-                )
-
-                historical = source.truths["historical"]
-                source_counterfactual = source.truths["counterfactual"]
-                hard_counterfactual = hard.spec.truths["counterfactual"]
-                parameter = _changed_key(
-                    historical.parameters,
-                    source_counterfactual.parameters,
-                )
-                expected = (
-                    float(historical.parameters[parameter])
-                    + float(source_counterfactual.parameters[parameter])
-                ) / 2.0
-                self.assertAlmostEqual(
-                    hard_counterfactual.parameters[parameter], expected
-                )
-                for name in historical.parameters:
-                    if name != parameter:
-                        self.assertEqual(
-                            hard_counterfactual.parameters[name],
-                            historical.parameters[name],
-                        )
-
-                source_structure = _formula_structure(
-                    source_counterfactual.discovery_outputs
-                )
-                self.assertEqual(
-                    _formula_structure(historical.discovery_outputs),
-                    source_structure,
-                )
-                self.assertEqual(
-                    _formula_structure(hard_counterfactual.discovery_outputs),
-                    source_structure,
-                )
-                self.assert_experimental_contract_unchanged(source, hard.spec)
-                self.assertGreater(
-                    easy.fixed_design_separation,
-                    hard.fixed_design_separation,
-                )
-                self.assertGreater(hard.fixed_design_separation, 0.0)
-                self.assert_truth_submissions_pass(hard.spec)
+                # This operation requires aligned expression trees. Structural
+                # siblings are authored laws, not endpoints on that parameter path.
+                with self.assertRaisesRegex(ValueError, "structures differ"):
+                    make_counterfactual_variant(
+                        source, "hard", counterfactual_fraction=0.5,
+                    )
 
     def test_separation_is_symmetric_and_uses_the_fixed_design_by_default(self):
         spec = CASE_SPECS["pendulum"]

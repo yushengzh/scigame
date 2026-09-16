@@ -5,7 +5,7 @@ IFM/K2-Horizon 的显式三角色配置见 [IFM 三角色运行指南](RUN_IFM_T
 
 `experiments/run_case_matrix.py` 是当前公开 development benchmark 的统一入口。它负责：
 
-- 选择 `historical`、`temporal` 或二者并集；其他已注册 pack 见 `--help`；
+- 选择 `historical`、`temporal` 或二者并集 `both`；
 - 分别初始化 Player、可选的 LLM Oracle presentation 和 post-hoc Evaluator；
 - 在单个 episode 内保持 Player–Oracle 串行交互；
 - 在不同 episodes 之间有界并发；
@@ -25,7 +25,9 @@ PYTHONPATH=src:. python3 experiments/run_case_matrix.py --help
 | `temporal` | 30 | 2 conditions × 2 task settings | 120 |
 | `both` | 50 | 2 conditions × 2 task settings | 200 |
 
-`both` 是前两者的无重复并集。运行量按下面的公式计算：
+`historical` 始终指当前唯一 Historical 数据集：20 个经典关系理想化世界及其三步结构变异反事实。`both` 是它与当前公开 Temporal 的无重复并集。数据说明见 [Historical dataset](HISTORICAL_DATASET.md)，清单为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)。数据演进由 Git 记录，CLI 不保留旧 Historical 包选项。既有实验保留当时的数据含义，不改名冒充当前结果。
+
+运行量按下面的公式计算：
 
 ```text
 episodes = cases × evaluation methods × repeats

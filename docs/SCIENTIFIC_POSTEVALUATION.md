@@ -65,7 +65,7 @@ Judge 的 F2 若与已证明表达式等价冲突，保留冲突说明并不自�
 
 ```bash
 PYTHONPATH=src:. python3 -B -m experiments.run_case_matrix \
-  --case-pack historical_v2 --family rc_discharge --repeats 1 \
+  --case-pack historical --family rc_discharge --repeats 1 \
   --task-setting discovery --evaluation-method 'prior-only baseline' \
   --condition counterfactual --output-dir out/scientific_metrics --dry-run
 ```
@@ -86,7 +86,7 @@ PYTHONPATH=src:. python3 -B -m experiments.postevaluate_science \
 
 该命令输出到独立目录，保留原实验结果、原成败和 `source_metrics_protocol`，日志仍指向实际运行。重复执行只补缺失或失败评价；旧的物理解释／证据修订分数不当成已完成的前后理解测量。实际使用的 Judge 模型记录在新汇总中。
 
-输入目前支持标准 case-matrix 的 `results/*.result.json`。Historical/revision 专用脚本的异形结果不自动转换；程序会明确提示。这不影响通过标准 case-matrix 运行 `historical_v2` 数据集和已注册 Temporal case 的后评估；数据集标识保留自身的科学来源含义。
+输入目前支持标准 case-matrix 的 `results/*.result.json`。Historical/revision 专用脚本的异形结果不自动转换；程序会明确提示。当前 `historical` 和已注册 Temporal case 均通过标准 case-matrix 接入。补评入口明确拒绝带旧 Historical 数据标识的结果；这些结果需要对应 Git 提交的代码与原始参考关系。不能仅凭相同 family 名称套用当前真值，也不能重标为当前数据集结果。固定名称和数据含义见 [Historical dataset](HISTORICAL_DATASET.md)。
 
 ## 6. 产物与分布
 

@@ -16,6 +16,7 @@ from role_benchmark.cases import (
     BOYLE_J_TUBE_SPEC,
     CASE_FAMILIES,
     GALILEO_INCLINED_PLANE_SPEC,
+    HISTORICAL_SCIENCE_CARDS,
     PHOTOELECTRIC_SPEC,
     make_boyle_j_tube_case,
     make_case,
@@ -45,7 +46,7 @@ def galileo_proposal(distance=1.0, angle=5.0, mass=0.2):
             "ball_mass_kg": mass,
         },
         readouts=("collected_water_g",),
-        replicates=4,
+        replicates=1,
         forecasts={
             "H1": {"collected_water_g": 24.0},
             "H2": {"collected_water_g": 12.0},
@@ -62,7 +63,7 @@ def boyle_proposal(added_pressure=0.0, readouts=("air_volume_ml",)):
             "thermal_condition": "constant_room_temperature",
         },
         readouts=readouts,
-        replicates=3,
+        replicates=1,
         forecasts={
             "H1": {readout: 48.0 for readout in readouts},
             "H2": {readout: 24.0 for readout in readouts},
@@ -83,7 +84,7 @@ def photoelectric_proposal(
             "absorbed_photon_flux_relative": absorbed_flux,
         },
         readouts=readouts,
-        replicates=5,
+        replicates=1,
         forecasts={
             "H1": {readout: 1.0 for readout in readouts},
             "H2": {readout: 0.0 for readout in readouts},
@@ -144,54 +145,38 @@ class HistoricalCaseRegistryTest(unittest.TestCase):
 
 
 class HistoricalWorldModelTest(unittest.TestCase):
-    def test_corrected_public_scientific_contracts_are_explicit(self):
-        self.assertIn(
-            "(distance_m / 1 m)",
-            GALILEO_INCLINED_PLANE_SPEC.identification_formula,
-        )
-        galileo_notes = " ".join(GALILEO_INCLINED_PLANE_SPEC.common_notes)
-        self.assertIn("from rest", galileo_notes)
-        self.assertIn("geometrically similar", galileo_notes)
+    def test_science_cards_preserve_historical_parameters_and_scope(self):
+        galileo = HISTORICAL_SCIENCE_CARDS["galileo_inclined_plane"]
+        self.assertIn("(distance_m / 1 m)", galileo.historical_formula)
+        galileo_scope = " ".join(galileo.historical_applicability)
+        self.assertIn("from rest", galileo_scope)
+        self.assertIn("geometrically similar", galileo_scope)
 
-        boyle_credit = " ".join(
-            credit.citation for credit in BOYLE_J_TUBE_SPEC.credits
-        )
+        boyle = HISTORICAL_SCIENCE_CARDS["boyle_j_tube"]
+        boyle_credit = " ".join(credit.citation for credit in boyle.source_credits)
         self.assertIn("1661", boyle_credit)
         self.assertNotIn("1660", boyle_credit)
-        boyle_volume = next(
-            readout
-            for readout in BOYLE_J_TUBE_SPEC.readouts
-            if readout.name == "air_volume_ml"
-        )
+        boyle_volume = next(readout for readout in boyle.readouts
+                            if readout.name == "air_volume_ml")
         self.assertIn("total volume", boyle_volume.description)
         self.assertIn("fixed end-space", boyle_volume.description)
-        historical_boyle_scope = " ".join(
-            BOYLE_J_TUBE_SPEC.truths["historical"].applicability
-            + BOYLE_J_TUBE_SPEC.truths["historical"].fixed_conditions
-        )
+        historical_boyle_scope = " ".join(boyle.historical_applicability + boyle.fixed_conditions)
         self.assertIn("ideal-gas limit", historical_boyle_scope)
         self.assertIn("adsorption", historical_boyle_scope)
-        self.assertIn(
-            "not asserted to be an ideal gas",
-            " ".join(BOYLE_J_TUBE_SPEC.truths["counterfactual"].applicability),
-        )
+        self.assertIn("no claim of physical realizability", " ".join(boyle.counterfactual_scope))
 
-        photo_controls = {
-            control.name for control in PHOTOELECTRIC_SPEC.controls
-        }
+        photo = HISTORICAL_SCIENCE_CARDS["photoelectric"]
+        photo_controls = {control.name for control in photo.controls}
         self.assertIn("absorbed_photon_flux_relative", photo_controls)
         self.assertNotIn("intensity_relative", photo_controls)
-        photo_parameters = set(PHOTOELECTRIC_SPEC.identification_parameters)
+        photo_parameters = {parameter.name for parameter in photo.historical_parameters}
         self.assertIn("work_function_equivalent_v", photo_parameters)
         self.assertNotIn("work_function_ev", photo_parameters)
-        photo_notes = " ".join(PHOTOELECTRIC_SPEC.common_notes)
-        self.assertNotIn("frequency-independent quantum yield", photo_notes)
-        self.assertNotIn("collects every emitted electron", photo_notes)
-        for truth in PHOTOELECTRIC_SPEC.truths.values():
-            private_scope = " ".join(truth.applicability + truth.fixed_conditions)
-            self.assertIn("single-photon photoemission", private_scope)
-            self.assertIn("frequency-independent emission yield", private_scope)
-            self.assertIn("collects every emitted electron", private_scope)
+        photo_scope = " ".join(photo.historical_applicability + photo.fixed_conditions)
+        self.assertIn("single-photon photoemission", photo_scope)
+        self.assertIn("frequency-independent emission yield", photo_scope)
+        self.assertIn("collects every emitted electron", photo_scope)
+        self.assertIn("no claim of physical realizability", " ".join(photo.counterfactual_scope))
 
     def test_galileo_distance_square_root_and_mass_independence(self):
         case = make_galileo_inclined_plane_case()

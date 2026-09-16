@@ -94,18 +94,14 @@ CASE_FAMILIES = tuple(CASE_FACTORIES)
 if tuple(CASE_SPECS) != CASE_FAMILIES:
     raise AssertionError("case factories and scientific specifications must align")
 
-# Versioned release registry.  Imported only after the legacy registry is
-# complete so historical_v2 can preserve the exact v1 Historical ASTs without
-# introducing an import cycle.
-from .historical_v2 import (  # noqa: E402
-    DATASET_ID as HISTORICAL_V2_DATASET_ID,
-    DATASET_STATUS as HISTORICAL_V2_DATASET_STATUS,
-    DATASET_VERSION as HISTORICAL_V2_DATASET_VERSION,
-    HISTORICAL_V2_CASE_SPECS,
-    HISTORICAL_V2_FAMILIES,
-    HISTORICAL_V2_SCIENCE_CARDS,
-    make_historical_v2_case,
-    release_digest as historical_v2_release_digest,
+# The public registry and named family helpers all use the current Historical data.
+from .historical import (
+    DATASET_ID as HISTORICAL_DATASET_ID,
+    DATASET_STATUS as HISTORICAL_DATASET_STATUS,
+    HISTORICAL_CASE_SPECS,
+    HISTORICAL_FAMILIES,
+    HISTORICAL_SCIENCE_CARDS,
+    make_historical_case,
 )
 
 
@@ -130,12 +126,11 @@ __all__ = [
     "CASE_FACTORIES",
     "CASE_FAMILIES",
     "CASE_SPECS",
-    "HISTORICAL_V2_CASE_SPECS",
-    "HISTORICAL_V2_DATASET_ID",
-    "HISTORICAL_V2_DATASET_STATUS",
-    "HISTORICAL_V2_DATASET_VERSION",
-    "HISTORICAL_V2_FAMILIES",
-    "HISTORICAL_V2_SCIENCE_CARDS",
+    "HISTORICAL_CASE_SPECS",
+    "HISTORICAL_DATASET_ID",
+    "HISTORICAL_DATASET_STATUS",
+    "HISTORICAL_FAMILIES",
+    "HISTORICAL_SCIENCE_CARDS",
     "MATCHED_WORLDS",
     "SourceFamilySpec",
     "PENDULUM_WORLDS",
@@ -150,7 +145,7 @@ __all__ = [
     "make_faraday_induction_case",
     "make_galileo_inclined_plane_case",
     "make_hooke_spring_case",
-    "make_historical_v2_case",
+    "make_historical_case",
     "make_kepler_orbit_case",
     "make_michaelis_menten_case",
     "make_newton_cooling_case",
@@ -164,5 +159,4 @@ __all__ = [
     "make_stefan_boltzmann_case",
     "make_torricelli_efflux_case",
     "make_young_double_slit_case",
-    "historical_v2_release_digest",
 ]

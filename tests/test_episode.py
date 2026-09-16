@@ -55,7 +55,7 @@ def experiment(
             "release_angle_deg": angle,
         },
         readouts=readouts,
-        replicates=3,
+        replicates=1,
         forecasts={
             hypothesis_id: {
                 readout: 2.0 + 0.2 * index for readout in readouts
@@ -114,7 +114,7 @@ class EpisodeBudgetTest(unittest.TestCase):
         )
         self.assertEqual(valid.status, OracleStatus.VALID)
         self.assertEqual(episode.view().attempts_used, 4)
-        self.assertEqual(episode.view().attempts_remaining, 4)
+        self.assertEqual(episode.view().attempts_remaining, episode.view().case.budget - 4)
 
     def test_episode_snapshots_actions_responses_views_and_results(self):
         episode = Episode(make_pendulum_case())

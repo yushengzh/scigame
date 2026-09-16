@@ -2,8 +2,10 @@
 
 The variants in this module are complete two-world pairs.  ``easy`` and
 ``hard`` are therefore design variants of the same family, not additional
-world labels.  Construction is deliberately separate from the curated and
-temporal registries so source-reported temporal conditions remain unchanged.
+world labels. Numeric interpolation applies only to pairs with the same
+expression structure. Current Historical structural twins do not satisfy this
+assumption. Construction is separate from the temporal registry so
+source-reported temporal conditions remain unchanged.
 """
 
 from __future__ import annotations
@@ -39,7 +41,6 @@ AUTHORED_TEMPORAL_COUNTERFACTUAL_NOTE = (
     "benchmark-authored counterfactuals, not source-reported conditions."
 )
 
-_CURATED_FRACTIONS = {"easy": 1.0, "hard": 0.5}
 _AUTHORED_TEMPORAL_FRACTIONS = {"easy": 0.75, "hard": 0.5}
 _AUTHORED_APPLICABILITY = (
     "Benchmark-authored counterfactual relation over the unchanged declared "
@@ -247,7 +248,7 @@ def make_counterfactual_variant(
     counterfactual_fraction: float,
     temporal_authored: bool = False,
 ) -> CounterfactualVariant:
-    """Construct one complete H/C pair without changing its experimental contract."""
+    """Construct an H/C pair; fractions below one require matching structures."""
 
     if difficulty not in COUNTERFACTUAL_DIFFICULTIES:
         raise ValueError(
@@ -350,18 +351,6 @@ def _make_variants(
     return variants
 
 
-def make_curated_counterfactual_variants(
-    spec: MatchedFamilySpec,
-) -> Dict[str, CounterfactualVariant]:
-    """Return curated easy (existing C) and hard (H/C midpoint) pairs."""
-
-    return _make_variants(
-        spec,
-        _CURATED_FRACTIONS,
-        temporal_authored=False,
-    )
-
-
 def make_authored_temporal_counterfactual_variants(
     spec: MatchedFamilySpec,
 ) -> Dict[str, CounterfactualVariant]:
@@ -381,6 +370,5 @@ __all__ = [
     "CounterfactualVariant",
     "make_authored_temporal_counterfactual_variants",
     "make_counterfactual_variant",
-    "make_curated_counterfactual_variants",
     "rms_symmetric_tolerance_scaled_separation",
 ]

@@ -8,7 +8,7 @@ from role_benchmark.cases import CASE_FAMILIES, CASE_SPECS, MATCHED_WORLDS, make
 
 
 class WorldNeutralCaseIdTest(unittest.TestCase):
-    def test_instance_ids_are_track_stable_world_distinct_and_counterbalanced(self):
+    def test_instance_ids_share_world_across_tracks_and_are_counterbalanced(self):
         historical_suffixes = []
         counterfactual_suffixes = []
         for family in CASE_FAMILIES:
@@ -20,14 +20,16 @@ class WorldNeutralCaseIdTest(unittest.TestCase):
                 discovery = make_case(
                     family, world, BenchmarkTrack.DISCOVERY
                 ).definition.case_id
-                self.assertEqual(identification, discovery)
+                self.assertEqual(identification.rsplit(".", 1)[0], discovery.rsplit(".", 1)[0])
+                self.assertTrue(identification.endswith(".identification"))
+                self.assertTrue(discovery.endswith(".discovery"))
                 self.assertNotIn("world", identification.lower())
-                self.assertNotIn(world, identification.lower())
+                self.assertNotIn(world, identification.lower().split(".")[2:])
                 ids[world] = identification
 
             self.assertNotEqual(ids["historical"], ids["counterfactual"])
-            historical_suffixes.append(ids["historical"].rsplit(".", 1)[-1])
-            counterfactual_suffixes.append(ids["counterfactual"].rsplit(".", 1)[-1])
+            historical_suffixes.append(ids["historical"].split(".")[-2])
+            counterfactual_suffixes.append(ids["counterfactual"].split(".")[-2])
 
         expected = Counter({"instance_1": 10, "instance_2": 10})
         self.assertEqual(Counter(historical_suffixes), expected)
