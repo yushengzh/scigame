@@ -5,7 +5,7 @@ IFM/K2-Horizon 的显式三角色配置见 [IFM 三角色运行指南](RUN_IFM_T
 
 `experiments/run_case_matrix.py` 是当前公开 development benchmark 的统一入口。它负责：
 
-- 选择 `historical`、`temporal` 或二者并集；
+- 选择 `historical`、`temporal` 或二者并集；其他已注册 pack 见 `--help`；
 - 分别初始化 Player、可选的 LLM Oracle presentation 和 post-hoc Evaluator；
 - 在单个 episode 内保持 Player–Oracle 串行交互；
 - 在不同 episodes 之间有界并发；
@@ -14,7 +14,6 @@ IFM/K2-Horizon 的显式三角色配置见 [IFM 三角色运行指南](RUN_IFM_T
 以下命令均从仓库根目录执行：
 
 ```bash
-cd /home/yusheng.zhao/scigame
 PYTHONPATH=src:. python3 experiments/run_case_matrix.py --help
 ```
 
@@ -86,7 +85,6 @@ PYTHONPATH=src:. python3 experiments/run_case_matrix.py \
   --player-max-output-tokens 8192 \
   --oracle-max-output-tokens 8192 \
   --evaluator-max-output-tokens 8192 \
-  --max-actions 6 \
   --workers 1 \
   --experiment-id EXP-SCIENCE-SMOKE \
   --output-dir runs/EXP-SCIENCE-SMOKE \
@@ -102,8 +100,7 @@ Selected 1 of 1 episodes ...
 然后只删除最后的 `--dry-run`，执行真实 smoke。`PASS` 和 `SCI` 都说明完整执行链路已经
 运行；同时查看 `metrics_complete` 及科学后评估覆盖，确认公式指标与 Judge 已返回。每个真实 episode 可能包含多次 Player/Oracle 请求，并包含一次科学 Judge 请求，所以一个 episode 不等于一次 API 调用。
 
-曾经公开粘贴、写入 issue 或提交到仓库的 key 应立即撤销并重新生成。不要把 key 直接
-写入命令行；环境变量不会被写入 benchmark 产物。
+凭据从环境变量读取，runner 不会把凭据写入 benchmark 产物。
 
 ## 4. 完整 200-case Phase 1 矩阵
 
@@ -181,7 +178,7 @@ CLI 默认 Player provider 为 `openai`，Oracle/Evaluator provider 为 `deepsee
 | `--ROLE-model` | 原样发送给 provider 的精确模型 ID；runner 没有模型白名单 |
 | `--ROLE-endpoint` | 可选的完整 HTTP URL；省略时使用 provider 默认值 |
 | `--ROLE-api-key-env` | 可选的 key 环境变量名；省略时使用上表默认值 |
-| `--ROLE-prompt-version` | Player/Evaluator 使用唯一当前默认值，无需指定；Oracle 按 presentation 或 semantic 模式配置 |
+| `--oracle-prompt-version` | 可选 Oracle prompt 配置；Player/Evaluator 自动使用当前唯一流程，没有 prompt 选择参数 |
 | `--ROLE-reasoning-effort` | provider 支持时可用；OpenAI 默认 `none` |
 | `--ROLE-timeout-s` | 单次请求超时，默认 120 秒 |
 | `--ROLE-concurrency` | 该角色同时调用数，默认等于并受限于 `--workers` |
@@ -202,8 +199,7 @@ Bearer 鉴权和 `chat_template_kwargs.reasoning_effort`（默认 `medium`）。
 --max-repair-attempts 0
 ```
 
-通用入口的 token、采样和并发参数可以显式配置。既往 IFM 模型实际调用记录见
-[K2 Horizon 实验记录](RUN_HISTORICAL20_V2_K2_HORIZON_NATIVE_20260916.md)，当前科学后评估按 [统一指标说明](SCIENTIFIC_POSTEVALUATION.md) 执行。
+通用入口的 token、采样和并发参数可以显式配置。当前科学后评估按 [统一指标说明](SCIENTIFIC_POSTEVALUATION.md) 执行。
 
 需要旧 Core42 接口时显式增加 `--ROLE-ifm-api-mode core42`：默认 endpoint 为
 `https://api.core42.ai/v1/chat/completions`，模型为 `k2-horizon-375b`，使用 `api-key`
@@ -283,16 +279,15 @@ adaptive experimental design
 ```
 
 含空格的值必须加引号。同一种 selector 的多个值取并集，不同 selector 之间取交集；空
-交集会在任何付费调用前报错。完整 family、variant 和 condition 列表见
-[`case_catalog.md`](case_catalog.md) 或 `--help`。
+交集会在任何付费调用前报错。完整 family、variant 和 condition 列表见 `--help`。
 
 方法语义：
 
 - `prior-only baseline`：不向 Player 返回实验观测；
 - `fixed experimental design`：使用 family 预定义的诊断实验；
-- `adaptive experimental design`：Player 在同等 family budget 内逐轮选择实验。
+- `adaptive experimental design`：Player 逐轮选择实验，没有预设观测预算；当前最高假设置信度严格超过公开阈值时必须停止实验并提交。
 
-三种方法共享最终 executable predictor、held-out conditions 和确定性 scorer。
+三种方法共享最终 executable predictor、held-out conditions 和确定性 scorer。当前 fixed 与 adaptive 的停止规则不同，不能表述为同预算比较。
 
 ## 7. 生成上限、并发和 Oracle 模式
 
@@ -301,9 +296,9 @@ adaptive experimental design
 | `--player-max-output-tokens` | 8192 | 8192 |
 | `--oracle-max-output-tokens` | 256 | 8192，避免 reasoning 占满预算 |
 | `--evaluator-max-output-tokens` | 2048 | 8192，避免 reasoning 导致 JSON 截断 |
-| `--max-repair-attempts` | 1 | 保持 1 |
-| `--max-actions` | 16 | 完整矩阵保持默认；小 smoke 可设 6 |
-| `--workers` | 1 | 从 2–4 开始，并按 provider 配额调整 |
+| `--max-repair-attempts` | CLI 保留 1；当前 Player 实际固定为 0 | 当前结构化 Player 不重生成；可显式传 0 |
+| `--max-actions` | 16 | 仅用于有限预算任务；adaptive 不使用此动作上限 |
+| `--workers` | 1 | 先用 1 完成单 case，再按配额增加 |
 
 `--repeats` 默认是 5；本手册的 Phase 1 命令显式设为 1。`--schedule-seed` 默认是
 `20260825`，用于冻结 repeat 的执行顺序。`--repeat K` 只是从已冻结的 repeats 中选择要
@@ -312,7 +307,7 @@ adaptive experimental design
 `--oracle-mode deterministic` 由本地 WorldModel 直接返回权威 observation，不调用 Oracle
 LLM。`--oracle-mode llm_presentation` 会初始化独立 Oracle LLM，但它只能呈现已经由
 WorldModel 生成的 observation；解析结果必须与权威结构完全一致。需要完整三 LLM 角色时
-使用 `llm_presentation`。
+使用 `llm_presentation`。`llm_semantic` 则由独立 Oracle LLM 判断问询是否合法，实验数值仍由确定性 world 计算。
 
 `--workers N` 只并行不同 episode pipelines。单个 episode 内始终保持：
 
@@ -342,6 +337,8 @@ runner 没有单独的 resume 开关。中断后，用完全相同的 Experiment
 | `SCI` | 合法提交，但 held-out predictor 未通过 | 否 |
 | `GEN` | Player generation/严格解码失败 | 否 |
 | `PROTO` | Player 协议或停止失败 | 否 |
+| `TRUNC` / `REFUSE` | Player 输出截断或被 provider 拒绝 | 否 |
+| `LIMIT` | Player 本地资源上限失败 | 否 |
 | `INFRA` | provider、网络或评测基础设施失败 | 是，使用相同命令恢复 |
 
 运行目录包含：
@@ -353,23 +350,26 @@ results/<episode_id>.result.json
 evaluations/<episode_id>.evaluation.json
 episodes.json
 episodes.csv
+scientific_postevaluation.json
 ```
 
-API key 不会写入这些文件。确定性科学评分是权威结果；post-hoc LLM Evaluator 只提供
-exploratory diagnostics，不能覆盖或平均进 `PASS/SCI`。详细指标见
-[`EVALUATOR_PIPELINE.md`](EVALUATOR_PIPELINE.md)，三角色边界见
-[`THREE_LLM_EVALUATION.md`](THREE_LLM_EVALUATION.md)。
+API key 不会写入这些文件。二元结果仍由 `active_pass = protocol_completion && evaluation_success` 决定，科学 Judge 不改写该结果。独立报告：
 
-## 9. 本地零 API 验证
+- normalized error；
+- 表达式在当前 world 及声明域内是否等价；
+- 同 episode 公开科学理解的起点、终点和可测增量；
+- 全部失败 episode 中 F1–F5 的多标签分布。
+
+各指标不加权；缺少前态的理解增量记为空，缺少 Judge 不伪装成零分。有限评估点准确不等于表达式等价，也不单独证明理解正确。具体定义、覆盖率和分母见 [科学后评估](SCIENTIFIC_POSTEVALUATION.md)。
+
+## 9. 零 API 功能检查
 
 ```bash
-PYTHONPATH=src:. python3 -m unittest \
-  tests.test_gemini_generate_content \
-  tests.test_openai_responses \
-  tests.test_case_matrix_experiment
-
-PYTHONPATH=src:tests:. python3 -m unittest discover -s tests -p 'test_*.py'
+PYTHONPATH=src:tests:. python3 -m unittest \
+  test_discovery_evaluation \
+  test_scientific_postevaluation \
+  test_postevaluation_pipeline \
+  test_postevaluate_science
 ```
 
-代码或资产更新后，应至少重新执行 `--help`、1-case dry-run 和完整矩阵 dry-run。真实外部
-provider 的模型可用性、额度、限流和 wire compatibility 只能由真实 1-case smoke 验证。
+`--help`、单 case 和完整矩阵的 `--dry-run` 可以检查当前参数及计划，不产生模型调用。它们不代表真实模型的科学表现或 Judge 与人工判定的一致性；这些需要单独的实际评估。

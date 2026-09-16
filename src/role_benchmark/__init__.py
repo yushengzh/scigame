@@ -142,6 +142,31 @@ from .protocols import (
     WorldModel,
     WorldModelContractError,
 )
+from .private_eval import (
+    PRIVATE_FAILURE_SCHEMA,
+    PRIVATE_RESULT_EXPORT_SCHEMA,
+    PRIVATE_SESSION_CREATE_SCHEMA,
+    PRIVATE_SESSION_SCHEMA,
+    PRIVATE_TURN_RESULT_SCHEMA,
+    PRIVATE_TURN_SCHEMA,
+    PrivateCasePack,
+    PrivateEvaluationError,
+    PrivateEvaluationService,
+    PrivateEvaluationUnit,
+    load_private_case_pack,
+)
+from .private_http import (
+    PRIVATE_ERROR_SCHEMA,
+    PrivateEvaluationHTTPClient,
+    PrivateSessionState,
+    export_private_results,
+    make_private_evaluation_http_server,
+)
+from .private_runner import (
+    PRIVATE_ISOLATED_EVALUATION_PROFILE,
+    PrivateEpisodeReceipt,
+    run_private_llm_episode,
+)
 from .runner import run_episode
 from .runlog import (
     JSONLRunLog,
@@ -318,4 +343,23 @@ __all__ = [
     "prepare_evaluation_case",
     "validate_expression_program",
     "EvaluationMethodPlan",
+    'PRIVATE_ERROR_SCHEMA',
+    'PRIVATE_FAILURE_SCHEMA',
+    'PRIVATE_ISOLATED_EVALUATION_PROFILE',
+    'PRIVATE_RESULT_EXPORT_SCHEMA',
+    'PRIVATE_SESSION_CREATE_SCHEMA',
+    'PRIVATE_SESSION_SCHEMA',
+    'PRIVATE_TURN_RESULT_SCHEMA',
+    'PRIVATE_TURN_SCHEMA',
+    'PrivateCasePack',
+    'PrivateEpisodeReceipt',
+    'PrivateEvaluationError',
+    'PrivateEvaluationHTTPClient',
+    'PrivateEvaluationService',
+    'PrivateEvaluationUnit',
+    'PrivateSessionState',
+    'export_private_results',
+    'load_private_case_pack',
+    'run_private_llm_episode',
+    'make_private_evaluation_http_server',
 ]

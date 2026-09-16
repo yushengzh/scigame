@@ -12,10 +12,14 @@ from role_benchmark.cases.source import (
 )
 from role_benchmark.models import BenchmarkTrack
 from role_benchmark.temporal.admission import (
+    TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2,
     TEMPORAL_ADMISSION_REVIEW_SCHEMA,
+    TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2,
     TemporalAdmissionError,
     assess_temporal_admission,
     parse_temporal_admission_review_payload,
+    temporal_admission_review_to_payload,
+    temporal_admission_review_v2_request_payload,
 )
 from role_benchmark.temporal.counterfactual_construction import (
     TemporalCounterfactualRequest,
@@ -174,6 +178,36 @@ def _eligible_review_payload(card) -> dict:
     }
 
 
+def _eligible_v2_review_payload(card) -> dict:
+    payload = dict(
+        temporal_admission_review_v2_request_payload(
+            card,
+            paper_id="paper-001",
+        )
+    )
+    payload.update(
+        {
+            "reviewer": "independent-source-reviewer",
+            "decision": "eligible_for_temporal_case",
+            "assessment": (
+                "All eight pre-compile checks pass against the fixed source."
+            ),
+            "checks": {
+                name: "pass" for name in TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2
+            },
+            "issues": [
+                {
+                    "code": "source.limitations_noted",
+                    "detail": "The relation is restricted to the fixed condition.",
+                    "blocking": False,
+                    "line_ranges": [_anchor(4)],
+                }
+            ],
+        }
+    )
+    return payload
+
+
 def _admission(card=None):
     selected = card or _card()
     review = parse_temporal_admission_review_payload(
@@ -203,6 +237,80 @@ class _FakeBackend:
 
 
 class TemporalMinimalPipelineTests(unittest.TestCase):
+    def test_v1_admission_review_remains_replay_compatible(self):
+        payload = _eligible_review_payload(_card())
+        review = parse_temporal_admission_review_payload(payload)
+
+        self.assertEqual(
+            TEMPORAL_ADMISSION_REVIEW_SCHEMA,
+            "role_benchmark.temporal_admission_review.v1",
+        )
+        self.assertEqual(review.schema, TEMPORAL_ADMISSION_REVIEW_SCHEMA)
+        self.assertIsNone(review.precompile_checks)
+        self.assertEqual(temporal_admission_review_to_payload(review), payload)
+
+    def test_v2_admission_requires_exactly_eight_passing_precompile_checks(self):
+        card = _card()
+        request = temporal_admission_review_v2_request_payload(
+            card,
+            paper_id="paper-001",
+        )
+        self.assertEqual(request["schema"], TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2)
+        self.assertEqual(
+            set(request["checks"]),
+            set(TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2),
+        )
+        self.assertEqual(set(request["checks"].values()), {"not_assessable"})
+        self.assertNotIn("constructed_case_fidelity", request["checks"])
+
+        payload = _eligible_v2_review_payload(card)
+        review = parse_temporal_admission_review_payload(payload)
+        self.assertEqual(review.schema, TEMPORAL_ADMISSION_REVIEW_SCHEMA_V2)
+        self.assertEqual(
+            review.precompile_checks,
+            {name: "pass" for name in TEMPORAL_ADMISSION_PRECOMPILE_CHECKS_V2},
+        )
+        self.assertIsNone(review.source_support_confirmed)
+        self.assertEqual(temporal_admission_review_to_payload(review), payload)
+
+        result = assess_temporal_admission(
+            card,
+            review,
+            paper_id="paper-001",
+            source_line_count=4,
+        )
+        self.assertTrue(result.admitted)
+
+        incomplete = _eligible_v2_review_payload(card)
+        incomplete["checks"]["control_support"] = "not_assessable"
+        with self.assertRaises(TemporalAdmissionError) as raised:
+            parse_temporal_admission_review_payload(incomplete)
+        self.assertEqual(raised.exception.code, "temporal_admission.decision")
+
+        revision = _eligible_v2_review_payload(card)
+        revision["decision"] = "card_revision_required"
+        revision["checks"]["control_support"] = "fail"
+        revision["issues"][0]["blocking"] = True
+        parsed_revision = parse_temporal_admission_review_payload(revision)
+        self.assertEqual(parsed_revision.decision, "card_revision_required")
+        revision["issues"][0]["blocking"] = False
+        with self.assertRaises(TemporalAdmissionError) as raised:
+            parse_temporal_admission_review_payload(revision)
+        self.assertEqual(raised.exception.code, "temporal_admission.decision")
+
+    def test_v2_admission_rejects_invalid_or_postcompile_checks(self):
+        invalid_status = _eligible_v2_review_payload(_card())
+        invalid_status["checks"]["anchor_accuracy"] = "pending"
+        with self.assertRaises(TemporalAdmissionError) as raised:
+            parse_temporal_admission_review_payload(invalid_status)
+        self.assertEqual(raised.exception.path, "$.checks.anchor_accuracy")
+
+        postcompile = _eligible_v2_review_payload(_card())
+        postcompile["checks"]["constructed_case_fidelity"] = "pass"
+        with self.assertRaises(TemporalAdmissionError) as raised:
+            parse_temporal_admission_review_payload(postcompile)
+        self.assertEqual(raised.exception.path, "$.checks")
+
     def test_repair_allowlist_matches_the_historical_mechanical_policy(self):
         self.assertEqual(
             RETRYABLE_MINIMAL_CARD_ERROR_CODES,
