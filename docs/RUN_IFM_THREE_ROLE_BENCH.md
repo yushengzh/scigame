@@ -81,7 +81,7 @@ Evaluator 在当前 episode 的 Player–Oracle 日志封存后，读取完整�
 
 `historical` 是唯一当前 Historical 包，包含 20 个 family 的原关系与三步结构变异反事实，共 80 个 case。数据说明及 Git 追溯规则见 [Historical dataset](HISTORICAL_DATASET.md)。
 
-`temporal` 是唯一当前 Temporal 包，包含 29 篇论文中的 30 个关系及对应作者构造反事实，共 120 个 case；两类条件为 `source_reported` / `counterfactual`。说明见 [Temporal dataset](TEMPORAL_DATASET.md)。`both` 合并这两份当前数据，包含 50 个 family、200 个 case。固定清单分别为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)、[`datasets/temporal/manifest.json`](../datasets/temporal/manifest.json)。
+`temporal` 是唯一当前 Temporal 包，包含 32 篇论文中的 33 个关系及对应作者构造反事实，共 132 个 case；两类条件为 `source_reported` / `counterfactual`。说明见 [Temporal dataset](TEMPORAL_DATASET.md)。`both` 合并这两份当前数据，包含 53 个 family、212 个 case。固定清单分别为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)、[`datasets/temporal/manifest.json`](../datasets/temporal/manifest.json)。
 
 先使用**新的名称和目录**检查计划：
 
@@ -94,13 +94,16 @@ run_ifm historical historical_discovery --task-setting discovery
 run_ifm historical historical_all --dry-run
 run_ifm historical historical_all
 
-# 30 families × 2 worlds × discovery × 3 methods = 180 episodes
+# 33 families × 2 worlds × discovery × 3 methods = 198 episodes
 run_ifm temporal temporal_discovery --task-setting discovery --dry-run
 run_ifm temporal temporal_discovery --task-setting discovery
 
-# Temporal 的两种任务共 360 episodes；both 共 600 episodes。
+# Temporal 的两种任务共 396 episodes；both 共 636 episodes。
 run_ifm temporal temporal_all --dry-run
 run_ifm both both_all --dry-run
+
+# both 仅 discovery：53 families × 2 worlds × 3 methods = 318 episodes
+run_ifm both both_discovery --task-setting discovery --dry-run
 ```
 
 上面列出的是可选范围，选择需要的一项运行，避免重复启动重叠矩阵。`--repeats` 默认值在函数中显式设为 1。

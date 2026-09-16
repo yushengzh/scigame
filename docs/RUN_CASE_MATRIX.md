@@ -22,12 +22,12 @@ PYTHONPATH=src:. python3 experiments/run_case_matrix.py --help
 | `--case-pack` | families | 每个 family | cases |
 |---|---:|---:|---:|
 | `historical` | 20 | 2 conditions × 2 task settings | 80 |
-| `temporal` | 30 | 2 conditions × 2 task settings | 120 |
-| `both` | 50 | 2 conditions × 2 task settings | 200 |
+| `temporal` | 33 | 2 conditions × 2 task settings | 132 |
+| `both` | 53 | 2 conditions × 2 task settings | 212 |
 
-`historical` 始终指当前唯一 Historical 数据集：20 个经典关系理想化世界及其三步结构变异反事实。`temporal` 是 29 篇论文中的 30 个关系，每个关系都与作者构造的反事实配对。`both` 是这两份当前数据的无重复并集。
+`historical` 始终指当前唯一 Historical 数据集：20 个经典关系理想化世界及其三步结构变异反事实。`temporal` 是 32 篇论文中的 33 个关系，每个关系都与作者构造的反事实配对。`both` 是这两份当前数据的无重复并集。
 
-两份数据都使用 `--variant canonical`。Historical 的条件是 `historical` / `counterfactual`；Temporal 的条件是 `source_reported` / `counterfactual`，分别表示论文来源关系和 benchmark 作者构造的关系。旧公开 Temporal 中 9 个双来源条件 family 加 21 个参数反事实 family 的组成已经退役，虽然它也恰好有 30 个 family。
+两份数据都使用 `--variant canonical`。Historical 的条件是 `historical` / `counterfactual`；Temporal 的条件是 `source_reported` / `counterfactual`，分别表示论文来源关系和 benchmark 作者构造的关系。旧公开 Temporal 中 9 个双来源条件 family 加 21 个参数反事实 family 的组成已经退役，保留为历史数据记录。
 
 数据说明见 [Historical dataset](HISTORICAL_DATASET.md)、[Temporal dataset](TEMPORAL_DATASET.md)，固定清单为 [`datasets/historical/manifest.json`](../datasets/historical/manifest.json)、[`datasets/temporal/manifest.json`](../datasets/temporal/manifest.json)。运行所需卡片随 Python 包提供。数据演进由 Git 记录，CLI 不保留旧数据包选项。既有实验保留当时的数据含义，不改名冒充当前结果。
 
@@ -39,12 +39,13 @@ episodes = cases × evaluation methods × repeats
 
 因此：
 
-- `both` + 单一 method + 1 repeat：200 episodes；
-- `both` + 三种 methods + 1 repeat：600 episodes；
-- `both` + 三种 methods + 默认 5 repeats：3,000 episodes。
+- `temporal` + 三种 methods + 1 repeat：396 episodes；仅 Discovery 为 198；
+- `both` + 单一 method + 1 repeat：212 episodes；
+- `both` + 三种 methods + 1 repeat：636 episodes；仅 Discovery 为 318；
+- `both` + 三种 methods + 默认 5 repeats：3,180 episodes。
 
-本手册把“完整 Phase 1 矩阵”定义为 **200 cases × 三种 methods**。同一 family 的四个
-cases 是配对单元，不是四个独立 family。当前 50 个 families 及 truth/scorer 都随源码
+本手册把“完整 Phase 1 矩阵”定义为 **212 cases × 三种 methods**。同一 family 的四个
+cases 是配对单元，不是四个独立 family。当前 53 个 families 及 truth/scorer 都随源码
 公开，因此结果应称为 public development/Phase 1 results，不能称为 private 或
 contamination-resistant evaluation。
 
@@ -109,15 +110,15 @@ Selected 1 of 1 episodes ...
 
 凭据从环境变量读取，runner 不会把凭据写入 benchmark 产物。
 
-## 4. 完整 200-case Phase 1 矩阵
+## 4. 完整 212-case Phase 1 矩阵
 
 下面的命令选择：
 
-- `both` 的全部 50 families / 200 cases；
+- `both` 的全部 53 families / 212 cases；
 - 三种 evaluation methods（因为没有传 `--evaluation-method`）；
 - 1 repeat；
 - OpenAI Player 与独立的 Gemini Oracle/Evaluator；
-- 总计 600 episodes。
+- 总计 636 episodes。
 
 先带 `--dry-run` 执行：
 
@@ -150,19 +151,19 @@ PYTHONPATH=src:. python3 experiments/run_case_matrix.py \
 预期输出：
 
 ```text
-Selected 600 of 600 episodes ...
+Selected 636 of 636 episodes ...
 ```
 
 确认后只删除 `--dry-run`，不要改变其他参数。先使用实际模型配置完成小规模运行，再扩大到 `--workers 4`。若
 provider 出现 429、连接错误或吞吐限制，降低 workers 后必须使用新目录，因为并发配置
-属于冻结实验配置。若只希望让全部 200 cases 各跑一次 adaptive method，增加：
+属于冻结实验配置。若只希望让全部 212 cases 各跑一次 adaptive method，增加：
 
 ```text
 --evaluation-method "adaptive experimental design"
 ```
 
-此时应使用新的 Experiment ID/output directory，dry-run 结果为 `Selected 200 of 200
-episodes`。若把 `--repeats 1` 改成 `--repeats N`，完整三方法矩阵为 `600 × N` episodes。
+此时应使用新的 Experiment ID/output directory，dry-run 结果为 `Selected 212 of 212
+episodes`。若把 `--repeats 1` 改成 `--repeats N`，完整三方法矩阵为 `636 × N` episodes。
 
 ## 5. Provider、model、key 和 endpoint
 

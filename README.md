@@ -30,19 +30,19 @@ Inspect available selectors and role-specific API options:
 PYTHONPATH=src:. python3 -m experiments.run_case_matrix --help
 ```
 
-The development packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contains two conditions and two task settings. Run size is `cases × selected evaluation methods × repeats`.
+The development packs are `historical` (20 families / 80 cases), `temporal` (33 / 132), and `both` (53 / 212). Each family contains two conditions and two task settings. Run size is `cases × selected evaluation methods × repeats`. With all three methods and one repeat, Temporal selects 396 episodes and `both` selects 636; selecting only Discovery gives 198 and 318 episodes, respectively.
 
 Both datasets use stable names and one current definition:
 
 | Pack | Scientific content | Dataset guide and manifest |
 | --- | --- | --- |
 | `historical` | 20 classical scientific idealizations, each paired with a three-step structural counterfactual | [Guide](docs/HISTORICAL_DATASET.md), [manifest](datasets/historical/manifest.json) |
-| `temporal` | 30 relations from 29 source papers, each paired with an authored counterfactual | [Guide](docs/TEMPORAL_DATASET.md), [manifest](datasets/temporal/manifest.json) |
-| `both` | The current Historical and Temporal datasets together | 50 families / 200 cases |
+| `temporal` | 33 relations from 32 source papers, each paired with an authored counterfactual | [Guide](docs/TEMPORAL_DATASET.md), [manifest](datasets/temporal/manifest.json) |
+| `both` | The current Historical and Temporal datasets together | 53 families / 212 cases |
 
-Each pack uses `--variant canonical`. Historical conditions are `historical` / `counterfactual`; Temporal conditions are `source_reported` / `counterfactual`. All current Temporal families have an authored counterfactual; the earlier public Temporal mixture of source A/B pairs and parameter twins is retired. The unchanged case count does not make those earlier results comparable to this dataset by renaming them.
+Each pack uses `--variant canonical`. Historical conditions are `historical` / `counterfactual`; Temporal conditions are `source_reported` / `counterfactual`. All current Temporal families have an authored counterfactual; the earlier public Temporal mixture of source A/B pairs and parameter twins is retired. Earlier results retain their original dataset definitions and cannot become current results by renaming them.
 
-Dataset changes are recorded in Git, without numbered dataset names or selectable older packs. Scientific cards ship with the Python package, so running cases does not require downloading the source papers. These are executable, source-grounded worlds; publication dates do not establish that a model has never encountered their scientific relations.
+Dataset changes are recorded in Git, without numbered dataset names or selectable older packs. Scientific cards ship with the Python package, so running cases does not require downloading the source papers. These are executable, source-grounded worlds. Some source papers have preprints from before 2026; the pack is not a claim that all 33 relations first appeared in 2026. Publication dates do not establish that a model has never encountered their scientific relations.
 
 Start with a one-case plan that makes no API calls:
 

@@ -26,7 +26,7 @@ class TemporalDatasetTests(unittest.TestCase):
             args = matrix._parser().parse_args(['--output-dir', directory, '--case-pack', 'both'])
             metadata = matrix._case_pack(args).release_metadata['temporal']
             self.assertEqual(metadata['dataset_id'], 'role_benchmark.temporal')
-            self.assertEqual(metadata['distinct_source_papers'], 29)
+            self.assertEqual(metadata['distinct_source_papers'], 32)
 
     def test_old_temporal_results_keep_their_original_scientific_reference(self):
         spec = matrix.build_plan(families=['defect_sre'], repeats=1,

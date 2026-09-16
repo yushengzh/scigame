@@ -2,15 +2,17 @@
 
 ## Current case-matrix runner
 
-`run_case_matrix.py` runs public development cases with independently configured Player, Oracle, and post-hoc Evaluator roles. The packs are `historical` (20 families / 80 cases), `temporal` (30 / 120), and `both` (50 / 200). Each family contributes two conditions × identification/discovery.
+`run_case_matrix.py` runs public development cases with independently configured Player, Oracle, and post-hoc Evaluator roles. The packs are `historical` (20 families / 80 cases), `temporal` (33 / 132), and `both` (53 / 212). Each family contributes two conditions × identification/discovery.
 
-`historical` selects twenty classical relations with three-step structural counterfactuals. `temporal` selects 30 relations from 29 papers, each with an authored counterfactual. `both` includes exactly these two current datasets. Both use variant `canonical`. Historical conditions are `historical` / `counterfactual`; Temporal conditions are `source_reported` / `counterfactual`.
+`historical` selects twenty classical relations with three-step structural counterfactuals. `temporal` selects 33 relations from 32 papers, each with an authored counterfactual. `both` includes exactly these two current datasets. Both use variant `canonical`. Historical conditions are `historical` / `counterfactual`; Temporal conditions are `source_reported` / `counterfactual`.
 
-Names and manifest paths stay fixed: [Historical manifest](../datasets/historical/manifest.json), [Temporal manifest](../datasets/temporal/manifest.json). Git records their evolution. Earlier datasets are retired; the old public Temporal mixture of source A/B pairs and parameter twins is not the current 30-family dataset. Older experiment outputs retain their original scientific meaning. See [Historical dataset](../docs/HISTORICAL_DATASET.md) and [Temporal dataset](../docs/TEMPORAL_DATASET.md).
+Names and manifest paths stay fixed: [Historical manifest](../datasets/historical/manifest.json), [Temporal manifest](../datasets/temporal/manifest.json). Git records their evolution. Earlier datasets are retired; the old public Temporal mixture of source A/B pairs and parameter twins is not the current 33-family dataset. Older experiment outputs retain their original scientific meaning. See [Historical dataset](../docs/HISTORICAL_DATASET.md) and [Temporal dataset](../docs/TEMPORAL_DATASET.md).
 
 ```text
 episodes = cases × selected evaluation methods × repeats
 ```
+
+With all three methods and one repeat, Temporal contains 396 episodes and `both` contains 636. Selecting only Discovery gives 198 and 318 episodes, respectively.
 
 The three methods are:
 
@@ -46,7 +48,7 @@ PYTHONPATH=src:. python3 -m experiments.run_case_matrix \
   --dry-run
 ```
 
-This selects 200 episodes. For a real run, begin with one case and explicitly configure the model and credential for each used role:
+This selects 212 episodes. For a real run, begin with one case and explicitly configure the model and credential for each used role:
 
 ```bash
 PYTHONPATH=src:. python3 -m experiments.run_case_matrix \

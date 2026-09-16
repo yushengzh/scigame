@@ -1,5 +1,7 @@
 # Temporal 数据集统一：独立科学复核
 
+**历史迁移记录。** 本文记录此前 30-family 数据迁入稳定入口时的比较与测试，不代表当前集合的数量。当前唯一 `temporal` 已扩展为 33 families、32 篇论文、132 cases，见 [当前数据说明](TEMPORAL_DATASET.md) 和 [清单](../datasets/temporal/manifest.json)。下文原始测量结果保留。
+
 日期：2026-09-17
 
 复核者：独立 subagent `canonical_historical_dataset`

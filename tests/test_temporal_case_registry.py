@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 
 from role_benchmark.cases import CASE_FAMILIES
+from role_benchmark.cases.matched import truth_submission
+from role_benchmark.evaluation_methods import FIXED_EXPERIMENTAL_DESIGN, prepare_evaluation_case
 from role_benchmark.models import BenchmarkTrack, ExperimentProposal, OracleStatus
 from role_benchmark.protocols import CaseOracle
 from role_benchmark.temporal_cases import (
@@ -14,12 +16,42 @@ from role_benchmark.temporal_cases import (
 
 class TemporalCaseRegistryTests(unittest.TestCase):
     def test_current_registry_is_complete_and_distinct_from_historical(self):
-        self.assertEqual(len(TEMPORAL_CASE_FAMILIES), 30)
+        self.assertEqual(len(TEMPORAL_CASE_FAMILIES), 33)
         self.assertEqual(tuple(TEMPORAL_CASE_SPECS), TEMPORAL_CASE_FAMILIES)
-        self.assertEqual(len(set(TEMPORAL_SOURCE_PAPER_IDS.values())), 29)
+        self.assertEqual(len(set(TEMPORAL_SOURCE_PAPER_IDS.values())), 32)
         self.assertTrue(set(TEMPORAL_CASE_FAMILIES).isdisjoint(CASE_FAMILIES))
         self.assertIn("temporal_enriched_104003", TEMPORAL_CASE_FAMILIES)
         self.assertNotIn("kz_incompressible_energy_temperature_regimes", TEMPORAL_CASE_FAMILIES)
+
+    def test_added_relations_keep_their_truths_and_eight_fixed_observations(self):
+        families = (
+            "temporal_enriched_102006",
+            "temporal_enriched_105006",
+            "temporal_enriched_109001",
+        )
+        for family in families:
+            spec = TEMPORAL_CASE_SPECS[family]
+            self.assertEqual(len(spec.diagnostic_conditions), 8)
+            for condition, world in TEMPORAL_CONDITION_RUNTIME_MAP[family].items():
+                sibling = "counterfactual" if world == "historical" else "historical"
+                for track in BenchmarkTrack:
+                    with self.subTest(family=family, condition=condition, track=track):
+                        case = make_temporal_case(family, condition, track)
+                        own = case.evaluator.evaluate(truth_submission(spec, world, track))
+                        other = case.evaluator.evaluate(truth_submission(spec, sibling, track))
+                        self.assertTrue(own.success, own.message)
+                        self.assertFalse(other.success, other.message)
+                        prepared = prepare_evaluation_case(case, spec, FIXED_EXPERIMENTAL_DESIGN)
+                        self.assertEqual(prepared.initial_attempts_used, 8)
+                        self.assertEqual(len(prepared.fixed_observations), 8)
+                        oracle = CaseOracle(case.definition, case.world_model)
+                        for controls, observation in zip(spec.diagnostic_conditions,
+                                                         prepared.fixed_observations):
+                            self.assertEqual(dict(observation.proposal.controls), controls)
+                            self.assertIs(observation.response.status, OracleStatus.VALID)
+                            response = oracle.respond(observation.proposal)
+                            self.assertIs(response.status, OracleStatus.VALID)
+                            self.assertEqual(response.evidence, observation.response.evidence)
 
     def test_all_families_instantiate_both_worlds_and_tracks(self):
         for family in TEMPORAL_CASE_FAMILIES:

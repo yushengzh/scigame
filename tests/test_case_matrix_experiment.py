@@ -291,20 +291,20 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         self.assertEqual(temporal.families, TEMPORAL_CASE_FAMILIES)
         self.assertIn("temporal_enriched_104003", temporal.families)
         self.assertNotIn("kz_incompressible_energy_temperature_regimes", temporal.families)
-        self.assertEqual(len(temporal.families), 30)
+        self.assertEqual(len(temporal.families), 33)
         self.assertEqual(both.families, BOTH_CASE_FAMILIES)
         self.assertEqual(
             both.families,
             HISTORICAL_CASE_FAMILIES + TEMPORAL_CASE_FAMILIES,
         )
-        self.assertEqual(len(both.families), 50)
-        self.assertEqual(len(set(both.families)), 50)
+        self.assertEqual(len(both.families), 53)
+        self.assertEqual(len(set(both.families)), 53)
 
         paper_ids = tuple(temporal.source_paper_ids.values())
         version_ids = tuple(temporal.source_version_ids.values())
-        self.assertEqual(len(paper_ids), 30)
-        self.assertEqual(len(set(paper_ids)), 29)
-        self.assertEqual(len(version_ids), 30)
+        self.assertEqual(len(paper_ids), 33)
+        self.assertEqual(len(set(paper_ids)), 32)
+        self.assertEqual(len(version_ids), 33)
         self.assertEqual(sum(value is None for value in version_ids), 6)
 
         for case_pack in CASE_PACKS:
@@ -349,15 +349,15 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 {"canonical"},
             ),
             "temporal": (
-                120,
-                {"temporal_counterfactual": 120},
+                132,
+                {"temporal_counterfactual": 132},
                 {"canonical"},
             ),
             "both": (
-                200,
+                212,
                 {
                     "historical_counterfactual": 80,
-                    "temporal_counterfactual": 120,
+                    "temporal_counterfactual": 132,
                 },
                 {
                     "canonical",
@@ -441,6 +441,13 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             else:
                 self.assertEqual(spec.condition_role, "counterfactual")
                 self.assertIsNone(spec.source_condition_id)
+
+    def test_both_with_two_repeats_covers_all_current_cases_and_methods(self):
+        plan = build_plan(case_pack="both", repeats=2)
+        self.assertEqual(len(plan), 1272)
+        self.assertEqual(len({item.benchmark_instance_id for item in plan}), 212)
+        self.assertEqual({item.evaluation_method for item in plan}, set(EVALUATION_METHODS))
+        self.assertEqual({item.repeat for item in plan}, {1, 2})
 
     def test_temporal_pack_has_an_independent_complete_plan(self):
         with tempfile.TemporaryDirectory() as directory:
