@@ -94,6 +94,8 @@ def _source_row(row, source_dir):
         copied["log_path"] = str((path if path.is_absolute() else source_dir / path).resolve())
     copied["source_metrics_protocol"] = row.get("source_metrics_protocol", row.get("metrics_protocol", "legacy"))
     copied["metrics_protocol"] = PERFORMANCE_PROTOCOL
+    if "evaluator_mode" in copied:
+        copied["source_evaluator_mode"] = copied.pop("evaluator_mode")
     for key in ("llm_evaluation", "llm_evaluation_status", "evaluator_llm_stats", "evaluator_result_path",
                 "metrics_complete", "science_postevaluation"):
         copied.pop(key, None)

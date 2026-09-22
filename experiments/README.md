@@ -26,7 +26,7 @@ Use these exact names with repeated `--evaluation-method` arguments. The older b
 
 The methods share the final predictor representation and deterministic evaluation conditions. Fixed and adaptive currently have different stopping rules; their results must not be described as an equal-budget comparison.
 
-Standard case-matrix runs automatically produce the current scientific post-evaluation:
+By default, standard case-matrix runs automatically produce the current scientific post-evaluation:
 
 - binary `active_pass = protocol_completion && evaluation_success`;
 - normalized error;
@@ -35,6 +35,8 @@ Standard case-matrix runs automatically produce the current scientific post-eval
 - F1–F5 multi-label failure distributions among failed episodes.
 
 These measurements remain independent. The scientific Judge does not change the binary outcome. Missing evidence stays missing, and infrastructure failures are reported separately. Definitions and denominators are maintained in [Scientific post-evaluation](../docs/SCIENTIFIC_POSTEVALUATION.md).
+
+To collect the benchmark first, pass `--defer-evaluator` to this same API runner. It saves trajectories, deterministic scores, and offline formula comparisons without an Evaluator model, credential, or backend. Judge status remains `deferred` and metrics remain incomplete until separate post-evaluation. Resume collection with the same flag, with either serial or parallel execution. Then use `postevaluate_science --judge` with explicit Evaluator API settings and a separate output directory; Player and Oracle are not rerun. See the [two-step API example](../README.md#collect-benchmark-results-then-run-the-judge) and [batch post-evaluation](../docs/SCIENTIFIC_POSTEVALUATION.md#5-已有结果独立补评).
 
 ## Plan and run
 

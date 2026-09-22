@@ -28,7 +28,7 @@ class PostevaluateScienceTests(unittest.TestCase):
         args = matrix_fixtures._args(source)
         spec = matrix.build_plan(args.schedule_seed, families=["pendulum"], repeats=1,
                                  case_pack="historical", task_settings=["discovery"],
-                                 evaluation_methods=[matrix.FIXED_EXPERIMENTAL_DESIGN],
+                                 evaluation_methods=["fixed experimental design (4 observations)"],
                                  conditions=["historical"])[0]
         fixture = action_fixtures.UnlimitedAdaptiveTests()
         fixture.setUp()

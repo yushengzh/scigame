@@ -2,7 +2,7 @@
 
 SciGame is an interactive benchmark for scientific identification and discovery through experimentation. The **Player** proposes experiments, revises explicit scientific hypotheses, and submits an executable predictor with an explanation. A deterministic `WorldModel` supplies measurements for legal experiments.
 
-Standard case-matrix runs use one current scientific post-evaluation flow. The binary episode outcome remains `active_pass = protocol_completion && evaluation_success`. Independent metrics report normalized prediction error, mathematical expression equivalence, and expressed scientific understanding before and after interaction. Failed episodes receive F1–F5 scientific failure labels where the evidence supports them. These metrics are not combined into a weighted score, and the post-hoc Judge cannot change the binary outcome. See [Scientific post-evaluation](docs/SCIENTIFIC_POSTEVALUATION.md) for definitions and coverage limits.
+The binary episode outcome is `active_pass = protocol_completion && evaluation_success`. Independent metrics report normalized prediction error, mathematical expression equivalence, and expressed scientific understanding before and after interaction. Failed episodes receive F1–F5 scientific failure labels where the evidence supports them. By default, the runner calls the scientific Judge after each episode. Add `--defer-evaluator` to collect benchmark results first and run the LLM Judge separately later. These metrics are not combined into a weighted score, and the Judge cannot change the binary outcome. See [Scientific post-evaluation](docs/SCIENTIFIC_POSTEVALUATION.md) for definitions and coverage limits.
 
 ## Player, Oracle, and Evaluator
 
@@ -11,7 +11,7 @@ Standard case-matrix runs use one current scientific post-evaluation flow. The b
 | Player | LLM in the experiment runners | Propose experiments, revise hypotheses, and submit a predictor and explanation |
 | Oracle | Deterministic by default | Validate experimental controls and return measurements computed by the private `WorldModel` |
 | Case evaluator | Deterministic code | Score the submitted predictor against held-out conditions and determine scientific success |
-| Post-hoc Evaluator / Judge | LLM in standard case-matrix runs | Assess expressed scientific understanding from the transcript and an active-world reference |
+| Post-hoc Evaluator / Judge | LLM, immediately or in a separate later run | Assess expressed scientific understanding from the transcript and an active-world reference |
 
 The Oracle has three modes. `deterministic` makes no Oracle model calls. `llm_presentation` calls a model but requires an exact copy of the authoritative feedback. `llm_semantic` adds an LLM legality review after hard validation. In every mode, experimental measurements come from the deterministic world model. Player, optional LLM Oracle, and post-hoc Evaluator can use independently configured models.
 
@@ -80,9 +80,9 @@ Fixed methods receive their observations before final submission. Their ordered,
 
 The default is **five repeats**, so an unfiltered `both` run has 5,300 episodes. Set `--repeats 1` for an initial run. Repeat `--evaluation-method` to choose a subset; use the exact names above. A three-method comparison of prior-only, fixed-4, and adaptive must select those three explicitly.
 
-### Plan a small run
+### Collect benchmark results, then run the Judge
 
-Start with a one-case plan that makes no API calls:
+First plan one case with `--defer-evaluator`. This saves the benchmark trajectory, deterministic outcome, and offline formula comparison when executed, without configuring or calling an LLM Evaluator. The following `--dry-run` makes no API calls:
 
 ```bash
 PYTHONPATH=src:. python3 -m experiments.run_case_matrix \
@@ -96,20 +96,34 @@ PYTHONPATH=src:. python3 -m experiments.run_case_matrix \
   --player-provider openai \
   --player-model PLAYER_MODEL \
   --player-api-key-env BENCH_PLAYER_API_KEY \
-  --evaluator-provider openai \
-  --evaluator-model EVALUATOR_MODEL \
-  --evaluator-api-key-env BENCH_EVALUATOR_API_KEY \
-  --evaluator-max-output-tokens 8192 \
+  --defer-evaluator \
   --experiment-id EXP-EXAMPLE-001 \
   --output-dir runs/EXP-EXAMPLE-001 \
   --dry-run
 ```
 
-Use exact provider model IDs in place of `PLAYER_MODEL` and `EVALUATOR_MODEL`. After inspecting the plan, supply the corresponding environment variables and remove `--dry-run` to execute it. The deterministic Oracle needs no API key. Player and Evaluator use the current prompts automatically; no metric-version selector is required.
+Replace `PLAYER_MODEL` with an exact provider model ID, set `BENCH_PLAYER_API_KEY` in the environment, and remove `--dry-run` to collect the result. The deterministic Oracle needs no API key. Deferred collection needs no Evaluator model, endpoint, credential, or backend. Its Judge status is `deferred` and `metrics_complete=false` intentionally; the deterministic episode result remains available. `--defer-evaluator` defaults to false, so omitting it retains immediate evaluation.
+
+After collecting the desired runs, configure the Evaluator and judge the saved record in a separate output directory:
+
+```bash
+PYTHONPATH=src:. python3 -m experiments.postevaluate_science \
+  --run-dir runs/EXP-EXAMPLE-001 \
+  --output-dir runs/EXP-EXAMPLE-001-postevaluation \
+  --judge \
+  --evaluator-provider openai \
+  --evaluator-model EVALUATOR_MODEL \
+  --evaluator-api-key-env BENCH_EVALUATOR_API_KEY \
+  --evaluator-max-output-tokens 8192
+```
+
+Replace `EVALUATOR_MODEL` and set `BENCH_EVALUATOR_API_KEY` before this second step. It calls only the Judge, preserves the source results and logs, and reuses compatible completed assessments when resumed. No Player or Oracle episode is replayed. Use the same compatible code and scientific dataset snapshot for collection and post-evaluation.
+
+Deferred collection supports serial and parallel runs (`--workers`); resume collection with the same command, including `--defer-evaluator`. Each source run needs its own post-evaluation directory. A [batch example](docs/SCIENTIFIC_POSTEVALUATION.md#5-已有结果独立补评) processes several collected runs after collection finishes.
 
 ### API configuration
 
-The standard entry point is `experiments.run_case_matrix`, configured with API credentials, exact model IDs, and complete request endpoints. It runs independently of the Codex desktop app. The example above uses the OpenAI Responses API for both Player and Evaluator; they may use the same API account or different accounts.
+The standard entry point is `experiments.run_case_matrix`, configured with API credentials, exact model IDs, and complete request endpoints. It runs independently of the Codex desktop app. The two steps above use the OpenAI Responses API for Player and Evaluator separately; they may use the same API account or different accounts.
 
 | Provider | API contract | Current structured Player support |
 | --- | --- | --- |
@@ -129,7 +143,7 @@ Configure each used role with the same argument pattern, replacing `ROLE` with `
 | `--ROLE-max-output-tokens` | Per-call output limit sent through the selected API adapter |
 | `--ROLE-timeout-s` | Per-call timeout; defaults to 120 seconds |
 
-Set `BENCH_PLAYER_API_KEY` and `BENCH_EVALUATOR_API_KEY` in your environment before executing the example without `--dry-run`. Credentials are read independently for each role. The deterministic Oracle needs no credentials. Model names and endpoint URLs are CLI settings; they are not inferred from arbitrary `MODEL` or `BASE_URL` environment variables.
+Set `BENCH_PLAYER_API_KEY` for collection and `BENCH_EVALUATOR_API_KEY` for the later Judge. Credentials are read independently for each used role. The deterministic Oracle needs no credentials. Model names and endpoint URLs are CLI settings; they are not inferred from arbitrary `MODEL` or `BASE_URL` environment variables. For immediate evaluation, omit `--defer-evaluator` and pass the Evaluator settings to `run_case_matrix` alongside the Player settings.
 
 An endpoint override must implement the selected adapter's complete request and response contract. A service that advertises OpenAI compatibility may support only Chat Completions, which cannot be used through the `openai` Responses adapter. The Player also requires native recursive structured output; JSON-only prompting is insufficient. The runner defaults to OpenAI for Player and DeepSeek for Evaluator, so explicitly select providers in reproducible commands.
 
@@ -145,7 +159,7 @@ PYTHONPATH=src:. python3 -m experiments.postevaluate_science \
 
 This computes the available offline metrics and reuses compatible Judge results without rerunning Player or Oracle. Missing measurements remain missing. Add `--judge` with explicit Evaluator settings to generate missing scientific assessments. The source run remains unchanged; see the [post-evaluation guide](docs/SCIENTIFIC_POSTEVALUATION.md).
 
-Dedicated experiment drivers can defer the Judge and run it later. Their scheduling and resume rules differ from the standard matrix runner; see the [experiment entry points](experiments/README.md).
+Both immediate and deferred standard matrix results use this post-evaluation command. Specialized experiment drivers have their own scheduling and resume rules; see the [experiment entry points](experiments/README.md).
 
 ## Optional local adapter
 

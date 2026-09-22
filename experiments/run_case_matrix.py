@@ -1097,14 +1097,34 @@ def _record_codex_generation(generation: Dict[str, Any]) -> None:
     generation.update(_codex_generation_controls())
 
 
-def _codex_run_metadata(runtime: MatrixRuntime, oracle_mode: str) -> Mapping[str, Any]:
+def _codex_run_metadata(runtime: MatrixRuntime, oracle_mode: str, *,
+                        defer_evaluator: bool = False) -> Mapping[str, Any]:
     roles = {
         role: _codex_generation_controls()
         for role in ROLES
         if runtime.for_role(role).provider == "codex"
         and not (role == "oracle" and oracle_mode == DETERMINISTIC_ORACLE)
+        and not (role == "evaluator" and defer_evaluator)
     }
     return {"generation_controls": roles} if roles else {}
+
+
+def _defer_evaluator(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "defer_evaluator", False))
+
+
+def _deferred_evaluator_metadata(args: argparse.Namespace) -> Mapping[str, Any]:
+    """Do not attribute unused default Judge settings to collected episodes."""
+    if not _defer_evaluator(args):
+        return {}
+    return {
+        "evaluator_mode": "deferred",
+        **{name: None for name in (
+            "evaluator_profile", "evaluator_provider", "evaluator_model",
+            "evaluator_checkpoint_or_snapshot_id", "evaluator_thinking",
+            "evaluator_reasoning_effort", "evaluator_prompt_version",
+        )},
+    }
 
 
 def _oracle_mode(args: argparse.Namespace) -> str:
@@ -1147,6 +1167,8 @@ def _role_concurrency_limits(args: argparse.Namespace) -> Mapping[str, int]:
         limits[role] = min(workers, configured)
     if _oracle_mode(args) == DETERMINISTIC_ORACLE:
         limits["oracle"] = 0
+    if _defer_evaluator(args):
+        limits["evaluator"] = 0
     return limits
 
 
@@ -1522,6 +1544,22 @@ def _config_payload(
         "failure_modes": "F1_F5_multi_label_among_failed_episodes",
         "missing_metric_policy": "report_status_and_coverage; never_impute_zero",
     }
+
+    if _defer_evaluator(args):
+        payload["design"]["evaluator_profile"] = {
+            "status": "deferred", "provider": None, "model": None,
+        }
+        payload["providers"]["evaluator"] = {
+            "name": None, "status": "deferred", "llm_calls": 0,
+        }
+        payload["evaluator_generation"] = {"mode": "deferred", "llm_calls": 0}
+        execution.update({
+            "evaluator_mode": "deferred",
+            "evaluator_failure_policy": "not_applicable_while_deferred",
+            "episode_causality": "player_oracle_turns_sequential; evaluator_deferred",
+            "role_concurrency_limits": dict(_role_concurrency_limits(args)),
+            "resume_policy": "retry_failed_or_missing_active_work; evaluator_deferred",
+        })
 
     return payload
 
@@ -1990,7 +2028,9 @@ def _with_evaluator_summary(
     if evaluator_result is None:
         merged.update(
             {
-                "llm_evaluation_status": "pending",
+                "llm_evaluation_status": (
+                    "deferred" if result.get("evaluator_mode") == "deferred" else "pending"
+                ),
                 "llm_evaluation": None,
                 "evaluator_llm_stats": None,
                 "evaluator_result_path": None,
@@ -2366,7 +2406,8 @@ def _run_one_episode(
             initial_attempts_used=prepared.initial_attempts_used,
             require_budget_exhaustion=prepared.plan.require_budget_exhaustion,
             run_metadata={
-                **_codex_run_metadata(runtime, oracle_mode),
+                **_codex_run_metadata(runtime, oracle_mode,
+                                      defer_evaluator=_defer_evaluator(args)),
                 "experiment_schema": EXPERIMENT_SCHEMA,
                 "experiment_id": _experiment_id(args),
                 "episode_id": spec.episode_id,
@@ -2433,6 +2474,7 @@ def _run_one_episode(
                 "evaluator_checkpoint_or_snapshot_id": (
                     runtime.evaluator.checkpoint_or_snapshot_id
                 ),
+                **_deferred_evaluator_metadata(args),
             },
         )
         run_log_path = getattr(run, "log_path", None)
@@ -2456,9 +2498,10 @@ def _run_one_episode(
             oracle_mode=oracle_mode,
         )
         result["formula_consistency"] = _formula_result(spec, result)
+        result.update(_deferred_evaluator_metadata(args))
         return result
     except Exception as exc:
-        return _infrastructure_failed_result(
+        result = _infrastructure_failed_result(
             spec=spec,
             log_path=log_path,
             output_dir=output_dir,
@@ -2469,6 +2512,8 @@ def _run_one_episode(
             experiment_id=_experiment_id(args),
             oracle_mode=oracle_mode,
         )
+        result.update(_deferred_evaluator_metadata(args))
+        return result
 
 
 def _formula_result(spec, result):
@@ -2533,7 +2578,7 @@ def _run_parallel_active_task(
     *,
     player_backend: TextGenerationBackend,
     oracle_backend: Optional[TextGenerationBackend],
-    evaluator_backend: TextGenerationBackend,
+    evaluator_backend: Optional[TextGenerationBackend],
     output_dir: Path,
     spec: EpisodeSpec,
     log_path: Path,
@@ -2550,7 +2595,7 @@ def _run_parallel_active_task(
         log_path=log_path,
     )
     _write_episode_result(output_dir, spec, episode_result, output_lock)
-    if episode_result.get("status") != "evaluated":
+    if episode_result.get("status") != "evaluated" or _defer_evaluator(args):
         return _ParallelTaskOutcome(
             spec=spec,
             task_kind="active",
@@ -2560,6 +2605,8 @@ def _run_parallel_active_task(
 
     # The active transcript is closed by _run_one_episode and its evaluated
     # sidecar is durably visible before post-hoc evaluation begins.
+    if evaluator_backend is None:
+        raise AssertionError("post-hoc evaluation requires an Evaluator backend")
     evaluator_result = _run_evaluator(
         args,
         evaluator_backend=evaluator_backend,
@@ -2620,7 +2667,7 @@ def _run_parallel_tasks(
     *,
     player_backend: Optional[TextGenerationBackend],
     oracle_backend: Optional[TextGenerationBackend],
-    evaluator_backend: TextGenerationBackend,
+    evaluator_backend: Optional[TextGenerationBackend],
     output_dir: Path,
     pending: Sequence[Tuple[EpisodeSpec, Path]],
     evaluator_pending: Sequence[Tuple[EpisodeSpec, Mapping[str, Any]]],
@@ -2633,6 +2680,8 @@ def _run_parallel_tasks(
         max_workers=_worker_count(args),
         thread_name_prefix="case-matrix",
     ) as executor:
+        if evaluator_pending and evaluator_backend is None:
+            raise AssertionError("evaluator-only retries require an Evaluator backend")
         for spec, episode_result in evaluator_pending:
             future = executor.submit(
                 _run_parallel_evaluator_task,
@@ -2724,6 +2773,7 @@ def run_matrix(
     oracle_backend_loader: Optional[BackendLoader] = None,
     evaluator_backend_loader: Optional[BackendLoader] = None,
 ) -> List[Mapping[str, Any]]:
+    evaluator_enabled = not _defer_evaluator(args)
     workers = _worker_count(args)
     role_concurrency_limits = _role_concurrency_limits(args)
     schedule_start_index = int(getattr(args, "schedule_start_index", 1))
@@ -2868,10 +2918,11 @@ def run_matrix(
                 {None, "pending", "infrastructure_failed"}):
             episode_result["formula_consistency"] = _formula_result(spec, episode_result)
             _write_json(_result_path(output_dir, spec), episode_result)
-        evaluator_result = _load_evaluator_result(output_dir, spec.episode_id)
-        if (evaluator_result is None or evaluator_result.get("status") != "evaluated"
-                or evaluator_result.get("evaluator_prompt_version") != DISCOVERY_PROMPT_VERSION):
-            evaluator_pending.append((spec, episode_result))
+        if evaluator_enabled:
+            evaluator_result = _load_evaluator_result(output_dir, spec.episode_id)
+            if (evaluator_result is None or evaluator_result.get("status") != "evaluated"
+                    or evaluator_result.get("evaluator_prompt_version") != DISCOVERY_PROMPT_VERSION):
+                evaluator_pending.append((spec, episode_result))
     print(
         "Running %d unfinished episode(s) and %d evaluator-only retry(s) with "
         "%d episode worker(s)"
@@ -2889,15 +2940,17 @@ def run_matrix(
             loader=player_backend_loader,
             ifm_request_gate=ifm_gate,
         )
-        evaluator_backend = load_role_backend(
-            args,
-            "evaluator",
-            api_key=_key_for_backend(
-                args, "evaluator", evaluator_api_key, evaluator_backend_loader
-            ),
-            loader=evaluator_backend_loader,
-            ifm_request_gate=ifm_gate,
-        )
+        evaluator_backend = None
+        if evaluator_enabled:
+            evaluator_backend = load_role_backend(
+                args,
+                "evaluator",
+                api_key=_key_for_backend(
+                    args, "evaluator", evaluator_api_key, evaluator_backend_loader
+                ),
+                loader=evaluator_backend_loader,
+                ifm_request_gate=ifm_gate,
+            )
         oracle_backend = None
         if _oracle_mode(args) != DETERMINISTIC_ORACLE:
             oracle_backend = load_role_backend(
@@ -2909,7 +2962,9 @@ def run_matrix(
                 loader=oracle_backend_loader,
                 ifm_request_gate=ifm_gate,
             )
-        active_backends = [player_backend, evaluator_backend]
+        active_backends = [player_backend]
+        if evaluator_backend is not None:
+            active_backends.append(evaluator_backend)
         if oracle_backend is not None:
             active_backends.append(oracle_backend)
         if len({id(backend) for backend in active_backends}) != len(active_backends):
@@ -2951,10 +3006,10 @@ def run_matrix(
             concurrency_limit=role_concurrency_limits["evaluator"],
         )
 
-    if workers > 1 and evaluator_backend is not None:
+    if workers > 1 and (pending or evaluator_pending):
         if pending and player_backend is None:
             raise AssertionError(
-                "parallel active execution requires Player and Evaluator backends"
+                "parallel active execution requires a Player backend"
             )
         if (
             pending
@@ -2993,8 +3048,8 @@ def run_matrix(
                 )
 
     if pending:
-        if player_backend is None or evaluator_backend is None:
-            raise AssertionError("active execution requires Player and Evaluator backends")
+        if player_backend is None or (evaluator_enabled and evaluator_backend is None):
+            raise AssertionError("active execution requires backends for all enabled roles")
         if (
             _oracle_mode(args) != DETERMINISTIC_ORACLE
             and oracle_backend is None
@@ -3027,6 +3082,8 @@ def run_matrix(
                     "episode %s hit an infrastructure failure: %s"
                     % (spec.episode_id, result["error_message"])
                 )
+            if not evaluator_enabled:
+                continue
             evaluator_result = _run_evaluator(
                 args,
                 evaluator_backend=evaluator_backend,
@@ -3043,8 +3100,15 @@ def run_matrix(
                 )
 
     results = write_summaries(output_dir)
-    if any(row.get("status") == "evaluated" and not row.get("metrics_complete") for row in results):
+    if evaluator_enabled and any(row.get("status") == "evaluated" and not row.get("metrics_complete") for row in results):
         raise RuntimeError("required performance metrics remain incomplete; completed Player episodes are preserved for metric-only retry")
+    if not evaluator_enabled and any(
+        row.get("status") == "evaluated"
+        and (row.get("formula_consistency") or {}).get("status") not in
+        {"equivalent", "not_equivalent", "inconclusive", "unavailable"}
+        for row in results
+    ):
+        raise RuntimeError("deterministic formula metrics remain incomplete; completed Player episodes are preserved for metric-only retry")
     evaluated = sum(result["status"] == "evaluated" for result in results)
     failed = sum(
         result["status"] == "infrastructure_failed" for result in results
@@ -3178,6 +3242,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     for role in ROLES:
         _add_role_arguments(parser, role)
+    parser.add_argument(
+        "--defer-evaluator",
+        action="store_true",
+        help=(
+            "collect benchmark trajectories and deterministic scores without "
+            "loading or calling the LLM Evaluator; later use "
+            "experiments.postevaluate_science --judge"
+        ),
+    )
     parser.add_argument(
         "--oracle-mode",
         choices=ORACLE_MODES,

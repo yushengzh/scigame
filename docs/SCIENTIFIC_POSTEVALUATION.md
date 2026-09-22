@@ -1,10 +1,12 @@
 # 自动科学后评估：成败、独立指标与失败分布
 
-本文是当前科学后评估的唯一维护说明。标准 case-matrix 新运行默认使用本流程；代码演进由 Git 记录，运行入口不提供多套指标版本选择。原实验的记录和评分含义保留，已有结果通过独立补评目录接入。
+本文是当前科学后评估的唯一维护说明。标准 case-matrix 新运行默认在每个 episode 后执行科学 Judge；也可通过 `--defer-evaluator` 先采集 benchmark，再单独批量补评。代码演进由 Git 记录，运行入口不提供多套指标版本选择。原实验的记录和评分含义保留，已有结果通过独立补评目录接入。
 
 ## 1. 流程
 
-沿用现有 case-matrix 流程：episode 结束 → 原确定性评价与成败 → 表达式比较 → 一次科学 Judge 调用 → JSON/CSV 与分组失败统计。
+默认流程：episode 结束 → 原确定性评价与成败 → 表达式比较 → 一次科学 Judge 调用 → JSON/CSV 与分组失败统计。
+
+延后流程：`run_case_matrix --defer-evaluator` 保存 episode 日志、确定性评价与表达式比较；采集完所需运行后，再用 `postevaluate_science --judge` 读取已有日志，调用科学 Judge，并在独立目录生成补评结果。`--defer-evaluator` 默认关闭，不传该选项时仍使用默认流程。
 
 科学 Judge 同时评价理解前后表述和可能的科学缺陷；无需额外运行一组“失败原因 Judge”。成功 episode 同样评价理解，失败标签只在 `active_pass=false` 的 episode 中计数。
 
@@ -16,7 +18,7 @@
 | `understanding.before_score / after_score / delta` | 同一运行、相同科学要点的前后得分与差；资料不足保留 null |
 | `failure_analysis` | 直接阻断条件、F1–F5 多标签、无法分类状态及相关科学理由 |
 
-这些量不加权，不改变成败。`metrics_complete=true` 表示各项测量流程已返回，不代表公式已证等价、前测存在、模型成功或解释全部正确。
+这些量不加权，不改变成败。`metrics_complete=true` 表示各项测量流程已返回，不代表公式已证等价、前测存在、模型成功或解释全部正确。延后采集的 Judge 状态为 `deferred`，`metrics_complete=false` 是预期状态，不代表已完成的确定性 benchmark 失败；尚未测量的理解分和 Judge 失败分类保留缺测。
 
 外部调用失败沿用 runner 的独立状态，不强行变成科学失败。成功率以已产生明确二元结果的 episode 为分母；F1–F5 各类失败比例以其中全部失败 episode 为分母。全部记录数、未完成数与指标覆盖另报。
 
@@ -57,20 +59,42 @@ Judge 的 F2 若与已证明表达式等价冲突，保留冲突说明并不自�
 
 未完成 Judge、未能分类、判断冲突与“确实没有科学标签”分别记录。这里统计的是可观察失败模式；不会把它们直接声称为已经确定的因果根因。
 
-## 4. 新运行接入
+## 4. 先采集 benchmark，再运行 Judge
 
-直接使用现有 bench 命令和新的输出目录。Player 在既有 hypothesis、experiment intent、final explanation 和 scope 字段中表述科学关系、观测依据及适用条件；Evaluator 默认执行本文定义的理解评分与失败分类。三个角色继续使用既有 provider、模型与凭据配置。科学后评估在 episode 结束后调用一次 Judge，不额外要求 Player 重做实验或补写解释。
+Player 在既有 hypothesis、experiment intent、final explanation 和 scope 字段中表述科学关系、观测依据及适用条件。采集与科学 Judge 可以使用两个独立 API 命令。以下示例只选择一个 RC 反事实 case、一个方法和一次重复。
 
-例如先生成一个 RC 反事实的运行计划：
+第一步，先检查采集计划。将 `PLAYER_MODEL` 替换为服务支持的准确模型 ID；正式执行前在环境中设置 `BENCH_PLAYER_API_KEY`，然后去掉 `--dry-run`：
 
 ```bash
 PYTHONPATH=src:. python3 -B -m experiments.run_case_matrix \
   --case-pack historical --family rc_discharge --repeats 1 \
   --task-setting discovery --evaluation-method 'prior-only baseline' \
-  --condition counterfactual --output-dir out/scientific_metrics --dry-run
+  --condition counterfactual \
+  --oracle-mode deterministic \
+  --player-provider openai --player-model PLAYER_MODEL \
+  --player-api-key-env BENCH_PLAYER_API_KEY \
+  --defer-evaluator \
+  --experiment-id EXP-COLLECT-RC-001 \
+  --output-dir out/bench_rc --dry-run
 ```
 
-正式运行继续使用项目已有的三角色模型配置。相同命令恢复时跳过已完成 episode，只补算缺失或失败的公式指标与科学 Judge；已有科学失败不因指标缺失而重新调用 Player。历史实验若使用不同的评价含义，应使用下述独立补评命令。
+这一步仍执行 case 的确定性评分器、保存完整交互日志，并计算离线公式指标；不需要配置 Evaluator 的模型、endpoint 或 API key，也不会读取其凭据或创建其 backend。确定性 Oracle 同样不调用模型。需要 LLM Oracle 时可以独立配置，`--defer-evaluator` 只推迟科学 Judge。
+
+串行和 `--workers` 并行运行均支持该选项。恢复采集时使用相同命令，包括 `--defer-evaluator`；已完成的科学失败不会被重新采样，基础设施失败沿用 runner 的恢复规则。后续 Judge 使用另一个输出目录，不通过改写原采集配置启动。
+
+第二步，在采集完成后设置 `BENCH_EVALUATOR_API_KEY`，并将 `EVALUATOR_MODEL` 替换为准确模型 ID：
+
+```bash
+PYTHONPATH=src:. python3 -B -m experiments.postevaluate_science \
+  --run-dir out/bench_rc \
+  --output-dir out/postevaluation/bench_rc \
+  --judge \
+  --evaluator-provider openai --evaluator-model EVALUATOR_MODEL \
+  --evaluator-api-key-env BENCH_EVALUATOR_API_KEY \
+  --evaluator-max-output-tokens 8192
+```
+
+这一步只调用 Evaluator，不运行 Player 或 Oracle，不要求补写解释。原采集结果、日志和二元成败保持不变；重复执行补评命令只补充缺失或失败的评价，并复用兼容的已完成 Judge。若希望每个 episode 结束后立即评价，则不传 `--defer-evaluator`，直接为 `run_case_matrix` 同时配置 Player 与 Evaluator。
 
 ## 5. 已有结果独立补评
 
@@ -85,6 +109,24 @@ PYTHONPATH=src:. python3 -B -m experiments.postevaluate_science \
 补充缺失的科学 Judge 时，在同一命令上增加 `--judge` 及原项目支持的 `--evaluator-provider`、`--evaluator-model`、`--evaluator-api-key-env`、必要时 `--evaluator-endpoint`。只有 Evaluator 会调用模型。
 
 该命令输出到独立目录，保留原实验结果、原成败和 `source_metrics_protocol`，日志仍指向实际运行。重复执行只补缺失或失败评价；旧的物理解释／证据修订分数不当成已完成的前后理解测量。实际使用的 Judge 模型记录在新汇总中。
+
+多个 benchmark 目录全部采集完成后，可以逐个补评。以下目录名代表两份已有的运行，模型占位符和 API key 设置方式同上：
+
+```bash
+for run_name in bench_model_a bench_model_b; do
+  PYTHONPATH=src:. python3 -B -m experiments.postevaluate_science \
+    --run-dir "out/${run_name}" \
+    --output-dir "out/postevaluation/${run_name}" \
+    --judge \
+    --evaluator-provider openai --evaluator-model EVALUATOR_MODEL \
+    --evaluator-api-key-env BENCH_EVALUATOR_API_KEY \
+    --evaluator-max-output-tokens 8192
+done
+```
+
+每个来源必须对应独立输出目录；不同模型运行可能具有相同 `episode_id`，不要把它们的 sidecar 文件合并进同一目录。输出目录须位于来源目录之外。补评仍引用来源中的原日志，应保留这些文件。
+
+采集和补评应使用科学定义兼容的代码与数据快照，因为补评会读取该快照的参考关系并重新计算公式指标。仅凭相同 family 名称或相同 manifest 路径，不能认定不同代码版本的真值相同。
 
 输入目前支持标准 case-matrix 的 `results/*.result.json`。Historical/revision 专用脚本的异形结果不自动转换；程序会明确提示。当前 `historical` 和已注册 Temporal case 均通过标准 case-matrix 接入。补评入口明确拒绝带旧 Historical 数据标识的结果；这些结果需要对应 Git 提交的代码与原始参考关系。不能仅凭相同 family 名称套用当前真值，也不能重标为当前数据集结果。固定名称和数据含义见 [Historical dataset](HISTORICAL_DATASET.md)。
 
