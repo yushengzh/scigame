@@ -36,6 +36,7 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 from urllib.parse import quote
+from role_benchmark.fixed_design import FIXED_METHOD_BUDGETS, FIXED_DESIGN_MANIFEST
 from role_benchmark.llm import PLAYER_PROMPT_VERSION_V5_PERFORMANCE, STRUCTURED_PLAYER_PROMPTS, MAX_LLM_ACTION_BYTES
 from role_benchmark.performance import PERFORMANCE_PROTOCOL, formula_metric, discovery_reference_context
 from role_benchmark.discovery_evaluation import DISCOVERY_PROMPT_VERSION
@@ -95,6 +96,7 @@ from role_benchmark.llm import (
 from role_benchmark.wire import DEFAULT_MAX_ACTION_BYTES, final_submission_to_payload
 
 from experiments.gemini_generate_content import GeminiGenerateContentBackend
+from experiments.codex_structured_backend import validate_codex_model_config
 from experiments.ifm_chat_completions import (
     DEFAULT_IFM_CHAT_COMPLETIONS_ENDPOINT,
     DEFAULT_IFM_MODEL,
@@ -115,6 +117,8 @@ LLM_EVALUATOR_RESULT_SCHEMA = "role_benchmark.case_matrix_llm_evaluation.v2"
 DEFAULT_PROVIDER = "deepseek"
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 OPENAI_ENDPOINT = "https://api.openai.com/v1/responses"
+CODEX_ENDPOINT = "stdio://codex-app-server"
+CODEX_BINDING_ID = "case_matrix.codex_app_server"
 GEMINI_ENDPOINT_TEMPLATE = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     "{model}:generateContent"
@@ -280,6 +284,32 @@ def _role_runtime(args: argparse.Namespace, role: str) -> RoleRuntime:
         "evaluator": EVALUATOR_MODEL,
     }[role]
 
+    if provider == "codex":
+        if thinking_override is not None:
+            raise ValueError("--%s-thinking is only defined for DeepSeek" % role)
+        if endpoint_override not in (None, CODEX_ENDPOINT):
+            raise ValueError("Codex uses the local app-server stdio endpoint")
+        if any(_role_value(args, role, field) not in (None, False)
+               for field in ("api_key", "api_key_env", "api_key_stdin", "prompt_api_key")):
+            raise ValueError("Codex uses its existing login, not API-key options")
+        model = model_override or "gpt-5.5"
+        reasoning_effort = effort_override or "high"
+        validate_codex_model_config(model, reasoning_effort)
+        return RoleRuntime(
+            role=role,
+            profile_id=profile_id,
+            provider="codex",
+            endpoint=CODEX_ENDPOINT,
+            api="app_server_jsonrpc",
+            response_format="native_json_schema_local_validation",
+            binding_id=CODEX_BINDING_ID,
+            api_key_env="",
+            model=model,
+            checkpoint_or_snapshot_id=snapshot_override or "unknown",
+            thinking=None,
+            reasoning_effort=reasoning_effort,
+            timeout_s=float(timeout_s),
+        )
     if provider == "deepseek":
         thinking = thinking_override or THINKING
         if thinking not in ("enabled", "disabled"):
@@ -944,6 +974,16 @@ def load_role_backend(
     runtime = _runtime_profile(args).for_role(role)
     if loader is not None:
         backend = loader()
+    elif runtime.provider == "codex":
+        from experiments.codex_structured_backend import CodexStructuredBackend
+
+        backend = CodexStructuredBackend(
+            model=runtime.model,
+            reasoning_effort=runtime.reasoning_effort,
+            timeout_s=runtime.timeout_s,
+            audit_dir=Path(args.output_dir).resolve() / "codex_calls",
+            role=role,
+        )
     else:
         if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("%s api_key must be non-empty" % role)
@@ -1031,7 +1071,40 @@ def _provider_payload(runtime: RoleRuntime) -> Mapping[str, Any]:
         payload.update({"store": False, "reasoning_context": "current_turn"})
     if runtime.provider == "ifm":
         payload["api_mode"] = runtime.ifm_api_mode or "ifm_platform"
+    if runtime.provider == "codex":
+        payload.update({
+            "authentication": "existing_codex_login",
+            "generation_config_semantics": "logical_request_only; see generation_controls",
+            "generation_controls": _codex_generation_controls(),
+        })
     return payload
+
+
+def _codex_generation_controls() -> Mapping[str, Any]:
+    """Record unavailable Codex controls without claiming API equivalence."""
+    fields = ("temperature", "top_p", "max_output_tokens", "seed")
+    return {
+        "actual_generation": {name: None for name in fields},
+        "enforced": {name: False for name in fields},
+        "status": "not_exposed_by_app_server",
+    }
+
+
+def _record_codex_generation(generation: Dict[str, Any]) -> None:
+    fields = ("temperature", "top_p", "max_output_tokens", "seed")
+    generation["requested_generation"] = {name: generation[name] for name in fields}
+    generation.update({name: None for name in fields})
+    generation.update(_codex_generation_controls())
+
+
+def _codex_run_metadata(runtime: MatrixRuntime, oracle_mode: str) -> Mapping[str, Any]:
+    roles = {
+        role: _codex_generation_controls()
+        for role in ROLES
+        if runtime.for_role(role).provider == "codex"
+        and not (role == "oracle" and oracle_mode == DETERMINISTIC_ORACLE)
+    }
+    return {"generation_controls": roles} if roles else {}
 
 
 def _oracle_mode(args: argparse.Namespace) -> str:
@@ -1221,11 +1294,12 @@ def _config_payload(
     runtime = _runtime_profile(args)
     fixed_designs = {
         family: {
-            variant_id: evaluation_method_plan_to_payload(
-                build_evaluation_method_plan(
-                    specification, FIXED_EXPERIMENTAL_DESIGN
+            variant_id: {
+                method: evaluation_method_plan_to_payload(
+                    build_evaluation_method_plan(specification, method)
                 )
-            )
+                for method in FIXED_METHOD_BUDGETS
+            }
             for variant_id, specification in case_pack.specifications[family].items()
             if any(
                 item.case_family == family and item.variant_id == variant_id
@@ -1308,6 +1382,11 @@ def _config_payload(
         "score_axes": ["understanding_before", "understanding_after", "understanding_gain"],
         "scientific_score_policy": "separate_from_deterministic_evaluation",
     }
+    for role, generation in (("player", player_generation), ("oracle", oracle_generation),
+                             ("evaluator", evaluator_generation)):
+        if runtime.for_role(role).provider == "codex" and (
+                role != "oracle" or oracle_mode != DETERMINISTIC_ORACLE):
+            _record_codex_generation(generation)
     # Record the actual prompts used for this run.
     player_generation["prompt_version"] = player_prompt_version
     if oracle_prompt_version != DEFAULT_ORACLE_PROMPT_VERSION:
@@ -1386,11 +1465,9 @@ def _config_payload(
             "repeat_policy": "provider-stochastic repeats; no client seed",
             "observation_budget_policy": {
                 PRIOR_ONLY_BASELINE: 0,
-                FIXED_EXPERIMENTAL_DESIGN: (
-                    "family-specific B from pre-defined diagnostic_conditions"
-                ),
+                **FIXED_METHOD_BUDGETS,
                 ADAPTIVE_EXPERIMENTAL_DESIGN: (
-                    "unlimited experiments and actions until selected confidence exceeds threshold"
+                    "unlimited experiments and actions until selected confidence reaches or exceeds threshold"
                 ),
                 "adaptive_early_stopping": True,
             },
@@ -1436,6 +1513,7 @@ def _config_payload(
     }
     if case_pack.release_metadata:
         payload["design"]["dataset_release"] = dict(case_pack.release_metadata)
+    payload["fixed_budget_design"] = FIXED_DESIGN_MANIFEST
     payload["metrics_protocol"] = PERFORMANCE_PROTOCOL
     payload["design"]["performance_metrics"] = {
         "deterministic_prediction": "case_owned_ast_evaluator",
@@ -1791,6 +1869,8 @@ def _run_evaluator(
     }
     evaluator_prompt_version = _prompt_version(args, "evaluator")
     base["evaluator_prompt_version"] = evaluator_prompt_version
+    if runtime.provider == "codex":
+        base["generation_controls"] = _codex_generation_controls()
     log_path_value = episode_result.get("log_path")
     if not isinstance(log_path_value, str) or not log_path_value:
         raise ValueError("evaluated episode is missing its canonical log path")
@@ -2286,6 +2366,7 @@ def _run_one_episode(
             initial_attempts_used=prepared.initial_attempts_used,
             require_budget_exhaustion=prepared.plan.require_budget_exhaustion,
             run_metadata={
+                **_codex_run_metadata(runtime, oracle_mode),
                 "experiment_schema": EXPERIMENT_SCHEMA,
                 "experiment_id": _experiment_id(args),
                 "episode_id": spec.episode_id,
@@ -2303,6 +2384,10 @@ def _run_one_episode(
                 "evaluation_method": spec.evaluation_method,
                 "evaluation_method_plan": method_plan,
                 "fixed_observations": fixed_observations,
+                "fixed_unique_control_points": len({
+                    json.dumps(observation["proposal"]["controls"], sort_keys=True)
+                    for observation in fixed_observations
+                }),
                 "repeat": spec.repeat,
                 "schedule_index": spec.schedule_index,
                 "schedule_seed": args.schedule_seed,
@@ -2407,6 +2492,8 @@ def _key_for_backend(
     supplied: Optional[str],
     loader: Optional[BackendLoader],
 ) -> Optional[str]:
+    if _runtime_profile(args).for_role(role).provider == "codex":
+        return None
     if loader is not None or supplied is not None:
         return supplied
     return _resolve_api_key(args, role)
@@ -2983,7 +3070,7 @@ def _add_role_arguments(parser: argparse.ArgumentParser, role: str) -> None:
     label = role.capitalize()
     parser.add_argument(
         "--%s-provider" % role,
-        choices=("deepseek", "openai", "gemini", "ifm"),
+        choices=("deepseek", "openai", "gemini", "ifm", "codex"),
         default="openai" if role == "player" else DEFAULT_PROVIDER,
         help="%s provider binding" % label,
     )

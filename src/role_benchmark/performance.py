@@ -14,7 +14,6 @@ def discovery_reference_context(case, spec, world):
     outputs = ", ".join(r.name for r in spec.readouts)
     reference.update({
         "task_setting": case.definition.track.value,
-        "counterfactual_change": spec.counterfactual_change,
         "understanding_criteria": [
             {"id": "relation_meaning", "question":
              "Explain the active-world dependence of %s on %s, including any necessary interactions. "
@@ -30,11 +29,14 @@ def discovery_reference_context(case, spec, world):
              "absence of observations at the baseline is not itself an error."},
         ],
     })
-    original = spec.truths.get("historical")
-    if original is not None:
+    # A mutation describes the authored sibling, not every active world. Giving
+    # it to an original-world judge can contradict the authoritative predictor.
+    if world == "counterfactual":
+        reference["counterfactual_change"] = spec.counterfactual_change
+        original = spec.truths["historical"]
         reference["original_world_comparison"] = {
             "predictor": {"outputs": deepcopy(dict(original.discovery_outputs))},
-            "purpose": "Comparison only. Grade the active world, never demand historical names or facts.",
+            "purpose": "Inactive original-world comparison only. Grade the active predictor above; this comparison is not the active law.",
         }
     # The Historical RC task has two independently meaningful relationships.
     # Freeze both questions across endpoints; do not let a judge choose whichever
@@ -59,12 +61,14 @@ def reference_context(case, spec, world):
     """
     truth = spec.truths[world]
     return deepcopy({"case_id": case.definition.case_id,
+        "active_world": {"runtime_key": world,
+            "is_counterfactual": world == "counterfactual"},
         "predictor": {"outputs": dict(truth.discovery_outputs)},
         "applicability": list(truth.applicability),
         "fixed_conditions": list(truth.fixed_conditions),
         "controls": [asdict(c) for c in case.definition.resources.controls],
         "readouts": [asdict(r) for r in case.definition.resources.readouts],
-        "interpretation": "The active benchmark world's predictive relation. An empirical formula alone does not establish a causal mechanism."})
+        "interpretation": "The predictor here is the authoritative active-world relation. If is_counterfactual is false, the original historical or source-reported relation is active and no sibling mutation applies. An empirical formula alone does not establish a causal mechanism."})
 
 
 def formula_metric(submission, spec, world):
@@ -75,4 +79,3 @@ def formula_metric(submission, spec, world):
     return compare_formulas(submission.parameters,
         {"outputs": dict(spec.truths[world].discovery_outputs)}, spec.controls,
         probes=tuple(spec.hidden_conditions) + tuple(spec.diagnostic_conditions))
-

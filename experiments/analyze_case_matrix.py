@@ -31,12 +31,13 @@ from role_benchmark import (
     PRIOR_ONLY_BASELINE,
 )
 from role_benchmark.expression import ExpressionError, evaluate_expression_program
-from role_benchmark.postevaluation import aggregate_scientific_postevaluation
+from experiments.offline_adjudications import apply_adjudications, is_adjudicated, scientific_summary
 
 
 ANALYSIS_SCHEMA = "role_benchmark.case_matrix_analysis.v2"
 HISTORICAL_COUNTERFACTUAL_DATASET = "historical_counterfactual"
 TEMPORAL_DATASET = "temporal"
+TEMPORAL_COUNTERFACTUAL_DATASET = "temporal_counterfactual"
 HISTORICAL_ROLE = "historical"
 COUNTERFACTUAL_ROLE = "counterfactual"
 IDENTIFICATION_TASK_SETTING = "identification"
@@ -67,6 +68,9 @@ def _mean(values: Iterable[Optional[float]]) -> Optional[float]:
 
 def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
     evaluated = [row for row in rows if row.get("status") == "evaluated"]
+    adjudicated_n = sum(is_adjudicated(row) for row in rows)
+    decisions = [row for row in evaluated if type(row.get("active_pass")) is bool]
+    binary_denominator = len(decisions) + adjudicated_n
     player = [row.get("player_llm_stats") or {} for row in evaluated]
     oracle = [row.get("oracle_llm_stats") or {} for row in evaluated]
     evaluator = [row.get("evaluator_llm_stats") or {} for row in evaluated]
@@ -82,8 +86,13 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
     return {
         "n": len(rows),
         "evaluated_n": len(evaluated),
+        "machine_evaluated_n": len(evaluated),
+        "user_adjudicated_failure_n": adjudicated_n,
+        "active_pass_denominator": binary_denominator,
         "active_pass_n": sum(row.get("active_pass") is True for row in evaluated),
-        "active_pass_rate": _rate(row.get("active_pass") is True for row in evaluated),
+        "active_fail_n": sum(row.get("active_pass") is False for row in evaluated) + adjudicated_n,
+        "active_pass_rate": (sum(row["active_pass"] is True for row in decisions) / binary_denominator
+                             if binary_denominator else None),
         "scientifically_evaluable_n": sum(
             row.get("scientifically_evaluable") is True for row in evaluated
         ),
@@ -133,7 +142,7 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
             )
             for axis in DISCOVERY_SCORE_AXES
         },
-        "scientific_postevaluation": aggregate_scientific_postevaluation(rows),
+        "scientific_postevaluation": scientific_summary(rows),
         "elapsed_s": sum(float(row.get("elapsed_s") or 0.0) for row in evaluated),
     }
 
@@ -279,16 +288,17 @@ def _temporal_estimands(
     cell_summaries: Sequence[Mapping[str, Any]],
 ) -> Mapping[str, Any]:
     condition_groups: Dict[
-        Tuple[str, str, str, str, str], List[Mapping[str, Any]]
+        Tuple[str, str, str, str, str, str], List[Mapping[str, Any]]
     ] = defaultdict(list)
     for row in cell_summaries:
-        if row["dataset_kind"] != TEMPORAL_DATASET:
+        dataset_kind = row["dataset_kind"]
+        if dataset_kind not in (TEMPORAL_DATASET, TEMPORAL_COUNTERFACTUAL_DATASET):
             continue
         source_paper_id = row.get("source_paper_id")
         source_version_id = row.get("source_version_id")
-        if not source_paper_id or not source_version_id:
+        if not source_paper_id or (dataset_kind == TEMPORAL_DATASET and not source_version_id):
             raise ValueError(
-                "temporal rows require source_paper_id and source_version_id"
+                "temporal rows require source_paper_id; legacy temporal also requires source_version_id"
             )
         task_setting = str(row["task_setting"])
         if task_setting not in (
@@ -305,6 +315,7 @@ def _temporal_estimands(
             continue
         condition_groups[
             (
+                str(dataset_kind),
                 str(source_paper_id),
                 str(row["case_family"]),
                 str(row["variant_id"]),
@@ -315,6 +326,7 @@ def _temporal_estimands(
 
     condition_estimates = []
     for (
+        dataset_kind,
         source_paper_id,
         family,
         variant_id,
@@ -340,7 +352,7 @@ def _temporal_estimands(
         y_a = float(values[ADAPTIVE_EXPERIMENTAL_DESIGN])
         condition_estimates.append(
             {
-                "dataset_kind": TEMPORAL_DATASET,
+                "dataset_kind": dataset_kind,
                 "source_paper_id": source_paper_id,
                 "source_version_id": _common_value(group, "source_version_id"),
                 "case_family": family,
@@ -360,11 +372,12 @@ def _temporal_estimands(
         )
 
     family_groups: Dict[
-        Tuple[str, str, str, str], List[Mapping[str, Any]]
+        Tuple[str, str, str, str, str], List[Mapping[str, Any]]
     ] = defaultdict(list)
     for item in condition_estimates:
         family_groups[
             (
+                str(item["dataset_kind"]),
                 str(item["source_paper_id"]),
                 str(item["case_family"]),
                 str(item["variant_id"]),
@@ -373,7 +386,7 @@ def _temporal_estimands(
         ].append(item)
     family_estimates = [
         {
-            "dataset_kind": TEMPORAL_DATASET,
+            "dataset_kind": dataset_kind,
             "source_paper_id": source_paper_id,
             "source_version_id": _common_value(group, "source_version_id"),
             "case_family": family,
@@ -387,6 +400,7 @@ def _temporal_estimands(
             "adaptive_gain": _mean(item["adaptive_gain"] for item in group),
         }
         for (
+            dataset_kind,
             source_paper_id,
             family,
             variant_id,
@@ -395,11 +409,12 @@ def _temporal_estimands(
     ]
 
     paper_groups: Dict[
-        Tuple[str, str, str], List[Mapping[str, Any]]
+        Tuple[str, str, str, str], List[Mapping[str, Any]]
     ] = defaultdict(list)
     for item in family_estimates:
         paper_groups[
             (
+                str(item["dataset_kind"]),
                 str(item["source_paper_id"]),
                 str(item["variant_id"]),
                 str(item["task_setting"]),
@@ -407,7 +422,7 @@ def _temporal_estimands(
         ].append(item)
     source_paper_estimates = [
         {
-            "dataset_kind": TEMPORAL_DATASET,
+            "dataset_kind": dataset_kind,
             "source_paper_id": source_paper_id,
             "source_version_id": _common_value(group, "source_version_id"),
             "variant_id": variant_id,
@@ -417,6 +432,7 @@ def _temporal_estimands(
             "adaptive_gain": _mean(item["adaptive_gain"] for item in group),
         }
         for (
+            dataset_kind,
             source_paper_id,
             variant_id,
             task_setting,
@@ -424,22 +440,22 @@ def _temporal_estimands(
     ]
 
     mean_groups: Dict[
-        Tuple[str, str], List[Mapping[str, Any]]
+        Tuple[str, str, str], List[Mapping[str, Any]]
     ] = defaultdict(list)
     for item in source_paper_estimates:
-        mean_groups[(str(item["variant_id"]), str(item["task_setting"]))].append(
+        mean_groups[(str(item["dataset_kind"]), str(item["variant_id"]), str(item["task_setting"]))].append(
             item
         )
     equal_source_paper_means = [
         {
-            "dataset_kind": TEMPORAL_DATASET,
+            "dataset_kind": dataset_kind,
             "variant_id": variant_id,
             "task_setting": task_setting,
             "source_paper_n": len(group),
             "fixed_gain": _mean(item["fixed_gain"] for item in group),
             "adaptive_gain": _mean(item["adaptive_gain"] for item in group),
         }
-        for (variant_id, task_setting), group in sorted(mean_groups.items())
+        for (dataset_kind, variant_id, task_setting), group in sorted(mean_groups.items())
     ]
     return {
         "outcome": HELD_OUT_PREDICTION_SCORE,
@@ -730,6 +746,9 @@ def _write_json(path: Path, payload: Any) -> None:
 def _write_cell_csv(path: Path, cells: Sequence[Mapping[str, Any]]) -> None:
     fields = CELL_FIELDS + (
         "n",
+        "machine_evaluated_n",
+        "user_adjudicated_failure_n",
+        "active_pass_denominator",
         "active_pass_n",
         "active_pass_rate",
         "scientifically_evaluable_n",
@@ -787,6 +806,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     rows = source.get("episodes")
     if not isinstance(rows, list):
         raise SystemExit("episodes.json does not contain an episodes array")
+    rows = apply_adjudications(run_dir, rows)
     result = analyze(rows)
     output_dir = (
         Path(args.output_dir).resolve()

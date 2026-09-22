@@ -20,7 +20,6 @@ from role_benchmark import (
     BenchmarkTrack,
     DEFAULT_ORACLE_PROMPT_VERSION,
     EVALUATION_METHODS,
-    FIXED_EXPERIMENTAL_DESIGN,
     FinalSubmission,
     GenerationConfig,
     GenerationRequest,
@@ -85,6 +84,8 @@ from experiments.ifm_chat_completions import (
     DEFAULT_IFM_PLATFORM_MODEL,
     IFMChatCompletionsBackend,
 )
+
+FIXED_FOUR = "fixed experimental design (4 observations)"
 
 
 def _args(output_dir):
@@ -444,7 +445,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
 
     def test_both_with_two_repeats_covers_all_current_cases_and_methods(self):
         plan = build_plan(case_pack="both", repeats=2)
-        self.assertEqual(len(plan), 1272)
+        self.assertEqual(len(plan), 2120)
         self.assertEqual(len({item.benchmark_instance_id for item in plan}), 212)
         self.assertEqual({item.evaluation_method for item in plan}, set(EVALUATION_METHODS))
         self.assertEqual({item.repeat for item in plan}, {1, 2})
@@ -466,7 +467,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 config["design"]["case_families"],
                 list(TEMPORAL_CASE_FAMILIES),
             )
-            cells_per_repeat = len(TEMPORAL_CASE_FAMILIES) * 4 * 3
+            cells_per_repeat = len(TEMPORAL_CASE_FAMILIES) * 4 * 5
             total_episodes = cells_per_repeat * 5
             self.assertEqual(
                 config["design"]["cells_per_repeat"], cells_per_repeat
@@ -497,7 +498,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             args.variant = ["canonical"]
             args.condition = ["counterfactual"]
             args.task_setting = ["discovery"]
-            args.evaluation_method = [FIXED_EXPERIMENTAL_DESIGN]
+            args.evaluation_method = [FIXED_FOUR]
             args.repeats = 2
             args.dry_run = True
             with contextlib.redirect_stdout(io.StringIO()):
@@ -509,7 +510,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             self.assertEqual(config["design"]["task_settings"], ["discovery"])
             self.assertEqual(
                 config["design"]["evaluation_methods"],
-                [FIXED_EXPERIMENTAL_DESIGN],
+                [FIXED_FOUR],
             )
             self.assertEqual(config["design"]["total_episodes"], 2)
 
@@ -522,8 +523,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             * len(EVALUATION_METHODS)
         )
         total_episodes = cells_per_repeat * 5
-        self.assertEqual(cells_per_repeat, 240)
-        self.assertEqual(total_episodes, 1200)
+        self.assertEqual(cells_per_repeat, 400)
+        self.assertEqual(total_episodes, 2000)
         self.assertEqual(len(plan), total_episodes)
         self.assertEqual(len({spec.episode_id for spec in plan}), total_episodes)
         self.assertEqual(
@@ -537,7 +538,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
 
         family_counts = Counter(spec.case_family for spec in plan)
         for family in HISTORICAL_CASE_FAMILIES:
-            self.assertEqual(family_counts[family], 60)
+            self.assertEqual(family_counts[family], 100)
 
         matched_cells = {
             (
@@ -591,8 +592,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 and spec.task_setting == "discovery"
             ],
         )
-        self.assertEqual(len(select_plan(first, repeats=[1])), 240)
-        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 720)
+        self.assertEqual(len(select_plan(first, repeats=[1])), 400)
+        self.assertEqual(len(select_plan(first, repeats=[1, 2, 3])), 1200)
         self.assertEqual(
             len(
                 select_plan(
@@ -607,7 +608,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         unique = {}
         for spec in build_plan():
             unique.setdefault(spec.cell, spec)
-        self.assertEqual(len(unique), 240)
+        self.assertEqual(len(unique), 400)
         for spec in unique.values():
             with self.subTest(cell=spec.cell):
                 case = _make_case(spec)
@@ -994,8 +995,8 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             ):
                 self.assertNotIn(secret, serialized)
             self.assertNotIn("api_key", serialized.lower())
-            self.assertEqual(config["schedule"]["block_sizes"], [240] * 5)
-            self.assertEqual(len(config["schedule"]["execution_order"]), 1200)
+            self.assertEqual(config["schedule"]["block_sizes"], [400] * 5)
+            self.assertEqual(len(config["schedule"]["execution_order"]), 2000)
             prepare_output(root, config)
             stored = (root / "config.json").read_text(encoding="utf-8")
             for secret in (
@@ -1329,7 +1330,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
             spec = next(
                 item
                 for item in build_plan()
-                if item.evaluation_method == FIXED_EXPERIMENTAL_DESIGN
+                if item.evaluation_method == FIXED_FOUR
             )
             with mock.patch(
                 "experiments.run_case_matrix.run_llm_episode",
@@ -1357,7 +1358,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
         )
         self.assertEqual(
             keyword["run_metadata"]["evaluation_method"],
-            FIXED_EXPERIMENTAL_DESIGN,
+            FIXED_FOUR,
         )
         self.assertIsNone(keyword["oracle_backend"])
         self.assertIsNone(keyword["oracle_config"])
@@ -1443,7 +1444,7 @@ class CaseMatrixExperimentTests(unittest.TestCase):
                 build_plan(families=("pendulum",)), repeats=[1]
             )
             self.assertEqual(observed, [spec.episode_id for spec in selected])
-            self.assertEqual(len(observed), 12)
+            self.assertEqual(len(observed), 20)
             first = next(
                 result for result in results if result["episode_id"] == observed[0]
             )

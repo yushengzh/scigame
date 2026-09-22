@@ -6,7 +6,7 @@ IFM/K2-Horizon 的显式三角色配置见 [IFM 三角色运行指南](RUN_IFM_T
 `experiments/run_case_matrix.py` 是当前公开 development benchmark 的统一入口。它负责：
 
 - 选择 `historical`、`temporal` 或二者并集 `both`；
-- 分别初始化 Player、可选的 LLM Oracle presentation 和 post-hoc Evaluator；
+- 分别初始化 Player、可选的 LLM Oracle（presentation 或 semantic）和 post-hoc Evaluator；
 - 在单个 episode 内保持 Player–Oracle 串行交互；
 - 在不同 episodes 之间有界并发；
 - 保存可恢复、可重放的 JSONL、结果 sidecar 和汇总。
@@ -39,12 +39,14 @@ episodes = cases × evaluation methods × repeats
 
 因此：
 
-- `temporal` + 三种 methods + 1 repeat：396 episodes；仅 Discovery 为 198；
+- `historical` + 五种 methods + 1 repeat：400 episodes；仅 Discovery 为 200；
+- `temporal` + 五种 methods + 1 repeat：660 episodes；仅 Discovery 为 330；
 - `both` + 单一 method + 1 repeat：212 episodes；
-- `both` + 三种 methods + 1 repeat：636 episodes；仅 Discovery 为 318；
-- `both` + 三种 methods + 默认 5 repeats：3,180 episodes。
+- `both` + 五种 methods + 1 repeat：1,060 episodes；仅 Discovery 为 530；
+- `both` + 五种 methods + 默认 5 repeats：5,300 episodes。
 
-本手册把“完整 Phase 1 矩阵”定义为 **212 cases × 三种 methods**。同一 family 的四个
+默认五种 methods 为 prior-only、fixed 2 / 4 / 8 observations 和 adaptive。
+本手册把“完整 Phase 1 矩阵”定义为 **212 cases × 五种 methods**。同一 family 的四个
 cases 是配对单元，不是四个独立 family。当前 53 个 families 及 truth/scorer 都随源码
 公开，因此结果应称为 public development/Phase 1 results，不能称为 private 或
 contamination-resistant evaluation。
@@ -115,10 +117,10 @@ Selected 1 of 1 episodes ...
 下面的命令选择：
 
 - `both` 的全部 53 families / 212 cases；
-- 三种 evaluation methods（因为没有传 `--evaluation-method`）；
+- 五种 evaluation methods（因为没有传 `--evaluation-method`）；
 - 1 repeat；
 - OpenAI Player 与独立的 Gemini Oracle/Evaluator；
-- 总计 636 episodes。
+- 总计 1,060 episodes。
 
 先带 `--dry-run` 执行：
 
@@ -151,7 +153,7 @@ PYTHONPATH=src:. python3 experiments/run_case_matrix.py \
 预期输出：
 
 ```text
-Selected 636 of 636 episodes ...
+Selected 1060 of 1060 episodes ...
 ```
 
 确认后只删除 `--dry-run`，不要改变其他参数。先使用实际模型配置完成小规模运行，再扩大到 `--workers 4`。若
@@ -163,13 +165,19 @@ provider 出现 429、连接错误或吞吐限制，降低 workers 后必须使�
 ```
 
 此时应使用新的 Experiment ID/output directory，dry-run 结果为 `Selected 212 of 212
-episodes`。若把 `--repeats 1` 改成 `--repeats N`，完整三方法矩阵为 `636 × N` episodes。
+episodes`。若把 `--repeats 1` 改成 `--repeats N`，完整五方法矩阵为 `1060 × N` episodes。
 
 ## 5. Provider、model、key 和 endpoint
 
 当前 CLI 没有公共 `--model` 简写。Player、Oracle、Evaluator 分别使用
 `--player-*`、`--oracle-*`、`--evaluator-*`；这保证三个角色可以独立配置。
-CLI 默认 Player provider 为 `openai`，Oracle/Evaluator provider 为 `deepseek`；正式实验建议像上述命令一样显式配置每个角色。
+CLI 默认 Player provider 为 `openai`，Oracle/Evaluator provider 为 `deepseek`，Oracle 模式为 `deterministic`，因此默认不会初始化或调用 Oracle LLM。正式实验建议像上述命令一样显式配置实际使用的角色。
+
+标准接入方式是按角色提供 `provider`、精确 `model`、API key 环境变量和可选完整
+`endpoint`。选择 binding 时以服务实际实现的 wire API 为准。当前 Player 要求 provider
+原生约束完整递归动作 JSON Schema；HTTP binding 中 `openai` 和 `ifm` 的 IFM Platform
+模式支持这一要求。`deepseek`、`gemini` 及 IFM Core42 可用于 Oracle/Evaluator，但不支持
+当前 Player 所需的严格动作 schema。模型名称或“OpenAI-compatible”标签本身不足以说明兼容。
 
 | Provider | wire API | 默认 endpoint | 默认 key 环境变量 |
 |---|---|---|---|
@@ -177,17 +185,18 @@ CLI 默认 Player provider 为 `openai`，Oracle/Evaluator provider 为 `deepsee
 | `openai` | OpenAI Responses | `https://api.openai.com/v1/responses` | `OPENAI_API_KEY` |
 | `deepseek` | Chat Completions | `https://api.deepseek.com/chat/completions` | `DEEPSEEK_API_KEY` |
 | `ifm` | IFM Platform Chat Completions | `https://api.ifm.ai/v1/chat/completions` | `IFM_API_KEY` |
+| `codex` | 本地 Codex app-server JSON-RPC | `stdio://codex-app-server` | 不使用 API key；复用本地 ChatGPT 登录 |
 
 对每个角色，最常用的参数是：
 
 | 参数模式 | 含义 |
 |---|---|
-| `--ROLE-provider` | `gemini`、`openai`、`deepseek` 或 `ifm` |
-| `--ROLE-model` | 原样发送给 provider 的精确模型 ID；runner 没有模型白名单 |
-| `--ROLE-endpoint` | 可选的完整 HTTP URL；省略时使用 provider 默认值 |
-| `--ROLE-api-key-env` | 可选的 key 环境变量名；省略时使用上表默认值 |
+| `--ROLE-provider` | `gemini`、`openai`、`deepseek`、`ifm` 或 `codex` |
+| `--ROLE-model` | 原样发送给 provider 的精确模型 ID；`codex` 仅接受下述三个 ID，其他 binding 没有模型白名单 |
+| `--ROLE-endpoint` | HTTP provider 可指定完整 URL；`codex` 只能省略或使用上表中的本地 stdio 地址 |
+| `--ROLE-api-key-env` | HTTP provider 可指定 key 环境变量名；省略时使用上表默认值；`codex` 拒绝此参数 |
 | `--oracle-prompt-version` | 可选 Oracle prompt 配置；Player/Evaluator 自动使用当前唯一流程，没有 prompt 选择参数 |
-| `--ROLE-reasoning-effort` | provider 支持时可用；OpenAI 默认 `none` |
+| `--ROLE-reasoning-effort` | provider 支持时可用；OpenAI 默认 `none`，Codex 默认 `high` |
 | `--ROLE-timeout-s` | 单次请求超时，默认 120 秒 |
 | `--ROLE-concurrency` | 该角色同时调用数，默认等于并受限于 `--workers` |
 
@@ -263,8 +272,20 @@ runner 使用的 Responses 请求字段，并返回标准的 status、output 和
 --evaluator-api-key-env BENCH_EVALUATOR_API_KEY
 ```
 
-也支持 `--ROLE-api-key`、`--ROLE-api-key-stdin` 和 `--ROLE-prompt-api-key`，但直接把 key
+HTTP provider 也支持 `--ROLE-api-key`、`--ROLE-api-key-stdin` 和 `--ROLE-prompt-api-key`，但直接把 key
 放进命令行容易进入 shell history 和进程列表，不推荐。
+
+### 可选：本地 Codex 登录
+
+`--ROLE-provider codex` 使用本地 `codex` 可执行程序及已有 ChatGPT 登录，不接受 API-key
+参数或 HTTP endpoint。它仅接受 `gpt-5.5`、`gpt-5.6-sol`、`gpt-6-astra`（默认 `gpt-5.5`），
+reasoning effort 仅接受 `low`、`medium`、`high`、`xhigh`（默认 `high`）。每次生成使用独立
+进程、空工作目录和临时 task，通过原生 `outputSchema` 约束输出，不继承对话或启用工具。
+
+该 binding 不强制执行 `max_output_tokens`、`temperature`、`top_p`、`seed`；请求值保存在
+`requested_generation`，实际值记为 `null`、`enforced=false`。调用超时（CLI 默认 120 秒，
+可用 `--ROLE-timeout-s` 调整）和本地动作字节限制仍生效，调用审计保存在 `codex_calls/`。
+`--dry-run` 不启动 app-server 或检查登录。
 
 ## 6. Case 和方法选择
 
@@ -276,13 +297,15 @@ runner 使用的 Responses 请求字段，并返回标准的 status、output 和
 | `--variant canonical` | 当前两份数据均使用这个唯一 variant；可省略 |
 | `--condition CONDITION` | Historical 为 `historical` / `counterfactual`；Temporal 为 `source_reported` / `counterfactual`；可重复，省略表示全选 |
 | `--task-setting SETTING` | `identification` 或 `discovery`；可重复 |
-| `--evaluation-method METHOD` | 三种 method 之一；可重复；省略表示三种全选 |
+| `--evaluation-method METHOD` | 五种 method 之一；可重复；省略表示五种全选 |
 
-三种精确 method 名称是：
+五种精确 method 名称是：
 
 ```text
 prior-only baseline
-fixed experimental design
+fixed experimental design (2 observations)
+fixed experimental design (4 observations)
+fixed experimental design (8 observations)
 adaptive experimental design
 ```
 
@@ -292,10 +315,10 @@ adaptive experimental design
 方法语义：
 
 - `prior-only baseline`：不向 Player 返回实验观测；
-- `fixed experimental design`：使用 family 预定义的诊断实验；
-- `adaptive experimental design`：Player 逐轮选择实验，没有预设观测预算；当前最高假设置信度严格超过公开阈值时必须停止实验并提交。
+- `fixed experimental design (2/4/8 observations)`：分别使用 family 固定设计的前 2、4、8 个实验；这些确定性观测在首次 Player 调用前提供。实际命令必须使用上面列出的三个完整名称之一；
+- `adaptive experimental design`：Player 逐轮选择实验，没有预设观测预算；当前最高假设置信度达到或超过公开阈值（`>=`）时必须停止实验并提交。
 
-三种方法共享最终 executable predictor、held-out conditions 和确定性 scorer。当前 fixed 与 adaptive 的停止规则不同，不能表述为同预算比较。
+五种方法共享最终 executable predictor、held-out conditions 和确定性 scorer。当前 CLI 不再接受不带观测数的旧 `fixed experimental design` 名称。fixed 与 adaptive 的停止规则不同，不能表述为同预算比较。
 
 ## 7. 生成上限、并发和 Oracle 模式
 
@@ -304,23 +327,27 @@ adaptive experimental design
 | `--player-max-output-tokens` | 8192 | 8192 |
 | `--oracle-max-output-tokens` | 256 | 8192，避免 reasoning 占满预算 |
 | `--evaluator-max-output-tokens` | 2048 | 8192，避免 reasoning 导致 JSON 截断 |
+| `--player-max-action-bytes` | 262144 | 独立于 token 的本地 UTF-8 动作限制；最大可设为 1048576 |
 | `--max-repair-attempts` | CLI 保留 1；当前 Player 实际固定为 0 | 当前结构化 Player 不重生成；可显式传 0 |
 | `--max-actions` | 16 | 仅用于有限预算任务；adaptive 不使用此动作上限 |
 | `--workers` | 1 | 先用 1 完成单 case，再按配额增加 |
+
+上表的 token 上限不由 `codex` binding 强制执行，详见“可选：本地 Codex 登录”。
 
 `--repeats` 默认是 5；本手册的 Phase 1 命令显式设为 1。`--schedule-seed` 默认是
 `20260825`，用于冻结 repeat 的执行顺序。`--repeat K` 只是从已冻结的 repeats 中选择要
 执行的 block，也是恢复时唯一允许在同一 output directory 内改变的执行过滤器。
 
-`--oracle-mode deterministic` 由本地 WorldModel 直接返回权威 observation，不调用 Oracle
+默认 `--oracle-mode deterministic` 由本地 WorldModel 直接返回权威 observation，不调用 Oracle
 LLM。`--oracle-mode llm_presentation` 会初始化独立 Oracle LLM，但它只能呈现已经由
 WorldModel 生成的 observation；解析结果必须与权威结构完全一致。需要完整三 LLM 角色时
-使用 `llm_presentation`。`llm_semantic` 则由独立 Oracle LLM 判断问询是否合法，实验数值仍由确定性 world 计算。
+使用 `llm_presentation` 或 `llm_semantic`。`llm_semantic` 则由独立 Oracle LLM 判断问询是否合法，自动使用 semantic Oracle prompt；实验数值仍由确定性 world 计算。两种 LLM 模式均不能自由生成测量数值。
 
 `--workers N` 只并行不同 episode pipelines。单个 episode 内始终保持：
 
 ```text
-Player action → WorldModel → optional Oracle presentation → next Player turn
+Player action → request validation (optional semantic Oracle) → WorldModel
+              → optional Oracle presentation → next Player turn
               → final → sealed active result → post-hoc Evaluator
 ```
 
@@ -377,7 +404,9 @@ PYTHONPATH=src:tests:. python3 -m unittest \
   test_discovery_evaluation \
   test_scientific_postevaluation \
   test_postevaluation_pipeline \
-  test_postevaluate_science
+  test_evaluation_methods \
+  test_codex_backend \
+  test_codex_matrix
 ```
 
 `--help`、单 case 和完整矩阵的 `--dry-run` 可以检查当前参数及计划，不产生模型调用。它们不代表真实模型的科学表现或 Judge 与人工判定的一致性；这些需要单独的实际评估。

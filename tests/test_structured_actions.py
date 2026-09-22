@@ -219,7 +219,8 @@ class StructuredActionTests(unittest.TestCase):
         self.assertTrue(run.outcome.protocol_completed)
         self.assertFalse(run.outcome.active_pass)
         run, _ = self.run_actions([self.fixture.final(confidence=0.9)])
-        self.assertFalse(run.outcome.protocol_completed)
+        self.assertTrue(run.outcome.protocol_completed)
+        self.assertTrue(run.outcome.active_pass)
 
     def test_prior_and_fixed_budgets_have_independent_public_contexts(self):
         spec = replace(self.fixture.spec, budget=8,

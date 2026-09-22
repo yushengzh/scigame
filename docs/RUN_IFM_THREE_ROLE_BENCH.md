@@ -2,7 +2,7 @@
 
 本指南使用 `experiments.run_case_matrix` 的默认科学后评估：保留 episode 二元成败，独立报告 normalized error、表达式等价、科学理解前后得分与增量，并统计 F1–F5 失败分布。指标定义统一见 [自动科学后评估](SCIENTIFIC_POSTEVALUATION.md)。
 
-既往 IFM 实际调用记录见 [2026-09-16 测试报告](IFM_PIPELINE_TEST_20260916.md)；该记录保留当时的配置和结果，不作为当前理解 Judge 已完成语义验证的证据。
+以下命令描述当前接口与运行流程。实际使用的模型、endpoint 和账户组合应先完成小规模 smoke，再扩大运行范围。
 
 ## 1. 环境与凭据
 
@@ -29,7 +29,7 @@ export IFM_API_KEY
 以及对应 `--*-model`。endpoint 必须包括 `/chat/completions`。
 runner 不读取 `IFM_BASE_URL` 或 `IFM_MODEL` 来自动覆盖这些参数。
 
-## 2. 六 episode 并行 smoke
+## 2. 十 episode 并行 smoke
 
 下面的 Bash 函数可直接复制使用，前两个参数分别是数据包和实验名称。带 `--dry-run` 时只生成计划、配置，不读取 key、不调用 API；检查后去掉该参数执行。再次执行相同命令即恢复。
 
@@ -64,13 +64,22 @@ run_ifm() {
 run_ifm historical historical_smoke --family ohm_circuit --task-setting discovery --dry-run
 run_ifm historical historical_smoke --family ohm_circuit --task-setting discovery
 
-# Temporal 的原论文关系 / 作者构造反事实配对，同样为 6 episodes。
+# Temporal 的原论文关系 / 作者构造反事实配对，同样为 10 episodes。
 run_ifm temporal temporal_smoke --family defect_sre --task-setting discovery --dry-run
 run_ifm temporal temporal_smoke --family defect_sre --task-setting discovery
 ```
 
-这里是一个 family × 两个 world × 三种方法 = **6 episodes**。
-`prior-only baseline` 和 `fixed experimental design` 不请求在线 Oracle；
+这里是一个 family × 两个 world × discovery × 五种方法 × 一次重复 = **10 episodes**。
+未指定 `--evaluation-method` 时，当前 runner 选择以下五种方法：
+
+- `prior-only baseline`
+- `fixed experimental design (2 observations)`
+- `fixed experimental design (4 observations)`
+- `fixed experimental design (8 observations)`
+- `adaptive experimental design`
+
+`prior-only baseline` 和全部三种 fixed 方法不请求在线 LLM Oracle；
+fixed 的观测由确定性世界预先生成，分别采用同一预定序列的前 2、4、8 项。
 adaptive episode 中，合法的实验提案才触发 LLM Oracle。仅配置三个 provider 不代表实际调用了三个角色。
 
 Oracle LLM 只检查实验程序是否合法。观测值仍由 case 的确定性物理模型生成。
@@ -86,27 +95,27 @@ Evaluator 在当前 episode 的 Player–Oracle 日志封存后，读取完整�
 先使用**新的名称和目录**检查计划：
 
 ```bash
-# 20 families × 2 worlds × discovery × 3 methods = 120 episodes
+# 20 families × 2 worlds × discovery × 5 methods = 200 episodes
 run_ifm historical historical_discovery --task-setting discovery --dry-run
 run_ifm historical historical_discovery --task-setting discovery
 
-# 同时包括 discovery 和 identification：240 episodes
+# 同时包括 discovery 和 identification：400 episodes
 run_ifm historical historical_all --dry-run
 run_ifm historical historical_all
 
-# 33 families × 2 worlds × discovery × 3 methods = 198 episodes
+# 33 families × 2 worlds × discovery × 5 methods = 330 episodes
 run_ifm temporal temporal_discovery --task-setting discovery --dry-run
 run_ifm temporal temporal_discovery --task-setting discovery
 
-# Temporal 的两种任务共 396 episodes；both 共 636 episodes。
+# Temporal 的两种任务共 660 episodes；both 共 1060 episodes。
 run_ifm temporal temporal_all --dry-run
 run_ifm both both_all --dry-run
 
-# both 仅 discovery：53 families × 2 worlds × 3 methods = 318 episodes
+# both 仅 discovery：53 families × 2 worlds × 5 methods = 530 episodes
 run_ifm both both_discovery --task-setting discovery --dry-run
 ```
 
-上面列出的是可选范围，选择需要的一项运行，避免重复启动重叠矩阵。`--repeats` 默认值在函数中显式设为 1。
+上面列出的是可选范围，选择需要的一项运行，避免重复启动重叠矩阵。此函数显式设置 `--repeats 1`；直接使用 runner 时，其默认值为 5。
 实际启动前确认 dry-run 输出的计划数量。此 smoke 不代表已完成所有 family 的 API 测试。
 
 ## 4. 并发、输出预算与恢复

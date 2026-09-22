@@ -101,7 +101,7 @@ class FormulaTests(unittest.TestCase):
                     for world in spec.truths:
                         submission = truth_submission(spec, world, BenchmarkTrack.DISCOVERY)
                         self.assertEqual(formula_metric(submission, spec, world)["status"], "equivalent")
-        self.assertEqual(len(checked), 50)
+        self.assertEqual(len(checked), 53)
 
 
 class PerformanceIntegrationTests(unittest.TestCase):

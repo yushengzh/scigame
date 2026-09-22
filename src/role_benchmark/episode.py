@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import math
 from typing import List, Optional
 
 from .models import (
@@ -243,12 +242,12 @@ class Episode:
         if (
             self._observation_budget is None
             and threshold is not None
-            and portfolio.top.confidence > threshold
+            and portfolio.top.confidence >= threshold
         ):
             violation = ProtocolViolation(
                 code="confidence_stop_required",
                 message=(
-                    "Current portfolio confidence strictly exceeds the public "
+                    "Current portfolio confidence reaches or exceeds the public "
                     "threshold; submit a final predictor instead of an experiment."
                 ),
             )
@@ -338,22 +337,6 @@ class Episode:
                     message="Final portfolio hypothesis_id values are not unique.",
                 )
             )
-        total_confidence = sum(
-            item.confidence for item in portfolio.hypotheses
-        )
-        if not math.isclose(
-            total_confidence,
-            1.0,
-            rel_tol=0.0,
-            abs_tol=1e-6,
-        ):
-            violations.append(
-                ProtocolViolation(
-                    code="portfolio_confidence_not_normalized",
-                    message="Final portfolio confidences do not sum to 1.",
-                )
-            )
-
         selected_id = submission.hypothesis_id or portfolio.top.hypothesis_id
         selected = [
             item for item in portfolio.hypotheses
@@ -389,9 +372,7 @@ class Episode:
         )
         threshold_reached = (
             selected_confidence is not None
-            and (selected_confidence > self.case.definition.confidence_threshold
-                 if self._observation_budget is None
-                 else selected_confidence >= self.case.definition.confidence_threshold)
+            and selected_confidence >= self.case.definition.confidence_threshold
         )
         if (
             selected_confidence is not None
@@ -402,7 +383,7 @@ class Episode:
                 ProtocolViolation(
                     code="stopping_condition_not_met",
                     message=(
-                        "Selected portfolio confidence must strictly exceed the "
+                        "Selected portfolio confidence must reach or exceed the "
                         "public threshold for an unlimited adaptive episode."
                         if self._observation_budget is None else
                         "Selected portfolio confidence is below the public "

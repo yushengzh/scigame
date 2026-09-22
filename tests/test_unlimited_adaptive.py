@@ -7,7 +7,7 @@ import unittest
 
 from role_benchmark import (
     ADAPTIVE_EXPERIMENTAL_DESIGN, FIXED_EXPERIMENTAL_DESIGN,
-    Episode, ExperimentProposal, GenerationResponse, Hypothesis,
+    Episode, EpisodeProtocolError, ExperimentProposal, GenerationResponse, Hypothesis,
     HypothesisPortfolio, PlayerAction, build_evaluation_method_plan,
     load_run_log, prepare_evaluation_case, replay_run_log, run_llm_episode,
 )
@@ -69,9 +69,9 @@ class UnlimitedAdaptiveTests(unittest.TestCase):
         episode.apply(self.final())
         self.assertTrue(episode.outcome.active_pass)
 
-    def test_threshold_is_strict_and_not_a_scientific_correctness_label(self):
+    def test_threshold_is_inclusive_and_not_a_scientific_correctness_label(self):
         threshold = self.case.definition.confidence_threshold
-        for confidence, completed in ((threshold - 0.01, False), (threshold, False),
+        for confidence, completed in ((threshold - 0.01, False), (threshold, True),
                                       (threshold + 0.01, True)):
             with self.subTest(confidence=confidence):
                 episode = Episode(self.case)
@@ -83,6 +83,15 @@ class UnlimitedAdaptiveTests(unittest.TestCase):
         self.assertTrue(episode.outcome.protocol_completed)
         self.assertFalse(episode.outcome.evaluation.success)
         self.assertFalse(episode.outcome.active_pass)
+
+    def test_exact_threshold_rejects_more_experiments_without_consuming_attempt(self):
+        episode = Episode(self.case)
+        proposal = self.experiment()
+        action = replace(proposal, portfolio=self.final(0.9).portfolio)
+        with self.assertRaises(EpisodeProtocolError) as raised:
+            episode.apply(action)
+        self.assertEqual(raised.exception.code, "confidence_stop_required")
+        self.assertEqual(episode.view().attempts_used, 0)
 
     def test_many_attempts_do_not_bypass_the_confidence_rule(self):
         episode = Episode(self.case)

@@ -12,13 +12,17 @@ Names and manifest paths stay fixed: [Historical manifest](../datasets/historica
 episodes = cases × selected evaluation methods × repeats
 ```
 
-With all three methods and one repeat, Temporal contains 396 episodes and `both` contains 636. Selecting only Discovery gives 198 and 318 episodes, respectively.
+With all five methods and one repeat, Historical contains 400 episodes, Temporal contains 660, and `both` contains 1,060. Selecting only Discovery gives 200, 330, and 530 episodes, respectively. The default is five repeats, so unfiltered `both` selects 5,300 episodes.
 
-The three methods are:
+The five methods selected by default are:
 
 - `prior-only baseline`: no experimental observations;
-- `fixed experimental design`: the family's predefined diagnostic observations;
-- `adaptive experimental design`: Player-selected experiments, with no preset observation budget, until the public confidence stopping rule is met.
+- `fixed experimental design (2 observations)`: the first two observations from the shared fixed design;
+- `fixed experimental design (4 observations)`: the first four observations;
+- `fixed experimental design (8 observations)`: all eight observations;
+- `adaptive experimental design`: Player-selected experiments, with no preset observation budget, until the selected confidence reaches or exceeds the public threshold.
+
+Use these exact names with repeated `--evaluation-method` arguments. The older bare `fixed experimental design` label is not a current matrix CLI choice. Fixed sequences are stored in [`datasets/fixed_budget_design.json`](../datasets/fixed_budget_design.json).
 
 The methods share the final predictor representation and deterministic evaluation conditions. Fixed and adaptive currently have different stopping rules; their results must not be described as an equal-budget comparison.
 
@@ -78,7 +82,9 @@ PYTHONPATH=src:. python3 -m experiments.run_case_matrix \
 
 Replace the model placeholders with exact provider IDs. Inspect the plan, then remove `--dry-run` with the same settings to execute. Credentials are read from the named environment variables and are not written to run artifacts.
 
-The current Player uses a strict structured action schema and does not regenerate malformed output. Player defaults to OpenAI; Oracle and Evaluator default to DeepSeek, so specify all used roles explicitly. The Oracle LLM presents observations computed by the case `WorldModel`; it does not generate experimental measurements. `--oracle-mode deterministic` omits the Oracle model call.
+The current Player uses a strict structured action schema and does not regenerate malformed output. Player defaults to OpenAI; Oracle and Evaluator provider settings default to DeepSeek, so specify all used roles explicitly. Oracle mode defaults to `deterministic`, which makes no Oracle model calls. `llm_presentation` requires the model to copy authoritative feedback; `llm_semantic` adds an LLM legality review. Measurements always come from the case `WorldModel`. The case evaluator computes scientific success, while the separate LLM Evaluator assesses the recorded scientific explanation.
+
+The standard integration is API-based. Each used role takes a provider, exact model ID, API-key environment-variable name, and optional complete request endpoint. Player currently requires the OpenAI Responses or IFM Platform native structured-output binding. Oracle and Evaluator can also use DeepSeek or Gemini. See the [API configuration reference](../README.md#api-configuration).
 
 The [running guide](../docs/RUN_CASE_MATRIX.md) covers provider configuration, current command options, concurrency, and resume behavior. [IFM instructions](../docs/RUN_IFM_THREE_ROLE_BENCH.md) cover the IFM Platform binding.
 
@@ -109,6 +115,11 @@ PYTHONPATH=src:. python3 -m experiments.render_case_matrix \
 
 ## Other entry points and registrations
 
+- `run_codex_dataset_benchmark.py` runs fresh Player trials with a deterministic Oracle and deferred Judge. `--profile main3` selects prior-only, fixed-4, and adaptive; `--profile five` selects all five methods. Existing attempts are sealed and resume schedules only never-attempted episodes. Configure `--model` and `--output-dir` explicitly; defaults are three repeats and 16 workers.
+- `run_astra_postevaluation.py` runs the separate Codex Judge over an existing prepared post-evaluation directory. Inspect `--help` for retry and resume options.
+- `run_semantic_ablation.py` runs the semantic-information ablation study; `analyze_semantic_ablation.py` analyzes its results.
+- `report_codex_benchmark.py` and `compare_codex_models.py` summarize recorded Codex experiment outcomes.
+- `recover_codex_failed.py`, `resume_codex_long_output.py`, and `retry_codex_remaining_judge.py` are recovery tools for a specific recorded experiment. Their frozen identifiers and assumptions are not a general resume interface.
 - `run_pendulum_matrix.py` retains the separate pendulum validation experiment.
 - `run_temporal_conversion.py` and `compare_temporal_conversion.py` support the registered temporal authoring conversion study.
 - [EXP-TEMPORAL-AUTHORING-001](registrations/EXP-TEMPORAL-AUTHORING-001/) records the source cohort and comparison assumptions.
@@ -116,3 +127,9 @@ PYTHONPATH=src:. python3 -m experiments.render_case_matrix \
 - [EXP-METHOD-PILOT-001](registrations/EXP-METHOD-PILOT-001/) is archived. Its earlier case-pack commands are historical records, not current CLI examples.
 
 Read each registration before using its dedicated entry point. Generated runs, local datasets, and unpublished manuscript results are not implied to be included or validated by this code release.
+
+## Optional local Codex adapter
+
+All roles also accept `--ROLE-provider codex` through the local app-server binding. This requires `codex` on `PATH` and an existing ChatGPT login; API-key arguments are rejected. Each call creates a fresh isolated, tool-free session with native structured output.
+
+The adapter permits `gpt-5.5`, `gpt-5.6-sol`, and `gpt-6-astra`, with effort `low`, `medium`, `high`, or `xhigh`. Availability depends on the local account and runtime. Temperature, top-p, seed, and output-token-limit controls are recorded as unavailable. These local sessions should not be assumed to share the API adapters' generation settings.

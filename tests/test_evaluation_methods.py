@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from role_benchmark import (
     ADAPTIVE_EXPERIMENTAL_DESIGN,
+    BenchmarkTrack,
     EVALUATION_METHODS,
     FIXED_EXPERIMENTAL_DESIGN,
     PRIOR_ONLY_BASELINE,
@@ -26,6 +28,7 @@ from role_benchmark import (
 )
 from role_benchmark.cases import CASE_SPECS, make_case
 from role_benchmark.cases.matched import truth_submission
+from role_benchmark.fixed_design import FIXED_CONDITIONS, FIXED_METHOD_BUDGETS
 from role_benchmark.temporal_cases import (
     TEMPORAL_CASE_SPECS,
     TEMPORAL_CONDITIONS,
@@ -60,6 +63,33 @@ class _StaticBackend:
 
 
 class EvaluationMethodTests(unittest.TestCase):
+    def test_fixed_budgets_are_valid_nested_prefixes_for_every_case(self):
+        packs = ((CASE_SPECS, make_case, ("historical", "counterfactual")),
+                 (TEMPORAL_CASE_SPECS, make_temporal_case,
+                  ("source_reported", "counterfactual")))
+        self.assertEqual(set(FIXED_CONDITIONS), set(CASE_SPECS) | set(TEMPORAL_CASE_SPECS))
+        for registry, factory, worlds in packs:
+            for family, spec in registry.items():
+                for world in worlds:
+                    for track in (BenchmarkTrack.IDENTIFICATION, BenchmarkTrack.DISCOVERY):
+                        case = factory(family, world, track)
+                        for method, budget in FIXED_METHOD_BUDGETS.items():
+                            with self.subTest(family=family, world=world, track=track, budget=budget):
+                                prepared = prepare_evaluation_case(case, spec, method)
+                                controls = tuple(dict(x.proposal.controls)
+                                                 for x in prepared.fixed_observations)
+                                self.assertEqual(controls, FIXED_CONDITIONS[family][:budget])
+                                self.assertEqual(prepared.initial_attempts_used, budget)
+                                self.assertIs(prepared.case.world_model, case.world_model)
+                                self.assertIs(prepared.case.evaluator, case.evaluator)
+
+    def test_finite_domain_fixed_eight_retains_declared_repeated_observations(self):
+        spec = TEMPORAL_CASE_SPECS["temporal_source_2025"]
+        plan = build_evaluation_method_plan(spec, "fixed experimental design (8 observations)")
+        controls = [json.dumps(dict(x.controls), sort_keys=True) for x in plan.fixed_experiments]
+        self.assertEqual(len(controls), 8)
+        self.assertEqual(len(set(controls)), 5)
+
     def test_every_family_has_finite_fixed_and_unlimited_adaptive_budget(self):
         registries = (CASE_SPECS, TEMPORAL_CASE_SPECS)
         for registry in registries:
@@ -324,7 +354,7 @@ class EvaluationMethodTests(unittest.TestCase):
         note = prepared.case.definition.resources.notes[-1]
         self.assertIn("experiment attempts", note)
         self.assertIn("budget=null", note)
-        self.assertIn("strictly exceeds", note)
+        self.assertIn("reaches or exceeds", note)
         self.assertIn("no experiment budget or action-count limit", note)
 
     def test_adaptive_confident_early_final_is_allowed_and_replays(self):
@@ -361,7 +391,9 @@ class EvaluationMethodTests(unittest.TestCase):
             EVALUATION_METHODS,
             (
                 "prior-only baseline",
-                "fixed experimental design",
+                "fixed experimental design (2 observations)",
+                "fixed experimental design (4 observations)",
+                "fixed experimental design (8 observations)",
                 "adaptive experimental design",
             ),
         )
