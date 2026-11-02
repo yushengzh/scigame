@@ -1,4 +1,16 @@
+<div align="center">
+
 # SciGame
+
+**Let Agents Play the Scientific Discovery Games in the Real and Counterfactual World**
+
+[Project](https://yushengzh.github.io/projects/scigame.html), [Paper](https://arxiv.org/abs/2610.37919), [PDF](https://arxiv.org/pdf/2610.37919), [Code](https://github.com/yushengzh/scigame)
+
+[Overview](#overview), [Components](#player-oracle-and-evaluator), [Layout](#repository-layout), [Requirements](#requirements), [Run](#run-the-benchmark), [Post-evaluation](#add-scientific-metrics-to-existing-results), [Tests](#tests)
+
+</div>
+
+## Overview
 
 SciGame is an interactive benchmark for scientific identification and discovery through experimentation. The **Player** proposes experiments, revises explicit scientific hypotheses, and submits an executable predictor with an explanation. A deterministic `WorldModel` supplies measurements for legal experiments.
 
